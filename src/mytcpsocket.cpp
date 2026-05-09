@@ -160,17 +160,16 @@ void MyTcpSocket::run()
     * 1 2 4 4 MSGSize 1
     *底层写数据线程
     */
-    for(;;)
-    {
+    for(;;) {
         {
             QMutexLocker locker(&m_lock);
             if(m_isCanRun == false) return; //在每次循环判断是否可以运行，如果不行就退出循环
         }
         
         //构造消息体
-		LOG_INFO("MyTcpSocket", "取出队列: MESG *send = queue_send.pop_msg()");
         MESG * send = queue_send.pop_msg();
-        if(send == NULL) continue;
+        if(send == nullptr) continue;
+		LOG_INFO("MyTcpSocket", "取出队列: send != nullptr");
         LOG_INFO("MyTcpSocket", "调用sendData方法: sendData(send)");
         QMetaObject::invokeMethod(this, "sendData", Q_ARG(MESG*, send));
         LOG_INFO("MyTcpSocket", "sendData方法调用完成");
@@ -498,8 +497,8 @@ bool MyTcpSocket::connectServer(QString ip, QString port, QIODevice::OpenModeFla
 }
 
 
-bool MyTcpSocket::connectToServer(QString ip, QString port, QIODevice::OpenModeFlag flag)
-{
+bool MyTcpSocket::connectToServer(QString ip, QString port, QIODevice::OpenModeFlag flag) {
+	LOG_INFO("MyTcpSocket", "连接服务器: " << ip.toStdString() << ":" << port.toStdString());
 	_sockThread->start(); // 开启链接，与接受
 	bool retVal;
 	QMetaObject::invokeMethod(this, "connectServer", Qt::BlockingQueuedConnection, Q_RETURN_ARG(bool, retVal),

@@ -81,11 +81,9 @@ private:
     QWaitCondition send_queueCond;
     QQueue<T*> send_queue;
 public:
-    void push_msg(T* msg)
-    {
+    void push_msg(T* msg) {
         send_queueLock.lock();
-        while(send_queue.size() > QUEUE_MAXSIZE)
-        {
+        while(send_queue.size() > QUEUE_MAXSIZE) {
             send_queueCond.wait(&send_queueLock);
         }
         send_queue.push_back(msg);
@@ -93,16 +91,13 @@ public:
         send_queueCond.wakeOne();
     }
 
-    T* pop_msg()
-    {
+    T* pop_msg() {
         send_queueLock.lock();
-        while(send_queue.size() == 0)
-        {
+        while(send_queue.size() == 0) {
             bool f = send_queueCond.wait(&send_queueLock, WAITSECONDS * 1000);
-            if(f == false)
-            {
+            if(f == false) {
                 send_queueLock.unlock();
-                return NULL;
+                return nullptr;
             }
         }
         T* send = send_queue.front();
@@ -112,8 +107,7 @@ public:
         return send;
     }
 
-    void clear()
-    {
+    void clear() {
         send_queueLock.lock();
         send_queue.clear();
         send_queueLock.unlock();

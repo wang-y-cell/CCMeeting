@@ -363,8 +363,8 @@ void Widget::closeImg(quint32 ip)
     }
 }
 
-void Widget::on_connServer_clicked()
-{
+void Widget::on_connServer_clicked() {
+    LOG_INFO("Widget","点击连接服务器按钮");
     QString ip = ui->ip->text(), port = ui->port->text();
     ui->outlog->setText("正在连接到" + ip + ":" + port);
     repaint(); //立即重绘窗口部件
@@ -381,16 +381,18 @@ void Widget::on_connServer_clicked()
     int pos = 0;
     if(ipvalidate.validate(ip, pos) != QValidator::Acceptable)
     {
+        LOG_WARN("Widget", "Ip Error");
         QMessageBox::warning(this, "Input Error", "Ip Error", QMessageBox::Yes, QMessageBox::Yes);
         return;
     }
     if(portvalidate.validate(port, pos) != QValidator::Acceptable)
     {
+        LOG_WARN("Widget", "Port Error");
         QMessageBox::warning(this, "Input Error", "Port Error", QMessageBox::Yes, QMessageBox::Yes);
         return;
     }
 
-    if(_mytcpSocket ->connectToServer(ip, port, QIODevice::ReadWrite))
+    if(_mytcpSocket->connectToServer(ip, port, QIODevice::ReadWrite))
     {
         ui->outlog->setText("成功连接到" + ip + ":" + port);
         ui->openAudio->setDisabled(true);

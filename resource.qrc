@@ -2,6 +2,7 @@
     <qresource prefix="/myImage">
         <file>source/1.png</file>
         <file>source/3.gif</file>
+        <file>source/EmptyHead.png</file>
     </qresource>
     <qresource prefix="/myEffect">
         <file>source/2.wav</file>

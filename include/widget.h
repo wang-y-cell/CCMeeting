@@ -73,27 +73,22 @@ public:
     ~Widget();
 
 private slots:
-    void on_createmeetBtn_clicked();
-    void on_exitmeetBtn_clicked();
+    void on_createmeetBtn_clicked(); //点击创建会议按钮
+    void on_exitmeetBtn_clicked(); //点击退出会议按钮
+    void on_openVedio_clicked(); //点击打开视频按钮
+    void on_openAudio_clicked();  //点击打开音频按钮
+    void on_connServer_clicked(); //点击连接服务器按钮
+    void on_joinmeetBtn_clicked(); //点击加入会议按钮
 
-    void on_openVedio_clicked();
-    void on_openAudio_clicked();
-    void on_connServer_clicked();
-    void cameraError(QCamera::Error error, const QString &errorString);
-    void audioError(QString);
-//    void mytcperror(QAbstractSocket::SocketError);
-    void datasolve(MESG *);
-    void recvip(quint32);
-    void cameraImageCapture(QVideoFrame frame);
-    void on_joinmeetBtn_clicked();
-
-    void on_horizontalSlider_valueChanged(int value);
-    void speaks(QString);
-
-    void on_sendmsg_clicked();
-
-    void textSend();
-
+    void on_horizontalSlider_valueChanged(int value); //音量改变
+    void cameraError(QCamera::Error error, const QString &errorString); //摄像头错误处理
+    void audioError(QString); //音频错误处理
+    void datasolve(MESG *); //数据处理
+    void recvip(quint32); //接收IP
+    void cameraImageCapture(QVideoFrame frame); //摄像头图像捕获
+    void speaks(QString); //说话
+    void on_sendmsg_clicked(); //发送消息
+    void textSend(); //发送文本
 signals:
     void pushImg(QImage);
     void PushText(MSG_TYPE, QString = "");
