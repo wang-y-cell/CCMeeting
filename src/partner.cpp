@@ -1,4 +1,6 @@
 #include "partner.h"
+#include "configure/configure.h"
+#include <QString>
 #include <QDebug>
 #include <QEvent>
 #include <QHostAddress>
@@ -10,7 +12,7 @@ Partner::Partner(QWidget *parent, quint32 p):QLabel(parent)
     //水平方向尽量随父布局拉伸，垂直方向高度取“最小需要”，适合放在网格/横向列表里和别的项对齐。
     this->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
     w = ((QWidget *)this->parent())->size().width(); //获取父窗口的宽度
-    this->setPixmap(QPixmap::fromImage(QImage(":/myImage/source/1.png").scaled(w-10, w-10)));
+    this->setPixmap(QPixmap::fromImage(QImage(QString::fromUtf8(Source::default_avatar)).scaled(w-10, w-10)));
     this->setFrameShape(QFrame::Box); //设置边框形状
 
     //设置 1px 蓝色半透明描边

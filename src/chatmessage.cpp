@@ -1,5 +1,7 @@
 #include "chatmessage.h"
+#include "configure/configure.h"
 #include "Logger.h"
+#include <QString>
 #include <cmath>
 #include <QFontMetrics>
 #include <QPaintEvent>
@@ -15,12 +17,12 @@ ChatMessage::ChatMessage(QWidget *parent) : QWidget(parent)
     te_font.setPointSize(12); //设置字体大小
     this->setFont(te_font);
     //加载头像图片
-    m_leftPixmap = QPixmap(":/myImage/source/1.png");
-    m_rightPixmap = QPixmap(":/myImage/source/1.png");
+    m_leftPixmap = QPixmap(QString::fromUtf8(Source::default_avatar));
+    m_rightPixmap = QPixmap(QString::fromUtf8(Source::default_avatar));
 
     //加载加载动画
     m_loadingMovie = new QMovie(this);
-    m_loadingMovie->setFileName(":/myImage/source/3.gif");
+    m_loadingMovie->setFileName(QString::fromUtf8(Source::wait_gif));
     m_loading = new QLabel(this);
     m_loading->setMovie(m_loadingMovie); //设置动画
     //setScaledContents: 用于控制标签内的图片是否自动缩放以适应标签大小

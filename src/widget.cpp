@@ -2,6 +2,8 @@
 #include "ui_widget.h"
 #include "screen.h"
 #include "Logger.h"
+#include "configure/configure.h"
+#include <QString>
 #include <QCamera>
 #include <QMediaDevices>
 #include <QPainter>
@@ -362,11 +364,11 @@ void Widget::closeImg(quint32 ip)
         return;
     }
     Partner * p = partner[ip];
-    p->setpic(QImage(":/myImage/source/1.png"));
+    p->setpic(QImage(QString::fromUtf8(Source::default_avatar)));
 
     if(mainip == ip)
     {
-        m_avatarImg.showImage(QImage(":/myImage/source/1.png"));
+        m_avatarImg.showImage(QImage(QString::fromUtf8(Source::default_avatar)));
     }
 }
 
@@ -458,7 +460,7 @@ void Widget::datasolve(MESG *msg)
             addPartner(_mytcpSocket->getlocalip());
             mainip = _mytcpSocket->getlocalip();
             ui->groupBox_2->setTitle(QHostAddress(mainip).toString());
-            m_avatarImg.showImage(QImage(":/myImage/source/1.png"));
+            m_avatarImg.showImage(QImage(QString::fromUtf8(Source::default_avatar)));
         }
         else
         {
@@ -500,7 +502,7 @@ void Widget::datasolve(MESG *msg)
             addPartner(_mytcpSocket->getlocalip());
             mainip = _mytcpSocket->getlocalip();
             ui->groupBox_2->setTitle(QHostAddress(mainip).toString());
-            m_avatarImg.showImage(QImage(":/myImage/source/1.png"));
+            m_avatarImg.showImage(QImage(QString::fromUtf8(Source::default_avatar)));
             ui->joinmeetBtn->setDisabled(true);
             ui->exitmeetBtn->setDisabled(false);
             ui->createmeetBtn->setDisabled(true);
@@ -549,7 +551,7 @@ void Widget::datasolve(MESG *msg)
         Partner* p = addPartner(msg->ip);
         if(p)
         {
-            p->setpic(QImage(":/myImage/source/1.png"));
+            p->setpic(QImage(QString::fromUtf8(Source::default_avatar)));
             ui->outlog->setText(QString("%1 join meeting").arg(QHostAddress(msg->ip).toString()));
             iplist.append(QString("@") + QHostAddress(msg->ip).toString());
             ui->plainTextEdit->setCompleter(iplist);
@@ -560,7 +562,7 @@ void Widget::datasolve(MESG *msg)
         removePartner(msg->ip);
         if(mainip == msg->ip)
         {
-            m_avatarImg.showImage(QImage(":/myImage/source/1.png"));
+            m_avatarImg.showImage(QImage(QString::fromUtf8(Source::default_avatar)));
         }
         if(iplist.removeOne(QString("@") + QHostAddress(msg->ip).toString()))
         {
@@ -587,7 +589,7 @@ void Widget::datasolve(MESG *msg)
 			Partner* p = addPartner(ip);
             if (p)
             {
-                p->setpic(QImage(":/myImage/source/1.png"));
+                p->setpic(QImage(QString::fromUtf8(Source::default_avatar)));
                 iplist << QString("@") + QHostAddress(ip).toString();
             }
         }
@@ -734,7 +736,7 @@ void Widget::recvip(quint32 ip)
 		Partner* p = partner[ip];
 		p->setStyleSheet("border-width: 1px; border-style: solid; border-color:rgba(255, 0 , 0, 0.7)");
 	}
-	m_avatarImg.showImage(QImage(":/myImage/source/1.png"));
+	m_avatarImg.showImage(QImage(QString::fromUtf8(Source::default_avatar)));
     mainip = ip;
     ui->groupBox_2->setTitle(QHostAddress(mainip).toString());
     LOG_DEBUG("Widget", "mainshow switch mainip=" << ip);
