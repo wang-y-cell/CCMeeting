@@ -39,6 +39,15 @@ Widget::Widget(QWidget *parent)
 
     ui->setupUi(this);  //解析ui文件
 
+    m_videoImg.setTarget(ui->mainshow_label);
+    m_videoImg.setDrawMode(ImgDisplay::DrawMode::FitWidgetSmooth);
+    m_videoImg.setAlignment(Qt::AlignCenter);
+
+    m_avatarImg.setTarget(ui->mainshow_label);
+    m_avatarImg.setDrawMode(ImgDisplay::DrawMode::ScaleToHeightFractionCentered);
+    m_avatarImg.setHeightFraction(0.1);
+    m_avatarImg.setAlignment(Qt::AlignCenter);
+
     //设置打开视频和音频的按钮
     ui->openAudio->setText(QString(OPENAUDIO).toUtf8());
     ui->openVedio->setText(QString(OPENVIDEO).toUtf8());
@@ -164,10 +173,10 @@ void Widget::cameraImageCapture(QVideoFrame frame)
         QTransform matrix;
         //matrix.rotate(0.0);
 
-        QImage img =  videoImg.transformed(matrix, Qt::FastTransformation)
-                              .scaled(
+        QImage transformed = videoImg.transformed(matrix, Qt::FastTransformation);
+        QImage img = transformed.scaled(
                                 ui->mainshow_label->size(),
-                                Qt::KeepAspectRatio, 
+                                Qt::KeepAspectRatio,
                                 Qt::SmoothTransformation
                                );
 
@@ -177,9 +186,7 @@ void Widget::cameraImageCapture(QVideoFrame frame)
         }
 
         if(_mytcpSocket->getlocalip() == mainip) {
-            ui->mainshow_label->setPixmap(QPixmap::fromImage(img).
-                scaled(ui->mainshow_label->size(),Qt::KeepAspectRatio,Qt::SmoothTransformation)
-            );
+            m_videoImg.showImage(transformed);
         }
 
         Partner *p = partner[_mytcpSocket->getlocalip()];
@@ -355,11 +362,11 @@ void Widget::closeImg(quint32 ip)
         return;
     }
     Partner * p = partner[ip];
-    p->setpic(QImage(":/myImage/1.png"));
+    p->setpic(QImage(":/myImage/source/1.png"));
 
     if(mainip == ip)
     {
-        ui->mainshow_label->setPixmap(QPixmap::fromImage(QImage(":/myImage/1.png").scaled(ui->mainshow_label->size())));
+        m_avatarImg.showImage(QImage(":/myImage/source/1.png"));
     }
 }
 
@@ -451,7 +458,7 @@ void Widget::datasolve(MESG *msg)
             addPartner(_mytcpSocket->getlocalip());
             mainip = _mytcpSocket->getlocalip();
             ui->groupBox_2->setTitle(QHostAddress(mainip).toString());
-            ui->mainshow_label->setPixmap(QPixmap::fromImage(QImage(":/myImage/1.png").scaled(ui->mainshow_label->size())));
+            m_avatarImg.showImage(QImage(":/myImage/source/1.png"));
         }
         else
         {
@@ -493,7 +500,7 @@ void Widget::datasolve(MESG *msg)
             addPartner(_mytcpSocket->getlocalip());
             mainip = _mytcpSocket->getlocalip();
             ui->groupBox_2->setTitle(QHostAddress(mainip).toString());
-            ui->mainshow_label->setPixmap(QPixmap::fromImage(QImage(":/myImage/1.png").scaled(ui->mainshow_label->size())));
+            m_avatarImg.showImage(QImage(":/myImage/source/1.png"));
             ui->joinmeetBtn->setDisabled(true);
             ui->exitmeetBtn->setDisabled(false);
             ui->createmeetBtn->setDisabled(true);
@@ -519,7 +526,7 @@ void Widget::datasolve(MESG *msg)
 
         if(msg->ip == mainip)
         {
-            ui->mainshow_label->setPixmap(QPixmap::fromImage(img).scaled(ui->mainshow_label->size()));
+            m_videoImg.showImage(img);
         }
         repaint();
     } else if(msg->msg_type == TEXT_RECV) {
@@ -542,7 +549,7 @@ void Widget::datasolve(MESG *msg)
         Partner* p = addPartner(msg->ip);
         if(p)
         {
-            p->setpic(QImage(":/myImage/1.png"));
+            p->setpic(QImage(":/myImage/source/1.png"));
             ui->outlog->setText(QString("%1 join meeting").arg(QHostAddress(msg->ip).toString()));
             iplist.append(QString("@") + QHostAddress(msg->ip).toString());
             ui->plainTextEdit->setCompleter(iplist);
@@ -553,7 +560,7 @@ void Widget::datasolve(MESG *msg)
         removePartner(msg->ip);
         if(mainip == msg->ip)
         {
-            ui->mainshow_label->setPixmap(QPixmap::fromImage(QImage(":/myImage/1.png").scaled(ui->mainshow_label->size())));
+            m_avatarImg.showImage(QImage(":/myImage/source/1.png"));
         }
         if(iplist.removeOne(QString("@") + QHostAddress(msg->ip).toString()))
         {
@@ -580,7 +587,7 @@ void Widget::datasolve(MESG *msg)
 			Partner* p = addPartner(ip);
             if (p)
             {
-                p->setpic(QImage(":/myImage/1.png"));
+                p->setpic(QImage(":/myImage/source/1.png"));
                 iplist << QString("@") + QHostAddress(ip).toString();
             }
         }
@@ -686,7 +693,7 @@ void Widget::removePartner(quint32 ip)
 
 void Widget::clearPartner()
 {
-    ui->mainshow_label->setPixmap(QPixmap());
+    m_videoImg.clear();
     if(partner.size() == 0) return;
 
     QMap<quint32, Partner*>::iterator iter =   partner.begin();
@@ -727,7 +734,7 @@ void Widget::recvip(quint32 ip)
 		Partner* p = partner[ip];
 		p->setStyleSheet("border-width: 1px; border-style: solid; border-color:rgba(255, 0 , 0, 0.7)");
 	}
-	ui->mainshow_label->setPixmap(QPixmap::fromImage(QImage(":/myImage/1.png").scaled(ui->mainshow_label->size())));
+	m_avatarImg.showImage(QImage(":/myImage/source/1.png"));
     mainip = ip;
     ui->groupBox_2->setTitle(QHostAddress(mainip).toString());
     LOG_DEBUG("Widget", "mainshow switch mainip=" << ip);

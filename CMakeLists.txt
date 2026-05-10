@@ -13,8 +13,10 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets Multimedia MultimediaWidgets Networ
 
 file(GLOB PROJECT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Img/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.ui"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/Img/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/logger/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/logger/*.cpp"
 )

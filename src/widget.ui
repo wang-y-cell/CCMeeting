@@ -399,7 +399,7 @@
         <enum>QTabWidget::TabShape::Rounded</enum>
        </property>
        <property name="currentIndex">
-        <number>1</number>
+        <number>0</number>
        </property>
        <property name="usesScrollButtons">
         <bool>true</bool>
@@ -438,7 +438,7 @@
               <x>0</x>
               <y>0</y>
               <width>394</width>
-              <height>412</height>
+              <height>409</height>
              </rect>
             </property>
             <property name="sizePolicy">
@@ -803,16 +803,16 @@
          </widget>
         </item>
         <item>
-         <widget class="QLabel" name="label_3">
-          <property name="text">
-           <string>音量:</string>
+         <widget class="QSlider" name="horizontalSlider">
+          <property name="orientation">
+           <enum>Qt::Orientation::Horizontal</enum>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QSlider" name="horizontalSlider">
-          <property name="orientation">
-           <enum>Qt::Orientation::Horizontal</enum>
+         <widget class="QLabel" name="label_3">
+          <property name="text">
+           <string>音量:</string>
           </property>
          </widget>
         </item>
