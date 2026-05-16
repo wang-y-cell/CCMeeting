@@ -42,11 +42,11 @@ Widget::Widget(QWidget *parent)
     ui->setupUi(this);  //解析ui文件
 
     m_videoImg.setTarget(ui->mainshow_label);
-    m_videoImg.setDrawMode(ImgDisplay::DrawMode::FitWidgetSmooth);
+    m_videoImg.setDrawMode(ImgDisplay::DrawMode::FitWidgetSmooth); //设置视频显示模式
     m_videoImg.setAlignment(Qt::AlignCenter);
 
     m_avatarImg.setTarget(ui->mainshow_label);
-    m_avatarImg.setDrawMode(ImgDisplay::DrawMode::ScaleToHeightFractionCentered);
+    m_avatarImg.setDrawMode(ImgDisplay::DrawMode::ScaleToHeightFractionCentered); //设置头像显示模式
     m_avatarImg.setHeightFraction(0.1);
     m_avatarImg.setAlignment(Qt::AlignCenter);
 
@@ -166,17 +166,22 @@ Widget::Widget(QWidget *parent)
 */
 void Widget::cameraImageCapture(QVideoFrame frame)
 {
-    if(frame.isValid())
+    if(frame.isValid()) //如果是有效的视频帧
     {
-        QVideoFrame cloneFrame(frame);
-        cloneFrame.map(QVideoFrame::ReadOnly);
+        QVideoFrame cloneFrame(frame); 
+        /*
+        QVideoFrame 里的原始像素数据（比如摄像头采集到的 YUV 格式画面）
+        通常存储在 GPU 显存或某些受保护的硬件缓冲区中，
+        CPU 是无法直接通过指针去读取或修改这些数据的 
+        */
+        cloneFrame.map(QVideoFrame::ReadOnly); //将视频帧映射为只读模式
         QImage videoImg = cloneFrame.toImage();
 
         QTransform matrix;
         //matrix.rotate(0.0);
 
         QImage transformed = videoImg.transformed(matrix, Qt::FastTransformation);
-        QImage img = transformed.scaled(
+        QImage img = transformed.scaled( //将视频帧缩放到标签大小
                                 ui->mainshow_label->size(),
                                 Qt::KeepAspectRatio,
                                 Qt::SmoothTransformation
@@ -198,8 +203,7 @@ void Widget::cameraImageCapture(QVideoFrame frame)
     }
 }
 
-Widget::~Widget()
-{
+Widget::~Widget() {
     //终止底层发送与接收线程
 
     if(_mytcpSocket->isRunning())

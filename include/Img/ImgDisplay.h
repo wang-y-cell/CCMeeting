@@ -32,11 +32,11 @@ public:
     explicit ImgDisplay(QWidget *target = nullptr);
     ~ImgDisplay();
 
-    void setTarget(QWidget *target);
-    QWidget *target() const { return m_target; }
+    void setTarget(QWidget *target); //设置父控件
+    QWidget *target() const { return m_target; } //获得父控件
 
-    void setDrawMode(DrawMode mode);
-    DrawMode drawMode() const { return m_drawMode; }
+    void setDrawMode(DrawMode mode); //设置显示模式
+    DrawMode drawMode() const { return m_drawMode; } //获得显示模式
 
     /** 仅在 DrawMode::FixedSize 时生效：输出 pixmap 的像素尺寸 */
     void setFixedOutputSize(const QSize &size);
