@@ -162,7 +162,7 @@ Widget::Widget(QWidget *parent)
 
 
 /**
-获得frame将frame放入标签中,根据是否是房主判断放在哪个标签中
+获得frame将frame放入标签中,根据是否是主屏幕判断放在哪个标签中
 */
 void Widget::cameraImageCapture(QVideoFrame frame)
 {
@@ -181,15 +181,15 @@ void Widget::cameraImageCapture(QVideoFrame frame)
         //matrix.rotate(0.0);
 
         QImage transformed = videoImg.transformed(matrix, Qt::FastTransformation);
-        QImage img = transformed.scaled( //将视频帧缩放到标签大小
-                                ui->mainshow_label->size(),
-                                Qt::KeepAspectRatio,
-                                Qt::SmoothTransformation
-                               );
+        // QImage img = transformed.scaled( //将视频帧缩放到标签大小
+        //                         ui->mainshow_label->size(),
+        //                         Qt::KeepAspectRatio,
+        //                         Qt::SmoothTransformation
+        //                        );
 
         if(partner.size() > 1) //如果房间人数大于1,发送pushImg信号
         {
-			emit pushImg(img);
+			emit pushImg(transformed);
         }
 
         if(_mytcpSocket->getlocalip() == mainip) {
@@ -197,7 +197,7 @@ void Widget::cameraImageCapture(QVideoFrame frame)
         }
 
         Partner *p = partner[_mytcpSocket->getlocalip()];
-        if(p) p->setpic(img);
+        if(p) p->setpic(transformed);
 
         cloneFrame.unmap();
     }
