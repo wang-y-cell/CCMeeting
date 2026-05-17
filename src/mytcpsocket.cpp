@@ -152,8 +152,7 @@ void MyTcpSocket::sendData(MESG* send)
  */
 void MyTcpSocket::run()
 {
-	LOG_INFO("MyTcpSocket", "start sending data thread " << QThread::currentThreadId());
-    //qDebug() << "send data" << QThread::currentThreadId();
+	LOG_INFO("MyTcpSocket", "发送数据线程: " << QThread::currentThreadId());
     m_isCanRun = true; //标记可以运行
     /*
     *$_MSGType_IPV4_MSGSize_data_# //

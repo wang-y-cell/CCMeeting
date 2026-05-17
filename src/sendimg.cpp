@@ -18,31 +18,28 @@ SendImg::SendImg(QObject *par):QThread(par)
 */
 void SendImg::run()
 {
-    LOG_INFO("SendImg", "start sending picture thread " << QThread::currentThreadId());
+    LOG_INFO("SendImg", "发送图像线程: " << QThread::currentThreadId());
     m_isCanRun = true;
     for(;;) {
         queue_lock.lock(); //加锁
+        //如果队列为空就等待，直到有图像加入队列
         while(imgqueue.size() == 0) {
-            //qDebug() << this << QThread::currentThreadId();
             bool f = queue_waitCond.wait(&queue_lock, WAITSECONDS * 1000);
-			if (f == false) //timeout
-			{
+			if (f == false)  { //timeout 
 				QMutexLocker locker(&m_lock);
-				if (m_isCanRun == false)
-				{
+				if (m_isCanRun == false) {
                     queue_lock.unlock();
-					LOG_INFO("SendImg", "stop sending picture thread " << QThread::currentThreadId());
+					LOG_INFO("SendImg", "发送图像线程结束: " << QThread::currentThreadId());
 					return;
 				}
 			}
         }
 
+        //取出队列中的图像
         QByteArray img = imgqueue.front();
-        //qDebug() << "取出队列:" << QThread::currentThreadId();
         imgqueue.pop_front();
         queue_lock.unlock();//解锁
         queue_waitCond.wakeOne(); //唤醒添加线程
-
 
         //构造消息体
         MESG* imgsend = (MESG*)malloc(sizeof(MESG));
@@ -54,14 +51,11 @@ void SendImg::run()
 			imgsend->len = img.size();
             LOG_DEBUG("SendImg", "encoded img bytes=" << img.size());
             imgsend->data = (uchar*)malloc(imgsend->len);
-            if (imgsend->data == nullptr)
-            {
+            if (imgsend->data == nullptr) {
                 free(imgsend);
 				LOG_ERROR("SendImg", "malloc error (image data)");
                 continue;
-            }
-            else
-            {
+            } else {
                 memset(imgsend->data, 0, imgsend->len);
 				memcpy_s(imgsend->data, imgsend->len, img.data(), img.size());
 				//加入发送队列

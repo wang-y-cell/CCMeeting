@@ -9,8 +9,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>965</width>
-    <height>643</height>
+    <width>900</width>
+    <height>604</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -399,7 +399,7 @@
         <enum>QTabWidget::TabShape::Rounded</enum>
        </property>
        <property name="currentIndex">
-        <number>0</number>
+        <number>1</number>
        </property>
        <property name="usesScrollButtons">
         <bool>true</bool>
@@ -438,7 +438,7 @@
               <x>0</x>
               <y>0</y>
               <width>394</width>
-              <height>409</height>
+              <height>368</height>
              </rect>
             </property>
             <property name="sizePolicy">

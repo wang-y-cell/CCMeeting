@@ -156,7 +156,7 @@ Widget::Widget(QWidget *parent)
 
     ui->listWidget->setFont(te_font);
 
-    ui->tabWidget->setCurrentIndex(1);
+    //ui->tabWidget->setCurrentIndex(1);
     ui->tabWidget->setCurrentIndex(0);
 }
 
@@ -181,11 +181,6 @@ void Widget::cameraImageCapture(QVideoFrame frame)
         //matrix.rotate(0.0);
 
         QImage transformed = videoImg.transformed(matrix, Qt::FastTransformation);
-        // QImage img = transformed.scaled( //将视频帧缩放到标签大小
-        //                         ui->mainshow_label->size(),
-        //                         Qt::KeepAspectRatio,
-        //                         Qt::SmoothTransformation
-        //                        );
 
         if(partner.size() > 1) //如果房间人数大于1,发送pushImg信号
         {
@@ -415,7 +410,7 @@ void Widget::on_connServer_clicked() {
         ui->joinmeetBtn->setDisabled(false);
         LOG_INFO("Widget", "succeed connecting to " << ip.toStdString() << ":" << port.toStdString());
         QMessageBox::warning(this, "Connection success", "成功连接服务器" , QMessageBox::Yes, QMessageBox::Yes);
-        ui->sendmsg->setDisabled(false);
+        ui->sendmsg->setDisabled(true);
         ui->connServer->setDisabled(true);
     }
     else
@@ -458,6 +453,7 @@ void Widget::datasolve(MESG *msg)
             ui->exitmeetBtn->setDisabled(false);
             ui->openVedio->setDisabled(false);
             ui->joinmeetBtn->setDisabled(true);
+            ui->sendmsg->setDisabled(false);
 
             LOG_INFO("Widget", "succeed creating room " << roomno);
             //添加用户自己
@@ -489,6 +485,7 @@ void Widget::datasolve(MESG *msg)
             ui->openVedio->setDisabled(true);
             ui->joinmeetBtn->setDisabled(false);
             ui->connServer->setDisabled(true);
+            ui->sendmsg->setDisabled(true);
             _joinmeet = false;
         }
         else if(c == -1)
@@ -510,6 +507,7 @@ void Widget::datasolve(MESG *msg)
             ui->joinmeetBtn->setDisabled(true);
             ui->exitmeetBtn->setDisabled(false);
             ui->createmeetBtn->setDisabled(true);
+            ui->sendmsg->setDisabled(false);
             _joinmeet = true;
         }
     }
