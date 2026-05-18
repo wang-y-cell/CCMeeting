@@ -158,6 +158,12 @@ Widget::Widget(QWidget *parent)
 
     //ui->tabWidget->setCurrentIndex(1);
     ui->tabWidget->setCurrentIndex(0);
+
+    ui->plainTextEdit->setStyleSheet(
+        "QPlainTextEdit [placeholderText=\"@对方可私信\"] { "
+        "background-color: #AAAAAA; "
+        "}"
+    );
 }
 
 
@@ -812,15 +818,16 @@ void Widget::dealMessageTime(QString curMsgTime)
 {
     bool isShowTime = false;
     if(ui->listWidget->count() > 0) {
-        //如果发送了不止一个消息
+        //如果消息框发送了不止一个消息,则判断是否显示时间
         QListWidgetItem* lastItem = ui->listWidget->item(ui->listWidget->count() - 1); //获取最后一行的列表项
-        ChatMessage* messageW = (ChatMessage *)ui->listWidget->itemWidget(lastItem);
+        ChatMessage* messageW = (ChatMessage *)ui->listWidget->itemWidget(lastItem); //获得最后一个自定义消息控件widget
         int lastTime = messageW->time().toInt();
         int curTime = curMsgTime.toInt();
         LOG_DEBUG("Widget", "message time delta sec=" << (curTime - lastTime));
         isShowTime = ((curTime - lastTime) > 60); // 两个消息相差一分钟
 //        isShowTime = true;
     } else {
+        //如果消息框没有消息,则显示时间
         isShowTime = true;
     }
     if(isShowTime) {

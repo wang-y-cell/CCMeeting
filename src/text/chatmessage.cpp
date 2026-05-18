@@ -141,14 +141,14 @@ QSize ChatMessage::fontRect(QString str)
 QSize ChatMessage::getRealString(QString src)
 {
     QFontMetricsF fm(this->font());
-    m_lineHeight = fm.lineSpacing();
+    m_lineHeight = fm.lineSpacing(); //获取当前字体行高
 
     // 使用与 paintEvent::drawText 一致的 WordWrap 测量尺寸。旧实现误把像素宽度当「字符数」、且
     // mid(pos, len) 第二个参数写成了 (i+1)*size，导致折行高度偏小，正文被裁切（空格后整段不见等）。
     if (m_textWidth <= 0) {
-        const qreal w = fm.horizontalAdvance(src);
-        const qreal h = fm.boundingRect(src).height();
-        return QSize(static_cast<int>(std::ceil(w + m_spaceWid)),
+        const qreal w = fm.horizontalAdvance(src); //获取文本宽度
+        const qreal h = fm.boundingRect(src).height(); //获取文本高度
+        return QSize(static_cast<int>(std::ceil(w + m_spaceWid)), 
                      static_cast<int>(std::ceil(h + 2 * m_lineHeight)));
     }
 

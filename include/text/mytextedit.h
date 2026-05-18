@@ -21,7 +21,7 @@ class MyTextEdit : public QWidget
 private:
     QPlainTextEdit *edit;
     Completer *completer;
-    QVector<QPair<int, int> > ipspan;
+    QVector<QPair<int, int>> ipspan;
 public:
     explicit MyTextEdit(QWidget *parent = nullptr);
     QString toPlainText();
