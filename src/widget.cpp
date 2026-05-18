@@ -728,17 +728,23 @@ void Widget::clearPartner()
 
 void Widget::recvip(quint32 ip)
 {
-    if (partner.contains(mainip))
-    {
+    if (partner.contains(mainip)) {
         Partner* p = partner[mainip];
-        p->setStyleSheet("border-width: 1px; border-style: solid; border-color:rgba(0, 0 , 255, 0.7)");
+        p->setStyleSheet(
+            "border-width: 1px; "
+            "border-style: solid; "
+            "border-color:rgba(0, 0, 255, 0.7)"
+        );
     }
-	if (partner.contains(ip))
-	{
+	if (partner.contains(ip)) {
 		Partner* p = partner[ip];
-		p->setStyleSheet("border-width: 1px; border-style: solid; border-color:rgba(255, 0 , 0, 0.7)");
+		p->setStyleSheet(
+            "border-width: 1px; "
+            "border-style: solid; "
+            "border-color:rgba(255, 0, 0, 0.7)"
+        );
 	}
-	m_avatarImg.showImage(QImage(QString::fromUtf8(Source::default_avatar)));
+	//m_avatarImg.showImage(QImage(QString::fromUtf8(Source::default_avatar)));
     mainip = ip;
     ui->groupBox_2->setTitle(QHostAddress(mainip).toString());
     LOG_DEBUG("Widget", "mainshow switch mainip=" << ip);
