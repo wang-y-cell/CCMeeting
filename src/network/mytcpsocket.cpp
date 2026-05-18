@@ -1,6 +1,6 @@
-#include "mytcpsocket.h"
-#include "netheader.h"
-#include "Logger.h"
+#include "network/mytcpsocket.h"
+#include "network/netheader.h"
+#include "logger/Logger.h"
 #include <QHostAddress>
 #include <QtEndian>
 #include <QMetaObject>

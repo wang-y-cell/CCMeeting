@@ -1,5 +1,5 @@
-#include "sendtext.h"
-#include "Logger.h"
+#include "network/sendtext.h"
+#include "logger/Logger.h"
 #include <QThread>
 
 extern QUEUE_DATA<MESG> queue_send;

@@ -3,7 +3,7 @@
 #include <QApplication>
 #include <QScreen>
 #include <QDebug>
-#include "Logger.h"
+#include "logger/Logger.h"
 
 int Screen::width = -1;
 int Screen::height = -1;

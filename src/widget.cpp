@@ -1,14 +1,14 @@
 #include "widget.h"
 #include "ui_widget.h"
 #include "screen.h"
-#include "Logger.h"
+#include "logger/Logger.h"
 #include "configure/configure.h"
 #include <QString>
 #include <QCamera>
 #include <QMediaDevices>
 #include <QPainter>
-#include "myvideosurface.h"
-#include "sendimg.h"
+#include "video/myvideosurface.h"
+#include "video/sendimg.h"
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
 #include <QMessageBox>

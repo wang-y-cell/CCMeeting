@@ -12,13 +12,23 @@ set(CMAKE_PREFIX_PATH F:/Qt/6.8.3/mingw_64)
 find_package(Qt6 REQUIRED COMPONENTS Widgets Multimedia MultimediaWidgets Network)
 
 file(GLOB PROJECT_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/configure/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/Img/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/network/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/text/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/video/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/Audio/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/logger/*.h"
+
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/network/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/text/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/video/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Audio/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Img/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.ui"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/Img/*.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/logger/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/logger/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.ui"
 )
 list(SORT PROJECT_SOURCES)
 

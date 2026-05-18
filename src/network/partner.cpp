@@ -1,4 +1,4 @@
-#include "partner.h"
+#include "network/partner.h"
 #include "configure/configure.h"
 #include <QString>
 #include <QDebug>

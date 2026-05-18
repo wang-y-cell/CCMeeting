@@ -1,7 +1,7 @@
 #include <QApplication>
 #include "widget.h"
 #include "screen.h"
-#include "Logger.h"
+#include "logger/Logger.h"
 
 int main(int argc, char* argv[])
 {

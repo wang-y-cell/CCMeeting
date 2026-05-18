@@ -1,6 +1,6 @@
 #ifndef RECVSOLVE_H
 #define RECVSOLVE_H
-#include "netheader.h"
+#include "network/netheader.h"
 #include <QThread>
 #include <QMutex>
 /*

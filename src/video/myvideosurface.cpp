@@ -1,4 +1,4 @@
-#include "myvideosurface.h"
+#include "video/myvideosurface.h"
 #include <QDebug>
 
 MyVideoSurface::MyVideoSurface(QObject *parent)

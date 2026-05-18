@@ -5,7 +5,7 @@
 #include <QTcpSocket>
 #include <QMutex>
 #include "netheader.h"
-#include "Logger.h"
+#include "logger/Logger.h"
 #ifndef MB
 #define MB (1024 * 1024)
 #endif

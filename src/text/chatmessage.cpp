@@ -1,6 +1,6 @@
-#include "chatmessage.h"
+#include "text/chatmessage.h"
 #include "configure/configure.h"
-#include "Logger.h"
+#include "logger/Logger.h"
 #include <QString>
 #include <cmath>
 #include <QFontMetrics>

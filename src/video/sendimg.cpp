@@ -1,6 +1,6 @@
-#include "sendimg.h"
-#include "Logger.h"
-#include "netheader.h"
+#include "video/sendimg.h"
+#include "logger/Logger.h"
+#include "network/netheader.h"
 #include <cstring>
 #include <QBuffer>
 

@@ -1,5 +1,5 @@
-#include "recvsolve.h"
-#include "Logger.h"
+#include "network/recvsolve.h"
+#include "logger/Logger.h"
 #include <QMetaType>
 #include <QThread>
 #include <QMutexLocker>

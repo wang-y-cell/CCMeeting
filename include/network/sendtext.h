@@ -4,7 +4,7 @@
 #include <QThread>
 #include <QMutex>
 #include <QQueue>
-#include "netheader.h"
+#include "network/netheader.h"
 
 struct M {
     QString str{};

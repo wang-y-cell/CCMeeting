@@ -1,5 +1,5 @@
-#include "audiocommon.h"
-#include "Logger.h"
+#include "audio/audiocommon.h"
+#include "logger/Logger.h"
 #include <QAudioDevice>
 #include <QMediaDevices>
 
