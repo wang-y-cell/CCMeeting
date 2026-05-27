@@ -27,6 +27,7 @@ public:
     QString toPlainText();
     void setPlainText(QString);
     void setPlaceholderText(QString);
+    void setCenterOnScroll(bool on){edit->setCenterOnScroll(on);}
     void setCompleter(QStringList );
 private:
     QString textUnderCursor();

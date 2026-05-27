@@ -154,8 +154,11 @@ QSize ChatMessage::getRealString(QString src)
 
     const QRectF textRect(0, 0, static_cast<qreal>(m_textWidth), 1000000.0);
     const QRectF br = fm.boundingRect(textRect,
-                                      Qt::TextWordWrap | Qt::AlignLeft | Qt::AlignTop,
+                                      Qt::TextWordWrap | Qt::AlignLeft | Qt::AlignTop, 
                                       src);
+    // ::TextWordWrap: 超过textRect宽度时,自动换行
+    // ::AlignLeft: 左对齐
+    // ::AlignTop: 上对齐
     const int tw = qMin(m_textWidth, static_cast<int>(std::ceil(br.width())));
     const int th = static_cast<int>(std::ceil(br.height()));
     const int totalH = th + static_cast<int>(2 * m_lineHeight);

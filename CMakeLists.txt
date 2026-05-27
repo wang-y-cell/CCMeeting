@@ -56,6 +56,12 @@ target_link_libraries(
 )
 target_include_directories(CloudMeeting PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/Audio
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/video
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/configure
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/img
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/network
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/text
     ${CMAKE_CURRENT_SOURCE_DIR}/logger
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
