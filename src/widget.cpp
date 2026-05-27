@@ -159,11 +159,9 @@ Widget::Widget(QWidget *parent)
     //ui->tabWidget->setCurrentIndex(1);
     ui->tabWidget->setCurrentIndex(0);
 
-    ui->plainTextEdit->setStyleSheet(
-        "QPlainTextEdit [placeholderText=\"@对方可私信\"] { "
-        "background-color: #AAAAAA; "
-        "}"
-    );
+    ui->plainTextEdit->setPlaceholderText("可@对方私信");
+    ui->plainTextEdit->setStyleSheet("color: #AAAAAA;");
+    this->setStyleSheet("background-color:rgb(46, 46, 46)");
 }
 
 

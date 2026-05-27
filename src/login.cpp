@@ -10,6 +10,26 @@ login::login(QWidget *parent)
     ui->setupUi(this);
 
     connect(ui->login_button, &QPushButton::clicked, this, &login::Login);
+
+    ui->account_line->setStyleSheet(R"(
+        QLineEdit {
+            border-radius: 4px;
+            padding: 5px;
+        }
+        QLineEdit:focus {
+            border: 1px solid #2f54eb; /* 获取焦点时高亮边框 */
+        }
+    )");
+
+    ui->password_line->setStyleSheet(R"(
+        QLineEdit {
+            border-radius: 4px;
+            padding: 5px;
+        }
+        QLineEdit:focus {
+            border: 1px solid #2f54eb; /* 获取焦点时高亮边框 */
+        }
+    )");
 }
 
 login::~login()

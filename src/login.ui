@@ -34,6 +34,9 @@
      <height>31</height>
     </rect>
    </property>
+   <property name="placeholderText">
+    <string>                    账号</string>
+   </property>
   </widget>
   <widget class="QLineEdit" name="password_line">
    <property name="geometry">
@@ -43,6 +46,9 @@
      <width>171</width>
      <height>31</height>
     </rect>
+   </property>
+   <property name="placeholderText">
+    <string>                    密码</string>
    </property>
   </widget>
   <widget class="QPushButton" name="login_button">
