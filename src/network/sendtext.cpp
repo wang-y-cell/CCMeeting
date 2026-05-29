@@ -27,7 +27,6 @@ void SendText::push_Text(MSG_TYPE msgType, QString str)
     }
     LOG_INFO("SendText", "将文本信号加入队列: textqueue.push_back(M(str, msgType))");
     textqueue.push_back(M(str, msgType));
-
     textqueue_lock.unlock();
     queue_waitCond.wakeOne();
     LOG_INFO("SendText", "文本信号加入队列完成");

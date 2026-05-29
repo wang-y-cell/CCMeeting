@@ -3,6 +3,7 @@
 #include "screen.h"
 #include "login.h"
 #include "logger/Logger.h"
+#include "main_window.h"
 
 int main(int argc, char* argv[])
 {
@@ -14,10 +15,11 @@ int main(int argc, char* argv[])
     Screen::init();
 
     login loginDialog;
+    main_window main_windowDialog;
     Widget w;
     loginDialog.show();
     if(loginDialog.exec() == QDialog::Accepted) {
-        w.show();
+        main_windowDialog.show();
         const int ret = app.exec();
         Logger::instance().shutdown();
         return ret;
