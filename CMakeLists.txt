@@ -12,6 +12,7 @@ set(CMAKE_PREFIX_PATH F:/Qt/6.8.3/mingw_64)
 find_package(Qt6 REQUIRED COMPONENTS Widgets Multimedia MultimediaWidgets Network)
 
 file(GLOB PROJECT_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/configure/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/Img/*.h"
@@ -21,6 +22,8 @@ file(GLOB PROJECT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/Audio/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/logger/*.h"
 
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.ui"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/network/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/text/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/video/*.cpp"

@@ -1,5 +1,4 @@
 #include <QApplication>
-#include "widget.h"
 #include "screen.h"
 #include "login.h"
 #include "logger/Logger.h"
@@ -16,7 +15,6 @@ int main(int argc, char* argv[])
 
     login loginDialog;
     main_window main_windowDialog;
-    Widget w;
     loginDialog.show();
     if(loginDialog.exec() == QDialog::Accepted) {
         main_windowDialog.show();

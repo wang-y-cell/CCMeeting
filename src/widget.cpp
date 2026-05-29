@@ -63,7 +63,6 @@ Widget::Widget(QWidget *parent)
     //初始化这些按钮是不能点击的状态
     ui->exitmeetBtn->setDisabled(true);
     ui->joinmeetBtn->setDisabled(true);
-    ui->createmeetBtn->setDisabled(true);
     ui->openAudio->setDisabled(true);
     ui->openVedio->setDisabled(true);
     ui->sendmsg->setDisabled(true);
@@ -246,7 +245,6 @@ void Widget::on_createmeetBtn_clicked()
     LOG_INFO("Widget", "点击创建会议按钮");
     if(false == _createmeet)
     {
-        ui->createmeetBtn->setDisabled(true);
         ui->openAudio->setDisabled(true);
         ui->openVedio->setDisabled(true);
         ui->exitmeetBtn->setDisabled(true);
@@ -276,7 +274,6 @@ void Widget::on_exitmeetBtn_clicked()
         _camera->stop();
     }
 
-    ui->createmeetBtn->setDisabled(true);
     ui->exitmeetBtn->setDisabled(true);
     _createmeet = false;
     _joinmeet = false;
@@ -291,7 +288,6 @@ void Widget::on_exitmeetBtn_clicked()
 
     ui->outlog->setText(tr("已退出会议"));
 
-    ui->connServer->setDisabled(false);
     ui->groupBox_2->setTitle(QString("主屏幕"));
 //    ui->groupBox->setTitle(QString("副屏幕"));
     //清除聊天记录
@@ -370,12 +366,8 @@ void Widget::closeImg(quint32 ip)
     }
 }
 
-void Widget::on_connServer_clicked() {
-    LOG_INFO("Widget","点击连接服务器按钮");
-    QString ip = ui->ip->text(), port = ui->port->text();
-    ui->outlog->setText("正在连接到" + ip + ":" + port);
-    repaint(); //立即重绘窗口部件
-
+void Widget::on_connServer(QString ip, QString port) {
+    repaint();
     //正则表达式
     //ip
     QRegularExpression ipreg(
@@ -404,13 +396,10 @@ void Widget::on_connServer_clicked() {
         ui->outlog->setText("成功连接到" + ip + ":" + port);
         ui->openAudio->setDisabled(true);
         ui->openVedio->setDisabled(true);
-        ui->createmeetBtn->setDisabled(false);
         ui->exitmeetBtn->setDisabled(true);
         ui->joinmeetBtn->setDisabled(false);
         LOG_INFO("Widget", "succeed connecting to " << ip.toStdString() << ":" << port.toStdString());
-        QMessageBox::warning(this, "Connection success", "成功连接服务器" , QMessageBox::Yes, QMessageBox::Yes);
         ui->sendmsg->setDisabled(true);
-        ui->connServer->setDisabled(true);
     }
     else
     {
@@ -466,7 +455,6 @@ void Widget::datasolve(MESG *msg)
             _createmeet = false;
             QMessageBox::information(this, "Room Information", QString("无可用房间"), QMessageBox::Yes, QMessageBox::Yes);
             ui->outlog->setText(QString("无可用房间"));
-            ui->createmeetBtn->setDisabled(false);
             LOG_WARN("Widget", "no empty room");
         }
     }
@@ -483,7 +471,6 @@ void Widget::datasolve(MESG *msg)
             ui->exitmeetBtn->setDisabled(true);
             ui->openVedio->setDisabled(true);
             ui->joinmeetBtn->setDisabled(false);
-            ui->connServer->setDisabled(true);
             ui->sendmsg->setDisabled(true);
             _joinmeet = false;
         }
@@ -505,7 +492,6 @@ void Widget::datasolve(MESG *msg)
             m_avatarImg.showImage(QImage(QString::fromUtf8(Source::default_avatar)));
             ui->joinmeetBtn->setDisabled(true);
             ui->exitmeetBtn->setDisabled(false);
-            ui->createmeetBtn->setDisabled(true);
             ui->sendmsg->setDisabled(false);
             _joinmeet = true;
         }
@@ -604,9 +590,7 @@ void Widget::datasolve(MESG *msg)
         _mytcpSocket->disconnectFromHost();
         _mytcpSocket->wait();
         ui->outlog->setText(QString("关闭与服务器的连接"));
-        ui->createmeetBtn->setDisabled(true);
         ui->exitmeetBtn->setDisabled(true);
-        ui->connServer->setDisabled(false);
         ui->joinmeetBtn->setDisabled(true);
         //清除聊天记录
         while(ui->listWidget->count() > 0)
