@@ -111,6 +111,11 @@ void SendImg::clearImgQueue()
 
 void SendImg::stopImmediately()
 {
-    QMutexLocker locker(&m_lock);
-    m_isCanRun = false;
+    {
+        QMutexLocker locker(&m_lock);
+        m_isCanRun = false;
+    }
+    queue_lock.lock();
+    queue_waitCond.wakeAll();
+    queue_lock.unlock();
 }

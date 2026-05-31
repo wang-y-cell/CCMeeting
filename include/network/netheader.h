@@ -112,6 +112,12 @@ public:
         send_queue.clear();
         send_queueLock.unlock();
     }
+
+    void wakeAll() {
+        send_queueLock.lock();
+        send_queueCond.wakeAll();
+        send_queueLock.unlock();
+    }
 };
 
 #endif // NETHEADER_H

@@ -18,6 +18,7 @@
 #include "Img/ImgDisplay.h"
 #include <QStringListModel>
 #include <QSoundEffect>
+#include <QCloseEvent>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class Widget; }
@@ -31,31 +32,37 @@ class Widget : public QWidget
 {
     Q_OBJECT
 private:
-    static QRect pos;
-    quint32 mainip;
-    QCamera *_camera;
+    static QRect pos; //窗口位置
+    quint32 mainip; //主屏幕IP
+    QCamera *_camera; //摄像头
     QMediaCaptureSession _captureSession;
-    bool  _createmeet;
-    bool _joinmeet;
-    bool _openCamera;
+    bool  _createmeet; //是否创建会议
+    bool _joinmeet; //是否加入会议
+    bool _openCamera; //是否打开摄像头
+    bool _sessionActive; //是否已连接服务器（会议会话）
 
-    MyVideoSurface *_myvideosurface;
+    void initPermanentWorkers();
+    void endMeetingSession();
+    void resetMeetingUi();
+    void shutdownAllWorkers();
 
-    QVideoFrame mainshow;
+    MyVideoSurface *_myvideosurface; //视频表面
 
-    SendImg *_sendImg;
+    QVideoFrame mainshow; //主屏幕视频
 
-    RecvSolve *_recvThread;
+    SendImg *_sendImg; //发送图像
+
+    RecvSolve *_recvThread; //接收线程
     SendText * _sendText;
     // socket
-    MyTcpSocket *_mytcpSocket;
-    void paintEvent(QPaintEvent *event);
+    MyTcpSocket *_mytcpSocket; //socket
+    void paintEvent(QPaintEvent *event) override;
 
     QMap<quint32, Partner *> partner; //用于记录房间用户
-    Partner* addPartner(quint32);
-    void removePartner(quint32);
+    Partner* addPartner(quint32); //添加用户
+    void removePartner(quint32); //删除用户
     void clearPartner(); //退出会议，或者会议结束
-    void closeImg(quint32); //根据IP重置图像
+    void closeImg(quint32); //根据IP关闭图像
 
     void dealMessage(ChatMessage *messageW, QListWidgetItem *item, QString text, QString time, QString ip ,ChatMessage::User_Type type); //用户发送文本
     void dealMessageTime(QString curMsgTime); //处理时间
@@ -76,13 +83,15 @@ public:
     Widget(QWidget *parent = nullptr);
     ~Widget();
 
+protected:
+    void closeEvent(QCloseEvent *event) override;
 
 public slots:
     void on_createmeetBtn_clicked(); //点击创建会议按钮
     void on_exitmeetBtn_clicked(); //点击退出会议按钮
     void on_openVedio_clicked(); //点击打开视频按钮
     void on_openAudio_clicked();  //点击打开音频按钮
-    void on_connServer(QString ip, QString port); //点击连接服务器按钮
+    bool on_connServer(QString ip, QString port); //点击连接服务器按钮，成功返回 true
     void on_joinmeetBtn_clicked(); //点击加入会议按钮
 private slots:
     void on_horizontalSlider_valueChanged(int value); //音量改变

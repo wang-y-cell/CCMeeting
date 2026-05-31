@@ -5,6 +5,7 @@
 #include <QtEndian>
 #include <QMetaObject>
 #include <QMutexLocker>
+#include <QEventLoop>
 #include <iomanip>
 
 extern QUEUE_DATA<MESG> queue_send;
@@ -17,31 +18,59 @@ void MyTcpSocket::stopImmediately()
         QMutexLocker lock(&m_lock);
         if(m_isCanRun == true) m_isCanRun = false;
     }
-    //关闭read
-    _sockThread->quit();
-    _sockThread->wait();
+    queue_send.wakeAll();
+    if (_sockThread->isRunning()) {
+        QMetaObject::invokeMethod(_worker, "closeSocket", Qt::BlockingQueuedConnection);
+        _sockThread->quit();
+        _sockThread->wait(3000);
+    }
 }
 
 void MyTcpSocket::closeSocket()
 {
-	if (_socktcp && _socktcp->isOpen())
-	{
-		_socktcp->close();
+	if (_socktcp != nullptr) {
+		_socktcp->abort();
+		delete _socktcp;
+		_socktcp = nullptr;
 	}
 }
 
-MyTcpSocket::MyTcpSocket(QObject *par):QThread(par)
+MyTcpSocketWorker::MyTcpSocketWorker(MyTcpSocket *socket, QObject *parent)
+    : QObject(parent), _socket(socket)
 {
+}
+
+bool MyTcpSocketWorker::connectServer(QString ip, QString port)
+{
+    return _socket->connectServerImpl(ip, port, QIODevice::ReadWrite);
+}
+
+void MyTcpSocketWorker::sendData(MESG *msg)
+{
+    _socket->sendData(msg);
+}
+
+void MyTcpSocketWorker::recvFromSocket()
+{
+    _socket->recvFromSocket();
+}
+
+void MyTcpSocketWorker::closeSocket()
+{
+    _socket->closeSocket();
+}
+
+MyTcpSocket::MyTcpSocket(QObject *par):QThread(par) {
     qRegisterMetaType<QAbstractSocket::SocketError>();
+    qRegisterMetaType<MESG *>("MESG*");
 	_socktcp = nullptr;
 
-    _sockThread = new QThread(); //发送数据线程
-    this->moveToThread(_sockThread);
-	connect(_sockThread, SIGNAL(finished()), this, SLOT(closeSocket()));
+    _sockThread = new QThread();
+    _worker = new MyTcpSocketWorker(this);
+    _worker->moveToThread(_sockThread);
     sendbuf =(uchar *) malloc(4 * MB);
 	recvbuf = (uchar*)malloc(4 * MB);
     hasrecvive = 0;
-
 }
 
 
@@ -49,19 +78,13 @@ void MyTcpSocket::errorDetect(QAbstractSocket::SocketError error)
 {
     LOG_ERROR("MyTcpSocket", "socket error, tid=" << QThread::currentThreadId());
     MESG * msg = (MESG *) malloc(sizeof (MESG));
-    if (msg == NULL)
-    {
+    if (msg == nullptr) {
         LOG_ERROR("MyTcpSocket", "errorDetect malloc MESG failed");
-    }
-    else
-    {
+    } else {
         memset(msg, 0, sizeof(MESG));
-		if (error == QAbstractSocket::RemoteHostClosedError)
-		{
+		if (error == QAbstractSocket::RemoteHostClosedError) {
 			msg->msg_type = RemoteHostClosedError;
-		}
-		else
-		{
+		} else {
 			msg->msg_type = OtherNetError;
 		}
 		queue_recv.push_msg(msg);
@@ -109,8 +132,10 @@ void MyTcpSocket::sendData(MESG* send)
 	}
 
 	//将数据拷入sendbuf
-	memcpy(sendbuf + bytestowrite, send->data, send->len);
-	bytestowrite += send->len;
+	if (send->len > 0 && send->data != nullptr) {
+		memcpy(sendbuf + bytestowrite, send->data, send->len);
+		bytestowrite += send->len;
+	}
 	sendbuf[bytestowrite++] = '#'; //结尾字符
 
 	//----------------write to server-------------------------
@@ -170,7 +195,7 @@ void MyTcpSocket::run()
         if(send == nullptr) continue;
 		LOG_INFO("MyTcpSocket", "取出队列: send != nullptr");
         LOG_INFO("MyTcpSocket", "调用sendData方法: sendData(send)");
-        QMetaObject::invokeMethod(this, "sendData", Q_ARG(MESG*, send));
+        QMetaObject::invokeMethod(_worker, "sendData", Qt::BlockingQueuedConnection, Q_ARG(MESG*, send));
         LOG_INFO("MyTcpSocket", "sendData方法调用完成");
     }
 }
@@ -471,79 +496,118 @@ void MyTcpSocket::recvFromSocket() {
 
 MyTcpSocket::~MyTcpSocket()
 {
-    delete sendbuf;
+    if (_sockThread->isRunning()) {
+        _sockThread->quit();
+        _sockThread->wait(3000);
+    }
+    delete _worker;
+    free(sendbuf);
+    free(recvbuf);
     delete _sockThread;
 }
 
 
 
-bool MyTcpSocket::connectServer(QString ip, QString port, QIODevice::OpenModeFlag flag)
+bool MyTcpSocket::connectServerImpl(QString ip, QString port, QIODevice::OpenModeFlag flag)
 {
-    if(_socktcp == nullptr) _socktcp = new QTcpSocket(); //tcp
+	LOG_INFO("MyTcpSocket", "开始连接服务器: " << ip.toStdString() << ":" << port.toStdString()
+             << " tid=" << QThread::currentThreadId());
+    if (_socktcp != nullptr) {
+        _socktcp->abort();
+        delete _socktcp;
+        _socktcp = nullptr;
+    }
+    _socktcp = new QTcpSocket();
     _socktcp->connectToHost(ip, port.toUShort(), flag);
     const Qt::ConnectionType uniqueAuto =
         static_cast<Qt::ConnectionType>(int(Qt::AutoConnection) | int(Qt::UniqueConnection));
-    connect(_socktcp, SIGNAL(readyRead()), this, SLOT(recvFromSocket()), uniqueAuto); //接受数据
-    //处理套接字错误
+    connect(_socktcp, SIGNAL(readyRead()), _worker, SLOT(recvFromSocket()), uniqueAuto);
     connect(_socktcp, SIGNAL(error(QAbstractSocket::SocketError)), this, SLOT(errorDetect(QAbstractSocket::SocketError)),
             uniqueAuto);
 
     if(_socktcp->waitForConnected(5000)) {
+		LOG_INFO("MyTcpSocket", "连接成功");
+        _localIp = _socktcp->localAddress().toIPv4Address();
+        _hasLocalIp = true;
+        _lastError.clear();
+        hasrecvive = 0;
         return true;
     }
-	_socktcp->close();
+    _lastError = _socktcp->errorString();
+	LOG_ERROR("MyTcpSocket", "连接失败: " << _lastError.toStdString());
+    delete _socktcp;
+    _socktcp = nullptr;
     return false;
 }
 
 
 bool MyTcpSocket::connectToServer(QString ip, QString port, QIODevice::OpenModeFlag flag) {
+    Q_UNUSED(flag);
 	LOG_INFO("MyTcpSocket", "连接服务器: " << ip.toStdString() << ":" << port.toStdString());
-	_sockThread->start(); // 开启链接，与接受
-	bool retVal;
-	QMetaObject::invokeMethod(this, "connectServer", Qt::BlockingQueuedConnection, Q_RETURN_ARG(bool, retVal),
-								Q_ARG(QString, ip), Q_ARG(QString, port), Q_ARG(QIODevice::OpenModeFlag, flag));
-
-	if (retVal) {
-        this->start() ; //写数据
-		return true;
-	} else {
+	if (!_sockThread->isRunning()) {
+		QEventLoop loop;
+		QObject::connect(_sockThread, &QThread::started, &loop, &QEventLoop::quit);
+		_sockThread->start();
+		loop.exec();
+		QObject::disconnect(_sockThread, &QThread::started, &loop, &QEventLoop::quit);
+	}
+	bool retVal = false;
+	const bool invoked = QMetaObject::invokeMethod(_worker, "connectServer", Qt::BlockingQueuedConnection,
+        Q_RETURN_ARG(bool, retVal), Q_ARG(QString, ip), Q_ARG(QString, port));
+	if (!invoked) {
+		LOG_ERROR("MyTcpSocket", "connectServer not invoked");
+		_lastError = QStringLiteral("internal error: connectServer not invoked");
 		return false;
 	}
+
+	if (retVal) {
+		if (isRunning()) {
+			wait(500);
+		}
+        this->start();
+		return true;
+	}
+	return false;
 }
 
 QString MyTcpSocket::errorString()
 {
-    return _socktcp->errorString();
+    return _lastError;
 }
 
-void MyTcpSocket::disconnectFromHost()
-{
-    //write
-    if(this->isRunning())
-    {
+void MyTcpSocket::disconnectFromHost() {
+    _hasLocalIp = false;
+    _localIp = 0;
+    hasrecvive = 0;
+    if(this->isRunning()) {
         QMutexLocker locker(&m_lock);
         m_isCanRun = false;
     }
+    queue_send.wakeAll();
 
-    if(_sockThread->isRunning()) //read
-    {
-        _sockThread->quit();
-        _sockThread->wait();
+    if (isRunning()) {
+        wait(500);
     }
 
-    //清空 发送 队列，清空接受队列
+    if(_sockThread->isRunning()) {
+        QMetaObject::invokeMethod(_worker, "closeSocket", Qt::BlockingQueuedConnection);
+        _sockThread->quit();
+        _sockThread->wait(500);
+    }
+
     queue_send.clear();
     queue_recv.clear();
-	audio_recv.clear();
+    queue_recv.wakeAll();
+    audio_recv.clear();
+    audio_recv.wakeAll();
 }
 
 /**
 返回本机ipv4地址,如果失败返回-1
 */
 quint32 MyTcpSocket::getlocalip() {
-    if(_socktcp->isOpen()) {
-        return _socktcp->localAddress().toIPv4Address();
-    } else {
-        return -1;
+    if (_hasLocalIp) {
+        return _localIp;
     }
+    return static_cast<quint32>(-1);
 }

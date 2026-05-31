@@ -9,6 +9,7 @@ void RecvSolve::stopImmediately()
 {
     QMutexLocker locker(&m_lock);
     m_isCanRun = false;
+    queue_recv.wakeAll();
 }
 
 RecvSolve::RecvSolve(QObject *par):QThread(par)

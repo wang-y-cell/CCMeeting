@@ -113,6 +113,11 @@ void SendText::run() {
 }
 void SendText::stopImmediately()
 {
-    QMutexLocker locker(&m_lock);
-    m_isCanRun = false;
+    {
+        QMutexLocker locker(&m_lock);
+        m_isCanRun = false;
+    }
+    textqueue_lock.lock();
+    queue_waitCond.wakeAll();
+    textqueue_lock.unlock();
 }

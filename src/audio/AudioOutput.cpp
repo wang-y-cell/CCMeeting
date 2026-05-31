@@ -190,8 +190,11 @@ void AudioOutput::run()
 }
 void AudioOutput::stopImmediately()
 {
-	QMutexLocker lock(&m_lock);
-	is_canRun = false;
+	{
+		QMutexLocker lock(&m_lock);
+		is_canRun = false;
+	}
+	audio_recv.wakeAll();
 }
 
 
