@@ -88,7 +88,7 @@ protected:
 
 public slots:
     void on_createmeetBtn_clicked(); //点击创建会议按钮
-    void on_exitmeetBtn_clicked(); //点击退出会议按钮
+    //void on_exitmeetBtn_clicked(); //点击退出会议按钮
     void on_openVedio_clicked(); //点击打开视频按钮
     void on_openAudio_clicked();  //点击打开音频按钮
     bool on_connServer(QString ip, QString port); //点击连接服务器按钮，成功返回 true

@@ -70,7 +70,7 @@ Widget::Widget(QWidget *parent)
 
 
     //初始化这些按钮是不能点击的状态
-    ui->exitmeetBtn->setDisabled(true);
+    //ui->exitmeetBtn->setDisabled(true);
     ui->joinmeetBtn->setDisabled(true);
     ui->openAudio->setDisabled(true);
     ui->openVedio->setDisabled(true);
@@ -206,7 +206,7 @@ void Widget::closeEvent(QCloseEvent *event)
 
 void Widget::resetMeetingUi()
 {
-    ui->exitmeetBtn->setDisabled(true);
+    //ui->exitmeetBtn->setDisabled(true);
     ui->joinmeetBtn->setDisabled(false);
     ui->openAudio->setDisabled(true);
     ui->openVedio->setDisabled(true);
@@ -283,7 +283,7 @@ void Widget::on_createmeetBtn_clicked()
     {
         ui->openAudio->setDisabled(true);
         ui->openVedio->setDisabled(true);
-        ui->exitmeetBtn->setDisabled(true);
+        //ui->exitmeetBtn->setDisabled(true);
         LOG_INFO("Widget", "发送创建会议信号: PushText(CREATE_MEETING)");
         emit PushText(CREATE_MEETING); //将 “创建会议"加入到发送队列
         LOG_INFO("Widget", "创建会议信号发送完成");
@@ -303,12 +303,12 @@ void Widget::paintEvent(QPaintEvent *event)
 
 
 //退出会议（1，加入的会议， 2，自己创建的会议）
-void Widget::on_exitmeetBtn_clicked()
-{
-    endMeetingSession();
-    LOG_INFO("Widget", "exit meeting");
-    QMessageBox::warning(this, "Information", "退出会议" , QMessageBox::Yes, QMessageBox::Yes);
-}
+// void Widget::on_exitmeetBtn_clicked()
+// {
+//     endMeetingSession();
+//     LOG_INFO("Widget", "exit meeting");
+//     QMessageBox::warning(this, "Information", "退出会议" , QMessageBox::Yes, QMessageBox::Yes);
+// }
 
 void Widget::on_openVedio_clicked()
 {
@@ -369,6 +369,7 @@ void Widget::closeImg(quint32 ip)
     }
 }
 
+
 bool Widget::on_connServer(QString ip, QString port) {
     if (!_mytcpSocket) {
         LOG_WARN("Widget", "on_connServer: tcp socket not initialized");
@@ -404,7 +405,7 @@ bool Widget::on_connServer(QString ip, QString port) {
         ui->outlog->setText("成功连接到" + ip + ":" + port);
         ui->openAudio->setDisabled(true);
         ui->openVedio->setDisabled(true);
-        ui->exitmeetBtn->setDisabled(true);
+        //ui->exitmeetBtn->setDisabled(true);
         ui->joinmeetBtn->setDisabled(false);
         LOG_INFO("Widget", "succeed connecting to " << ip.toStdString() << ":" << port.toStdString());
         ui->sendmsg->setDisabled(true);
@@ -423,10 +424,14 @@ void Widget::cameraError(QCamera::Error, const QString &errorString)
     QMessageBox::warning(this, "Camera error", msg, QMessageBox::Yes, QMessageBox::Yes);
 }
 
+
+
 void Widget::audioError(QString err)
 {
     QMessageBox::warning(this, "Audio error", err, QMessageBox::Yes);
 }
+
+
 
 void Widget::datasolve(MESG *msg)
 {
@@ -445,7 +450,7 @@ void Widget::datasolve(MESG *msg)
             ui->groupBox_2->setTitle(QString("主屏幕(房间号: %1)").arg(roomno));
             ui->outlog->setText(QString("创建成功 房间号: %1").arg(roomno) );
             _createmeet = true;
-            ui->exitmeetBtn->setDisabled(false);
+            //ui->exitmeetBtn->setDisabled(false);
             ui->openVedio->setDisabled(false);
             ui->joinmeetBtn->setDisabled(true);
             ui->sendmsg->setDisabled(false);
@@ -476,7 +481,7 @@ void Widget::datasolve(MESG *msg)
             QMessageBox::information(this, "Meeting Error", tr("会议不存在") , QMessageBox::Yes, QMessageBox::Yes);
             ui->outlog->setText(QString("会议不存在"));
             LOG_WARN("Widget", "meeting not exist");
-            ui->exitmeetBtn->setDisabled(true);
+            //ui->exitmeetBtn->setDisabled(true);
             ui->openVedio->setDisabled(true);
             ui->joinmeetBtn->setDisabled(false);
             ui->sendmsg->setDisabled(true);
@@ -500,7 +505,7 @@ void Widget::datasolve(MESG *msg)
                 m_avatarImg.showImage(QImage(QString::fromUtf8(Source::default_avatar)));
             }
             ui->joinmeetBtn->setDisabled(true);
-            ui->exitmeetBtn->setDisabled(false);
+            //ui->exitmeetBtn->setDisabled(false);
             ui->sendmsg->setDisabled(false);
             _joinmeet = true;
         }
@@ -622,6 +627,9 @@ void Widget::datasolve(MESG *msg)
     }
 }
 
+
+
+
 Partner* Widget::addPartner(quint32 ip)
 {
 	if (partner.contains(ip)) return NULL; //如果存在这个ip,返回null
@@ -653,6 +661,8 @@ Partner* Widget::addPartner(quint32 ip)
     }
 }
 
+
+
 void Widget::removePartner(quint32 ip)
 {
     if(partner.contains(ip))
@@ -675,6 +685,8 @@ void Widget::removePartner(quint32 ip)
         }
     }
 }
+
+
 
 void Widget::clearPartner()
 {
@@ -709,6 +721,8 @@ void Widget::clearPartner()
     ui->openVedio->setText(QString(OPENVIDEO).toUtf8());
     ui->openVedio->setDisabled(true);
 }
+
+
 
 void Widget::recvip(quint32 ip)
 {
@@ -753,15 +767,21 @@ void Widget::on_joinmeetBtn_clicked() {
     }
 }
 
+
+
 void Widget::on_horizontalSlider_valueChanged(int value)
 {
     emit volumnChange(value);
 }
 
+
+
 void Widget::speaks(QString ip)
 {
     ui->outlog->setText(QString(ip + " 正在说话").toUtf8());
 }
+
+
 
 void Widget::on_sendmsg_clicked()
 {
@@ -782,6 +802,8 @@ void Widget::on_sendmsg_clicked()
     ui->sendmsg->setDisabled(true);
 }
 
+
+
 void Widget::dealMessage(ChatMessage *messageW, QListWidgetItem *item, QString text, QString time, QString ip ,ChatMessage::User_Type type)
 {
     ui->listWidget->addItem(item);
@@ -791,6 +813,8 @@ void Widget::dealMessage(ChatMessage *messageW, QListWidgetItem *item, QString t
     messageW->setText(text, time, size, ip, type);
     ui->listWidget->setItemWidget(item, messageW);
 }
+
+
 
 void Widget::dealMessageTime(QString curMsgTime)
 {
@@ -827,6 +851,8 @@ void Widget::dealMessageTime(QString curMsgTime)
         ui->listWidget->setItemWidget(itemTime, messageTime);
     }
 }
+
+
 
 void Widget::textSend()
 {
