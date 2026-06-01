@@ -4,6 +4,9 @@ project(CloudMeeting VERSION 1.0 LANGUAGES CXX)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC_SEARCH_PATHS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui"
+)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -20,6 +23,7 @@ file(GLOB PROJECT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/text/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/video/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/Audio/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/ui_h/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/logger/*.h"
 
     "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
@@ -30,8 +34,10 @@ file(GLOB PROJECT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Audio/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/Img/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui_cpp/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/logger/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.ui"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/*.ui"
 )
 list(SORT PROJECT_SOURCES)
 
@@ -65,6 +71,7 @@ target_include_directories(CloudMeeting PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include/img
     ${CMAKE_CURRENT_SOURCE_DIR}/include/network
     ${CMAKE_CURRENT_SOURCE_DIR}/include/text
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui_h
     ${CMAKE_CURRENT_SOURCE_DIR}/logger
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
