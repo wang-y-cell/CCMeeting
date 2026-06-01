@@ -71,7 +71,7 @@ Widget::Widget(QWidget *parent)
 
     //初始化这些按钮是不能点击的状态
     //ui->exitmeetBtn->setDisabled(true);
-    ui->joinmeetBtn->setDisabled(true);
+    //ui->joinmeetBtn->setDisabled(true);
     ui->openAudio->setDisabled(true);
     ui->openVedio->setDisabled(true);
     ui->sendmsg->setDisabled(true);
@@ -207,7 +207,7 @@ void Widget::closeEvent(QCloseEvent *event)
 void Widget::resetMeetingUi()
 {
     //ui->exitmeetBtn->setDisabled(true);
-    ui->joinmeetBtn->setDisabled(false);
+    //ui->joinmeetBtn->setDisabled(false);
     ui->openAudio->setDisabled(true);
     ui->openVedio->setDisabled(true);
     ui->sendmsg->setDisabled(true);
@@ -406,7 +406,7 @@ bool Widget::on_connServer(QString ip, QString port) {
         ui->openAudio->setDisabled(true);
         ui->openVedio->setDisabled(true);
         //ui->exitmeetBtn->setDisabled(true);
-        ui->joinmeetBtn->setDisabled(false);
+        //ui->joinmeetBtn->setDisabled(false);
         LOG_INFO("Widget", "succeed connecting to " << ip.toStdString() << ":" << port.toStdString());
         ui->sendmsg->setDisabled(true);
         return true;
@@ -452,7 +452,7 @@ void Widget::datasolve(MESG *msg)
             _createmeet = true;
             //ui->exitmeetBtn->setDisabled(false);
             ui->openVedio->setDisabled(false);
-            ui->joinmeetBtn->setDisabled(true);
+            //ui->joinmeetBtn->setDisabled(true);
             ui->sendmsg->setDisabled(false);
 
             LOG_INFO("Widget", "succeed creating room " << roomno);
@@ -483,7 +483,7 @@ void Widget::datasolve(MESG *msg)
             LOG_WARN("Widget", "meeting not exist");
             //ui->exitmeetBtn->setDisabled(true);
             ui->openVedio->setDisabled(true);
-            ui->joinmeetBtn->setDisabled(false);
+            //ui->joinmeetBtn->setDisabled(false);
             ui->sendmsg->setDisabled(true);
             _joinmeet = false;
         }
@@ -504,7 +504,7 @@ void Widget::datasolve(MESG *msg)
                 ui->groupBox_2->setTitle(QHostAddress(mainip).toString());
                 m_avatarImg.showImage(QImage(QString::fromUtf8(Source::default_avatar)));
             }
-            ui->joinmeetBtn->setDisabled(true);
+            //ui->joinmeetBtn->setDisabled(true);
             //ui->exitmeetBtn->setDisabled(false);
             ui->sendmsg->setDisabled(false);
             _joinmeet = true;
@@ -602,7 +602,7 @@ void Widget::datasolve(MESG *msg)
         const bool wasInMeeting = _createmeet || _joinmeet;
         endMeetingSession();
         ui->outlog->setText(QString("关闭与服务器的连接"));
-        ui->joinmeetBtn->setDisabled(true);
+        //ui->joinmeetBtn->setDisabled(true);
         if (wasInMeeting)
             QMessageBox::warning(this, "Meeting Information", "会议结束" , QMessageBox::Yes, QMessageBox::Yes);
     }
@@ -611,7 +611,7 @@ void Widget::datasolve(MESG *msg)
         const bool wasInMeeting = _createmeet || _joinmeet;
         endMeetingSession();
         ui->outlog->setText(QString("网络异常......"));
-        ui->joinmeetBtn->setDisabled(true);
+        //ui->joinmeetBtn->setDisabled(true);
         if (wasInMeeting)
             QMessageBox::warning(this, "Network Error", "网络异常" , QMessageBox::Yes, QMessageBox::Yes);
     }
@@ -752,9 +752,8 @@ void Widget::recvip(quint32 ip)
  * 加入会议
  */
 
-void Widget::on_joinmeetBtn_clicked() {
-    LOG_INFO("on_joinmeetBtn_clicked", "点击加入会议按钮");
-    QString roomNo = ui->meetno->text();
+void Widget::on_joinmeetBtn(QString roomNo) {
+    LOG_INFO("on_joinmeetBtn", "加入会议房间号: " << roomNo.toStdString());
 
     QRegularExpression roomreg("^[1-9][0-9]{1,4}$"); //房间号正则表达式
     QRegularExpressionValidator  roomvalidate(roomreg);
