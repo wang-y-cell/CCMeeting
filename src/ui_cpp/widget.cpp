@@ -21,6 +21,7 @@
 #include <QSoundEffect>
 #include <QCloseEvent>
 #include <qnamespace.h>
+#include <QSplitter>
 QRect  Widget::pos = QRect(-1, -1, -1, -1);
 
 Widget::Widget(QWidget *parent)
@@ -49,6 +50,8 @@ Widget::Widget(QWidget *parent)
     Widget::pos = QRect(0.1 * Screen::width, 0.1 * Screen::height, 0.8 * Screen::width, 0.8 * Screen::height);
 
     ui->setupUi(this);  //解析ui文件
+    
+
 
     m_videoImg.setTarget(ui->mainshow_label);
     m_videoImg.setDrawMode(ImgDisplay::DrawMode::FitWidgetSmooth); //设置视频显示模式
@@ -67,7 +70,7 @@ Widget::Widget(QWidget *parent)
     //设置窗口最大最小值
     this->setMinimumSize(QSize(Widget::pos.width() * 0.7, Widget::pos.height() * 0.7));
     this->setMaximumSize(QSize(Widget::pos.width(), Widget::pos.height()));
-
+    this->resize(QSize(Widget::pos.width() * 0.5, Widget::pos.height() * 0.5));
 
     //初始化这些按钮是不能点击的状态
     //ui->exitmeetBtn->setDisabled(true);
@@ -155,8 +158,7 @@ void Widget::initPermanentWorkers()
 /**
 获得frame将frame放入标签中,根据是否是主屏幕判断放在哪个标签中
 */
-void Widget::cameraImageCapture(QVideoFrame frame)
-{
+void Widget::cameraImageCapture(QVideoFrame frame) {
     if(frame.isValid()) //如果是有效的视频帧
     {
         QVideoFrame cloneFrame(frame); 
@@ -206,8 +208,6 @@ void Widget::closeEvent(QCloseEvent *event)
 
 void Widget::resetMeetingUi()
 {
-    //ui->exitmeetBtn->setDisabled(true);
-    //ui->joinmeetBtn->setDisabled(false);
     ui->openAudio->setDisabled(true);
     ui->openVedio->setDisabled(true);
     ui->sendmsg->setDisabled(true);
@@ -312,8 +312,7 @@ void Widget::paintEvent(QPaintEvent *event)
 
 void Widget::on_openVedio_clicked()
 {
-    if(_camera->isActive())
-    {
+    if(_camera->isActive()) {
         _camera->stop();
         LOG_INFO("Widget", "close camera");
         if(_camera->error() == QCamera::NoError)
@@ -325,9 +324,7 @@ void Widget::on_openVedio_clicked()
         }
         if (_mytcpSocket)
             closeImg(_mytcpSocket->getlocalip());
-    }
-    else
-    {
+    } else {
         _camera->start();
         LOG_INFO("Widget", "open camera");
         if(_camera->error() == QCamera::NoError)
@@ -405,223 +402,231 @@ bool Widget::on_connServer(QString ip, QString port) {
         ui->outlog->setText("成功连接到" + ip + ":" + port);
         ui->openAudio->setDisabled(true);
         ui->openVedio->setDisabled(true);
-        //ui->exitmeetBtn->setDisabled(true);
-        //ui->joinmeetBtn->setDisabled(false);
         LOG_INFO("Widget", "succeed connecting to " << ip.toStdString() << ":" << port.toStdString());
         ui->sendmsg->setDisabled(true);
         return true;
     }
-    ui->outlog->setText("连接失败,请重新连接...");
     LOG_WARN("Widget", "failed to connect " << ip.toStdString() << ":" << port.toStdString());
-    QMessageBox::warning(this, "Connection error", _mytcpSocket->errorString(), QMessageBox::Yes, QMessageBox::Yes);
+    hide();
     return false;
 }
 
 
-void Widget::cameraError(QCamera::Error, const QString &errorString)
-{
+void Widget::cameraError(QCamera::Error, const QString &errorString) {
     const QString msg = errorString.isEmpty() ? _camera->errorString() : errorString;
     QMessageBox::warning(this, "Camera error", msg, QMessageBox::Yes, QMessageBox::Yes);
 }
 
 
 
-void Widget::audioError(QString err)
-{
+void Widget::audioError(QString err) {
     QMessageBox::warning(this, "Audio error", err, QMessageBox::Yes);
 }
 
 
 
-void Widget::datasolve(MESG *msg)
+void Widget::handleCreateMeetingResponse(MESG *msg)
 {
-    LOG_INFO("Widget::datasolve", "收到消息: msg_type = " << static_cast<int>(msg->msg_type) << " len = " << msg->len);
-    if(msg->msg_type == CREATE_MEETING_RESPONSE)
-    {
-        int roomno = 0;
-        if (msg->data != nullptr && msg->len >= static_cast<long>(sizeof(int))) {
-            memcpy(&roomno, msg->data, sizeof(int));
-        }
-        LOG_INFO("Widget", "CREATE_MEETING_RESPONSE roomno: " << roomno << " len: " << msg->len);
-
-        if(roomno != 0) {
-            QMessageBox::information(this, "Room No", QString("房间号：%1").arg(roomno), QMessageBox::Yes, QMessageBox::Yes);
-
-            ui->groupBox_2->setTitle(QString("主屏幕(房间号: %1)").arg(roomno));
-            ui->outlog->setText(QString("创建成功 房间号: %1").arg(roomno) );
-            _createmeet = true;
-            //ui->exitmeetBtn->setDisabled(false);
-            ui->openVedio->setDisabled(false);
-            //ui->joinmeetBtn->setDisabled(true);
-            ui->sendmsg->setDisabled(false);
-
-            LOG_INFO("Widget", "succeed creating room " << roomno);
-            if (_mytcpSocket) {
-                addPartner(_mytcpSocket->getlocalip());
-                mainip = _mytcpSocket->getlocalip();
-                ui->groupBox_2->setTitle(QHostAddress(mainip).toString());
-                m_avatarImg.showImage(QImage(QString::fromUtf8(Source::default_avatar)));
-            }
-        }
-        else
-        {
-            _createmeet = false;
-            QMessageBox::information(this, "Room Information", QString("无可用房间"), QMessageBox::Yes, QMessageBox::Yes);
-            ui->outlog->setText(QString("无可用房间"));
-            LOG_WARN("Widget", "no empty room");
-        }
+    int roomno = 0;
+    if (msg->data != nullptr && msg->len >= static_cast<long>(sizeof(int))) {
+        memcpy(&roomno, msg->data, sizeof(int));
     }
-    else if(msg->msg_type == JOIN_MEETING_RESPONSE)
-    {
-        LOG_INFO("Widget", "JOIN_MEETING_RESPONSE消息类型");
-        qint32 c;
-        memcpy(&c, msg->data, msg->len);
-        if(c == 0)
-        {
-            QMessageBox::information(this, "Meeting Error", tr("会议不存在") , QMessageBox::Yes, QMessageBox::Yes);
-            ui->outlog->setText(QString("会议不存在"));
-            LOG_WARN("Widget", "meeting not exist");
-            //ui->exitmeetBtn->setDisabled(true);
-            ui->openVedio->setDisabled(true);
-            //ui->joinmeetBtn->setDisabled(false);
-            ui->sendmsg->setDisabled(true);
-            _joinmeet = false;
-        }
-        else if(c == -1)
-        {
-            QMessageBox::warning(this, "Meeting information", "成员已满，无法加入" , QMessageBox::Yes, QMessageBox::Yes);
-            ui->outlog->setText(QString("成员已满，无法加入"));
-            LOG_WARN("Widget", "full room, cannot join");
-        }
-        else if (c > 0)
-        {
-            QMessageBox::warning(this, "Meeting information", "加入成功" , QMessageBox::Yes, QMessageBox::Yes);
-            ui->outlog->setText(QString("加入成功"));
-            LOG_INFO("Widget", "succeed joining room");
-            if (_mytcpSocket) {
-                addPartner(_mytcpSocket->getlocalip());
-                mainip = _mytcpSocket->getlocalip();
-                ui->groupBox_2->setTitle(QHostAddress(mainip).toString());
-                m_avatarImg.showImage(QImage(QString::fromUtf8(Source::default_avatar)));
-            }
-            //ui->joinmeetBtn->setDisabled(true);
-            //ui->exitmeetBtn->setDisabled(false);
-            ui->sendmsg->setDisabled(false);
-            _joinmeet = true;
-        }
-    }
-    else if(msg->msg_type == IMG_RECV)
-    {
-        QHostAddress a(msg->ip);
-        LOG_DEBUG("Widget", "IMG_RECV from " << a.toString().toStdString());
-        QImage img;
-        img.loadFromData(msg->data, msg->len);
-        if(partner.count(msg->ip) == 1)
-        {
-            Partner* p = partner[msg->ip];
-            p->setpic(img);
-        }
-        else
-        {
-            Partner* p = addPartner(msg->ip);
-            p->setpic(img);
-        }
+    LOG_INFO("Widget", "CREATE_MEETING_RESPONSE roomno: " << roomno << " len: " << msg->len);
 
-        if(msg->ip == mainip)
-        {
-            m_videoImg.showImage(img);
-        }
-        repaint();
-    } else if(msg->msg_type == TEXT_RECV) {
-        QString str = QString::fromUtf8(reinterpret_cast<const char *>(msg->data), static_cast<int>(msg->len));
-        //qDebug() << str;
-        QString time = QString::number(QDateTime::currentDateTimeUtc().toSecsSinceEpoch());
-        ChatMessage *message = new ChatMessage(ui->listWidget);
-        QListWidgetItem *item = new QListWidgetItem();
-        //判断是否显示时间
-        dealMessageTime(time);
-        //显示消息
-        dealMessage(message, item, str, time, QHostAddress(msg->ip).toString() ,ChatMessage::User_She);
-        //如果发现消息是@自己的就播放提示音
-        if(str.contains('@' + QHostAddress(_mytcpSocket ? _mytcpSocket->getlocalip() : 0).toString())) {
-            _soundEffect->play();
-        }
-    }
-    else if(msg->msg_type == PARTNER_JOIN)
-    {
-        Partner* p = addPartner(msg->ip);
-        if(p)
-        {
-            p->setpic(QImage(QString::fromUtf8(Source::default_avatar)));
-            ui->outlog->setText(QString("%1 join meeting").arg(QHostAddress(msg->ip).toString()));
-            iplist.append(QString("@") + QHostAddress(msg->ip).toString());
-            ui->plainTextEdit->setCompleter(iplist);
-        }
-    }
-    else if(msg->msg_type == PARTNER_EXIT)
-    {
-        removePartner(msg->ip);
-        if(mainip == msg->ip)
-        {
+    if (roomno != 0) {
+        QMessageBox::information(this, "Room No", QString("房间号：%1").arg(roomno), QMessageBox::Yes, QMessageBox::Yes);
+
+        ui->groupBox_2->setTitle(QString("主屏幕(房间号: %1)").arg(roomno));
+        ui->outlog->setText(QString("创建成功 房间号: %1").arg(roomno));
+        _createmeet = true;
+        ui->openVedio->setDisabled(false);
+        ui->sendmsg->setDisabled(false);
+
+        LOG_INFO("Widget", "succeed creating room " << roomno);
+        if (_mytcpSocket) {
+            addPartner(_mytcpSocket->getlocalip());
+            mainip = _mytcpSocket->getlocalip();
+            ui->groupBox_2->setTitle(QHostAddress(mainip).toString());
             m_avatarImg.showImage(QImage(QString::fromUtf8(Source::default_avatar)));
         }
-        if(iplist.removeOne(QString("@") + QHostAddress(msg->ip).toString()))
-        {
-            ui->plainTextEdit->setCompleter(iplist);
-        }
-        else
-        {
-            LOG_WARN("Widget", "iplist remove failed, ip=" << QHostAddress(msg->ip).toString().toStdString());
-        }
-        ui->outlog->setText(QString("%1 exit meeting").arg(QHostAddress(msg->ip).toString()));
+    } else {
+        _createmeet = false;
+        QMessageBox::information(this, "Room Information", QString("无可用房间"), QMessageBox::Yes, QMessageBox::Yes);
+        ui->outlog->setText(QString("无可用房间"));
+        LOG_WARN("Widget", "no empty room");
     }
-    else if (msg->msg_type == CLOSE_CAMERA)
-    {
-	    closeImg(msg->ip);
-    }
-    else if (msg->msg_type == PARTNER_JOIN2)
-    {
-        uint32_t ip;
-        int other = msg->len / sizeof(uint32_t), pos = 0;
-        for (int i = 0; i < other; i++)
-        {
-            memcpy_s(&ip, sizeof(uint32_t), msg->data + pos , sizeof(uint32_t));
-            pos += sizeof(uint32_t);
-			Partner* p = addPartner(ip);
-            if (p)
-            {
-                p->setpic(QImage(QString::fromUtf8(Source::default_avatar)));
-                iplist << QString("@") + QHostAddress(ip).toString();
-            }
+}
+
+void Widget::handleJoinMeetingResponse(MESG *msg)
+{
+    LOG_INFO("Widget", "JOIN_MEETING_RESPONSE消息类型");
+    qint32 c;
+    memcpy(&c, msg->data, msg->len);
+    if (c == 0) {
+        QMessageBox::information(this, "Meeting Error", tr("会议不存在"), QMessageBox::Yes, QMessageBox::Yes);
+        ui->outlog->setText(QString("会议不存在"));
+        LOG_WARN("Widget", "meeting not exist");
+        ui->openVedio->setDisabled(true);
+        ui->sendmsg->setDisabled(true);
+        _joinmeet = false;
+    } else if (c == -1) {
+        QMessageBox::warning(this, "Meeting information", "成员已满，无法加入", QMessageBox::Yes, QMessageBox::Yes);
+        ui->outlog->setText(QString("成员已满，无法加入"));
+        LOG_WARN("Widget", "full room, cannot join");
+    } else if (c > 0) {
+        QMessageBox::warning(this, "Meeting information", "加入成功", QMessageBox::Yes, QMessageBox::Yes);
+        ui->outlog->setText(QString("加入成功"));
+        LOG_INFO("Widget", "succeed joining room");
+        if (_mytcpSocket) {
+            addPartner(_mytcpSocket->getlocalip());
+            mainip = _mytcpSocket->getlocalip();
+            ui->groupBox_2->setTitle(QHostAddress(mainip).toString());
+            m_avatarImg.showImage(QImage(QString::fromUtf8(Source::default_avatar)));
         }
+        ui->sendmsg->setDisabled(false);
+        _joinmeet = true;
+    }
+}
+
+void Widget::handleImgRecv(MESG *msg)
+{
+    QHostAddress a(msg->ip);
+    LOG_DEBUG("Widget", "IMG_RECV from " << a.toString().toStdString());
+    QImage img;
+    img.loadFromData(msg->data, msg->len);
+    if (partner.count(msg->ip) == 1) {
+        Partner *p = partner[msg->ip];
+        p->setpic(img);
+    } else {
+        Partner *p = addPartner(msg->ip);
+        p->setpic(img);
+    }
+
+    if (msg->ip == mainip) {
+        m_videoImg.showImage(img);
+    }
+    repaint();
+}
+
+void Widget::handleTextRecv(MESG *msg)
+{
+    QString str = QString::fromUtf8(reinterpret_cast<const char *>(msg->data), static_cast<int>(msg->len));
+    QString time = QString::number(QDateTime::currentDateTimeUtc().toSecsSinceEpoch());
+    ChatMessage *message = new ChatMessage(ui->listWidget);
+    QListWidgetItem *item = new QListWidgetItem();
+    dealMessageTime(time);
+    dealMessage(message, item, str, time, QHostAddress(msg->ip).toString(), ChatMessage::User_She);
+    if (str.contains('@' + QHostAddress(_mytcpSocket ? _mytcpSocket->getlocalip() : 0).toString())) {
+        _soundEffect->play();
+    }
+}
+
+void Widget::handlePartnerJoin(MESG *msg)
+{
+    Partner *p = addPartner(msg->ip);
+    if (p) {
+        p->setpic(QImage(QString::fromUtf8(Source::default_avatar)));
+        ui->outlog->setText(QString("%1 join meeting").arg(QHostAddress(msg->ip).toString()));
+        iplist.append(QString("@") + QHostAddress(msg->ip).toString());
         ui->plainTextEdit->setCompleter(iplist);
-        ui->openVedio->setDisabled(false);
     }
-    else if(msg->msg_type == RemoteHostClosedError)
-    {
-        const bool wasInMeeting = _createmeet || _joinmeet;
-        endMeetingSession();
-        ui->outlog->setText(QString("关闭与服务器的连接"));
-        //ui->joinmeetBtn->setDisabled(true);
-        if (wasInMeeting)
-            QMessageBox::warning(this, "Meeting Information", "会议结束" , QMessageBox::Yes, QMessageBox::Yes);
+}
+
+void Widget::handlePartnerExit(MESG *msg)
+{
+    removePartner(msg->ip);
+    if (mainip == msg->ip) {
+        m_avatarImg.showImage(QImage(QString::fromUtf8(Source::default_avatar)));
     }
-    else if(msg->msg_type == OtherNetError)
-    {
-        const bool wasInMeeting = _createmeet || _joinmeet;
-        endMeetingSession();
-        ui->outlog->setText(QString("网络异常......"));
-        //ui->joinmeetBtn->setDisabled(true);
-        if (wasInMeeting)
-            QMessageBox::warning(this, "Network Error", "网络异常" , QMessageBox::Yes, QMessageBox::Yes);
+    if (iplist.removeOne(QString("@") + QHostAddress(msg->ip).toString())) {
+        ui->plainTextEdit->setCompleter(iplist);
+    } else {
+        LOG_WARN("Widget", "iplist remove failed, ip=" << QHostAddress(msg->ip).toString().toStdString());
     }
-    if(msg->data)
-    {
+    ui->outlog->setText(QString("%1 exit meeting").arg(QHostAddress(msg->ip).toString()));
+}
+
+void Widget::handleCloseCamera(MESG *msg)
+{
+    closeImg(msg->ip);
+}
+
+void Widget::handlePartnerJoin2(MESG *msg)
+{
+    uint32_t ip;
+    int other = msg->len / sizeof(uint32_t), pos = 0;
+    for (int i = 0; i < other; i++) {
+        memcpy_s(&ip, sizeof(uint32_t), msg->data + pos, sizeof(uint32_t));
+        pos += sizeof(uint32_t);
+        Partner *p = addPartner(ip);
+        if (p) {
+            p->setpic(QImage(QString::fromUtf8(Source::default_avatar)));
+            iplist << QString("@") + QHostAddress(ip).toString();
+        }
+    }
+    ui->plainTextEdit->setCompleter(iplist);
+    ui->openVedio->setDisabled(false);
+}
+
+void Widget::handleRemoteHostClosedError()
+{
+    const bool wasInMeeting = _createmeet || _joinmeet;
+    endMeetingSession();
+    ui->outlog->setText(QString("关闭与服务器的连接"));
+    if (wasInMeeting)
+        QMessageBox::warning(this, "Meeting Information", "会议结束", QMessageBox::Yes, QMessageBox::Yes);
+}
+
+void Widget::handleOtherNetError()
+{
+    const bool wasInMeeting = _createmeet || _joinmeet;
+    endMeetingSession();
+    ui->outlog->setText(QString("网络异常......"));
+    if (wasInMeeting)
+        QMessageBox::warning(this, "Network Error", "网络异常", QMessageBox::Yes, QMessageBox::Yes);
+}
+
+void Widget::datasolve(MESG *msg) {
+    LOG_INFO("Widget::datasolve", "收到消息: msg_type = " << static_cast<int>(msg->msg_type) << " len = " << msg->len);
+    switch (msg->msg_type) {
+    case CREATE_MEETING_RESPONSE:
+        handleCreateMeetingResponse(msg);
+        break;
+    case JOIN_MEETING_RESPONSE:
+        handleJoinMeetingResponse(msg);
+        break;
+    case IMG_RECV:
+        handleImgRecv(msg);
+        break;
+    case TEXT_RECV:
+        handleTextRecv(msg);
+        break;
+    case PARTNER_JOIN:
+        handlePartnerJoin(msg);
+        break;
+    case PARTNER_EXIT:
+        handlePartnerExit(msg);
+        break;
+    case CLOSE_CAMERA:
+        handleCloseCamera(msg);
+        break;
+    case PARTNER_JOIN2:
+        handlePartnerJoin2(msg);
+        break;
+    case RemoteHostClosedError:
+        handleRemoteHostClosedError();
+        break;
+    case OtherNetError:
+        handleOtherNetError();
+        break;
+    default:
+        break;
+    }
+    if (msg->data) {
         free(msg->data);
         msg->data = NULL;
     }
-    if(msg)
-    {
+    if (msg) {
         free(msg);
         msg = NULL;
     }

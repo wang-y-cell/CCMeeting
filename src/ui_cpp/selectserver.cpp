@@ -11,6 +11,8 @@ SelectServer::SelectServer(QWidget *parent) :
 {
     ui->setupUi(this);
     this->parent = parent;
+    ui->ip->setText(ip);
+    ui->port->setText(port);
     connect(ui->ConnServer_btn,&QPushButton::clicked,this,&SelectServer::on_connServer_clicked);
 }
 

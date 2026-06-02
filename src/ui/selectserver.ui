@@ -55,7 +55,7 @@
        </rect>
       </property>
       <property name="text">
-       <string>127.0.0.1</string>
+       <string/>
       </property>
      </widget>
      <widget class="QLineEdit" name="port">
@@ -68,7 +68,7 @@
        </rect>
       </property>
       <property name="text">
-       <string>8888</string>
+       <string/>
       </property>
      </widget>
      <widget class="QPushButton" name="ConnServer_btn">

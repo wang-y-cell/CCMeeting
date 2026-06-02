@@ -67,6 +67,17 @@ private:
     void dealMessage(ChatMessage *messageW, QListWidgetItem *item, QString text, QString time, QString ip ,ChatMessage::User_Type type); //用户发送文本
     void dealMessageTime(QString curMsgTime); //处理时间
 
+    void handleCreateMeetingResponse(MESG *msg);//创建会议响应
+    void handleJoinMeetingResponse(MESG *msg);//加入会议响应
+    void handleImgRecv(MESG *msg);//图像接收
+    void handleTextRecv(MESG *msg);//文本接收
+    void handlePartnerJoin(MESG *msg);//人员加入
+    void handlePartnerExit(MESG *msg);//人员退出
+    void handleCloseCamera(MESG *msg);//关闭摄像头
+    void handlePartnerJoin2(MESG *msg);//人员加入2
+    void handleRemoteHostClosedError();//远程主机关闭错误
+    void handleOtherNetError();//其他网络错误
+
     //音频
     AudioInput* _ainput;
     QThread* _ainputThread;
