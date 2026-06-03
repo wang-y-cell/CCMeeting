@@ -44,6 +44,7 @@ void main_window::CreateMeeting_button_clicked() {
 
     widget->show();
     if (widget->on_connServer(this->ip, this->port)) {
+        LOG_INFO("main_window", "连接服务器成功: ip: " << this->ip.toStdString() << " port: " << this->port.toStdString());
         widget->on_createmeetBtn_clicked();
     }else {
         QMessageBox::warning(this, "Connection error","连接服务器失败", QMessageBox::Yes, QMessageBox::Yes);
@@ -77,7 +78,7 @@ void main_window::JoinMeeting_button_clicked() {
 
 void main_window::ConnectToServer_button_clicked() {
     LOG_INFO("main_window", "点击连接服务器按钮");
-    SelectServer selectServer(this);
+    SelectServer selectServer(this, this->ip, this->port);
     if (selectServer.exec() == QDialog::Accepted) {
         this->ip = selectServer.getIP();
         this->port = selectServer.getPort();

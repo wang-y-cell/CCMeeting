@@ -6,6 +6,9 @@
 #include <QMetaObject>
 #include <QMutexLocker>
 #include <QEventLoop>
+#include <QRegularExpression>
+#include <QRegularExpressionValidator>
+#include <QMessageBox>
 #include <iomanip>
 
 extern QUEUE_DATA<MESG> queue_send;
@@ -236,8 +239,7 @@ void MyTcpSocket::recvFromSocket() {
 		return;
 	}
     qint64 ret = _socktcp->read((char *) recvbuf + hasrecvive, availbytes);
-    if (ret <= 0)
-    {
+    if (ret <= 0) {
         LOG_DEBUG("MyTcpSocket", "recvFromSocket read returned " << ret);
 		return;
     }
@@ -610,4 +612,28 @@ quint32 MyTcpSocket::getlocalip() {
         return _localIp;
     }
     return static_cast<quint32>(-1);
+}
+
+bool MyTcpSocket::IpPortValid(QWidget *parent, QString ip, QString port) {
+	QRegularExpression ipreg(
+			R"(^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$)"
+		);
+		//port
+		QRegularExpression portreg("^([0-9]|[1-9]\\d|[1-9]\\d{2}|[1-9]\\d{3}|[1-5]\\d{4}|6[0-4]\\d{3}|65[0-4]\\d{2}|655[0-2]\\d|6553[0-5])$");
+		//判断是否有效
+		QRegularExpressionValidator ipvalidate(ipreg), portvalidate(portreg);
+		int pos = 0;
+		if(ipvalidate.validate(ip, pos) != QValidator::Acceptable) {
+			LOG_WARN("MyTcpSocket", "Ip Error");
+			QMessageBox::warning(parent, "Input Error", "Ip Error", QMessageBox::Yes, QMessageBox::Yes);
+			return false;
+		}
+
+		if(portvalidate.validate(port, pos) != QValidator::Acceptable) {
+			LOG_WARN("MyTcpSocket", "Port Error");
+			QMessageBox::warning(parent, "Input Error", "Port Error", QMessageBox::Yes, QMessageBox::Yes);
+			return false;
+		}
+
+		return true;
 }

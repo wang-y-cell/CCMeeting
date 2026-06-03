@@ -5,24 +5,30 @@
 #include <QRegularExpressionValidator>
 #include <QMessageBox>
 
-SelectServer::SelectServer(QWidget *parent) :
+SelectServer::SelectServer(QWidget *parent, QString _ip, QString _port) :
     QDialog(parent),
-    ui(new Ui::SelectServer)
+    ui(new Ui::SelectServer),
+    ip(_ip),
+    port(_port)
 {
     ui->setupUi(this);
     this->parent = parent;
-    ui->ip->setText(ip);
-    ui->port->setText(port);
+    ui->ip->setText(_ip);
+    ui->port->setText(_port);
     connect(ui->ConnServer_btn,&QPushButton::clicked,this,&SelectServer::on_connServer_clicked);
 }
 
-SelectServer::~SelectServer()
-{
+SelectServer::~SelectServer() {
     delete ui;
 }
 
 void SelectServer::on_connServer_clicked() {
     LOG_INFO("SlectServer","点击连接服务器按钮");
+
+    if(!MyTcpSocket::IpPortValid(this, ui->ip->text(), ui->port->text())) {
+        LOG_WARN("SelectServer", "ip or port 格式错误");
+        return;
+    }
     ip = ui->ip->text();
     port = ui->port->text();
     accept();

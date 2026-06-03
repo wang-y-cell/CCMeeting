@@ -375,29 +375,12 @@ bool Widget::on_connServer(QString ip, QString port) {
     repaint();
     //正则表达式
     //ip
-    QRegularExpression ipreg(
-        R"(^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$)"
-    );
-    //port
-    QRegularExpression portreg("^([0-9]|[1-9]\\d|[1-9]\\d{2}|[1-9]\\d{3}|[1-5]\\d{4}|6[0-4]\\d{3}|65[0-4]\\d{2}|655[0-2]\\d|6553[0-5])$");
-    //判断是否有效
-    QRegularExpressionValidator ipvalidate(ipreg), portvalidate(portreg);
-    int pos = 0;
-    if(ipvalidate.validate(ip, pos) != QValidator::Acceptable)
-    {
-        LOG_WARN("Widget", "Ip Error");
-        QMessageBox::warning(this, "Input Error", "Ip Error", QMessageBox::Yes, QMessageBox::Yes);
-        return false;
-    }
-    if(portvalidate.validate(port, pos) != QValidator::Acceptable)
-    {
-        LOG_WARN("Widget", "Port Error");
-        QMessageBox::warning(this, "Input Error", "Port Error", QMessageBox::Yes, QMessageBox::Yes);
+    if(!MyTcpSocket::IpPortValid(this, ip, port)) {
+        LOG_WARN("Widget", "ip or port 格式错误");
         return false;
     }
 
-    if(_mytcpSocket->connectToServer(ip, port, QIODevice::ReadWrite))
-    {
+    if(_mytcpSocket->connectToServer(ip, port, QIODevice::ReadWrite)) {
         _sessionActive = true;
         ui->outlog->setText("成功连接到" + ip + ":" + port);
         ui->openAudio->setDisabled(true);
@@ -457,8 +440,7 @@ void Widget::handleCreateMeetingResponse(MESG *msg)
     }
 }
 
-void Widget::handleJoinMeetingResponse(MESG *msg)
-{
+void Widget::handleJoinMeetingResponse(MESG *msg) {
     LOG_INFO("Widget", "JOIN_MEETING_RESPONSE消息类型");
     qint32 c;
     memcpy(&c, msg->data, msg->len);
@@ -637,23 +619,19 @@ void Widget::datasolve(MESG *msg) {
 
 Partner* Widget::addPartner(quint32 ip)
 {
-	if (partner.contains(ip)) return NULL; //如果存在这个ip,返回null
+	if (partner.contains(ip)) return nullptr; //如果存在这个ip,返回null
     Partner *p = new Partner(ui->scrollAreaWidgetContents ,ip); //创建一个新的Partner对象
-    if (p == NULL) //如果创建失败，则返回空
-    {
-        LOG_ERROR("Widget", "new Partner failed");
-        return NULL; //返回空
-    }
-    else //如果创建成功，则连接信号和槽
-    {
+    if (p == nullptr) /*如果创建失败，则返回空*/ {
+        LOG_ERROR("Widget", "创建Partner对象失败");
+        return nullptr; //返回空
+    } else /*如果创建成功，则连接信号和槽*/ {
 		connect(p, SIGNAL(sendip(quint32)), this, SLOT(recvip(quint32)));
         LOG_DEBUG("Widget", "将这个用户添加到partner中");
 		partner.insert(ip, p);
 		ui->verticalLayout_3->addWidget(p, 1);
 
 		//当有人员加入时，开启滑动条滑动事件，开启输入(只有自己时，不打开)
-        if (partner.size() > 1 && _ainput && _aoutput)
-        {
+        if (partner.size() > 1 && _ainput && _aoutput) {
 			const Qt::ConnectionType uniqueAuto =
 				static_cast<Qt::ConnectionType>(int(Qt::AutoConnection) | int(Qt::UniqueConnection));
 			connect(this, SIGNAL(volumnChange(int)), _ainput, SLOT(setVolumn(int)), uniqueAuto);

@@ -43,6 +43,7 @@ public:
     QString errorString();
     void disconnectFromHost();
     quint32 getlocalip();
+    static bool IpPortValid(QWidget *parent, QString ip, QString port);
 
 private:
     void run() override;

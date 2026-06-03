@@ -3,6 +3,7 @@
 
 #include <QDialog>
 #include "main_window.h"
+#include <QMessageBox>
 
 namespace Ui {
 class SelectServer;
@@ -12,7 +13,7 @@ class SelectServer : public QDialog
 {
     Q_OBJECT
 public:
-    explicit SelectServer(QWidget *parent = nullptr);
+    explicit SelectServer(QWidget *parent = nullptr, QString _ip = "127.0.0.1", QString _port = "8888");
     ~SelectServer();
     QString getIP();
     QString getPort();
