@@ -21,10 +21,12 @@ Partner::Partner(QWidget *parent, quint32 p):QLabel(parent)
 void Partner::resizeEvent(QResizeEvent *event)
 {
     QLabel::resizeEvent(event);
-    const int newW = width();
+    const int newW = event->size().width();
     if (newW <= 10 || newW == w)
         return;
     w = newW;
+    // 高度随宽度固定为方形，避免 setPixmap 改变 sizeHint 后触发滚动条显隐
+    setFixedHeight(w);
     updatePixmap();
 }
 

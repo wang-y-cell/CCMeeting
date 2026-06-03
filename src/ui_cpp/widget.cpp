@@ -109,6 +109,8 @@ Widget::Widget(QWidget *parent)
             "QScrollBar::sub-line:vertical:hover { height:9px; width:8px; border-image:url(:/images/a/2.png); subcontrol-position:top; } "
             "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background:rgba(0,0,0,10%); border-radius:4px; }"
         );
+    // 始终显示竖向滚动条，避免 Partner 在临界宽度下因滚动条显隐导致可用宽度 ±8px 振荡
+    ui->scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
     ui->scrollArea->verticalScrollBar()->setStyleSheet(verticalScrollBarStyle);
     ui->listWidget->setStyleSheet(verticalScrollBarStyle);
 
