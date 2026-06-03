@@ -41,6 +41,34 @@ void ChatMessage::setTextSuccess()
     m_isSending = true;
 }
 
+QSize ChatMessage::relayoutForWidth(int width)
+{
+    if (width <= 0)
+        width = this->width();
+    if (width <= 0)
+        return sizeHint();
+
+    setFixedWidth(width);
+    if (m_userType == User_Time) {
+        const QSize size(width, 40);
+        resize(size);
+        m_allSize = size;
+        m_curTime = QDateTime::fromSecsSinceEpoch(m_time.toInt()).toString("ddd hh:mm");
+        update();
+        return size;
+    }
+
+    const QSize size = fontRect(m_msg);
+    m_allSize = size;
+    if (m_userType == User_Me && !m_isSending && m_loading && m_loading->isVisible()) {
+        m_loading->move(
+            m_kuangRightRect.x() - m_loading->width() - 10,
+            m_kuangRightRect.y() + m_kuangRightRect.height() / 2 - m_loading->height() / 2);
+    }
+    update();
+    return size;
+}
+
 void ChatMessage::setText(QString text, QString time, QSize allSize, QString ip,ChatMessage::User_Type userType)
 {
     m_msg = text;
@@ -80,9 +108,9 @@ QSize ChatMessage::fontRect(QString str)
     int kuangTMP = 20; //框顶部间距
     int textSpaceRect = 12; //文本与气泡框内边距
     //气泡框宽度 = 控件总宽度 - 额外宽度 - 2 × (头像宽 + 头像与边缘的间距 + 头像边框宽度),左右两边都有头像区域
-    m_kuangWidth = this->width() - kuangTMP - 2*(iconWH+iconSpaceW+iconRectW);
+    m_kuangWidth = qMax(20, this->width() - kuangTMP - 2 * (iconWH + iconSpaceW + iconRectW));
     //文本宽度 = 气泡框宽度 - 2 × (文本与气泡框内边距)
-    m_textWidth = m_kuangWidth - 2*textSpaceRect; //文本宽度
+    m_textWidth = qMax(1, m_kuangWidth - 2 * textSpaceRect); //文本宽度
     //文本之外的空白区域宽度
     m_spaceWid = this->width() - m_textWidth; //文本之外的空白区域宽度
     m_iconLeftRect = QRect(iconSpaceW, iconTMPH + 10, iconWH, iconWH); //左头像矩形
@@ -94,18 +122,19 @@ QSize ChatMessage::fontRect(QString str)
 
     LOG_DEBUG("ChatMessage", "fontRect size " << size.width() << "x" << size.height());
     int hei = size.height() < minHei ? minHei : size.height(); //如果文本高度小于最小高度,则高度为最小高度,否则为文本高度
+    const int sanjiaoHei = qMax(1, hei - m_lineHeight);
 
     m_sanjiaoLeftRect = QRect(
         iconWH+iconSpaceW+iconRectW, //头像右侧边缘
         m_lineHeight/2 + 10, //垂直居中
         sanJiaoW, //宽度
-        hei - m_lineHeight //高度
+        sanjiaoHei //高度
     );
     m_sanjiaoRightRect = QRect(
         this->width() - iconRectW - iconWH - iconSpaceW - sanJiaoW, 
         m_lineHeight/2+10, //垂直居中
         sanJiaoW, //宽度
-        hei - m_lineHeight //高度
+        sanjiaoHei //高度
     );
 
     if(size.width() < (m_textWidth+m_spaceWid)) {

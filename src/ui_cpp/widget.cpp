@@ -20,6 +20,7 @@
 #include <QStringListModel>
 #include <QSoundEffect>
 #include <QCloseEvent>
+#include <QEvent>
 #include <qnamespace.h>
 #include <QSplitter>
 QRect  Widget::pos = QRect(-1, -1, -1, -1);
@@ -66,15 +67,19 @@ Widget::Widget(QWidget *parent)
     ui->openAudio->setText(QString(OPENAUDIO).toUtf8());
     ui->openVedio->setText(QString(OPENVIDEO).toUtf8());
 
-    this->setGeometry(Widget::pos); //设置我的窗口位置
+    QRect size = QRect(Widget::pos.x(),
+                       Widget::pos.y(), 
+                       Widget::pos.width() * 0.5, 
+                       Widget::pos.height() * 0.5
+                    );
+
+    this->setGeometry(size); //设置我的窗口位置
     //设置窗口最大最小值
     this->setMinimumSize(QSize(Widget::pos.width() * 0.7, Widget::pos.height() * 0.7));
     this->setMaximumSize(QSize(Widget::pos.width(), Widget::pos.height()));
-    this->resize(QSize(Widget::pos.width() * 0.5, Widget::pos.height() * 0.5));
+    //this->resize(QSize(Widget::pos.width() * 0.5, Widget::pos.height() * 0.5));
 
     //初始化这些按钮是不能点击的状态
-    //ui->exitmeetBtn->setDisabled(true);
-    //ui->joinmeetBtn->setDisabled(true);
     ui->openAudio->setDisabled(true);
     ui->openVedio->setDisabled(true);
     ui->sendmsg->setDisabled(true);
@@ -115,6 +120,9 @@ Widget::Widget(QWidget *parent)
 
     //ui->tabWidget->setCurrentIndex(1);
     ui->tabWidget->setCurrentIndex(0);
+
+    ui->main_box->setSizes(QList<int>{300, 700});
+    ui->listWidget->viewport()->installEventFilter(this);
 
     ui->plainTextEdit->setPlaceholderText("可@对方私信");
     ui->plainTextEdit->setStyleSheet("color: #AAAAAA;");
@@ -219,6 +227,7 @@ void Widget::resetMeetingUi()
         delete item;
         delete chat;
     }
+    m_lastChatListWidth = -1;
     iplist.clear();
     ui->plainTextEdit->setCompleter(iplist);
 }
@@ -786,11 +795,46 @@ void Widget::on_sendmsg_clicked()
 
 
 
+void Widget::relayoutChatMessages()
+{
+    if (m_inChatRelayout)
+        return;
+
+    const int listWidth = ui->listWidget->viewport()->width();
+    if (listWidth <= 0 || listWidth == m_lastChatListWidth)
+        return;
+
+    m_inChatRelayout = true;
+    m_lastChatListWidth = listWidth;
+
+    ui->listWidget->setUpdatesEnabled(false);
+    for (int i = 0; i < ui->listWidget->count(); ++i) {
+        QListWidgetItem *item = ui->listWidget->item(i);
+        auto *messageW = qobject_cast<ChatMessage *>(ui->listWidget->itemWidget(item));
+        if (!messageW)
+            continue;
+        item->setSizeHint(messageW->relayoutForWidth(listWidth));
+    }
+    ui->listWidget->setUpdatesEnabled(true);
+    ui->listWidget->viewport()->update();
+
+    m_inChatRelayout = false;
+}
+
+bool Widget::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == ui->listWidget->viewport() && event->type() == QEvent::Resize) {
+        relayoutChatMessages();
+    }
+    return QWidget::eventFilter(watched, event);
+}
+
 void Widget::dealMessage(ChatMessage *messageW, QListWidgetItem *item, QString text, QString time, QString ip ,ChatMessage::User_Type type)
 {
     ui->listWidget->addItem(item);
-    messageW->setFixedWidth(ui->listWidget->width());
-    QSize size = messageW->fontRect(text);
+    const int listWidth = ui->listWidget->viewport()->width();
+    messageW->setFixedWidth(listWidth > 0 ? listWidth : ui->listWidget->width());
+    const QSize size = messageW->fontRect(text);
     item->setSizeHint(size);
     messageW->setText(text, time, size, ip, type);
     ui->listWidget->setItemWidget(item, messageW);
@@ -821,13 +865,12 @@ void Widget::dealMessageTime(QString curMsgTime)
         QListWidgetItem* itemTime = new QListWidgetItem();
         // 把这行追加到列表末尾
         ui->listWidget->addItem(itemTime);
-        // 本行占位尺寸：宽度与列表一致，高度固定 40px
-        QSize size = QSize(ui->listWidget->width() , 40);
-        // 将时间行控件设为上述宽高
+        const int listWidth = ui->listWidget->viewport()->width();
+        const int w = listWidth > 0 ? listWidth : ui->listWidget->width();
+        const QSize size(w, 40);
+        messageTime->setFixedWidth(w);
         messageTime->resize(size);
-        // 告知 QListWidget 该行占用多大空间，否则行高可能计算不正确
         itemTime->setSizeHint(size);
-        // 填入要显示的内容（两处均为 curMsgTime；具体样式由 ChatMessage::setText 处理）
         messageTime->setText(curMsgTime, curMsgTime, size);
         // 把控件绑定到该行：列表这一行显示的就是 messageTime（绑定靠此 API，不靠 parent 指向 item）
         ui->listWidget->setItemWidget(itemTime, messageTime);

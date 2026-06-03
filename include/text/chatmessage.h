@@ -29,6 +29,8 @@ public:
     QSize getRealString(QString src);
     /// 根据文本更新各类 QRect，并返回供 QListWidgetItem::setSizeHint 使用的建议尺寸
     QSize fontRect(QString str);
+    /// splitter/窗口尺寸变化后，按新宽度重新排版并返回行高
+    QSize relayoutForWidth(int width);
 
     inline QString text() {return m_msg;}
     inline QString time() {return m_time;}

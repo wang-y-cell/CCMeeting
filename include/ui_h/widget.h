@@ -19,6 +19,7 @@
 #include <QStringListModel>
 #include <QSoundEffect>
 #include <QCloseEvent>
+#include <QEvent>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class Widget; }
@@ -66,6 +67,7 @@ private:
 
     void dealMessage(ChatMessage *messageW, QListWidgetItem *item, QString text, QString time, QString ip ,ChatMessage::User_Type type); //用户发送文本
     void dealMessageTime(QString curMsgTime); //处理时间
+    void relayoutChatMessages();
 
     void handleCreateMeetingResponse(MESG *msg);//创建会议响应
     void handleJoinMeetingResponse(MESG *msg);//加入会议响应
@@ -87,6 +89,9 @@ private:
 
     QSoundEffect* _soundEffect;
 
+    int m_lastChatListWidth = -1;
+    bool m_inChatRelayout = false;
+
     ImgDisplay m_videoImg;   ///< 主画面视频：按宽高比缩放以适配整块 label（尽可能“铺满”可视区域）
     ImgDisplay m_avatarImg; ///< 占位头像：高度为 label 的固定比例并居中
 
@@ -96,6 +101,7 @@ public:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 public slots:
     void on_createmeetBtn_clicked(); //点击创建会议按钮
