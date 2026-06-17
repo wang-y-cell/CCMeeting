@@ -38,13 +38,12 @@ private:
     static QRect pos; //窗口位置
     quint32 mainip; //主屏幕IP
     QCamera *_camera; //摄像头
-    QMediaCaptureSession _captureSession;
+    QMediaCaptureSession _captureSession; //媒体捕获会话
     bool  _createmeet; //是否创建会议
     bool _joinmeet; //是否加入会议
     bool _openCamera; //是否打开摄像头
     bool _sessionActive; //是否已连接服务器（会议会话）
     MyVideoSurface *_myvideosurface; //视频表面
-    QVideoFrame mainshow; //主屏幕视频
     SendImg *_sendImg; //发送图像
     RecvSolve *_recvThread; //接收线程
     SendText * _sendText;
@@ -105,7 +104,7 @@ private slots:
     void audioError(QString); //音频错误处理
     void datasolve(MESG *); //数据处理
     void recvip(quint32); //接收IP
-    void cameraImageCapture(QVideoFrame frame); //摄像头图像捕获
+    void cameraImageCapture(const QVideoFrame &frame); //摄像头图像捕获
     void speaks(QString); //说话
     void on_sendmsg_clicked(); //发送消息
     void textSend(); //发送文本

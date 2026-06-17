@@ -6,6 +6,9 @@
 #include <QVideoFrame>
 #include <QImage>
 
+/**
+* 
+*/
 class MyVideoSurface : public QObject
 {
     Q_OBJECT

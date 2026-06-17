@@ -8,8 +8,7 @@ MyVideoSurface::MyVideoSurface(QObject *parent)
     connect(m_videoSink, &QVideoSink::videoFrameChanged, this, &MyVideoSurface::handleVideoFrame);
 }
 
-QVideoSink* MyVideoSurface::getVideoSink() const
-{
+QVideoSink* MyVideoSurface::getVideoSink() const {
     return m_videoSink;
 }
 
