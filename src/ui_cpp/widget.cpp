@@ -50,10 +50,25 @@ Widget::Widget(QWidget *parent)
     //将窗口的位置设置为我的电脑频幕的相对位置
     Widget::pos = QRect(0.1 * Screen::width, 0.1 * Screen::height, 0.8 * Screen::width, 0.8 * Screen::height);
 
+    initUI();  //初始化UI
+
+    mainip = 0; //主屏幕显示的用户IP图像
+
+    //配置摄像头（网络/音视频线程在 initPermanentWorkers 中一次性创建）
+    _camera = new QCamera(this);
+    connect(_camera, &QCamera::errorOccurred, this, &Widget::cameraError); //摄像头错误处理
+    _myvideosurface = new MyVideoSurface(this); //视频表面
+    connect(_myvideosurface, SIGNAL(frameAvailable(QVideoFrame)), this, SLOT(cameraImageCapture(QVideoFrame)));
+
+    _captureSession.setCamera(_camera);
+    _captureSession.setVideoSink(_myvideosurface->getVideoSink());
+
+    initPermanentWorkers();
+}
+
+void Widget::initUI() {
     ui->setupUi(this);  //解析ui文件
     
-
-
     m_videoImg.setTarget(ui->mainshow_label);
     m_videoImg.setDrawMode(ImgDisplay::DrawMode::FitWidgetSmooth); //设置视频显示模式
     m_videoImg.setAlignment(Qt::AlignCenter);
@@ -62,7 +77,6 @@ Widget::Widget(QWidget *parent)
     m_avatarImg.setDrawMode(ImgDisplay::DrawMode::ScaleToHeightFractionCentered); //设置头像显示模式
     m_avatarImg.setHeightFraction(0.1);
     m_avatarImg.setAlignment(Qt::AlignCenter);
-
     //设置打开视频和音频的按钮
     ui->openAudio->setText(QString(OPENAUDIO).toUtf8());
     ui->openVedio->setText(QString(OPENVIDEO).toUtf8());
@@ -83,17 +97,6 @@ Widget::Widget(QWidget *parent)
     ui->openAudio->setDisabled(true);
     ui->openVedio->setDisabled(true);
     ui->sendmsg->setDisabled(true);
-    mainip = 0; //主屏幕显示的用户IP图像
-
-    //配置摄像头（网络/音视频线程在 initPermanentWorkers 中一次性创建）
-    _camera = new QCamera(this);
-    connect(_camera, &QCamera::errorOccurred, this, &Widget::cameraError);
-    _myvideosurface = new MyVideoSurface(this);
-    connect(_myvideosurface, SIGNAL(frameAvailable(QVideoFrame)), this, SLOT(cameraImageCapture(QVideoFrame)));
-
-    _captureSession.setCamera(_camera);
-    _captureSession.setVideoSink(_myvideosurface->getVideoSink());
-
     _soundEffect = new QSoundEffect(this);
     _soundEffect->setSource(QUrl("qrc:/myEffect/2.wav"));
     _soundEffect->setVolume(1.0);
@@ -130,7 +133,7 @@ Widget::Widget(QWidget *parent)
     ui->plainTextEdit->setStyleSheet("color: #AAAAAA;");
     this->setStyleSheet("background-color:rgb(46, 46, 46)");
 
-    initPermanentWorkers();
+
 }
 
 void Widget::initPermanentWorkers()

@@ -13,10 +13,8 @@ QVideoSink* MyVideoSurface::getVideoSink() const
     return m_videoSink;
 }
 
-void MyVideoSurface::handleVideoFrame(const QVideoFrame &frame)
-{
-    if (frame.isValid())
-    {
+void MyVideoSurface::handleVideoFrame(const QVideoFrame &frame) {
+    if (frame.isValid()) {
         QVideoFrame cloneFrame(frame);
         emit frameAvailable(cloneFrame);
     }

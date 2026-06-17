@@ -29,7 +29,9 @@ class QCameraImageCapture;
 class MyVideoSurface;
 class SendImg;
 class QListWidgetItem;
-class Widget : public QWidget
+
+
+class Widget : public QWidget 
 {
     Q_OBJECT
 private:
@@ -41,34 +43,36 @@ private:
     bool _joinmeet; //是否加入会议
     bool _openCamera; //是否打开摄像头
     bool _sessionActive; //是否已连接服务器（会议会话）
+    MyVideoSurface *_myvideosurface; //视频表面
+    QVideoFrame mainshow; //主屏幕视频
+    SendImg *_sendImg; //发送图像
+    RecvSolve *_recvThread; //接收线程
+    SendText * _sendText;
+    MyTcpSocket *_mytcpSocket; //socket
+    QMap<quint32, Partner *> partner; //用于记录房间用户
+    AudioInput* _ainput;
+    QThread* _ainputThread;
+    AudioOutput* _aoutput;
+    QStringList iplist;
+    QSoundEffect* _soundEffect;
+    int m_lastChatListWidth = -1;
+    bool m_inChatRelayout = false;
+    ImgDisplay m_videoImg;   ///< 主画面视频：按宽高比缩放以适配整块 label（尽可能“铺满”可视区域）
+    ImgDisplay m_avatarImg; ///< 占位头像：高度为 label 的固定比例并居中
 
-    void initPermanentWorkers();
+    void initUI(); //初始化UI
+    void paintEvent(QPaintEvent *event) override;
+    void initPermanentWorkers();//初始化永久工作线程
     void endMeetingSession();
     void resetMeetingUi();
     void shutdownAllWorkers();
-
-    MyVideoSurface *_myvideosurface; //视频表面
-
-    QVideoFrame mainshow; //主屏幕视频
-
-    SendImg *_sendImg; //发送图像
-
-    RecvSolve *_recvThread; //接收线程
-    SendText * _sendText;
-    // socket
-    MyTcpSocket *_mytcpSocket; //socket
-    void paintEvent(QPaintEvent *event) override;
-
-    QMap<quint32, Partner *> partner; //用于记录房间用户
-    Partner* addPartner(quint32); //添加用户
+   Partner* addPartner(quint32); //添加用户
     void removePartner(quint32); //删除用户
     void clearPartner(); //退出会议，或者会议结束
     void closeImg(quint32); //根据IP关闭图像
-
     void dealMessage(ChatMessage *messageW, QListWidgetItem *item, QString text, QString time, QString ip ,ChatMessage::User_Type type); //用户发送文本
     void dealMessageTime(QString curMsgTime); //处理时间
     void relayoutChatMessages();
-
     void handleCreateMeetingResponse(MESG *msg);//创建会议响应
     void handleJoinMeetingResponse(MESG *msg);//加入会议响应
     void handleImgRecv(MESG *msg);//图像接收
@@ -79,21 +83,6 @@ private:
     void handlePartnerJoin2(MESG *msg);//人员加入2
     void handleRemoteHostClosedError();//远程主机关闭错误
     void handleOtherNetError();//其他网络错误
-
-    //音频
-    AudioInput* _ainput;
-    QThread* _ainputThread;
-    AudioOutput* _aoutput;
-
-    QStringList iplist;
-
-    QSoundEffect* _soundEffect;
-
-    int m_lastChatListWidth = -1;
-    bool m_inChatRelayout = false;
-
-    ImgDisplay m_videoImg;   ///< 主画面视频：按宽高比缩放以适配整块 label（尽可能“铺满”可视区域）
-    ImgDisplay m_avatarImg; ///< 占位头像：高度为 label 的固定比例并居中
 
 public:
     Widget(QWidget *parent = nullptr);
