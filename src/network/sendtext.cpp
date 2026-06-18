@@ -6,19 +6,12 @@ extern QUEUE_DATA<MESG> queue_send;
 #ifndef WAITSECONDS
 #define WAITSECONDS 2
 #endif
-SendText::SendText(QObject *par):QThread(par)
-{
+SendText::SendText(QObject *par):QThread(par) { }
 
-}
+SendText::~SendText() { }
 
-SendText::~SendText()
-{
-
-}
-
-void SendText::push_Text(MSG_TYPE msgType, QString str)
-{
-    LOG_INFO("SendText", "收到文本信号: PushText(msgType, str)");
+void SendText::push_Text(MSG_TYPE msgType, QString str) {
+    LOG_INFO("SendText", "收到数据信号: PushText(msgType, str)");
     textqueue_lock.lock();
 
     while(textqueue.size() > QUEUE_MAXSIZE) {
@@ -32,7 +25,10 @@ void SendText::push_Text(MSG_TYPE msgType, QString str)
     LOG_INFO("SendText", "文本信号加入队列完成");
 }
 
-
+/*
+发送数据线程,从队列中取出数据，并发送出去
+会根据数据类型构造不同的MESG结构体，并发送出去
+*/
 void SendText::run() {
     m_isCanRun = true;
     LOG_INFO("SendText", "start sending text thread " << QThread::currentThreadId());
@@ -40,11 +36,9 @@ void SendText::run() {
         textqueue_lock.lock(); //加锁
         while(textqueue.size() == 0) {
             bool f = queue_waitCond.wait(&textqueue_lock, WAITSECONDS * 1000);
-            if(f == false) //timeout
-            {
+            if(f == false) /*timeout*/ {
                 QMutexLocker locker(&m_lock);
-                if(m_isCanRun == false)
-                {
+                if(m_isCanRun == false) /*如果运行结束，则退出线程*/ {
                     textqueue_lock.unlock();
 					LOG_INFO("SendText", "stop sending text thread " << QThread::currentThreadId());
                     return;
@@ -57,18 +51,17 @@ void SendText::run() {
         LOG_INFO("SendText", "取出队列内容: " << text.str.toStdString() << " " << static_cast<int>(text.type));
 //        qDebug() << "取出队列:" << QThread::currentThreadId();
 
-        textqueue.pop_front();
+        textqueue.pop_front(); //取出队列头数据
         textqueue_lock.unlock();//解锁
         queue_waitCond.wakeOne(); //唤醒添加线程
 
         //构造消息体
         MESG* send = (MESG*)malloc(sizeof(MESG));
-        LOG_INFO("SendText", "构造消息体: malloc(sizeof(MESG))");
-        if (send == NULL) {
-            LOG_ERROR("SendText", "malloc error (MESG)");
+        if (send == nullptr) { /*分配失败*/ 
+            LOG_ERROR("SendText", "内存分配失败");
             continue;
-        } else {
-			memset(send, 0, sizeof(MESG));
+        } else { //如果内存分配成功
+			memset(send, 0, sizeof(MESG)); /*清空内存*/
 			if (text.type == CREATE_MEETING || text.type == CLOSE_CAMERA) {
                 LOG_INFO("SendText", "构造消息体: send->len = 0,send->data = NULL,send->msg_type = " << static_cast<int>(text.type));
 				send->len = 0;
@@ -111,6 +104,8 @@ void SendText::run() {
         }
     }
 }
+
+
 void SendText::stopImmediately()
 {
     {

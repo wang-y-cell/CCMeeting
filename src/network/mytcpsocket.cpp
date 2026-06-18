@@ -39,12 +39,9 @@ void MyTcpSocket::closeSocket()
 }
 
 MyTcpSocketWorker::MyTcpSocketWorker(MyTcpSocket *socket, QObject *parent)
-    : QObject(parent), _socket(socket)
-{
-}
+    : QObject(parent), _socket(socket) { }
 
-bool MyTcpSocketWorker::connectServer(QString ip, QString port)
-{
+bool MyTcpSocketWorker::connectServer(QString ip, QString port) {
     return _socket->connectServerImpl(ip, port, QIODevice::ReadWrite);
 }
 
@@ -96,8 +93,7 @@ void MyTcpSocket::errorDetect(QAbstractSocket::SocketError error)
 
 
 
-void MyTcpSocket::sendData(MESG* send)
-{
+void MyTcpSocket::sendData(MESG* send) {
 	LOG_INFO("MyTcpSocket", "发送数据方法开始执行: sendData(send)");
 	if (_socktcp->state() == QAbstractSocket::UnconnectedState)
 	{
@@ -177,9 +173,9 @@ void MyTcpSocket::sendData(MESG* send)
 
 /*
  * 发送线程
+ * $MSGType_IPV4_MSGSize_data_#
  */
-void MyTcpSocket::run()
-{
+void MyTcpSocket::run() {
 	LOG_INFO("MyTcpSocket", "发送数据线程: " << QThread::currentThreadId());
     m_isCanRun = true; //标记可以运行
     /*
@@ -196,7 +192,6 @@ void MyTcpSocket::run()
         //构造消息体
         MESG * send = queue_send.pop_msg();
         if(send == nullptr) continue;
-		LOG_INFO("MyTcpSocket", "取出队列: send != nullptr");
         LOG_INFO("MyTcpSocket", "调用sendData方法: sendData(send)");
         QMetaObject::invokeMethod(_worker, "sendData", Qt::BlockingQueuedConnection, Q_ARG(MESG*, send));
         LOG_INFO("MyTcpSocket", "sendData方法调用完成");
@@ -204,8 +199,7 @@ void MyTcpSocket::run()
 }
 
 
-qint64 MyTcpSocket::readn(char * buf, quint64 maxsize, int n)
-{
+qint64 MyTcpSocket::readn(char * buf, quint64 maxsize, int n) {
     quint64 hastoread = n;
     quint64 hasread = 0;
     do
@@ -572,23 +566,22 @@ bool MyTcpSocket::connectToServer(QString ip, QString port, QIODevice::OpenModeF
 	return false;
 }
 
-QString MyTcpSocket::errorString()
-{
+QString MyTcpSocket::errorString() {
     return _lastError;
 }
 
 void MyTcpSocket::disconnectFromHost() {
-    _hasLocalIp = false;
-    _localIp = 0;
-    hasrecvive = 0;
+    _hasLocalIp = false; //设置本地ip为false
+    _localIp = 0; //设置本地ip为0
+    hasrecvive = 0; //设置接收数据长度为0
     if(this->isRunning()) {
         QMutexLocker locker(&m_lock);
         m_isCanRun = false;
     }
-    queue_send.wakeAll();
+    queue_send.wakeAll(); //唤醒发送队列
 
     if (isRunning()) {
-        wait(500);
+        wait(500); //等待500毫秒
     }
 
     if(_sockThread->isRunning()) {

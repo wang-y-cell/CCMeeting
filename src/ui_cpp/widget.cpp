@@ -50,13 +50,15 @@ Widget::Widget(QWidget *parent)
     mainip = 0; //主屏幕显示的用户IP图像
 
     //配置摄像头（网络/音视频线程在 initPermanentWorkers 中一次性创建）
-    _camera = new QCamera(this);
-    connect(_camera, &QCamera::errorOccurred, this, &Widget::cameraError); //摄像头错误处理
-    _myvideosurface = new MyVideoSurface(this); //视频表面
-    connect(_myvideosurface, &MyVideoSurface::frameAvailable, this, &Widget::cameraImageCapture);
+    //_camera = new QCamera(this);
+    // connect(_camera, &QCamera::errorOccurred, this, &Widget::cameraError); //摄像头错误处理
+    // _myvideosurface = new MyVideoSurface(this); //视频表面
+    // connect(_myvideosurface, &MyVideoSurface::frameAvailable, this, &Widget::cameraImageCapture);
 
-    _captureSession.setCamera(_camera);
-    _captureSession.setVideoSink(_myvideosurface->getVideoSink());
+    _cameraVideo = new CameraVideo(this, ui->mainshow_label);
+
+    //_captureSession.setCamera(_camera);
+    //_captureSession.setVideoSink(_myvideosurface->getVideoSink());
 
     initPermanentWorkers();
 }
@@ -65,9 +67,9 @@ void Widget::initUI() {
     ui->setupUi(this);  //解析ui文件
 
     Widget::pos = QRect(0.1 * Screen::width, 0.1 * Screen::height, 0.8 * Screen::width, 0.8 * Screen::height);
-    m_videoImg.setTarget(ui->mainshow_label);
-    m_videoImg.setDrawMode(ImgDisplay::DrawMode::FitWidgetSmooth); //设置视频显示模式
-    m_videoImg.setAlignment(Qt::AlignCenter);
+    // m_videoImg.setTarget(ui->mainshow_label);
+    // m_videoImg.setDrawMode(ImgDisplay::DrawMode::FitWidgetSmooth); //设置视频显示模式
+    // m_videoImg.setAlignment(Qt::AlignCenter);
 
     m_avatarImg.setTarget(ui->mainshow_label);
     m_avatarImg.setDrawMode(ImgDisplay::DrawMode::ScaleToHeightFractionCentered); //设置头像显示模式
@@ -167,38 +169,38 @@ void Widget::initPermanentWorkers()
 /**
 * 将获得的frame经过转换之后,显示在主界面的标签中
 */
-void Widget::cameraImageCapture(const QVideoFrame &frame) {
-    if(frame.isValid()) //如果是有效的视频帧
-    {
-        QVideoFrame cloneFrame(frame); 
-        /*
-        QVideoFrame 里的原始像素数据（比如摄像头采集到的 YUV 格式画面）
-        通常存储在 GPU 显存或某些受保护的硬件缓冲区中，
-        CPU 是无法直接通过指针去读取或修改这些数据的 
-        */
-        cloneFrame.map(QVideoFrame::ReadOnly); //将视频帧映射为只读模式
-        QImage videoImg = cloneFrame.toImage(); //讲frame转换成image
-        QTransform matrix; //变换矩阵
-        //matrix.rotate(0.0); //旋转角度
+// void Widget::cameraImageCapture(const QVideoFrame &frame) {
+//     if(frame.isValid()) //如果是有效的视频帧
+//     {
+//         QVideoFrame cloneFrame(frame); 
+//         /*
+//         QVideoFrame 里的原始像素数据（比如摄像头采集到的 YUV 格式画面）
+//         通常存储在 GPU 显存或某些受保护的硬件缓冲区中，
+//         CPU 是无法直接通过指针去读取或修改这些数据的 
+//         */
+//         cloneFrame.map(QVideoFrame::ReadOnly); //将视频帧映射为只读模式
+//         QImage videoImg = cloneFrame.toImage(); //讲frame转换成image
+//         QTransform matrix; //变换矩阵
+//         //matrix.rotate(0.0); //旋转角度
 
-        QImage transformed = videoImg.transformed(matrix, Qt::FastTransformation); //变换
+//         QImage transformed = videoImg.transformed(matrix, Qt::FastTransformation); //变换
 
-        if(partner.size() > 1 && _sendImg) /*如果房间人数大于1,发送pushImg信号*/ {
-			emit pushImg(transformed);
-        }
+//         if(partner.size() > 1 && _sendImg) /*如果房间人数大于1,发送pushImg信号*/ {
+// 			emit pushImg(transformed);
+//         }
 
-        if(_mytcpSocket && _mytcpSocket->getlocalip() == mainip) {
-            m_videoImg.showImage(transformed);
-        }
+//         if(_mytcpSocket && _mytcpSocket->getlocalip() == mainip) {
+//             m_videoImg.showImage(transformed);
+//         }
 
-        if(_mytcpSocket) {
-            Partner *p = partner.value(_mytcpSocket->getlocalip());
-            if(p) p->setpic(transformed);
-        }
+//         if(_mytcpSocket) {
+//             Partner *p = partner.value(_mytcpSocket->getlocalip());
+//             if(p) p->setpic(transformed);
+//         }
 
-        cloneFrame.unmap();
-    }
-}
+//         cloneFrame.unmap();
+//     }
+// }
 
 Widget::~Widget() {
     shutdownAllWorkers();
@@ -233,8 +235,9 @@ void Widget::resetMeetingUi()
 
 void Widget::endMeetingSession()
 {
-    if (_camera && !_camera->cameraDevice().isNull() && _camera->isActive())
-        _camera->stop();
+    // if (_camera && !_camera->cameraDevice().isNull() && _camera->isActive())
+    //     _camera->stop();
+    _cameraVideo->endVideo();
 
     _createmeet = false;
     _joinmeet = false;
@@ -253,8 +256,7 @@ void Widget::shutdownAllWorkers()
     if (_recvThread)
         disconnect(_recvThread, nullptr, this, nullptr);
 
-    if (_camera && !_camera->cameraDevice().isNull() && _camera->isActive())
-        _camera->stop();
+    _cameraVideo->endVideo();
 
     endMeetingSession();
 
@@ -320,25 +322,19 @@ void Widget::paintEvent(QPaintEvent *event)
 
 void Widget::on_openVedio_clicked()
 {
-    if(_camera->isActive()) {
-        _camera->stop();
-        LOG_INFO("Widget", "close camera");
-        if(_camera->error() == QCamera::NoError)
-        {
-            if (_sendImg)
-                _sendImg->clearImgQueue();
-            ui->openVedio->setText("关闭摄像头");
-			emit PushText(CLOSE_CAMERA);
-        }
+    if(_cameraVideo->isCameraRunning()) {
+        _cameraVideo->stopCamera();
+        LOG_INFO("Widget", "关闭摄像头");
+        if (_sendImg)
+            _sendImg->clearImgQueue();
+        ui->openVedio->setText("摄像头关闭");
+        emit PushText(CLOSE_CAMERA);
         if (_mytcpSocket)
             closeImg(_mytcpSocket->getlocalip());
     } else {
-        _camera->start();
-        LOG_INFO("Widget", "open camera");
-        if(_camera->error() == QCamera::NoError)
-        {
-            ui->openVedio->setText("开启摄像头");
-        }
+        _cameraVideo->startCamera();
+        LOG_INFO("Widget", "开启摄像头");
+        ui->openVedio->setText("摄像头开启");
     }
 }
 
@@ -403,10 +399,10 @@ bool Widget::on_connServer(QString ip, QString port) {
 }
 
 
-void Widget::cameraError(QCamera::Error, const QString &errorString) {
-    const QString msg = errorString.isEmpty() ? _camera->errorString() : errorString;
-    QMessageBox::warning(this, "Camera error", msg, QMessageBox::Yes, QMessageBox::Yes);
-}
+// void Widget::cameraError(QCamera::Error, const QString &errorString) {
+//     const QString msg = errorString.isEmpty() ? _camera->errorString() : errorString;
+//     QMessageBox::warning(this, "Camera error", msg, QMessageBox::Yes, QMessageBox::Yes);
+// }
 
 
 
@@ -493,7 +489,7 @@ void Widget::handleImgRecv(MESG *msg)
     }
 
     if (msg->ip == mainip) {
-        m_videoImg.showImage(img);
+        _cameraVideo->showImage(img);
     }
     repaint();
 }
@@ -681,7 +677,7 @@ void Widget::removePartner(quint32 ip)
 
 void Widget::clearPartner()
 {
-    m_videoImg.clear();
+    //m_videoImg.clear();
     if(partner.size() == 0) return;
 
     QMap<quint32, Partner*>::iterator iter =   partner.begin();

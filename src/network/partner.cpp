@@ -30,15 +30,13 @@ void Partner::resizeEvent(QResizeEvent *event)
     updatePixmap();
 }
 
-void Partner::updatePixmap()
-{
+void Partner::updatePixmap() {
     const int side = qMax(w - 10, 1);
     setPixmap(QPixmap::fromImage(
         m_sourceImage.scaled(side, side, Qt::KeepAspectRatio, Qt::SmoothTransformation)));
 }
 
-void Partner::mousePressEvent(QMouseEvent *)
-{
+void Partner::mousePressEvent(QMouseEvent *) {
     emit sendip(ip);
 }
 

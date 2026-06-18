@@ -20,6 +20,8 @@
 #include <QSoundEffect>
 #include <QCloseEvent>
 #include <QEvent>
+#include "video/cameravideo.h"
+
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class Widget; }
@@ -37,14 +39,14 @@ class Widget : public QWidget
 private:
     static QRect pos; //窗口位置
     quint32 mainip; //主屏幕IP
-    QCamera *_camera; //摄像头
-    QMediaCaptureSession _captureSession; //媒体捕获会话
+    //QCamera *_camera; //摄像头
+    //QMediaCaptureSession _captureSession; //媒体捕获会话
     bool  _createmeet; //是否创建会议
     bool _joinmeet; //是否加入会议
     bool _openCamera; //是否打开摄像头
     bool _sessionActive; //是否已连接服务器（会议会话）
-    MyVideoSurface *_myvideosurface; //视频表面
-    SendImg *_sendImg; //发送图像
+    //MyVideoSurface *_myvideosurface; //视频表面*
+    SendImg *_sendImg; //发送图像*
     RecvSolve *_recvThread; //接收线程
     SendText * _sendText;
     MyTcpSocket *_mytcpSocket; //socket
@@ -56,15 +58,16 @@ private:
     QSoundEffect* _soundEffect;
     int m_lastChatListWidth = -1;
     bool m_inChatRelayout = false;
-    ImgDisplay m_videoImg;   ///< 主画面视频：按宽高比缩放以适配整块 label（尽可能“铺满”可视区域）
+    //ImgDisplay m_videoImg;   ///< 主画面视频：按宽高比缩放以适配整块 label（尽可能“铺满”可视区域）
     ImgDisplay m_avatarImg; ///< 占位头像：高度为 label 的固定比例并居中
+    CameraVideo *_cameraVideo; //摄像头视频
 
     void initUI(); //初始化UI
     void paintEvent(QPaintEvent *event) override;
     void initPermanentWorkers();//初始化永久工作线程
-    void endMeetingSession();
-    void resetMeetingUi();
-    void shutdownAllWorkers();
+    void endMeetingSession(); //结束会议会话
+    void resetMeetingUi(); //重置会议UI
+    void shutdownAllWorkers(); //关闭所有工作线程
    Partner* addPartner(quint32); //添加用户
     void removePartner(quint32); //删除用户
     void clearPartner(); //退出会议，或者会议结束
@@ -100,11 +103,11 @@ public slots:
     void on_joinmeetBtn(QString roomNo); //点击加入会议按钮
 private slots:
     void on_horizontalSlider_valueChanged(int value); //音量改变
-    void cameraError(QCamera::Error error, const QString &errorString); //摄像头错误处理
+    //void cameraError(QCamera::Error error, const QString &errorString); //摄像头错误处理
     void audioError(QString); //音频错误处理
     void datasolve(MESG *); //数据处理
     void recvip(quint32); //接收IP
-    void cameraImageCapture(const QVideoFrame &frame); //摄像头图像捕获
+    //void cameraImageCapture(const QVideoFrame &frame); //摄像头图像捕获
     void speaks(QString); //说话
     void on_sendmsg_clicked(); //发送消息
     void textSend(); //发送文本

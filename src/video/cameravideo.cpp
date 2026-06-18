@@ -1,8 +1,9 @@
 #include "cameravideo.h"
 #include <QMessageBox>
 
-CameraVideo::CameraVideo(QWidget* parent) : MyVideoSurface(parent) {
+CameraVideo::CameraVideo(QWidget* parent, QWidget* target) : MyVideoSurface(parent) {
     _parent = parent;
+    _target = target;
     _camera = new QCamera(this);
     _captureSession.setCamera(_camera);
     _captureSession.setVideoSink(this->getVideoSink());
@@ -10,17 +11,34 @@ CameraVideo::CameraVideo(QWidget* parent) : MyVideoSurface(parent) {
     initFrameDisplay();
 }
 
-void CameraVideo::start(QWidget* target) {
+CameraVideo::~CameraVideo() {
+    endVideo();
+}
+
+void CameraVideo::setTarget(QWidget* target) {
     _target = target;
-    if(_isRunning)
+}
+
+void CameraVideo::startCamera() {
+    if(_isRunning || _target == nullptr)
         return;
     _camera->start();
     _isRunning = true;
 }
 
-void CameraVideo::stop() {
-    _camera->stop();
+void CameraVideo::stopCamera() {
+    if(_isRunning && _camera->isActive())
+        _camera->stop();
     _isRunning = false;
+}
+
+void CameraVideo::endVideo() {
+    stopCamera();
+    _videoImg.clear();
+}
+
+void CameraVideo::showImage(const QImage &image) {
+    _videoImg.showImage(image);
 }
 
 void CameraVideo::cameraError(QCamera::Error error, const QString &errorString) {
