@@ -4,9 +4,9 @@
 #include <QWidget>
 #include <QPlainTextEdit>
 #include <QCompleter>
-#include <QStringList>
 #include <QPair>
-#include <QVector>
+#include <utility>
+#include <vector>
 
 class Completer: public QCompleter
 {
@@ -21,14 +21,14 @@ class MyTextEdit : public QWidget
 private:
     QPlainTextEdit *edit;
     Completer *completer;
-    QVector<QPair<int, int>> ipspan;
+    std::vector<std::pair<int, int>> ipspan;
 public:
     explicit MyTextEdit(QWidget *parent = nullptr);
     QString toPlainText();
     void setPlainText(QString);
     void setPlaceholderText(QString);
     void setCenterOnScroll(bool on){edit->setCenterOnScroll(on);}
-    void setCompleter(QStringList );
+    void setCompleter(const std::vector<QString> &items);
 private:
     QString textUnderCursor();
     bool eventFilter(QObject *, QEvent *);

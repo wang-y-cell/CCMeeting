@@ -4,18 +4,15 @@
 #include "Audio/AudioInput.h"
 #include <QWidget>
 #include <QVideoFrame>
-#include <QTcpSocket>
-#include "network/mytcpsocket.h"
 #include <QCamera>
 #include <QMediaCaptureSession>
-#include "network/sendtext.h"
-#include "network/recvsolve.h"
 #include "network/partner.h"
 #include "network/netheader.h"
-#include <QMap>
+#include "network/networkmanager.h"
+#include <unordered_map>
+#include <vector>
 #include "Audio/AudioOutput.h"
 #include "text/chatmessage.h"
-#include <QStringListModel>
 #include <QSoundEffect>
 #include <QCloseEvent>
 #include <QEvent>
@@ -26,9 +23,6 @@ QT_BEGIN_NAMESPACE
 namespace Ui { class Widget; }
 QT_END_NAMESPACE
 
-class QCameraImageCapture;
-class MyVideoSurface;
-class SendImg;
 class QListWidgetItem;
 
 
@@ -42,16 +36,12 @@ private:
     bool _joinmeet; //是否加入会议
     bool _openCamera; //是否打开摄像头
     bool _sessionActive; //是否已连接服务器（会议会话）
-    //MyVideoSurface *_myvideosurface; //视频表面*
-    SendImg *_sendImg; //发送图像*
-    RecvSolve *_recvThread; //接收线程
-    SendText * _sendText;
-    MyTcpSocket *_mytcpSocket; //socket
-    QMap<quint32, Partner *> partner; //用于记录房间用户
+    NetworkManager *_network; //统一网络收发
+    std::unordered_map<quint32, Partner *> partner; //用于记录房间用户
     AudioInput* _ainput;
     QThread* _ainputThread;
     AudioOutput* _aoutput;
-    QStringList iplist;
+    std::vector<QString> iplist;
     QSoundEffect* _soundEffect;
     int m_lastChatListWidth = -1;
     bool m_inChatRelayout = false;
@@ -91,24 +81,20 @@ protected:
 
 public slots:
     void on_createmeetBtn_clicked(); //点击创建会议按钮
-    //void on_exitmeetBtn_clicked(); //点击退出会议按钮
     void on_openVedio_clicked(); //点击打开视频按钮
     void on_openAudio_clicked();  //点击打开音频按钮
     bool on_connServer(QString ip, QString port); //点击连接服务器按钮，成功返回 true
     void on_joinmeetBtn(QString roomNo); //点击加入会议按钮
 private slots:
     void on_horizontalSlider_valueChanged(int value); //音量改变
-    //void cameraError(QCamera::Error error, const QString &errorString); //摄像头错误处理
     void audioError(QString); //音频错误处理
     void datasolve(MESG *); //数据处理
     void recvip(quint32); //接收IP
-    //void cameraImageCapture(const QVideoFrame &frame); //摄像头图像捕获
+    void onLocalFrameCaptured(const QImage &image);
     void speaks(QString); //说话
     void on_sendmsg_clicked(); //发送消息
     void textSend(); //发送文本
 signals:
-    void pushImg(QImage);
-    void PushText(MSG_TYPE, QString = "");
     void stopAudio();
     void startAudio();
     void volumnChange(int);

@@ -1,6 +1,6 @@
 #include "Audio/AudioOutput.h"
 #include "Audio/audiocommon.h"
-#include <QMutexLocker>
+#include <mutex>
 #include "logger/Logger.h"
 #include "network/netheader.h"
 #include <QHostAddress>
@@ -108,7 +108,7 @@ void AudioOutput::stopPlay()
 		return;
 	if (audio->state() == QAudio::StoppedState) return;
 	{
-		QMutexLocker lock(&device_lock);
+		std::lock_guard<std::mutex> lock(device_lock);
 		outputdevice = nullptr;
 	}
 	audio->stop();
@@ -131,7 +131,7 @@ void AudioOutput::run()
 	for (;;)
 	{
 		{
-			QMutexLocker lock(&m_lock);
+			std::lock_guard<std::mutex> lock(m_lock);
 			if (is_canRun == false)
 			{
 				stopPlay();
@@ -142,7 +142,7 @@ void AudioOutput::run()
 		MESG* msg = audio_recv.pop_msg();
 		if (msg == NULL) continue;
 		{
-			QMutexLocker lock(&device_lock);
+			std::lock_guard<std::mutex> lock(device_lock);
 			if (outputdevice != nullptr) {
 				QByteArray pcm(reinterpret_cast<const char *>(msg->data), static_cast<int>(msg->len));
 				const AudioFormatStd::Spec wireSpec = standard();
@@ -191,7 +191,7 @@ void AudioOutput::run()
 void AudioOutput::stopImmediately()
 {
 	{
-		QMutexLocker lock(&m_lock);
+		std::lock_guard<std::mutex> lock(m_lock);
 		is_canRun = false;
 	}
 	audio_recv.wakeAll();

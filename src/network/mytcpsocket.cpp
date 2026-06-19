@@ -1,10 +1,11 @@
 #include "network/mytcpsocket.h"
+#include "network/messagecodec.h"
 #include "network/netheader.h"
 #include "logger/Logger.h"
 #include <QHostAddress>
 #include <QtEndian>
 #include <QMetaObject>
-#include <QMutexLocker>
+#include <mutex>
 #include <QEventLoop>
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
@@ -18,7 +19,7 @@ extern QUEUE_DATA<MESG> audio_recv;
 void MyTcpSocket::stopImmediately()
 {
     {
-        QMutexLocker lock(&m_lock);
+        std::lock_guard<std::mutex> lock(m_lock);
         if(m_isCanRun == true) m_isCanRun = false;
     }
     queue_send.wakeAll();
@@ -185,7 +186,7 @@ void MyTcpSocket::run() {
     */
     for(;;) {
         {
-            QMutexLocker locker(&m_lock);
+            std::lock_guard<std::mutex> locker(m_lock);
             if(m_isCanRun == false) return; //在每次循环判断是否可以运行，如果不行就退出循环
         }
         
@@ -371,13 +372,9 @@ void MyTcpSocket::recvFromSocket() {
 					const quint32 ip = qFromBigEndian<quint32>(recvbuf + 3);
 
 					if (msgtype == IMG_RECV) {
-						//QString ss = QString::fromLatin1((char *)recvbuf + MSG_HEADER, data_len);
-						QByteArray cc((char *) recvbuf + MSG_HEADER, nBody);
-						QByteArray rc = QByteArray::fromBase64(cc);
-						QByteArray rdc = qUncompress(rc);
-						//将消息加入到接收队列
-		//                qDebug() << roomNo;
-						
+						const QByteArray cc((char *) recvbuf + MSG_HEADER, static_cast<int>(nBody));
+						const QByteArray rdc = MessageCodec::decodeImageWirePayload(cc);
+
 						if (rdc.size() > 0)
 						{
 							MESG* msg = (MESG*)malloc(sizeof(MESG));
@@ -418,10 +415,8 @@ void MyTcpSocket::recvFromSocket() {
 					}
 					else if (msgtype == AUDIO_RECV)
 					{
-						//解压缩
-						QByteArray cc((char*)recvbuf + MSG_HEADER, nBody);
-						QByteArray rc = QByteArray::fromBase64(cc);
-						QByteArray rdc = qUncompress(rc);
+						const QByteArray cc((char*)recvbuf + MSG_HEADER, static_cast<int>(nBody));
+						const QByteArray rdc = MessageCodec::decodeAudioWirePayload(cc);
 
 						if (rdc.size() > 0) {
 							MESG* msg = (MESG*)malloc(sizeof(MESG));
@@ -449,10 +444,9 @@ void MyTcpSocket::recvFromSocket() {
 							}
 						}
 					} else if(msgtype == TEXT_RECV) {
-                        //解压缩
-                        QByteArray cc((char *)recvbuf + MSG_HEADER, nBody);
-                        std::string rr = qUncompress(cc).toStdString();
-                        if(rr.size() > 0) {
+                        const QByteArray cc((char *)recvbuf + MSG_HEADER, static_cast<int>(nBody));
+                        const QByteArray decoded = MessageCodec::decodeTextWirePayload(cc);
+                        if(decoded.size() > 0) {
                             MESG* msg = (MESG*)malloc(sizeof(MESG));
                             if (msg == NULL) {
                                 LOG_ERROR("MyTcpSocket", "TEXT_RECV malloc MESG failed");
@@ -460,14 +454,14 @@ void MyTcpSocket::recvFromSocket() {
                                 memset(msg, 0, sizeof(MESG));
                                 msg->msg_type = TEXT_RECV;
                                 msg->ip = ip;
-                                msg->data = (uchar*)malloc(rr.size());
+                                msg->data = (uchar*)malloc(decoded.size());
                                 if (msg->data == nullptr) {
                                     free(msg);
                                     LOG_ERROR("MyTcpSocket", "TEXT_RECV malloc msg.data failed");
                                 } else {
-                                    memset(msg->data, 0, rr.size());
-                                    memcpy_s(msg->data, rr.size(), rr.data(), rr.size());
-                                    msg->len = rr.size();
+                                    memset(msg->data, 0, decoded.size());
+                                    memcpy_s(msg->data, decoded.size(), decoded.data(), decoded.size());
+                                    msg->len = decoded.size();
                                     queue_recv.push_msg(msg);
                                 }
                             }
@@ -575,7 +569,7 @@ void MyTcpSocket::disconnectFromHost() {
     _localIp = 0; //设置本地ip为0
     hasrecvive = 0; //设置接收数据长度为0
     if(this->isRunning()) {
-        QMutexLocker locker(&m_lock);
+        std::lock_guard<std::mutex> locker(m_lock);
         m_isCanRun = false;
     }
     queue_send.wakeAll(); //唤醒发送队列

@@ -3,7 +3,7 @@
 
 #include <QThread>
 #include <QTcpSocket>
-#include <QMutex>
+#include <mutex>
 #include "netheader.h"
 #include "logger/Logger.h"
 #ifndef MB
@@ -60,7 +60,7 @@ private:
     uchar* recvbuf; //接收缓冲区
     quint64 hasrecvive; //接收数据长度
 
-    QMutex m_lock; //互斥锁
+    std::mutex m_lock; //互斥锁
     volatile bool m_isCanRun; //是否可以运行
     QString _lastError; //错误信息
     quint32 _localIp = 0; //本地ip

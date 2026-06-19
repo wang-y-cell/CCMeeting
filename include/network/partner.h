@@ -23,9 +23,9 @@ protected:
 private:
     void updateLabelGeometry();
 
-    quint32 ip = 0;
-    QLabel *m_displayLabel = nullptr;
-    int w = 40;
+    quint32 ip = 0; //用户ip
+    QLabel *m_displayLabel = nullptr; //显示摄像头视频的区域
+    int w = 40; //显示摄像头视频的区域的宽度
 };
 
 #endif // PARTNER_H

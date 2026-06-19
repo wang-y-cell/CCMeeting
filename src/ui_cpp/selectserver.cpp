@@ -1,5 +1,6 @@
 #include "selectserver.h"
 #include "ui_selectserver.h"
+#include "network/mytcpsocket.h"
 #include "logger/Logger.h"
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>

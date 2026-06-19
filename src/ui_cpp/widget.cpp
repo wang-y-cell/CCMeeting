@@ -3,12 +3,12 @@
 #include "screen.h"
 #include "logger/Logger.h"
 #include "configure/configure.h"
+#include "network/messagecodec.h"
 #include <QString>
 #include <QCamera>
 #include <QMediaDevices>
 #include <QPainter>
 #include "video/myvideosurface.h"
-#include "video/sendimg.h"
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
 #include <QMessageBox>
@@ -17,7 +17,8 @@
 #include <QUrl>
 #include <QDateTime>
 #include <QCompleter>
-#include <QStringListModel>
+#include <algorithm>
+#include <QCompleter>
 #include <QSoundEffect>
 #include <QCloseEvent>
 #include <QEvent>
@@ -37,10 +38,7 @@ Widget::Widget(QWidget *parent)
     _openCamera = false;
     _joinmeet = false;
     _sessionActive = false;
-    _sendImg = nullptr;
-    _mytcpSocket = nullptr;
-    _sendText = nullptr;
-    _recvThread = nullptr;
+    _network = nullptr;
     _ainput = nullptr;
     _ainputThread = nullptr;
     _aoutput = nullptr;
@@ -58,6 +56,7 @@ Widget::Widget(QWidget *parent)
 
     _cameraVideo = new CameraVideo(this);
     _cameraVideo->setMainTarget(ui->mainshow_label);
+    connect(_cameraVideo, &CameraVideo::frameCaptured, this, &Widget::onLocalFrameCaptured);
 
     //_captureSession.setCamera(_camera);
     //_captureSession.setVideoSink(_myvideosurface->getVideoSink());
@@ -135,20 +134,9 @@ void Widget::initUI() {
 
 void Widget::initPermanentWorkers()
 {
-    _sendImg = new SendImg(this);
-    _sendImg->start();
-
-    _sendText = new SendText(this);
-    _sendText->start();
-    connect(this, SIGNAL(PushText(MSG_TYPE,QString)), _sendText, SLOT(push_Text(MSG_TYPE,QString)));
-    connect(this, SIGNAL(pushImg(QImage)), _sendImg, SLOT(ImageCapture(QImage)));
-
-    _recvThread = new RecvSolve(this);
-    connect(_recvThread, SIGNAL(datarecv(MESG*)), this, SLOT(datasolve(MESG*)), Qt::QueuedConnection);
-    _recvThread->start();
-
-    _mytcpSocket = new MyTcpSocket(this);
-    connect(_mytcpSocket, SIGNAL(sendTextOver()), this, SLOT(textSend()));
+    _network = new NetworkManager(this);
+    connect(_network, &NetworkManager::packetReceived, this, &Widget::datasolve, Qt::QueuedConnection);
+    connect(_network, &NetworkManager::sendTextFinished, this, &Widget::textSend);
 
     _ainput = new AudioInput();
     _ainputThread = new QThread();
@@ -241,8 +229,8 @@ void Widget::endMeetingSession()
     _joinmeet = false;
     clearPartner();
 
-    if (_mytcpSocket && _sessionActive) {
-        _mytcpSocket->disconnectFromHost();
+    if (_network && _sessionActive) {
+        _network->disconnectFromHost();
         _sessionActive = false;
     }
 
@@ -252,29 +240,15 @@ void Widget::endMeetingSession()
 void Widget::shutdownAllWorkers()
 {
     LOG_DEBUG("Widget", "关闭所有工作线程");
-    if (_recvThread)
-        disconnect(_recvThread, nullptr, this, nullptr);
+    if (_network)
+        disconnect(_network, nullptr, this, nullptr);
 
     _cameraVideo->endVideo();
 
     endMeetingSession();
 
-    if (_mytcpSocket && _mytcpSocket->isRunning()) {
-        _mytcpSocket->stopImmediately();
-        _mytcpSocket->wait(3000);
-    }
-    if (_recvThread && _recvThread->isRunning()) {
-        _recvThread->stopImmediately();
-        _recvThread->wait(3000);
-    }
-    if (_sendImg && _sendImg->isRunning()) {
-        _sendImg->stopImmediately();
-        _sendImg->wait(3000);
-    }
-    if (_sendText && _sendText->isRunning()) {
-        _sendText->stopImmediately();
-        _sendText->wait(3000);
-    }
+    if (_network)
+        _network->stop();
     if (_ainputThread && _ainputThread->isRunning()) {
         _ainputThread->quit();
         _ainputThread->wait(3000);
@@ -287,13 +261,10 @@ void Widget::shutdownAllWorkers()
 
 void Widget::on_createmeetBtn_clicked() {
     LOG_INFO("Widget", "点击创建会议按钮");
-    if(false == _createmeet)
-    {
+    if(!_createmeet) {
         ui->openAudio->setDisabled(true);
         ui->openVedio->setDisabled(true);
-        //ui->exitmeetBtn->setDisabled(true);
-        LOG_INFO("Widget", "发送创建会议信号: PushText(CREATE_MEETING)");
-        emit PushText(CREATE_MEETING); //将 “创建会议"加入到发送队列
+        _network->sendCreateMeeting();
     }
 }
 
@@ -309,26 +280,18 @@ void Widget::paintEvent(QPaintEvent *event)
 }
 
 
-//退出会议（1，加入的会议， 2，自己创建的会议）
-// void Widget::on_exitmeetBtn_clicked()
-// {
-//     endMeetingSession();
-//     LOG_INFO("Widget", "exit meeting");
-//     QMessageBox::warning(this, "Information", "退出会议" , QMessageBox::Yes, QMessageBox::Yes);
-// }
-
 void Widget::on_openVedio_clicked()
 {
     LOG_DEBUG("Widget", "点击打开摄像头按钮");
     if(_cameraVideo->isCameraRunning()) {
         _cameraVideo->stopCamera();
         LOG_INFO("Widget", "摄像头关闭");
-        if (_sendImg)
-            _sendImg->clearImgQueue();
+        if (_network)
+            _network->clearPendingImages();
         ui->openVedio->setText("摄像头关闭");
-        emit PushText(CLOSE_CAMERA);
-        if (_mytcpSocket)
-            closeImg(_mytcpSocket->getlocalip());
+        _network->sendCloseCamera();
+        if (_network)
+            closeImg(_network->localIp());
     } else {
         _cameraVideo->startCamera();
         LOG_INFO("Widget", "摄像头开启");
@@ -354,7 +317,7 @@ void Widget::on_openAudio_clicked()
 
 void Widget::closeImg(quint32 ip) {
     LOG_DEBUG("Widget", "关闭图像: ip = " << ip);
-    if (!partner.contains(ip))
+    if (partner.find(ip) == partner.end())
     {
         LOG_WARN("Widget", "closeImg: partner missing for ip");
         return;
@@ -365,19 +328,13 @@ void Widget::closeImg(quint32 ip) {
 
 bool Widget::on_connServer(QString ip, QString port) {
     LOG_DEBUG("Widget", "连接服务器: ip = " << ip.toStdString() << ", port = " << port.toStdString());
-    if (!_mytcpSocket) {
-        LOG_WARN("Widget", "on_connServer: tcp socket not initialized");
+    if (!_network) {
+        LOG_WARN("Widget", "on_connServer: network not initialized");
         return false;
     }
     repaint();
-    //正则表达式
-    //ip
-    if(!MyTcpSocket::IpPortValid(this, ip, port)) {
-        LOG_WARN("Widget", "ip or port 格式错误");
-        return false;
-    }
 
-    if(_mytcpSocket->connectToServer(ip, port, QIODevice::ReadWrite)) {
+    if(_network->connectToServer(ip, port, this)) {
         _sessionActive = true;
         ui->outlog->setText("成功连接到" + ip + ":" + port);
         ui->openAudio->setDisabled(true);
@@ -423,8 +380,8 @@ void Widget::handleCreateMeetingResponse(MESG *msg)
         ui->sendmsg->setDisabled(false);
 
         LOG_INFO("Widget", "succeed creating room " << roomno);
-        if (_mytcpSocket) {
-            const quint32 localIp = _mytcpSocket->getlocalip();
+        if (_network) {
+            const quint32 localIp = _network->localIp();
             addPartner(localIp);
             mainip = localIp;
             _cameraVideo->setLocalIp(localIp);
@@ -459,8 +416,8 @@ void Widget::handleJoinMeetingResponse(MESG *msg) {
         QMessageBox::warning(this, "Meeting information", "加入成功", QMessageBox::Yes, QMessageBox::Yes);
         ui->outlog->setText(QString("加入成功"));
         LOG_INFO("Widget", "succeed joining room");
-        if (_mytcpSocket) {
-            const quint32 localIp = _mytcpSocket->getlocalip();
+        if (_network) {
+            const quint32 localIp = _network->localIp();
             addPartner(localIp);
             mainip = localIp;
             _cameraVideo->setLocalIp(localIp);
@@ -477,9 +434,8 @@ void Widget::handleImgRecv(MESG *msg)
 {
     QHostAddress a(msg->ip);
     LOG_DEBUG("Widget", "IMG_RECV from " << a.toString().toStdString());
-    QImage img;
-    img.loadFromData(msg->data, msg->len);
-    if (partner.count(msg->ip) == 0)
+    const QImage img = MessageCodec::decodeImageMessage(msg);
+    if (partner.find(msg->ip) == partner.end())
         addPartner(msg->ip);
 
     _cameraVideo->showImageForIp(msg->ip, img);
@@ -488,13 +444,13 @@ void Widget::handleImgRecv(MESG *msg)
 
 void Widget::handleTextRecv(MESG *msg)
 {
-    QString str = QString::fromUtf8(reinterpret_cast<const char *>(msg->data), static_cast<int>(msg->len));
+    const QString str = MessageCodec::decodeTextMessage(msg);
     QString time = QString::number(QDateTime::currentDateTimeUtc().toSecsSinceEpoch());
     ChatMessage *message = new ChatMessage(ui->listWidget);
     QListWidgetItem *item = new QListWidgetItem();
     dealMessageTime(time);
     dealMessage(message, item, str, time, QHostAddress(msg->ip).toString(), ChatMessage::User_She);
-    if (str.contains('@' + QHostAddress(_mytcpSocket ? _mytcpSocket->getlocalip() : 0).toString())) {
+    if (str.contains('@' + QHostAddress(_network ? _network->localIp() : 0).toString())) {
         _soundEffect->play();
     }
 }
@@ -505,7 +461,7 @@ void Widget::handlePartnerJoin(MESG *msg)
     if (p) {
         _cameraVideo->showAvatarForIp(msg->ip);
         ui->outlog->setText(QString("%1 join meeting").arg(QHostAddress(msg->ip).toString()));
-        iplist.append(QString("@") + QHostAddress(msg->ip).toString());
+        iplist.push_back(QString("@") + QHostAddress(msg->ip).toString());
         ui->plainTextEdit->setCompleter(iplist);
     }
 }
@@ -515,7 +471,10 @@ void Widget::handlePartnerExit(MESG *msg)
     removePartner(msg->ip);
     if (mainip == msg->ip)
         _cameraVideo->showMainAvatar();
-    if (iplist.removeOne(QString("@") + QHostAddress(msg->ip).toString())) {
+    const QString atTag = QString("@") + QHostAddress(msg->ip).toString();
+    const auto it = std::find(iplist.begin(), iplist.end(), atTag);
+    if (it != iplist.end()) {
+        iplist.erase(it);
         ui->plainTextEdit->setCompleter(iplist);
     } else {
         LOG_WARN("Widget", "iplist remove failed, ip=" << QHostAddress(msg->ip).toString().toStdString());
@@ -538,7 +497,7 @@ void Widget::handlePartnerJoin2(MESG *msg)
         Partner *p = addPartner(ip);
         if (p) {
             _cameraVideo->showAvatarForIp(ip);
-            iplist << QString("@") + QHostAddress(ip).toString();
+            iplist.push_back(QString("@") + QHostAddress(ip).toString());
         }
     }
     ui->plainTextEdit->setCompleter(iplist);
@@ -614,7 +573,7 @@ void Widget::datasolve(MESG *msg) {
 
 Partner* Widget::addPartner(quint32 ip)
 {
-	if (partner.contains(ip)) return nullptr; //如果存在这个ip,返回null
+	if (partner.find(ip) != partner.end()) return nullptr; //如果存在这个ip,返回null
     Partner *p = new Partner(ui->scrollAreaWidgetContents ,ip); //创建一个新的Partner对象
     if (p == nullptr) /*如果创建失败，则返回空*/ {
         LOG_ERROR("Widget", "创建Partner对象失败");
@@ -622,7 +581,7 @@ Partner* Widget::addPartner(quint32 ip)
     } else /*如果创建成功，则连接信号和槽*/ {
 		connect(p, SIGNAL(sendip(quint32)), this, SLOT(recvip(quint32)));
         LOG_DEBUG("Widget", "将这个用户添加到partner中");
-		partner.insert(ip, p);
+		partner.emplace(ip, p);
 		ui->verticalLayout_3->addWidget(p, 1);
         _cameraVideo->addPartnerDisplay(ip, p->displayLabel());
 
@@ -644,14 +603,15 @@ Partner* Widget::addPartner(quint32 ip)
 
 void Widget::removePartner(quint32 ip)
 {
-    if(partner.contains(ip))
+    auto it = partner.find(ip);
+    if (it != partner.end())
     {
-        Partner *p = partner[ip];
+        Partner *p = it->second;
         disconnect(p, SIGNAL(sendip(quint32)), this, SLOT(recvip(quint32)));
         _cameraVideo->removePartnerDisplay(ip);
         ui->verticalLayout_3->removeWidget(p);
         delete p;
-        partner.remove(ip);
+        partner.erase(it);
 
         //只有自已一个人时，关闭传输音频
         if (partner.size() <= 1 && _ainput && _aoutput)
@@ -675,16 +635,12 @@ void Widget::clearPartner()
 
     _cameraVideo->clearAllPartnerDisplays();
 
-    QMap<quint32, Partner*>::iterator iter =   partner.begin();
-    while (iter != partner.end())
-    {
-        quint32 ip = iter.key();
-        iter++;
-        Partner *p =  partner.take(ip);
+    for (auto it = partner.begin(); it != partner.end(); ) {
+        Partner *p = it->second;
         disconnect(p, SIGNAL(sendip(quint32)), this, SLOT(recvip(quint32)));
         ui->verticalLayout_3->removeWidget(p);
         delete p;
-        p = nullptr;
+        it = partner.erase(it);
     }
 
     //关闭传输音频
@@ -699,17 +655,27 @@ void Widget::clearPartner()
 	ui->openAudio->setText(QString(CLOSEAUDIO).toUtf8());
 	ui->openAudio->setDisabled(true);
 
-    if (_sendImg)
-        _sendImg->clearImgQueue();
+    if (_network)
+        _network->clearPendingImages();
     ui->openVedio->setText(QString(OPENVIDEO).toUtf8());
     ui->openVedio->setDisabled(true);
 }
 
 
 
+void Widget::onLocalFrameCaptured(const QImage &image)
+{
+    if (!_cameraVideo || !_cameraVideo->isCameraRunning() || !_network)
+        return;
+    if (partner.size() <= 1)
+        return;
+    _network->sendImage(image);
+}
+
+
 void Widget::recvip(quint32 ip)
 {
-    if (partner.contains(mainip)) {
+    if (partner.find(mainip) != partner.end()) {
         Partner* p = partner[mainip];
         p->setStyleSheet(
             "border-width: 1px; "
@@ -717,7 +683,7 @@ void Widget::recvip(quint32 ip)
             "border-color:rgba(0, 0, 255, 0.7)"
         );
     }
-	if (partner.contains(ip)) {
+	if (partner.find(ip) != partner.end()) {
 		Partner* p = partner[ip];
 		p->setStyleSheet(
             "border-width: 1px; "
@@ -745,7 +711,7 @@ void Widget::on_joinmeetBtn(QString roomNo) {
         QMessageBox::warning(this, "RoomNo Error", "房间号不合法" , QMessageBox::Yes, QMessageBox::Yes);
     } else {
         LOG_INFO("on_joinmeetBtn_clicked", "房间号合法，加入发送队列");
-        emit PushText(JOIN_MEETING, roomNo);
+        _network->sendJoinMeeting(roomNo);
     }
 }
 
@@ -779,8 +745,8 @@ void Widget::on_sendmsg_clicked()
     ChatMessage *message = new ChatMessage(ui->listWidget);
     QListWidgetItem *item = new QListWidgetItem();
     dealMessageTime(time);
-    dealMessage(message, item, msg, time, QHostAddress(_mytcpSocket ? _mytcpSocket->getlocalip() : 0).toString() ,ChatMessage::User_Me);
-    emit PushText(TEXT_SEND, msg);
+    dealMessage(message, item, msg, time, QHostAddress(_network ? _network->localIp() : 0).toString() ,ChatMessage::User_Me);
+    _network->sendText(msg);
     ui->sendmsg->setDisabled(true);
 }
 

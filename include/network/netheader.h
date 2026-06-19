@@ -1,10 +1,11 @@
 #ifndef NETHEADER_H
 #define NETHEADER_H
 #include <QMetaType>
-#include <QMutex>
-#include <QQueue>
 #include <QImage>
-#include <QWaitCondition>
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
+#include <queue>
 #define QUEUE_MAXSIZE 1500
 #ifndef MB
 #define MB 1024*1024
@@ -77,46 +78,44 @@ template<class T>
 struct QUEUE_DATA //消息队列
 {
 private:
-    QMutex send_queueLock;
-    QWaitCondition send_queueCond;
-    QQueue<T*> send_queue;
+    std::mutex send_queueLock;
+    std::condition_variable send_queueCond;
+    std::queue<T*> send_queue;
 public:
     void push_msg(T* msg) {
-        send_queueLock.lock();
-        while(send_queue.size() > QUEUE_MAXSIZE) {
-            send_queueCond.wait(&send_queueLock);
+        std::unique_lock<std::mutex> lock(send_queueLock);
+        while (send_queue.size() > QUEUE_MAXSIZE) {
+            send_queueCond.wait(lock);
         }
-        send_queue.push_back(msg);
-        send_queueLock.unlock();
-        send_queueCond.wakeOne();
+        send_queue.push(msg);
+        lock.unlock();
+        send_queueCond.notify_one();
     }
 
     T* pop_msg() {
-        send_queueLock.lock();
-        while(send_queue.size() == 0) {
-            bool f = send_queueCond.wait(&send_queueLock, WAITSECONDS * 1000);
-            if(f == false) {
-                send_queueLock.unlock();
+        std::unique_lock<std::mutex> lock(send_queueLock);
+        while (send_queue.empty()) {
+            if (send_queueCond.wait_for(lock, std::chrono::milliseconds(WAITSECONDS * 1000))
+                == std::cv_status::timeout) {
                 return nullptr;
             }
         }
         T* send = send_queue.front();
-        send_queue.pop_front();
-        send_queueLock.unlock();
-        send_queueCond.wakeOne();
+        send_queue.pop();
+        lock.unlock();
+        send_queueCond.notify_one();
         return send;
     }
 
     void clear() {
-        send_queueLock.lock();
-        send_queue.clear();
-        send_queueLock.unlock();
+        std::lock_guard<std::mutex> lock(send_queueLock);
+        while (!send_queue.empty()) {
+            send_queue.pop();
+        }
     }
 
     void wakeAll() {
-        send_queueLock.lock();
-        send_queueCond.wakeAll();
-        send_queueLock.unlock();
+        send_queueCond.notify_all();
     }
 };
 

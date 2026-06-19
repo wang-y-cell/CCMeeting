@@ -74,7 +74,7 @@ void MyTextEdit::changeCompletion(QString text)
     tc.insertText(" ");
     edit->setTextCursor(tc);
 
-    ipspan.push_back(QPair<int, int>(pos, str.size()+1));
+    ipspan.push_back(std::make_pair(pos, str.size() + 1));
 
 }
 
@@ -93,7 +93,7 @@ void MyTextEdit::setPlaceholderText(QString str)
     edit->setPlaceholderText(str);
 }
 
-void MyTextEdit::setCompleter(QStringList stringlist) {
+void MyTextEdit::setCompleter(const std::vector<QString> &items) {
     //如果completer为空,则创建一个completer
     if(completer == nullptr) {
         completer = new Completer(this);
@@ -107,6 +107,10 @@ void MyTextEdit::setCompleter(QStringList stringlist) {
         delete completer->model(); //删除原来的模型
         //就是上次传入的stringlist
     }
+    QStringList stringlist;
+    stringlist.reserve(static_cast<int>(items.size()));
+    for (const QString &item : items)
+        stringlist.append(item);
     //使用这次传入的stringlist创建一个新模型
     QStringListModel * model = new QStringListModel(stringlist, this);
     completer->setModel(model);
@@ -136,7 +140,7 @@ bool MyTextEdit::eventFilter(QObject *obj, QEvent *event)
                             tc.setPosition(ipspan[i].second + 1, QTextCursor::KeepAnchor);
                         }
                         tc.removeSelectedText();
-                        ipspan.removeAt(i);
+                        ipspan.erase(ipspan.begin() + i);
                         return true;
                     }
                     else if(p >= ipspan[i].first && p <= ipspan[i].second)

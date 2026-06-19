@@ -42,10 +42,10 @@ void CameraVideo::setMainIp(quint32 ip) {
 }
 
 void CameraVideo::addPartnerDisplay(quint32 ip, QWidget *label) {
-    if (_partnerDisplays.find(ip) != _partnerDisplays.end())
+    if (_partnerDisplays.find(ip) != _partnerDisplays.end()) //如果已经有这个人了
         return;
 
-    ImgDisplay *display = new ImgDisplay(this);
+    ImgDisplay *display = new ImgDisplay(this); //创建视频显示区域
     display->setTarget(label);
     display->setDrawMode(ImgDisplay::DrawMode::FitWidgetSmooth);
     display->setAlignment(Qt::AlignCenter);
@@ -89,18 +89,18 @@ void CameraVideo::showMainImage(const QImage &image) {
 }
 
 void CameraVideo::showAvatarForIp(quint32 ip) {
-    _lastImages.erase(ip);
-    const QImage avatar = defaultAvatar();
-    if (ImgDisplay *display = _partnerDisplays[ip])
-        display->showImage(avatar);
+    _lastImages.erase(ip); //删除ip对应的图像
+    const QImage avatar = defaultAvatar(); //获取默认头像
+    if (ImgDisplay *display = _partnerDisplays[ip]) //获得ip对应的显示区域
+        display->showImage(avatar); //显示默认头像
     if (ip == _mainIp)
-        showMainAvatar();
+        showMainAvatar(); //显示主头像
 }
 
 void CameraVideo::showMainAvatar() {
-    if (!_mainAvatarImg)
+    if (!_mainAvatarImg) //如果主头像显示区域为空
         return;
-    _mainAvatarImg->showImage(defaultAvatar());
+    _mainAvatarImg->showImage(defaultAvatar()); //显示默认头像
 }
 
 void CameraVideo::refreshMainForIp(quint32 ip) {
@@ -160,4 +160,5 @@ void CameraVideo::cameraImageCapture(const QVideoFrame &frame) {
         return;
 
     showImageForIp(_localIp, videoImg);
+    emit frameCaptured(videoImg);
 }
