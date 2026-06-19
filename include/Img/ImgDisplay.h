@@ -16,12 +16,13 @@ class QLabel;
  *
  * 典型用法：绑定 QLabel，设置 DrawMode / 可选矩形区域，再调用 showImage()。
  */
-class ImgDisplay
+class ImgDisplay : public QObject
 {
+    Q_OBJECT
 public:
     /// 图像相对目标控件的缩放与适配策略（对应项目中多处 QPixmap::fromImage + scaled）
     enum class DrawMode {
-        FitWidgetSmooth,   // 缩放到控件尺寸，KeepAspectRatio + SmoothTransformation
+        FitWidgetSmooth,   // 缩放到控件尺寸，KeepAspectRatio + SmoothTransformation,保持图像宽高比
         FitWidgetFast,     // 同样是缩放到目标尺寸且 保持宽高比，但用 快速缩放
         StretchWidget,     // 拉伸填满控件矩形（IgnoreAspectRatio）
         FixedSize,         // 按 setFixedOutputSize() 输出，不随控件变大而变大
@@ -29,7 +30,7 @@ public:
         Custom             // 使用 setPixmapTransform() 自定义
     };
 
-    explicit ImgDisplay(QWidget *target = nullptr);
+    explicit ImgDisplay(QObject *parent = nullptr);
     ~ImgDisplay();
 
     void setTarget(QWidget *target); //设置父控件

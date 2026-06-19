@@ -4,32 +4,52 @@
 #include "myvideosurface.h"
 #include "ImgDisplay.h"
 #include <QCamera>
+#include <unordered_map>
 #include <QMediaCaptureSession>
-class Widget;
+
 class CameraVideo : public MyVideoSurface {
 private:
     void initConnection();
-    void initFrameDisplay();
+    static QImage defaultAvatar();
+
 public:
-    //构造函数,parent为父窗口,target为画面目标窗口
-    CameraVideo(QWidget *parent = nullptr, QWidget* target = nullptr);
+    CameraVideo(QWidget *parent = nullptr);
     ~CameraVideo();
-    void setTarget(QWidget* target);
-    void startCamera(); //启动摄像头
-    void stopCamera(); //停止摄像头
-    bool isCameraRunning() const { return _isRunning; } //是否开启摄像头
-    void endVideo(); //结束所有视频采集与显示
-    void showImage(const QImage &image);
+
+    void setMainTarget(QWidget *label); // 设置主视频显示区域
+    void setLocalIp(quint32 ip); // 设置本地IP
+    void setMainIp(quint32 ip); // 设置主IP
+
+    void addPartnerDisplay(quint32 ip, QWidget *label); // 添加合作伙伴视频显示区域
+    void removePartnerDisplay(quint32 ip);
+    void clearAllPartnerDisplays();
+
+    void showImageForIp(quint32 ip, const QImage &image);
+    void showMainImage(const QImage &image);
+    void showAvatarForIp(quint32 ip);
+    void showMainAvatar();
+    void refreshMainForIp(quint32 ip);
+
+    void startCamera();
+    void stopCamera();
+    bool isCameraRunning() const { return _isRunning; }
+    void endVideo();
+
 private slots:
     void cameraError(QCamera::Error error, const QString &errorString);
-    void cameraImageCapture(const QVideoFrame &frame); //摄像头捕获图像
+    void cameraImageCapture(const QVideoFrame &frame);
+
 private:
-    QWidget * _parent; //父窗口,用来将消息显示在父窗口
-    QCamera *_camera; //摄像头
-    QMediaCaptureSession _captureSession; //媒体捕获会话
-    ImgDisplay _videoImg; //视频图像
-    QWidget* _target; //画面显示控件
-    bool _isRunning = false; //是否运行
+    QWidget *_parent = nullptr;
+    QCamera *_camera = nullptr;
+    QMediaCaptureSession _captureSession;
+    ImgDisplay *_mainVideoImg = nullptr;
+    ImgDisplay *_mainAvatarImg = nullptr;
+    std::unordered_map<quint32, ImgDisplay *> _partnerDisplays;
+    std::unordered_map<quint32, QImage> _lastImages;
+    quint32 _localIp = 0;
+    quint32 _mainIp = 0;
+    bool _isRunning = false;
 };
 
 #endif // CAMERAVIDEO_H

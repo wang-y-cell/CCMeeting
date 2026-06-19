@@ -21,6 +21,7 @@
 #include <QSoundEffect>
 #include <QCloseEvent>
 #include <QEvent>
+#include <cstdarg>
 #include <qnamespace.h>
 #include <QSplitter>
 QRect  Widget::pos = QRect(-1, -1, -1, -1);
@@ -55,7 +56,8 @@ Widget::Widget(QWidget *parent)
     // _myvideosurface = new MyVideoSurface(this); //视频表面
     // connect(_myvideosurface, &MyVideoSurface::frameAvailable, this, &Widget::cameraImageCapture);
 
-    _cameraVideo = new CameraVideo(this, ui->mainshow_label);
+    _cameraVideo = new CameraVideo(this);
+    _cameraVideo->setMainTarget(ui->mainshow_label);
 
     //_captureSession.setCamera(_camera);
     //_captureSession.setVideoSink(_myvideosurface->getVideoSink());
@@ -64,6 +66,7 @@ Widget::Widget(QWidget *parent)
 }
 
 void Widget::initUI() {
+    LOG_DEBUG("Widget", "初始化UI");
     ui->setupUi(this);  //解析ui文件
 
     Widget::pos = QRect(0.1 * Screen::width, 0.1 * Screen::height, 0.8 * Screen::width, 0.8 * Screen::height);
@@ -71,10 +74,6 @@ void Widget::initUI() {
     // m_videoImg.setDrawMode(ImgDisplay::DrawMode::FitWidgetSmooth); //设置视频显示模式
     // m_videoImg.setAlignment(Qt::AlignCenter);
 
-    m_avatarImg.setTarget(ui->mainshow_label);
-    m_avatarImg.setDrawMode(ImgDisplay::DrawMode::ScaleToHeightFractionCentered); //设置头像显示模式
-    m_avatarImg.setHeightFraction(0.1);
-    m_avatarImg.setAlignment(Qt::AlignCenter);
     //设置打开视频和音频的按钮
     ui->openAudio->setText(QString(OPENAUDIO).toUtf8());
     ui->openVedio->setText(QString(OPENVIDEO).toUtf8());
@@ -208,15 +207,15 @@ Widget::~Widget() {
     delete ui;
 }
 
-void Widget::closeEvent(QCloseEvent *event)
-{
+void Widget::closeEvent(QCloseEvent *event) {
+    LOG_INFO("Widget", "关闭窗口");
     hide();
     endMeetingSession();
     event->ignore();
 }
 
-void Widget::resetMeetingUi()
-{
+void Widget::resetMeetingUi() {
+    LOG_DEBUG("Widget", "重置会议UI");
     ui->openAudio->setDisabled(true);
     ui->openVedio->setDisabled(true);
     ui->sendmsg->setDisabled(true);
@@ -235,8 +234,7 @@ void Widget::resetMeetingUi()
 
 void Widget::endMeetingSession()
 {
-    // if (_camera && !_camera->cameraDevice().isNull() && _camera->isActive())
-    //     _camera->stop();
+    LOG_DEBUG("Widget", "结束会议会话");
     _cameraVideo->endVideo();
 
     _createmeet = false;
@@ -253,6 +251,7 @@ void Widget::endMeetingSession()
 
 void Widget::shutdownAllWorkers()
 {
+    LOG_DEBUG("Widget", "关闭所有工作线程");
     if (_recvThread)
         disconnect(_recvThread, nullptr, this, nullptr);
 
@@ -286,8 +285,7 @@ void Widget::shutdownAllWorkers()
     }
 }
 
-void Widget::on_createmeetBtn_clicked()
-{
+void Widget::on_createmeetBtn_clicked() {
     LOG_INFO("Widget", "点击创建会议按钮");
     if(false == _createmeet)
     {
@@ -296,7 +294,6 @@ void Widget::on_createmeetBtn_clicked()
         //ui->exitmeetBtn->setDisabled(true);
         LOG_INFO("Widget", "发送创建会议信号: PushText(CREATE_MEETING)");
         emit PushText(CREATE_MEETING); //将 “创建会议"加入到发送队列
-        LOG_INFO("Widget", "创建会议信号发送完成");
     }
 }
 
@@ -322,9 +319,10 @@ void Widget::paintEvent(QPaintEvent *event)
 
 void Widget::on_openVedio_clicked()
 {
+    LOG_DEBUG("Widget", "点击打开摄像头按钮");
     if(_cameraVideo->isCameraRunning()) {
         _cameraVideo->stopCamera();
-        LOG_INFO("Widget", "关闭摄像头");
+        LOG_INFO("Widget", "摄像头关闭");
         if (_sendImg)
             _sendImg->clearImgQueue();
         ui->openVedio->setText("摄像头关闭");
@@ -333,7 +331,7 @@ void Widget::on_openVedio_clicked()
             closeImg(_mytcpSocket->getlocalip());
     } else {
         _cameraVideo->startCamera();
-        LOG_INFO("Widget", "开启摄像头");
+        LOG_INFO("Widget", "摄像头开启");
         ui->openVedio->setText("摄像头开启");
     }
 }
@@ -354,24 +352,19 @@ void Widget::on_openAudio_clicked()
     }
 }
 
-void Widget::closeImg(quint32 ip)
-{
+void Widget::closeImg(quint32 ip) {
+    LOG_DEBUG("Widget", "关闭图像: ip = " << ip);
     if (!partner.contains(ip))
     {
         LOG_WARN("Widget", "closeImg: partner missing for ip");
         return;
     }
-    Partner * p = partner[ip];
-    p->setpic(QImage(QString::fromUtf8(Source::default_avatar)));
-
-    if(mainip == ip)
-    {
-        m_avatarImg.showImage(QImage(QString::fromUtf8(Source::default_avatar)));
-    }
+    _cameraVideo->showAvatarForIp(ip);
 }
 
 
 bool Widget::on_connServer(QString ip, QString port) {
+    LOG_DEBUG("Widget", "连接服务器: ip = " << ip.toStdString() << ", port = " << port.toStdString());
     if (!_mytcpSocket) {
         LOG_WARN("Widget", "on_connServer: tcp socket not initialized");
         return false;
@@ -431,10 +424,13 @@ void Widget::handleCreateMeetingResponse(MESG *msg)
 
         LOG_INFO("Widget", "succeed creating room " << roomno);
         if (_mytcpSocket) {
-            addPartner(_mytcpSocket->getlocalip());
-            mainip = _mytcpSocket->getlocalip();
+            const quint32 localIp = _mytcpSocket->getlocalip();
+            addPartner(localIp);
+            mainip = localIp;
+            _cameraVideo->setLocalIp(localIp);
+            _cameraVideo->setMainIp(mainip);
             ui->groupBox_2->setTitle(QHostAddress(mainip).toString());
-            m_avatarImg.showImage(QImage(QString::fromUtf8(Source::default_avatar)));
+            _cameraVideo->showMainAvatar();
         }
     } else {
         _createmeet = false;
@@ -464,10 +460,13 @@ void Widget::handleJoinMeetingResponse(MESG *msg) {
         ui->outlog->setText(QString("加入成功"));
         LOG_INFO("Widget", "succeed joining room");
         if (_mytcpSocket) {
-            addPartner(_mytcpSocket->getlocalip());
-            mainip = _mytcpSocket->getlocalip();
+            const quint32 localIp = _mytcpSocket->getlocalip();
+            addPartner(localIp);
+            mainip = localIp;
+            _cameraVideo->setLocalIp(localIp);
+            _cameraVideo->setMainIp(mainip);
             ui->groupBox_2->setTitle(QHostAddress(mainip).toString());
-            m_avatarImg.showImage(QImage(QString::fromUtf8(Source::default_avatar)));
+            _cameraVideo->showMainAvatar();
         }
         ui->sendmsg->setDisabled(false);
         _joinmeet = true;
@@ -480,17 +479,10 @@ void Widget::handleImgRecv(MESG *msg)
     LOG_DEBUG("Widget", "IMG_RECV from " << a.toString().toStdString());
     QImage img;
     img.loadFromData(msg->data, msg->len);
-    if (partner.count(msg->ip) == 1) {
-        Partner *p = partner[msg->ip];
-        p->setpic(img);
-    } else {
-        Partner *p = addPartner(msg->ip);
-        p->setpic(img);
-    }
+    if (partner.count(msg->ip) == 0)
+        addPartner(msg->ip);
 
-    if (msg->ip == mainip) {
-        _cameraVideo->showImage(img);
-    }
+    _cameraVideo->showImageForIp(msg->ip, img);
     repaint();
 }
 
@@ -511,7 +503,7 @@ void Widget::handlePartnerJoin(MESG *msg)
 {
     Partner *p = addPartner(msg->ip);
     if (p) {
-        p->setpic(QImage(QString::fromUtf8(Source::default_avatar)));
+        _cameraVideo->showAvatarForIp(msg->ip);
         ui->outlog->setText(QString("%1 join meeting").arg(QHostAddress(msg->ip).toString()));
         iplist.append(QString("@") + QHostAddress(msg->ip).toString());
         ui->plainTextEdit->setCompleter(iplist);
@@ -521,9 +513,8 @@ void Widget::handlePartnerJoin(MESG *msg)
 void Widget::handlePartnerExit(MESG *msg)
 {
     removePartner(msg->ip);
-    if (mainip == msg->ip) {
-        m_avatarImg.showImage(QImage(QString::fromUtf8(Source::default_avatar)));
-    }
+    if (mainip == msg->ip)
+        _cameraVideo->showMainAvatar();
     if (iplist.removeOne(QString("@") + QHostAddress(msg->ip).toString())) {
         ui->plainTextEdit->setCompleter(iplist);
     } else {
@@ -546,7 +537,7 @@ void Widget::handlePartnerJoin2(MESG *msg)
         pos += sizeof(uint32_t);
         Partner *p = addPartner(ip);
         if (p) {
-            p->setpic(QImage(QString::fromUtf8(Source::default_avatar)));
+            _cameraVideo->showAvatarForIp(ip);
             iplist << QString("@") + QHostAddress(ip).toString();
         }
     }
@@ -633,6 +624,7 @@ Partner* Widget::addPartner(quint32 ip)
         LOG_DEBUG("Widget", "将这个用户添加到partner中");
 		partner.insert(ip, p);
 		ui->verticalLayout_3->addWidget(p, 1);
+        _cameraVideo->addPartnerDisplay(ip, p->displayLabel());
 
 		//当有人员加入时，开启滑动条滑动事件，开启输入(只有自己时，不打开)
         if (partner.size() > 1 && _ainput && _aoutput) {
@@ -656,6 +648,7 @@ void Widget::removePartner(quint32 ip)
     {
         Partner *p = partner[ip];
         disconnect(p, SIGNAL(sendip(quint32)), this, SLOT(recvip(quint32)));
+        _cameraVideo->removePartnerDisplay(ip);
         ui->verticalLayout_3->removeWidget(p);
         delete p;
         partner.remove(ip);
@@ -680,12 +673,15 @@ void Widget::clearPartner()
     //m_videoImg.clear();
     if(partner.size() == 0) return;
 
+    _cameraVideo->clearAllPartnerDisplays();
+
     QMap<quint32, Partner*>::iterator iter =   partner.begin();
     while (iter != partner.end())
     {
         quint32 ip = iter.key();
         iter++;
         Partner *p =  partner.take(ip);
+        disconnect(p, SIGNAL(sendip(quint32)), this, SLOT(recvip(quint32)));
         ui->verticalLayout_3->removeWidget(p);
         delete p;
         p = nullptr;
@@ -729,8 +725,8 @@ void Widget::recvip(quint32 ip)
             "border-color:rgba(255, 0, 0, 0.7)"
         );
 	}
-	//m_avatarImg.showImage(QImage(QString::fromUtf8(Source::default_avatar)));
     mainip = ip;
+    _cameraVideo->refreshMainForIp(mainip);
     ui->groupBox_2->setTitle(QHostAddress(mainip).toString());
     LOG_DEBUG("Widget", "mainshow switch mainip=" << ip);
 }

@@ -1,47 +1,42 @@
 #include "network/partner.h"
-#include "configure/configure.h"
-#include <QString>
+#include <QLabel>
 #include <QHostAddress>
+#include <QMouseEvent>
 #include <QResizeEvent>
 
-Partner::Partner(QWidget *parent, quint32 p):QLabel(parent)
+Partner::Partner(QWidget *parent, quint32 p) : QWidget(parent), ip(p)
 {
-    ip = p;
+    m_displayLabel = new QLabel(this);
+    m_displayLabel->setAlignment(Qt::AlignCenter);
+    m_displayLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
 
-    this->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
-    m_sourceImage = QImage(QString::fromUtf8(Source::default_avatar));
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
     w = parent ? qMax(parent->width(), 40) : 40;
-    updatePixmap();
-    this->setFrameShape(QFrame::Box);
+    setFixedHeight(w);
+    updateLabelGeometry();
 
-    this->setStyleSheet("border-width: 1px; border-style: solid; border-color:rgba(0, 0, 255, 0.7)");
-    this->setToolTip(QHostAddress(ip).toString());
+    setStyleSheet("border-width: 1px; border-style: solid; border-color:rgba(0, 0, 255, 0.7)");
+    setToolTip(QHostAddress(ip).toString());
 }
 
 void Partner::resizeEvent(QResizeEvent *event)
 {
-    QLabel::resizeEvent(event);
+    QWidget::resizeEvent(event);
     const int newW = event->size().width();
     if (newW <= 10 || newW == w)
         return;
     w = newW;
-    // 高度随宽度固定为方形，避免 setPixmap 改变 sizeHint 后触发滚动条显隐
     setFixedHeight(w);
-    updatePixmap();
+    updateLabelGeometry();
 }
 
-void Partner::updatePixmap() {
-    const int side = qMax(w - 10, 1);
-    setPixmap(QPixmap::fromImage(
-        m_sourceImage.scaled(side, side, Qt::KeepAspectRatio, Qt::SmoothTransformation)));
-}
-
-void Partner::mousePressEvent(QMouseEvent *) {
-    emit sendip(ip);
-}
-
-void Partner::setpic(QImage img)
+void Partner::updateLabelGeometry()
 {
-    m_sourceImage = img;
-    updatePixmap();
+    const int margin = 5;
+    m_displayLabel->setGeometry(margin, margin, qMax(w - margin * 2, 1), qMax(w - margin * 2, 1));
+}
+
+void Partner::mousePressEvent(QMouseEvent *)
+{
+    emit sendip(ip);
 }

@@ -522,11 +522,11 @@ bool MyTcpSocket::connectServerImpl(QString ip, QString port, QIODevice::OpenMod
             uniqueAuto);
 
     if(_socktcp->waitForConnected(5000)) {
-		LOG_INFO("MyTcpSocket", "连接成功");
-        _localIp = _socktcp->localAddress().toIPv4Address();
-        _hasLocalIp = true;
+        _localIp = _socktcp->localAddress().toIPv4Address(); //连接成功就获得本机ip
+		LOG_INFO("MyTcpSocket", "连接成功,本机ip: " << _localIp);
+        _hasLocalIp = true; //含有本地ip
         _lastError.clear();
-        hasrecvive = 0;
+        hasrecvive = 0; //设置接收数据长度为0
         return true;
     }
     _lastError = _socktcp->errorString();

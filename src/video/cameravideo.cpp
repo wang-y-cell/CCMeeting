@@ -1,47 +1,144 @@
 #include "cameravideo.h"
+#include "configure/configure.h"
 #include <QMessageBox>
+#include <QWidget>
+#include "logger/logger.h"
 
-CameraVideo::CameraVideo(QWidget* parent, QWidget* target) : MyVideoSurface(parent) {
+CameraVideo::CameraVideo(QWidget *parent) : MyVideoSurface(parent) {
     _parent = parent;
-    _target = target;
     _camera = new QCamera(this);
     _captureSession.setCamera(_camera);
     _captureSession.setVideoSink(this->getVideoSink());
     initConnection();
-    initFrameDisplay();
 }
 
 CameraVideo::~CameraVideo() {
     endVideo();
 }
 
-void CameraVideo::setTarget(QWidget* target) {
-    _target = target;
+QImage CameraVideo::defaultAvatar() {
+    return QImage(QString::fromUtf8(Source::default_avatar));
+}
+
+void CameraVideo::setMainTarget(QWidget *label) {
+    _mainVideoImg = new ImgDisplay(this);
+    _mainVideoImg->setTarget(label);
+    _mainVideoImg->setDrawMode(ImgDisplay::DrawMode::FitWidgetSmooth);
+    _mainVideoImg->setAlignment(Qt::AlignCenter);
+
+    _mainAvatarImg = new ImgDisplay(this);
+    _mainAvatarImg->setTarget(label);
+    _mainAvatarImg->setDrawMode(ImgDisplay::DrawMode::ScaleToHeightFractionCentered);
+    _mainAvatarImg->setHeightFraction(0.1);
+    _mainAvatarImg->setAlignment(Qt::AlignCenter);
+}
+
+void CameraVideo::setLocalIp(quint32 ip) {
+    _localIp = ip;
+}
+
+void CameraVideo::setMainIp(quint32 ip) {
+    _mainIp = ip;
+}
+
+void CameraVideo::addPartnerDisplay(quint32 ip, QWidget *label) {
+    if (_partnerDisplays.find(ip) != _partnerDisplays.end())
+        return;
+
+    ImgDisplay *display = new ImgDisplay(this);
+    display->setTarget(label);
+    display->setDrawMode(ImgDisplay::DrawMode::FitWidgetSmooth);
+    display->setAlignment(Qt::AlignCenter);
+    _partnerDisplays[ip] = display;
+    showAvatarForIp(ip);
+}
+
+void CameraVideo::removePartnerDisplay(quint32 ip) {
+    auto it = _partnerDisplays.find(ip);
+    if (it != _partnerDisplays.end()) {
+        ImgDisplay *display = it->second;
+        delete display;
+        _partnerDisplays.erase(it);
+    }
+}
+
+void CameraVideo::clearAllPartnerDisplays() {
+    for (auto it = _partnerDisplays.begin(); it != _partnerDisplays.end(); ++it) {
+        ImgDisplay *display = it->second;
+        delete display;
+    }
+    _partnerDisplays.clear();
+    _lastImages.clear();
+}
+
+void CameraVideo::showImageForIp(quint32 ip, const QImage &image) {
+    if (image.isNull())
+        return;
+
+    _lastImages[ip] = image;
+    if (ImgDisplay *display = _partnerDisplays[ip])
+        display->showImage(image);
+    if (ip == _mainIp)
+        showMainImage(image);
+}
+
+void CameraVideo::showMainImage(const QImage &image) {
+    if (!_mainVideoImg || image.isNull())
+        return;
+    _mainVideoImg->showImage(image);
+}
+
+void CameraVideo::showAvatarForIp(quint32 ip) {
+    _lastImages.erase(ip);
+    const QImage avatar = defaultAvatar();
+    if (ImgDisplay *display = _partnerDisplays[ip])
+        display->showImage(avatar);
+    if (ip == _mainIp)
+        showMainAvatar();
+}
+
+void CameraVideo::showMainAvatar() {
+    if (!_mainAvatarImg)
+        return;
+    _mainAvatarImg->showImage(defaultAvatar());
+}
+
+void CameraVideo::refreshMainForIp(quint32 ip) {
+    _mainIp = ip;
+    if (_lastImages.find(ip) != _lastImages.end())
+        showMainImage(_lastImages[ip]);
+    else
+        showMainAvatar();
 }
 
 void CameraVideo::startCamera() {
-    if(_isRunning || _target == nullptr)
+    if (_isRunning || !_mainVideoImg)
         return;
     _camera->start();
+    LOG_INFO("CameraVideo", "摄像头启动");
     _isRunning = true;
 }
 
 void CameraVideo::stopCamera() {
-    if(_isRunning && _camera->isActive())
+    if (_isRunning && _camera->isActive())
         _camera->stop();
+    LOG_INFO("CameraVideo", "摄像头停止");
     _isRunning = false;
 }
 
 void CameraVideo::endVideo() {
     stopCamera();
-    _videoImg.clear();
+    if (_mainVideoImg)
+        _mainVideoImg->clear();
+    if (_mainAvatarImg)
+        _mainAvatarImg->clear();
+    for (auto it = _partnerDisplays.begin(); it != _partnerDisplays.end(); ++it) {
+        ImgDisplay *display = it->second;
+        display->clear();
+    }
 }
 
-void CameraVideo::showImage(const QImage &image) {
-    _videoImg.showImage(image);
-}
-
-void CameraVideo::cameraError(QCamera::Error error, const QString &errorString) {
+void CameraVideo::cameraError(QCamera::Error, const QString &errorString) {
     QMessageBox::warning(_parent, "Camera error", errorString, QMessageBox::Yes, QMessageBox::Yes);
 }
 
@@ -50,25 +147,17 @@ void CameraVideo::initConnection() {
     connect(this, &MyVideoSurface::frameAvailable, this, &CameraVideo::cameraImageCapture);
 }
 
-void CameraVideo::initFrameDisplay() {
-    _videoImg.setTarget(_target);
-    _videoImg.setDrawMode(ImgDisplay::DrawMode::FitWidgetSmooth); //设置视频显示模式
-    _videoImg.setAlignment(Qt::AlignCenter);
-}
-
 void CameraVideo::cameraImageCapture(const QVideoFrame &frame) {
-    if(frame.isValid()) /*如果是有效的视频帧*/ {
-        QVideoFrame cloneFrame(frame); 
-        /*
-        QVideoFrame 里的原始像素数据（比如摄像头采集到的 YUV 格式画面）
-        通常存储在 GPU 显存或某些受保护的硬件缓冲区中，
-        CPU 是无法直接通过指针去读取或修改这些数据的 
-        */
-        cloneFrame.map(QVideoFrame::ReadOnly); //将视频帧映射为只读模式
-        QImage videoImg = cloneFrame.toImage(); //讲frame转换成image
-        _videoImg.showImage(videoImg);
-        cloneFrame.unmap();
-    }
+    if (!frame.isValid() || _localIp == 0)
+        return;
+
+    QVideoFrame cloneFrame(frame);
+    cloneFrame.map(QVideoFrame::ReadOnly);
+    const QImage videoImg = cloneFrame.toImage();
+    cloneFrame.unmap();
+
+    if (videoImg.isNull())
+        return;
+
+    showImageForIp(_localIp, videoImg);
 }
-
-

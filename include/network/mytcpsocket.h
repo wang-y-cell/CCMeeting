@@ -46,7 +46,7 @@ public:
     static bool IpPortValid(QWidget *parent, QString ip, QString port); //验证ip和端口是否有效
 
 private:
-    void run() override;
+    void run() override; //发送数据线程
     qint64 readn(char *, quint64, int); //读取数据
     bool connectServerImpl(QString ip, QString port, QIODevice::OpenModeFlag flag);
     void sendData(MESG *send);

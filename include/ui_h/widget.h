@@ -15,7 +15,6 @@
 #include <QMap>
 #include "Audio/AudioOutput.h"
 #include "text/chatmessage.h"
-#include "Img/ImgDisplay.h"
 #include <QStringListModel>
 #include <QSoundEffect>
 #include <QCloseEvent>
@@ -39,8 +38,6 @@ class Widget : public QWidget
 private:
     static QRect pos; //窗口位置
     quint32 mainip; //主屏幕IP
-    //QCamera *_camera; //摄像头
-    //QMediaCaptureSession _captureSession; //媒体捕获会话
     bool  _createmeet; //是否创建会议
     bool _joinmeet; //是否加入会议
     bool _openCamera; //是否打开摄像头
@@ -58,9 +55,7 @@ private:
     QSoundEffect* _soundEffect;
     int m_lastChatListWidth = -1;
     bool m_inChatRelayout = false;
-    //ImgDisplay m_videoImg;   ///< 主画面视频：按宽高比缩放以适配整块 label（尽可能“铺满”可视区域）
-    ImgDisplay m_avatarImg; ///< 占位头像：高度为 label 的固定比例并居中
-    CameraVideo *_cameraVideo; //摄像头视频
+    CameraVideo *_cameraVideo; //统一处理图像/视频显示
 
     void initUI(); //初始化UI
     void paintEvent(QPaintEvent *event) override;

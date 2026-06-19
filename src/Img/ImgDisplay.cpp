@@ -2,61 +2,49 @@
 
 #include <QLabel>
 
-ImgDisplay::ImgDisplay(QWidget *target)
-    : m_target(target)
-{
-}
+ImgDisplay::ImgDisplay(QObject *parent)
+    : QObject(parent) { }
 
 ImgDisplay::~ImgDisplay() = default;
 
-void ImgDisplay::setTarget(QWidget *target)
-{
+void ImgDisplay::setTarget(QWidget *target) {
     m_target = target;
 }
 
-void ImgDisplay::setDrawMode(DrawMode mode)
-{
+void ImgDisplay::setDrawMode(DrawMode mode) {
     m_drawMode = mode;
 }
 
-void ImgDisplay::setFixedOutputSize(const QSize &size)
-{
+void ImgDisplay::setFixedOutputSize(const QSize &size) {
     m_fixedOutputSize = size;
 }
 
-void ImgDisplay::setContentRect(const QRect &rect)
-{
+void ImgDisplay::setContentRect(const QRect &rect) {
     m_contentRect = rect;
 }
 
-QRect ImgDisplay::contentRect() const
-{
+QRect ImgDisplay::contentRect() const {
     return m_contentRect;
 }
 
-void ImgDisplay::setAlignment(Qt::Alignment alignment)
-{
+void ImgDisplay::setAlignment(Qt::Alignment alignment) {
     m_alignment = alignment;
 }
 
-void ImgDisplay::setHeightFraction(double fraction)
-{
+void ImgDisplay::setHeightFraction(double fraction) {
     if (fraction > 0.0 && fraction <= 1.0) //如果输入的值不符合要求，则不进行设置
         m_heightFraction = fraction;
 }
 
-void ImgDisplay::setPixmapTransform(PixmapTransform fn)
-{
+void ImgDisplay::setPixmapTransform(PixmapTransform fn) {
     m_customTransform = std::move(fn);
 }
 
-void ImgDisplay::clearPixmapTransform()
-{
+void ImgDisplay::clearPixmapTransform() {
     m_customTransform = {};
 }
 
-QSize ImgDisplay::effectiveTargetSize() const
-{
+QSize ImgDisplay::effectiveTargetSize() const {
     if (!m_target) //如果父控件为空，则返回空尺寸
         return {};
 
@@ -67,8 +55,7 @@ QSize ImgDisplay::effectiveTargetSize() const
     return cr.size().isEmpty() ? m_target->size() : cr.size();
 }
 
-QRect ImgDisplay::effectiveContentRect() const
-{
+QRect ImgDisplay::effectiveContentRect() const {
     if (!m_target) //如果父控件为空，则返回空矩形
         return {};
 
@@ -78,8 +65,7 @@ QRect ImgDisplay::effectiveContentRect() const
     return m_target->rect(); //如果绘制内容的矩形无效，则返回父控件的矩形
 }
 
-QPixmap ImgDisplay::scaleImage(const QImage &image, const QSize &targetSize, DrawMode mode)
-{
+QPixmap ImgDisplay::scaleImage(const QImage &image, const QSize &targetSize, DrawMode mode) {
     if (image.isNull() || !targetSize.isValid())
         return QPixmap();
 
@@ -105,8 +91,7 @@ QPixmap ImgDisplay::scaleImage(const QImage &image, const QSize &targetSize, Dra
     return QPixmap::fromImage(image);
 }
 
-QPixmap ImgDisplay::preparePixmap(const QImage &image) const
-{
+QPixmap ImgDisplay::preparePixmap(const QImage &image) const {
     if (image.isNull())
         return QPixmap();
 
@@ -140,8 +125,7 @@ QPixmap ImgDisplay::preparePixmap(const QImage &image) const
     return scaleImage(image, sz, m_drawMode); //将图像缩放到目标尺寸
 }
 
-void ImgDisplay::refreshLabel(const QPixmap &pixmap)
-{
+void ImgDisplay::refreshLabel(const QPixmap &pixmap) {
     if (!m_target)
         return;
 
@@ -154,13 +138,11 @@ void ImgDisplay::refreshLabel(const QPixmap &pixmap)
     m_target->update(effectiveContentRect());
 }
 
-void ImgDisplay::showImage(const QImage &image)
-{
+void ImgDisplay::showImage(const QImage &image) {
     showPixmap(preparePixmap(image));
 }
 
-void ImgDisplay::showPixmap(const QPixmap &pixmap)
-{
+void ImgDisplay::showPixmap(const QPixmap &pixmap) {
     if (!m_target)
         return;
 
@@ -174,8 +156,7 @@ void ImgDisplay::showPixmap(const QPixmap &pixmap)
     m_target->update(effectiveContentRect());
 }
 
-void ImgDisplay::clear()
-{
+void ImgDisplay::clear() {
     if (!m_target)
         return;
 
