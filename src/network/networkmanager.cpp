@@ -3,7 +3,10 @@
 #include "network/mytcpsocket.h"
 #include "logger/Logger.h"
 #include <chrono>
+#include <climits>
+#include <cstdint>
 #include <mutex>
+#include <stdexcept>
 
 extern QUEUE_DATA<MESG> queue_send;
 extern QUEUE_DATA<MESG> queue_recv;
@@ -73,7 +76,7 @@ void SendWorker::run()
             packet = MessageCodec::encodeControl(item.controlType);
             break;
         case OutgoingItem::Kind::JoinRoom:
-            packet = MessageCodec::encodeJoinMeeting(item.text.toUInt());
+            packet = MessageCodec::encodeJoinMeeting(static_cast<std::uint32_t>(std::stoul(item.text)));
             break;
         case OutgoingItem::Kind::Text:
             packet = MessageCodec::encodeText(item.text);
@@ -161,8 +164,8 @@ void NetworkManager::disconnectFromHost()
         _socket->disconnectFromHost();
 }
 
-quint32 NetworkManager::localIp() const {
-    return _socket ? _socket->getlocalip() : static_cast<quint32>(-1);
+std::uint32_t NetworkManager::localIp() const {
+    return _socket ? _socket->getlocalip() : UINT32_MAX;
 }
 
 void NetworkManager::sendCreateMeeting() {
@@ -172,7 +175,7 @@ void NetworkManager::sendCreateMeeting() {
     _sendWorker->enqueue(item); //发送请求
 }
 
-void NetworkManager::sendJoinMeeting(const QString &roomNo)
+void NetworkManager::sendJoinMeeting(const std::string &roomNo)
 {
     OutgoingItem item;
     item.kind = OutgoingItem::Kind::JoinRoom;
@@ -180,7 +183,7 @@ void NetworkManager::sendJoinMeeting(const QString &roomNo)
     _sendWorker->enqueue(item);
 }
 
-void NetworkManager::sendText(const QString &text)
+void NetworkManager::sendText(const std::string &text)
 {
     OutgoingItem item;
     item.kind = OutgoingItem::Kind::Text;

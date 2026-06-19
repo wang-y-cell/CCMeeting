@@ -15,7 +15,7 @@ MESG *MessageCodec::encodeControl(MSG_TYPE type)
     return send;
 }
 
-MESG *MessageCodec::encodeJoinMeeting(quint32 roomNo)
+MESG *MessageCodec::encodeJoinMeeting(std::uint32_t roomNo)
 {
     MESG *send = static_cast<MESG *>(malloc(sizeof(MESG)));
     if (!send)
@@ -23,7 +23,7 @@ MESG *MessageCodec::encodeJoinMeeting(quint32 roomNo)
     memset(send, 0, sizeof(MESG));
     send->msg_type = JOIN_MEETING;
     send->len = 4;
-    send->data = static_cast<uchar *>(malloc(send->len + 10));
+    send->data = static_cast<std::uint8_t *>(malloc(send->len + 10));
     if (!send->data) {
         free(send);
         return nullptr;
@@ -33,21 +33,21 @@ MESG *MessageCodec::encodeJoinMeeting(quint32 roomNo)
     return send;
 }
 
-MESG *MessageCodec::encodeText(const QString &text)
+MESG *MessageCodec::encodeText(const std::string &text)
 {
     MESG *send = static_cast<MESG *>(malloc(sizeof(MESG)));
     if (!send)
         return nullptr;
     memset(send, 0, sizeof(MESG));
     send->msg_type = TEXT_SEND;
-    const QByteArray data = qCompress(QByteArray::fromStdString(text.toStdString()));
+    const QByteArray data = qCompress(QByteArray::fromStdString(text));
     send->len = data.size();
-    send->data = static_cast<uchar *>(malloc(send->len));
+    send->data = static_cast<std::uint8_t *>(malloc(static_cast<size_t>(send->len)));
     if (!send->data) {
         free(send);
         return nullptr;
     }
-    memset(send->data, 0, send->len);
+    memset(send->data, 0, static_cast<size_t>(send->len));
     memcpy(send->data, data.data(), static_cast<size_t>(data.size()));
     return send;
 }
@@ -69,12 +69,12 @@ MESG *MessageCodec::encodeImage(const QImage &image)
     memset(send, 0, sizeof(MESG));
     send->msg_type = IMG_SEND;
     send->len = payload.size();
-    send->data = static_cast<uchar *>(malloc(send->len));
+    send->data = static_cast<std::uint8_t *>(malloc(static_cast<size_t>(send->len)));
     if (!send->data) {
         free(send);
         return nullptr;
     }
-    memset(send->data, 0, send->len);
+    memset(send->data, 0, static_cast<size_t>(send->len));
     memcpy(send->data, payload.data(), static_cast<size_t>(payload.size()));
     return send;
 }
@@ -101,13 +101,14 @@ QImage MessageCodec::decodeImageMessage(const MESG *msg)
     QImage img;
     if (!msg || !msg->data || msg->len <= 0)
         return img;
-    img.loadFromData(msg->data, msg->len);
+    img.loadFromData(msg->data, static_cast<int>(msg->len));
     return img;
 }
 
-QString MessageCodec::decodeTextMessage(const MESG *msg)
+std::string MessageCodec::decodeTextMessage(const MESG *msg)
 {
     if (!msg || !msg->data || msg->len <= 0)
         return {};
-    return QString::fromUtf8(reinterpret_cast<const char *>(msg->data), static_cast<int>(msg->len));
+    return std::string(reinterpret_cast<const char *>(msg->data),
+                       static_cast<size_t>(msg->len));
 }

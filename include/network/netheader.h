@@ -4,6 +4,7 @@
 #include <QImage>
 #include <chrono>
 #include <condition_variable>
+#include <cstdint>
 #include <mutex>
 #include <queue>
 #define QUEUE_MAXSIZE 1500
@@ -66,9 +67,9 @@ Q_DECLARE_METATYPE(MSG_TYPE);
 struct MESG //消息结构体
 {
     MSG_TYPE msg_type;
-    uchar* data;
-    long len;
-    quint32 ip;
+    std::uint8_t *data;
+    std::int64_t len;
+    std::uint32_t ip;
 };
 Q_DECLARE_METATYPE(MESG *);
 

@@ -5,32 +5,33 @@
 #include "ImgDisplay.h"
 #include <QCamera>
 #include <QImage>
-#include <unordered_map>
 #include <QMediaCaptureSession>
+#include <cstdint>
+#include <unordered_map>
 
 class CameraVideo : public MyVideoSurface {
     Q_OBJECT
 private:
     void initConnection();
-    static QImage defaultAvatar(); // 返回默认头像
+    static QImage defaultAvatar();
 
 public:
     CameraVideo(QWidget *parent = nullptr);
     ~CameraVideo();
 
-    void setMainTarget(QWidget *label); // 设置主视频摄像头显示和头像显示区域,以及他们的格式
-    void setLocalIp(quint32 ip); // 设置本地IP
-    void setMainIp(quint32 ip); // 设置主IP
+    void setMainTarget(QWidget *label);
+    void setLocalIp(std::uint32_t ip);
+    void setMainIp(std::uint32_t ip);
 
-    void addPartnerDisplay(quint32 ip, QWidget *label); // 添加合作伙伴视频显示区域
-    void removePartnerDisplay(quint32 ip);
+    void addPartnerDisplay(std::uint32_t ip, QWidget *label);
+    void removePartnerDisplay(std::uint32_t ip);
     void clearAllPartnerDisplays();
 
-    void showImageForIp(quint32 ip, const QImage &image);
-    void showMainImage(const QImage &image); //在主窗口中显示主摄像头图像
-    void showAvatarForIp(quint32 ip); //在伙伴窗口中显示合作伙伴头像
-    void showMainAvatar(); //在主窗口中显示主头像
-    void refreshMainForIp(quint32 ip); //刷新主窗口中的主摄像头图像
+    void showImageForIp(std::uint32_t ip, const QImage &image);
+    void showMainImage(const QImage &image);
+    void showAvatarForIp(std::uint32_t ip);
+    void showMainAvatar();
+    void refreshMainForIp(std::uint32_t ip);
 
     void startCamera();
     void stopCamera();
@@ -50,10 +51,10 @@ private:
     QMediaCaptureSession _captureSession;
     ImgDisplay *_mainVideoImg = nullptr;
     ImgDisplay *_mainAvatarImg = nullptr;
-    std::unordered_map<quint32, ImgDisplay *> _partnerDisplays; //ip和图像显示区域
-    std::unordered_map<quint32, QImage> _lastImages; //ip和图像
-    quint32 _localIp = 0;
-    quint32 _mainIp = 0;
+    std::unordered_map<std::uint32_t, ImgDisplay *> _partnerDisplays;
+    std::unordered_map<std::uint32_t, QImage> _lastImages;
+    std::uint32_t _localIp = 0;
+    std::uint32_t _mainIp = 0;
     bool _isRunning = false;
 };
 

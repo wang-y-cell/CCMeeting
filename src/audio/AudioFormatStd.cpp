@@ -1,6 +1,7 @@
 #include "Audio/AudioFormatStd.h"
 #include "logger/Logger.h"
 #include <cstring>
+#include <cstdint>
 
 AudioFormatStd::AudioFormatStd() = default;
 
@@ -51,26 +52,26 @@ bool mergeStereoFrame(const char *L, const char *R, char *dst, QAudioFormat::Sam
 {
 	switch (sf) {
 	case QAudioFormat::UInt8: {
-		const quint16 sum = quint16(*reinterpret_cast<const uchar *>(L))
-			+ quint16(*reinterpret_cast<const uchar *>(R));
-		*reinterpret_cast<uchar *>(dst) = static_cast<quint8>(sum / 2);
+		const std::uint16_t sum = std::uint16_t(*reinterpret_cast<const std::uint8_t *>(L))
+			+ std::uint16_t(*reinterpret_cast<const std::uint8_t *>(R));
+		*reinterpret_cast<std::uint8_t *>(dst) = static_cast<std::uint8_t>(sum / 2);
 		return true;
 	}
 	case QAudioFormat::Int16: {
-		qint16 l = 0;
-		qint16 r = 0;
+		std::int16_t l = 0;
+		std::int16_t r = 0;
 		std::memcpy(&l, L, 2);
 		std::memcpy(&r, R, 2);
-		const qint16 m = static_cast<qint16>((static_cast<qint32>(l) + static_cast<qint32>(r)) / 2);
+		const std::int16_t m = static_cast<std::int16_t>((static_cast<std::int32_t>(l) + static_cast<std::int32_t>(r)) / 2);
 		std::memcpy(dst, &m, 2);
 		return true;
 	}
 	case QAudioFormat::Int32: {
-		qint32 l = 0;
-		qint32 r = 0;
+		std::int32_t l = 0;
+		std::int32_t r = 0;
 		std::memcpy(&l, L, 4);
 		std::memcpy(&r, R, 4);
-		const qint32 m = static_cast<qint32>((static_cast<qint64>(l) + static_cast<qint64>(r)) / 2);
+		const std::int32_t m = static_cast<std::int32_t>((static_cast<std::int64_t>(l) + static_cast<std::int64_t>(r)) / 2);
 		std::memcpy(dst, &m, 4);
 		return true;
 	}

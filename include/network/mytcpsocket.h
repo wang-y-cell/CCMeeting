@@ -3,14 +3,13 @@
 
 #include <QThread>
 #include <QTcpSocket>
+#include <cstdint>
 #include <mutex>
 #include "netheader.h"
 #include "logger/Logger.h"
 #ifndef MB
 #define MB (1024 * 1024)
 #endif
-
-typedef unsigned char uchar;
 
 class MyTcpSocket;
 
@@ -22,13 +21,13 @@ public:
     explicit MyTcpSocketWorker(MyTcpSocket *socket, QObject *parent = nullptr);
 
 public slots:
-    bool connectServer(QString ip, QString port); //连接服务器
-    void sendData(MESG *msg); //发送数据
-    void recvFromSocket(); //接收数据
+    bool connectServer(QString ip, QString port);
+    void sendData(MESG *msg);
+    void recvFromSocket();
     void closeSocket();
 
 private:
-    MyTcpSocket *_socket; //socket
+    MyTcpSocket *_socket;
 };
 
 class MyTcpSocket: public QThread
@@ -39,39 +38,39 @@ class MyTcpSocket: public QThread
 public:
     ~MyTcpSocket();
     MyTcpSocket(QObject *par = nullptr);
-    bool connectToServer(QString ip, QString port, QIODevice::OpenModeFlag flag); //连接服务器
-    QString errorString(); //返回错误信息
-    void disconnectFromHost(); //断开连接
-    quint32 getlocalip(); //获取本地ip
-    static bool IpPortValid(QWidget *parent, QString ip, QString port); //验证ip和端口是否有效
+    bool connectToServer(QString ip, QString port, QIODevice::OpenModeFlag flag);
+    QString errorString();
+    void disconnectFromHost();
+    std::uint32_t getlocalip();
+    static bool IpPortValid(QWidget *parent, QString ip, QString port);
 
 private:
-    void run() override; //发送数据线程
-    qint64 readn(char *, quint64, int); //读取数据
+    void run() override;
+    std::int64_t readn(char *, std::uint64_t, int);
     bool connectServerImpl(QString ip, QString port, QIODevice::OpenModeFlag flag);
     void sendData(MESG *send);
     void closeSocket();
     void recvFromSocket();
 
-    QTcpSocket *_socktcp; //tcp套接字
-    QThread *_sockThread; //线程
-    MyTcpSocketWorker *_worker; //工作线程
-    uchar *sendbuf; //发送缓冲区
-    uchar* recvbuf; //接收缓冲区
-    quint64 hasrecvive; //接收数据长度
+    QTcpSocket *_socktcp;
+    QThread *_sockThread;
+    MyTcpSocketWorker *_worker;
+    std::uint8_t *sendbuf;
+    std::uint8_t *recvbuf;
+    std::uint64_t hasrecvive;
 
-    std::mutex m_lock; //互斥锁
-    volatile bool m_isCanRun; //是否可以运行
-    QString _lastError; //错误信息
-    quint32 _localIp = 0; //本地ip
-    bool _hasLocalIp = false; //是否包含本地ip
+    std::mutex m_lock;
+    volatile bool m_isCanRun;
+    QString _lastError;
+    std::uint32_t _localIp = 0;
+    bool _hasLocalIp = false;
 
 public slots:
-    void stopImmediately(); //立刻停止
-    void errorDetect(QAbstractSocket::SocketError error); //错误检测
+    void stopImmediately();
+    void errorDetect(QAbstractSocket::SocketError error);
 signals:
-    void socketerror(QAbstractSocket::SocketError); //socket错误信号
-    void sendTextOver(); //发送文本完成信号
+    void socketerror(QAbstractSocket::SocketError);
+    void sendTextOver();
 };
 
 #endif // MYTCPSOCKET_H

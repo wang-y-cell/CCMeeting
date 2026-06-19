@@ -33,15 +33,15 @@ void CameraVideo::setMainTarget(QWidget *label) {
     _mainAvatarImg->setAlignment(Qt::AlignCenter);
 }
 
-void CameraVideo::setLocalIp(quint32 ip) {
+void CameraVideo::setLocalIp(std::uint32_t ip) {
     _localIp = ip;
 }
 
-void CameraVideo::setMainIp(quint32 ip) {
+void CameraVideo::setMainIp(std::uint32_t ip) {
     _mainIp = ip;
 }
 
-void CameraVideo::addPartnerDisplay(quint32 ip, QWidget *label) {
+void CameraVideo::addPartnerDisplay(std::uint32_t ip, QWidget *label) {
     if (_partnerDisplays.find(ip) != _partnerDisplays.end()) //如果已经有这个人了
         return;
 
@@ -53,7 +53,7 @@ void CameraVideo::addPartnerDisplay(quint32 ip, QWidget *label) {
     showAvatarForIp(ip);
 }
 
-void CameraVideo::removePartnerDisplay(quint32 ip) {
+void CameraVideo::removePartnerDisplay(std::uint32_t ip) {
     auto it = _partnerDisplays.find(ip);
     if (it != _partnerDisplays.end()) {
         ImgDisplay *display = it->second;
@@ -71,7 +71,7 @@ void CameraVideo::clearAllPartnerDisplays() {
     _lastImages.clear();
 }
 
-void CameraVideo::showImageForIp(quint32 ip, const QImage &image) {
+void CameraVideo::showImageForIp(std::uint32_t ip, const QImage &image) {
     if (image.isNull())
         return;
 
@@ -88,7 +88,7 @@ void CameraVideo::showMainImage(const QImage &image) {
     _mainVideoImg->showImage(image);
 }
 
-void CameraVideo::showAvatarForIp(quint32 ip) {
+void CameraVideo::showAvatarForIp(std::uint32_t ip) {
     _lastImages.erase(ip); //删除ip对应的图像
     const QImage avatar = defaultAvatar(); //获取默认头像
     if (ImgDisplay *display = _partnerDisplays[ip]) //获得ip对应的显示区域
@@ -103,7 +103,7 @@ void CameraVideo::showMainAvatar() {
     _mainAvatarImg->showImage(defaultAvatar()); //显示默认头像
 }
 
-void CameraVideo::refreshMainForIp(quint32 ip) {
+void CameraVideo::refreshMainForIp(std::uint32_t ip) {
     _mainIp = ip;
     if (_lastImages.find(ip) != _lastImages.end())
         showMainImage(_lastImages[ip]);

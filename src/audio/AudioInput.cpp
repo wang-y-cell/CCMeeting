@@ -97,7 +97,7 @@ void AudioInput::onreadyRead()
 		QByteArray cc = qCompress(rr).toBase64();
 		msg->len = cc.size();
 
-		msg->data = (uchar*)malloc(msg->len);
+		msg->data = static_cast<std::uint8_t *>(malloc(static_cast<size_t>(msg->len)));
 		if (msg->data == nullptr) {
 			LOG_ERROR("AudioInput", "分配内存失败");
 		} else {

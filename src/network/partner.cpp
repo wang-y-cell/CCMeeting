@@ -4,7 +4,7 @@
 #include <QMouseEvent>
 #include <QResizeEvent>
 
-Partner::Partner(QWidget *parent, quint32 p) : QWidget(parent), ip(p)
+Partner::Partner(QWidget *parent, std::uint32_t p) : QWidget(parent), ip(p)
 {
     m_displayLabel = new QLabel(this);
     m_displayLabel->setAlignment(Qt::AlignCenter);

@@ -2,6 +2,7 @@
 #define PARTNER_H
 
 #include <QWidget>
+#include <cstdint>
 
 class QLabel;
 
@@ -9,12 +10,12 @@ class Partner : public QWidget
 {
     Q_OBJECT
 public:
-    Partner(QWidget *parent = nullptr, quint32 ip = 0);
-    quint32 getIp() const { return ip; }
+    Partner(QWidget *parent = nullptr, std::uint32_t ip = 0);
+    std::uint32_t getIp() const { return ip; }
     QLabel *displayLabel() const { return m_displayLabel; }
 
 signals:
-    void sendip(quint32);
+    void sendip(std::uint32_t);
 
 protected:
     void mousePressEvent(QMouseEvent *ev) override;
@@ -23,9 +24,9 @@ protected:
 private:
     void updateLabelGeometry();
 
-    quint32 ip = 0; //用户ip
-    QLabel *m_displayLabel = nullptr; //显示摄像头视频的区域
-    int w = 40; //显示摄像头视频的区域的宽度
+    std::uint32_t ip = 0;
+    QLabel *m_displayLabel = nullptr;
+    int w = 40;
 };
 
 #endif // PARTNER_H

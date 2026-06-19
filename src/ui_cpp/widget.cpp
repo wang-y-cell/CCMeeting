@@ -315,7 +315,7 @@ void Widget::on_openAudio_clicked()
     }
 }
 
-void Widget::closeImg(quint32 ip) {
+void Widget::closeImg(std::uint32_t ip) {
     LOG_DEBUG("Widget", "关闭图像: ip = " << ip);
     if (partner.find(ip) == partner.end())
     {
@@ -381,7 +381,7 @@ void Widget::handleCreateMeetingResponse(MESG *msg)
 
         LOG_INFO("Widget", "succeed creating room " << roomno);
         if (_network) {
-            const quint32 localIp = _network->localIp();
+            const std::uint32_t localIp = _network->localIp();
             addPartner(localIp);
             mainip = localIp;
             _cameraVideo->setLocalIp(localIp);
@@ -399,7 +399,7 @@ void Widget::handleCreateMeetingResponse(MESG *msg)
 
 void Widget::handleJoinMeetingResponse(MESG *msg) {
     LOG_INFO("Widget", "JOIN_MEETING_RESPONSE消息类型");
-    qint32 c;
+    std::int32_t c;
     memcpy(&c, msg->data, msg->len);
     if (c == 0) {
         QMessageBox::information(this, "Meeting Error", tr("会议不存在"), QMessageBox::Yes, QMessageBox::Yes);
@@ -417,7 +417,7 @@ void Widget::handleJoinMeetingResponse(MESG *msg) {
         ui->outlog->setText(QString("加入成功"));
         LOG_INFO("Widget", "succeed joining room");
         if (_network) {
-            const quint32 localIp = _network->localIp();
+            const std::uint32_t localIp = _network->localIp();
             addPartner(localIp);
             mainip = localIp;
             _cameraVideo->setLocalIp(localIp);
@@ -444,7 +444,8 @@ void Widget::handleImgRecv(MESG *msg)
 
 void Widget::handleTextRecv(MESG *msg)
 {
-    const QString str = MessageCodec::decodeTextMessage(msg);
+    const std::string text = MessageCodec::decodeTextMessage(msg);
+    const QString str = QString::fromUtf8(text.c_str(), static_cast<int>(text.size()));
     QString time = QString::number(QDateTime::currentDateTimeUtc().toSecsSinceEpoch());
     ChatMessage *message = new ChatMessage(ui->listWidget);
     QListWidgetItem *item = new QListWidgetItem();
@@ -571,7 +572,7 @@ void Widget::datasolve(MESG *msg) {
 
 
 
-Partner* Widget::addPartner(quint32 ip)
+Partner* Widget::addPartner(std::uint32_t ip)
 {
 	if (partner.find(ip) != partner.end()) return nullptr; //如果存在这个ip,返回null
     Partner *p = new Partner(ui->scrollAreaWidgetContents ,ip); //创建一个新的Partner对象
@@ -579,7 +580,7 @@ Partner* Widget::addPartner(quint32 ip)
         LOG_ERROR("Widget", "创建Partner对象失败");
         return nullptr; //返回空
     } else /*如果创建成功，则连接信号和槽*/ {
-		connect(p, SIGNAL(sendip(quint32)), this, SLOT(recvip(quint32)));
+		connect(p, &Partner::sendip, this, &Widget::recvip);
         LOG_DEBUG("Widget", "将这个用户添加到partner中");
 		partner.emplace(ip, p);
 		ui->verticalLayout_3->addWidget(p, 1);
@@ -601,13 +602,13 @@ Partner* Widget::addPartner(quint32 ip)
 
 
 
-void Widget::removePartner(quint32 ip)
+void Widget::removePartner(std::uint32_t ip)
 {
     auto it = partner.find(ip);
     if (it != partner.end())
     {
         Partner *p = it->second;
-        disconnect(p, SIGNAL(sendip(quint32)), this, SLOT(recvip(quint32)));
+        disconnect(p, &Partner::sendip, this, &Widget::recvip);
         _cameraVideo->removePartnerDisplay(ip);
         ui->verticalLayout_3->removeWidget(p);
         delete p;
@@ -637,7 +638,7 @@ void Widget::clearPartner()
 
     for (auto it = partner.begin(); it != partner.end(); ) {
         Partner *p = it->second;
-        disconnect(p, SIGNAL(sendip(quint32)), this, SLOT(recvip(quint32)));
+        disconnect(p, &Partner::sendip, this, &Widget::recvip);
         ui->verticalLayout_3->removeWidget(p);
         delete p;
         it = partner.erase(it);
@@ -673,7 +674,7 @@ void Widget::onLocalFrameCaptured(const QImage &image)
 }
 
 
-void Widget::recvip(quint32 ip)
+void Widget::recvip(std::uint32_t ip)
 {
     if (partner.find(mainip) != partner.end()) {
         Partner* p = partner[mainip];
@@ -711,7 +712,7 @@ void Widget::on_joinmeetBtn(QString roomNo) {
         QMessageBox::warning(this, "RoomNo Error", "房间号不合法" , QMessageBox::Yes, QMessageBox::Yes);
     } else {
         LOG_INFO("on_joinmeetBtn_clicked", "房间号合法，加入发送队列");
-        _network->sendJoinMeeting(roomNo);
+        _network->sendJoinMeeting(roomNo.toStdString());
     }
 }
 
@@ -746,7 +747,7 @@ void Widget::on_sendmsg_clicked()
     QListWidgetItem *item = new QListWidgetItem();
     dealMessageTime(time);
     dealMessage(message, item, msg, time, QHostAddress(_network ? _network->localIp() : 0).toString() ,ChatMessage::User_Me);
-    _network->sendText(msg);
+    _network->sendText(msg.toStdString());
     ui->sendmsg->setDisabled(true);
 }
 

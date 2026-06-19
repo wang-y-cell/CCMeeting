@@ -5,8 +5,10 @@
 #include <QObject>
 #include <QThread>
 #include <condition_variable>
+#include <cstdint>
 #include <mutex>
 #include <queue>
+#include <string>
 #include "network/netheader.h"
 
 class MyTcpSocket;
@@ -24,7 +26,7 @@ struct OutgoingItem {
     */
     enum class Kind { Control, JoinRoom, Text, Image } kind = Kind::Control; //发送类型
     MSG_TYPE controlType = CREATE_MEETING; //信息类型,设置默认为创建会议类型
-    QString text; //文本
+    std::string text;
     QImage image; //图像
 };
 
@@ -80,11 +82,11 @@ public:
 
     bool connectToServer(const QString &ip, const QString &port, QWidget *validateParent = nullptr);
     void disconnectFromHost();
-    quint32 localIp() const;
+    std::uint32_t localIp() const;
 
     void sendCreateMeeting();
-    void sendJoinMeeting(const QString &roomNo);
-    void sendText(const QString &text);
+    void sendJoinMeeting(const std::string &roomNo);
+    void sendText(const std::string &text);
     void sendCloseCamera();
     void sendImage(const QImage &image);
     void clearPendingImages();

@@ -170,7 +170,7 @@ void AudioOutput::run()
 				m_pcmDataBuffer.append(pcm);
 
 				if (m_pcmDataBuffer.size() >= frame125ms) { // 累积约 125ms 再写入，降低 underrun 爆音
-					qint64 ret = outputdevice->write(m_pcmDataBuffer.data(), frame125ms);
+					const std::int64_t ret = outputdevice->write(m_pcmDataBuffer.data(), frame125ms);
 					if (ret < 0) {
 						LOG_ERROR("AudioOutput", "write failed: " << outputdevice->errorString().toStdString());
 						return;
