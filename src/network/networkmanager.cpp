@@ -137,7 +137,9 @@ NetworkManager::NetworkManager(QObject *parent)
     _sendWorker = new SendWorker(this);
     _recvWorker = new RecvWorker(this);
 
+    /*发送文本完成之后发送sendTextFinished信号,发送textSend信号*/
     connect(_socket, &MyTcpSocket::sendTextOver, this, &NetworkManager::sendTextFinished);
+    /*从数据接收队列取出数据之后发送packetReady信号,发送packetReceived信号*/
     connect(_recvWorker, &RecvWorker::packetReady, this, &NetworkManager::packetReceived);
 
     _sendWorker->start();

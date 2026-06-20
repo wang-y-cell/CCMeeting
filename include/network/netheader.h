@@ -41,8 +41,7 @@
 #define MSG_HEADER 11
 #endif
 
-enum MSG_TYPE
-{
+enum MSG_TYPE : std::uint8_t {
     IMG_SEND = 0,
     IMG_RECV,
     AUDIO_SEND,
@@ -55,12 +54,13 @@ enum MSG_TYPE
     CLOSE_CAMERA,
 
     CREATE_MEETING_RESPONSE = 20,
-    PARTNER_EXIT = 21,
-    PARTNER_JOIN = 22,
-    JOIN_MEETING_RESPONSE = 23,
-    PARTNER_JOIN2 = 24,
+    PARTNER_EXIT,
+    PARTNER_JOIN,
+    JOIN_MEETING_RESPONSE,
+    PARTNER_JOIN2,
+
     RemoteHostClosedError = 40,
-    OtherNetError = 41
+    OtherNetError
 };
 Q_DECLARE_METATYPE(MSG_TYPE);
 

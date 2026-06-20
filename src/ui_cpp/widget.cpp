@@ -47,20 +47,9 @@ Widget::Widget(QWidget *parent)
     initUI();  //初始化UI
 
     mainip = 0; //主屏幕显示的用户IP图像
-
-    //配置摄像头（网络/音视频线程在 initPermanentWorkers 中一次性创建）
-    //_camera = new QCamera(this);
-    // connect(_camera, &QCamera::errorOccurred, this, &Widget::cameraError); //摄像头错误处理
-    // _myvideosurface = new MyVideoSurface(this); //视频表面
-    // connect(_myvideosurface, &MyVideoSurface::frameAvailable, this, &Widget::cameraImageCapture);
-
     _cameraVideo = new CameraVideo(this);
     _cameraVideo->setMainTarget(ui->mainshow_label);
     connect(_cameraVideo, &CameraVideo::frameCaptured, this, &Widget::onLocalFrameCaptured);
-
-    //_captureSession.setCamera(_camera);
-    //_captureSession.setVideoSink(_myvideosurface->getVideoSink());
-
     initPermanentWorkers();
 }
 
@@ -69,10 +58,6 @@ void Widget::initUI() {
     ui->setupUi(this);  //解析ui文件
 
     Widget::pos = QRect(0.1 * Screen::width, 0.1 * Screen::height, 0.8 * Screen::width, 0.8 * Screen::height);
-    // m_videoImg.setTarget(ui->mainshow_label);
-    // m_videoImg.setDrawMode(ImgDisplay::DrawMode::FitWidgetSmooth); //设置视频显示模式
-    // m_videoImg.setAlignment(Qt::AlignCenter);
-
     //设置打开视频和音频的按钮
     ui->openAudio->setText(QString(OPENAUDIO).toUtf8());
     ui->openVedio->setText(QString(OPENVIDEO).toUtf8());
@@ -119,7 +104,6 @@ void Widget::initUI() {
 
     ui->listWidget->setFont(te_font);
 
-    //ui->tabWidget->setCurrentIndex(1);
     ui->tabWidget->setCurrentIndex(0);
 
     ui->main_box->setSizes(QList<int>{300, 700});
@@ -128,8 +112,6 @@ void Widget::initUI() {
     ui->plainTextEdit->setPlaceholderText("可@对方私信");
     ui->plainTextEdit->setStyleSheet("color: #AAAAAA;");
     this->setStyleSheet("background-color:rgb(46, 46, 46)");
-
-
 }
 
 void Widget::initPermanentWorkers()
@@ -151,43 +133,6 @@ void Widget::initPermanentWorkers()
     connect(_aoutput, SIGNAL(audiooutputerror(QString)), this, SLOT(audioError(QString)));
     connect(_aoutput, SIGNAL(speaker(QString)), this, SLOT(speaks(QString)));
 }
-
-
-/**
-* 将获得的frame经过转换之后,显示在主界面的标签中
-*/
-// void Widget::cameraImageCapture(const QVideoFrame &frame) {
-//     if(frame.isValid()) //如果是有效的视频帧
-//     {
-//         QVideoFrame cloneFrame(frame); 
-//         /*
-//         QVideoFrame 里的原始像素数据（比如摄像头采集到的 YUV 格式画面）
-//         通常存储在 GPU 显存或某些受保护的硬件缓冲区中，
-//         CPU 是无法直接通过指针去读取或修改这些数据的 
-//         */
-//         cloneFrame.map(QVideoFrame::ReadOnly); //将视频帧映射为只读模式
-//         QImage videoImg = cloneFrame.toImage(); //讲frame转换成image
-//         QTransform matrix; //变换矩阵
-//         //matrix.rotate(0.0); //旋转角度
-
-//         QImage transformed = videoImg.transformed(matrix, Qt::FastTransformation); //变换
-
-//         if(partner.size() > 1 && _sendImg) /*如果房间人数大于1,发送pushImg信号*/ {
-// 			emit pushImg(transformed);
-//         }
-
-//         if(_mytcpSocket && _mytcpSocket->getlocalip() == mainip) {
-//             m_videoImg.showImage(transformed);
-//         }
-
-//         if(_mytcpSocket) {
-//             Partner *p = partner.value(_mytcpSocket->getlocalip());
-//             if(p) p->setpic(transformed);
-//         }
-
-//         cloneFrame.unmap();
-//     }
-// }
 
 Widget::~Widget() {
     shutdownAllWorkers();

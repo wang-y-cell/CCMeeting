@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <mutex>
 #include "netheader.h"
+#include "network/messagecodec.h"
 #include "logger/Logger.h"
 #ifndef MB
 #define MB (1024 * 1024)
@@ -25,9 +26,11 @@ public slots:
     void sendData(MESG *msg);
     void recvFromSocket();
     void closeSocket();
+    void resetReceiveBuffer();
 
 private:
     MyTcpSocket *_socket;
+    MessageCodec::WireStreamParser _parser;
 };
 
 class MyTcpSocket: public QThread
@@ -46,18 +49,13 @@ public:
 
 private:
     void run() override;
-    std::int64_t readn(char *, std::uint64_t, int);
     bool connectServerImpl(QString ip, QString port, QIODevice::OpenModeFlag flag);
     void sendData(MESG *send);
     void closeSocket();
-    void recvFromSocket();
 
     QTcpSocket *_socktcp;
     QThread *_sockThread;
     MyTcpSocketWorker *_worker;
-    std::uint8_t *sendbuf;
-    std::uint8_t *recvbuf;
-    std::uint64_t hasrecvive;
 
     std::mutex m_lock;
     volatile bool m_isCanRun;

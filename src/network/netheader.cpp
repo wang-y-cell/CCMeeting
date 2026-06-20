@@ -1,5 +1,7 @@
 #include "network/netheader.h"
-
-QUEUE_DATA<MESG> queue_send; //发送给服务端的信息
-QUEUE_DATA<MESG> queue_recv; //接收到服务端的信息
-QUEUE_DATA<MESG> audio_recv; //接收到服务端的音频信息
+/*发送给服务器的消息队列*/
+QUEUE_DATA<MESG> queue_send; 
+/*接收来自服务器的消息队列*/
+QUEUE_DATA<MESG> queue_recv; 
+/*接收来自服务器的音频消息队列*/
+QUEUE_DATA<MESG> audio_recv; 

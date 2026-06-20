@@ -5,6 +5,7 @@
 #include <QByteArray>
 #include <QImage>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -12,17 +13,60 @@
 class MessageCodec
 {
 public:
-    static MESG *encodeControl(MSG_TYPE type);
-    static MESG *encodeJoinMeeting(std::uint32_t roomNo);
-    static MESG *encodeText(const std::string &text);
-    static MESG *encodeImage(const QImage &image);
+    enum class PacketQueue { Recv, Audio };
 
+    struct ParsedPacket {
+        MESG *msg = nullptr;
+        PacketQueue queue = PacketQueue::Recv;
+    };
+
+    /**编码控制消息*/
+    static MESG *encodeControl(MSG_TYPE type);
+    /**编码加入会议消息*/
+    static MESG *encodeJoinMeeting(std::uint32_t roomNo);
+    /**编码文本消息*/
+    static MESG *encodeText(const std::string &text);
+    /**编码图片消息*/
+    static MESG *encodeImage(const QImage &image);
+    /**编码网络错误消息*/
+    static MESG *encodeNetworkError(MSG_TYPE type);
+
+    /** 将 MESG 编码为线上帧：$ + type + ip + [len] + body + # */
+    static QByteArray encodeWireFrame(const MESG *send, std::uint32_t localIp);
+
+    /*解码图片数据,base64解码后，再解压缩*/
     static QByteArray decodeImageWirePayload(const QByteArray &wireBody);
+    /*解码文本数据,直接解压缩*/
     static QByteArray decodeTextWirePayload(const QByteArray &wireBody);
+    /*解码音频数据,base64解码后，再解压缩*/
     static QByteArray decodeAudioWirePayload(const QByteArray &wireBody);
 
+    /*解码图片消息,直接解压缩*/
     static QImage decodeImageMessage(const MESG *msg);
+    /*解码文本消息,直接解压缩*/
     static std::string decodeTextMessage(const MESG *msg);
+
+    /** 解析完整线上帧（不含 '$' 与 '#' 外的流式缓冲），返回 nullptr 表示忽略该包。 */
+    static std::optional<ParsedPacket> decodeWirePacket(const std::uint8_t *frame,
+                                                        std::uint32_t nBody,
+                                                        MSG_TYPE msgtype);
+
+    /** 流式解帧：feed 追加字节，返回本次解析出的全部 MESG。 */
+    class WireStreamParser
+    {
+    public:
+        /*重置流式缓冲*/
+        void reset();
+        /*追加字节*/
+        std::vector<ParsedPacket> feed(const std::uint8_t *data, std::size_t len);
+
+    private:
+        /*提取所有解析出的MESG*/
+        std::vector<ParsedPacket> extractAll();
+
+        QByteArray m_buffer; /*流式缓冲*/
+        static constexpr std::size_t kMaxBuffer = 4 * 1024 * 1024;
+    };
 };
 
 #endif // MESSAGECODEC_H
