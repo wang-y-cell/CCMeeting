@@ -129,9 +129,7 @@ void Connection::sendLoop()
 
 void Connection::sendMessage(MESG *msg)
 {
-    if (!msg)
-        return;
-
+    if (!msg)return;
     if (m_socket == nullptr || m_socket->state() == QAbstractSocket::UnconnectedState) {
         spdlog::info("[Connection] socket 未连接, 发送失败");
         if (msg->msg_type == TEXT_SEND)

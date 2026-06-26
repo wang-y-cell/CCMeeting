@@ -141,11 +141,13 @@ NetworkManager::NetworkManager(QObject *parent)
 {
     qRegisterMetaType<MESG *>("MESG*");
 
-    _connection = new Connection(this);
+    // 无 parent，以便 Connection 可 moveToThread 到 IO 线程（Qt 不允许子对象与 parent 跨线程）
+    _connection = new Connection(nullptr);
     _sendWorker = new SendWorker(this);
     _recvWorker = new RecvWorker(this);
 
-    connect(_connection, &Connection::sendTextOver, this, &NetworkManager::sendTextFinished);
+    connect(_connection, &Connection::sendTextOver, this, &NetworkManager::sendTextFinished,
+            Qt::QueuedConnection);
     /*从数据接收队列取出数据之后发送packetReady信号,发送packetReceived信号*/
     connect(_recvWorker, &RecvWorker::packetReady, this, &NetworkManager::packetReceived);
 
@@ -156,6 +158,8 @@ NetworkManager::NetworkManager(QObject *parent)
 NetworkManager::~NetworkManager()
 {
     stop();
+    delete _connection;
+    _connection = nullptr;
 }
 
 bool NetworkManager::connectToServer(const QString &ip, const QString &port, QWidget *validateParent)

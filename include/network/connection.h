@@ -76,17 +76,27 @@ private:
     void sendLoop();
     void releaseMessage(MESG *msg);
 
+    /*io线程*/
     QThread m_ioThread;
+    /*发送线程*/
     QThread *m_sendThread = nullptr;
+    /*socket*/
     QTcpSocket *m_socket = nullptr;
+    /*解析器*/
 
+    /*解析器*/
     MessageCodec::WireStreamParser m_parser;
 
+    /*发送互斥锁*/
     std::mutex m_sendMutex;
+    /*发送线程是否运行*/
     bool m_sendRunning = false;
+    /*最后错误信息*/
 
     QString m_lastError;
+    /*本地IP地址*/
     std::uint32_t m_localIp = 0;
+    /*是否有本地IP地址*/
     bool m_hasLocalIp = false;
 };
 
