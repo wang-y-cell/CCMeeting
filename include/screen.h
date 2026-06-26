@@ -2,8 +2,7 @@
 #define SCREEN_H
 
 
-class Screen
-{
+class Screen {
 public:
     static int width;
     static int height;

@@ -15,8 +15,7 @@
 class MyTcpSocket;
 
 /** 在 _sockThread 上执行 socket 读写；MyTcpSocket 继承 QThread，不能 moveToThread。 */
-class MyTcpSocketWorker : public QObject
-{
+class MyTcpSocketWorker : public QObject {
     Q_OBJECT
 public:
     explicit MyTcpSocketWorker(MyTcpSocket *socket, QObject *parent = nullptr);
@@ -33,8 +32,7 @@ private:
     MessageCodec::WireStreamParser _parser;
 };
 
-class MyTcpSocket: public QThread
-{
+class MyTcpSocket: public QThread {
     Q_OBJECT
     friend class MyTcpSocketWorker;
 
@@ -46,13 +44,12 @@ public:
     void disconnectFromHost();
     std::uint32_t getlocalip();
     static bool IpPortValid(QWidget *parent, QString ip, QString port);
-
 private:
     void run() override;
     bool connectServerImpl(QString ip, QString port, QIODevice::OpenModeFlag flag);
     void sendData(MESG *send);
     void closeSocket();
-
+private:
     QTcpSocket *_socktcp;
     QThread *_sockThread;
     MyTcpSocketWorker *_worker;

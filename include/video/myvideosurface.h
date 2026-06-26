@@ -9,8 +9,7 @@
 /**
 * 
 */
-class MyVideoSurface : public QObject
-{
+class MyVideoSurface : public QObject {
     Q_OBJECT
 public:
     MyVideoSurface(QObject *parent = nullptr); //构造函数

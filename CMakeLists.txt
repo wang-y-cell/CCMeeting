@@ -10,34 +10,21 @@ set(CMAKE_AUTOUIC_SEARCH_PATHS
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_PREFIX_PATH F:/Qt/6.8.3/mingw_64)
+set(CMAKE_PREFIX_PATH 
+    F:/Qt/6.8.3/mingw_64
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spdlog
+)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets Multimedia MultimediaWidgets Network)
+find_package(spdlog REQUIRED)
 
-file(GLOB PROJECT_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
+file(GLOB_RECURSE PROJECT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/configure/*.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/Img/*.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/network/*.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/text/*.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/video/*.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/Audio/*.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/ui_h/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/logger/*.h"
 
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/*.ui"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/network/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/text/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/video/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/Audio/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/Img/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui_cpp/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/logger/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.ui"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/*.ui"
 )
 list(SORT PROJECT_SOURCES)
 
@@ -61,6 +48,7 @@ target_link_libraries(
     Qt6::Multimedia
     Qt6::MultimediaWidgets
     Qt6::Network
+    spdlog::spdlog
     # Qt6::Core5Compat
 )
 target_include_directories(CloudMeeting PRIVATE

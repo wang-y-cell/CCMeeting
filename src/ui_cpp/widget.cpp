@@ -111,7 +111,7 @@ void Widget::initUI() {
 
     ui->plainTextEdit->setPlaceholderText("可@对方私信");
     ui->plainTextEdit->setStyleSheet("color: #AAAAAA;");
-    this->setStyleSheet("background-color:rgb(46, 46, 46)");
+    //this->setStyleSheet("background-color:rgb(46, 46, 46)");
 }
 
 void Widget::initPermanentWorkers()
@@ -650,7 +650,7 @@ void Widget::recvip(std::uint32_t ip)
 void Widget::on_joinmeetBtn(QString roomNo) {
     LOG_INFO("on_joinmeetBtn", "加入会议房间号: " << roomNo.toStdString());
 
-    QRegularExpression roomreg("^[1-9][0-9]{1,4}$"); //房间号正则表达式
+    QRegularExpression roomreg("^[1-9][0-9]{0,10}$"); //房间号正则表达式
     QRegularExpressionValidator  roomvalidate(roomreg);
     int pos = 0;
     if(roomvalidate.validate(roomNo, pos) != QValidator::Acceptable) {
