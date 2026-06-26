@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <mutex>
 #include "netheader.h"
-#include "network/messagecodec.h"
+#include "messagecodec.h"
 #ifndef MB
 #define MB (1024 * 1024)
 #endif

@@ -17,6 +17,7 @@ set(CMAKE_PREFIX_PATH
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets Multimedia MultimediaWidgets Network)
 find_package(Threads REQUIRED)
+find_package(spdlog REQUIRED)
 
 file(GLOB_RECURSE PROJECT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
@@ -47,20 +48,21 @@ target_link_libraries(
     Qt6::MultimediaWidgets
     Qt6::Network
     Threads::Threads
+    spdlog::spdlog
     # Qt6::Core5Compat
 )
+
 target_include_directories(CloudMeeting PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/Audio
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/video
     ${CMAKE_CURRENT_SOURCE_DIR}/include/configure
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/img
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/network
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/text
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/ui_h
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spdlog/include
-    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/message/audio 
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/message/video
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/message/text
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/network
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/widget 
 )
+
 
 if(${Qt6_VERSION} VERSION_LESS 6.1.0)
     set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.yourcompany.CloudMeeting)

@@ -1,4 +1,4 @@
-#include "network/partner.h"
+#include "partner.h"
 #include <QLabel>
 #include <QHostAddress>
 #include <QMouseEvent>

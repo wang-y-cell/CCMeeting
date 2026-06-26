@@ -2,13 +2,13 @@
 #include "ui_widget.h"
 #include "screen.h"
 #include <spdlog/spdlog.h>
-#include "configure/configure.h"
-#include "network/messagecodec.h"
+#include "configure.h"
+#include "messagecodec.h"
 #include <QString>
 #include <QCamera>
 #include <QMediaDevices>
 #include <QPainter>
-#include "video/myvideosurface.h"
+#include "myvideosurface.h"
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
 #include <QMessageBox>
@@ -29,8 +29,7 @@ QRect  Widget::pos = QRect(-1, -1, -1, -1);
 
 Widget::Widget(QWidget *parent)
     : QWidget(parent)
-    , ui(new Ui::Widget)
-{
+    , ui(new Ui::Widget) {
     qRegisterMetaType<MSG_TYPE>();
     spdlog::info("[Widget] -------------------------Application Start---------------------------");
     spdlog::info("[Widget] main UI thread id: {}", reinterpret_cast<quintptr>(QThread::currentThreadId()));
@@ -114,8 +113,7 @@ void Widget::initUI() {
     //this->setStyleSheet("background-color:rgb(46, 46, 46)");
 }
 
-void Widget::initPermanentWorkers()
-{
+void Widget::initPermanentWorkers() {
     _network = new NetworkManager(this);
     connect(_network, &NetworkManager::packetReceived, this, &Widget::datasolve, Qt::QueuedConnection);
     connect(_network, &NetworkManager::sendTextFinished, this, &Widget::textSend);
@@ -165,8 +163,7 @@ void Widget::resetMeetingUi() {
     ui->plainTextEdit->setCompleter(iplist);
 }
 
-void Widget::endMeetingSession()
-{
+void Widget::endMeetingSession() {
     spdlog::debug("[Widget] 结束会议会话");
     _cameraVideo->endVideo();
 
@@ -182,8 +179,7 @@ void Widget::endMeetingSession()
     resetMeetingUi();
 }
 
-void Widget::shutdownAllWorkers()
-{
+void Widget::shutdownAllWorkers() {
     spdlog::debug("[Widget] 关闭所有工作线程");
     if (_network)
         disconnect(_network, nullptr, this, nullptr);
@@ -213,8 +209,7 @@ void Widget::on_createmeetBtn_clicked() {
     }
 }
 
-void Widget::paintEvent(QPaintEvent *event)
-{
+void Widget::paintEvent(QPaintEvent *event) {
     Q_UNUSED(event);
     /*
      * 触发事件(3条， 一般使用第二条进行触发)
@@ -225,8 +220,7 @@ void Widget::paintEvent(QPaintEvent *event)
 }
 
 
-void Widget::on_openVedio_clicked()
-{
+void Widget::on_openVedio_clicked() {
     spdlog::debug("[Widget] 点击打开摄像头按钮");
     if(_cameraVideo->isCameraRunning()) {
         _cameraVideo->stopCamera();
@@ -245,8 +239,7 @@ void Widget::on_openVedio_clicked()
 }
 
 
-void Widget::on_openAudio_clicked()
-{
+void Widget::on_openAudio_clicked() {
     spdlog::info("[Widget] 点击打开音频按钮");
     if (!_createmeet && !_joinmeet) return; //如果未创建会议或未加入会议，则返回
     if (ui->openAudio->text().toUtf8() == QString(OPENAUDIO).toUtf8()){ //如果音频按钮文本为开启音频，则发送开始音频信号
@@ -307,8 +300,7 @@ void Widget::audioError(QString err) {
 
 
 
-void Widget::handleCreateMeetingResponse(MESG *msg)
-{
+void Widget::handleCreateMeetingResponse(MESG *msg) {
     int roomno = 0;
     if (msg->data != nullptr && msg->len >= static_cast<long>(sizeof(int))) {
         memcpy(&roomno, msg->data, sizeof(int));
@@ -375,8 +367,7 @@ void Widget::handleJoinMeetingResponse(MESG *msg) {
     }
 }
 
-void Widget::handleImgRecv(MESG *msg)
-{
+void Widget::handleImgRecv(MESG *msg) {
     QHostAddress a(msg->ip);
     spdlog::debug("[Widget] IMG_RECV from {}", a.toString().toStdString());
     const QImage img = MessageCodec::decodeImageMessage(msg);
@@ -387,8 +378,7 @@ void Widget::handleImgRecv(MESG *msg)
     repaint();
 }
 
-void Widget::handleTextRecv(MESG *msg)
-{
+void Widget::handleTextRecv(MESG *msg) {
     const std::string text = MessageCodec::decodeTextMessage(msg);
     const QString str = QString::fromUtf8(text.c_str(), static_cast<int>(text.size()));
     QString time = QString::number(QDateTime::currentDateTimeUtc().toSecsSinceEpoch());
@@ -401,8 +391,7 @@ void Widget::handleTextRecv(MESG *msg)
     }
 }
 
-void Widget::handlePartnerJoin(MESG *msg)
-{
+void Widget::handlePartnerJoin(MESG *msg) {
     Partner *p = addPartner(msg->ip);
     if (p) {
         _cameraVideo->showAvatarForIp(msg->ip);
@@ -412,8 +401,7 @@ void Widget::handlePartnerJoin(MESG *msg)
     }
 }
 
-void Widget::handlePartnerExit(MESG *msg)
-{
+void Widget::handlePartnerExit(MESG *msg) {
     removePartner(msg->ip);
     if (mainip == msg->ip)
         _cameraVideo->showMainAvatar();
@@ -428,13 +416,11 @@ void Widget::handlePartnerExit(MESG *msg)
     ui->outlog->setText(QString("%1 exit meeting").arg(QHostAddress(msg->ip).toString()));
 }
 
-void Widget::handleCloseCamera(MESG *msg)
-{
+void Widget::handleCloseCamera(MESG *msg) {
     closeImg(msg->ip);
 }
 
-void Widget::handlePartnerJoin2(MESG *msg)
-{
+void Widget::handlePartnerJoin2(MESG *msg) {
     uint32_t ip;
     int other = msg->len / sizeof(uint32_t), pos = 0;
     for (int i = 0; i < other; i++) {
@@ -450,8 +436,7 @@ void Widget::handlePartnerJoin2(MESG *msg)
     ui->openVedio->setDisabled(false);
 }
 
-void Widget::handleRemoteHostClosedError()
-{
+void Widget::handleRemoteHostClosedError() {
     const bool wasInMeeting = _createmeet || _joinmeet;
     endMeetingSession();
     ui->outlog->setText(QString("关闭与服务器的连接"));

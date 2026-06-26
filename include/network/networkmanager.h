@@ -9,7 +9,7 @@
 #include <mutex>
 #include <queue>
 #include <string>
-#include "network/netheader.h"
+#include "netheader.h"
 
 class MyTcpSocket;
 class QWidget;

@@ -1,4 +1,4 @@
-#include "network/messagecodec.h"
+#include "messagecodec.h"
 #include <spdlog/spdlog.h>
 #include <QBuffer>
 #include <QtEndian>

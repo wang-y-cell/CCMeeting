@@ -1,7 +1,7 @@
-#include "Audio/AudioInput.h"
-#include "Audio/audiocommon.h"
+#include "AudioInput.h"
+#include "audiocommon.h"
 #include <spdlog/spdlog.h>
-#include "network/netheader.h"
+#include "netheader.h"
 #include <QAudioFormat>
 #include <QThread>
 

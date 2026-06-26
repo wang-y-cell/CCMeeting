@@ -1,4 +1,4 @@
-#include "text/chatmessage.h"
+#include "chatmessage.h"
 #include "configure/configure.h"
 #include <spdlog/spdlog.h>
 #include <QString>

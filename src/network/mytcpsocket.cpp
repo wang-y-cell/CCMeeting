@@ -1,6 +1,6 @@
-#include "network/mytcpsocket.h"
-#include "network/messagecodec.h"
-#include "network/netheader.h"
+#include "mytcpsocket.h"
+#include "messagecodec.h"
+#include "netheader.h"
 #include <spdlog/spdlog.h>
 #include <QHostAddress>
 #include <QMetaObject>

@@ -1,8 +1,8 @@
-#include "Audio/AudioOutput.h"
-#include "Audio/audiocommon.h"
+#include "AudioOutput.h"
+#include "audiocommon.h"
 #include <mutex>
 #include <spdlog/spdlog.h>
-#include "network/netheader.h"
+#include "netheader.h"
 #include <QHostAddress>
 #include <QThread>
 

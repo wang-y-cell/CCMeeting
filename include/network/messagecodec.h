@@ -1,7 +1,7 @@
 #ifndef MESSAGECODEC_H
 #define MESSAGECODEC_H
 
-#include "network/netheader.h"
+#include "netheader.h"
 #include <QByteArray>
 #include <QImage>
 #include <cstdint>
@@ -52,8 +52,7 @@ public:
                                                         MSG_TYPE msgtype);
 
     /** 流式解帧：feed 追加字节，返回本次解析出的全部 MESG。 */
-    class WireStreamParser
-    {
+    class WireStreamParser {
     public:
         /*重置流式缓冲*/
         void reset();

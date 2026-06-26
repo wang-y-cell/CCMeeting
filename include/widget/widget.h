@@ -1,7 +1,7 @@
 #ifndef WIDGET_H
 #define WIDGET_H
 
-#include "Audio/AudioInput.h"
+#include "AudioInput.h"
 #include <QWidget>
 #include <QVideoFrame>
 #include <QCamera>
@@ -12,12 +12,12 @@
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
-#include "Audio/AudioOutput.h"
-#include "text/chatmessage.h"
+#include "AudioOutput.h"
+#include "chatmessage.h"
 #include <QSoundEffect>
 #include <QCloseEvent>
 #include <QEvent>
-#include "video/cameravideo.h"
+#include "cameravideo.h"
 
 
 QT_BEGIN_NAMESPACE

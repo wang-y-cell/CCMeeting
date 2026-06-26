@@ -1,6 +1,6 @@
-#include "network/networkmanager.h"
-#include "network/messagecodec.h"
-#include "network/mytcpsocket.h"
+#include "networkmanager.h"
+#include "messagecodec.h"
+#include "mytcpsocket.h"
 #include <spdlog/spdlog.h>
 #include <chrono>
 #include <climits>

@@ -1,4 +1,4 @@
-#include "text/mytextedit.h"
+#include "mytextedit.h"
 #include <QVBoxLayout>
 #include <QStringListModel>
 #include <QDebug>

@@ -1,4 +1,4 @@
-#include "Img/ImgDisplay.h"
+#include "ImgDisplay.h"
 
 #include <QLabel>
 
