@@ -1,5 +1,5 @@
 #include "Audio/AudioFormatStd.h"
-#include "logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include <cstring>
 #include <cstdint>
 
@@ -13,7 +13,7 @@ void AudioFormatStd::setStandard(const Spec &s)
 void AudioFormatStd::setSampleRate(int hz)
 {
 	if (hz <= 0) {
-		LOG_WARN("AudioFormatStd", "setSampleRate: 无效值，忽略（采样率转换尚未实现）");
+		spdlog::warn("[AudioFormatStd] setSampleRate: 无效值，忽略（采样率转换尚未实现）");
 		return;
 	}
 	m_standard.sampleRate = hz;
@@ -22,7 +22,7 @@ void AudioFormatStd::setSampleRate(int hz)
 void AudioFormatStd::setChannelCount(int channels)
 {
 	if (channels <= 0) {
-		LOG_WARN("AudioFormatStd", "setChannelCount: 无效值，忽略");
+		spdlog::warn("[AudioFormatStd] setChannelCount: 无效值，忽略");
 		return;
 	}
 	m_standard.channelCount = channels;
@@ -30,7 +30,7 @@ void AudioFormatStd::setChannelCount(int channels)
 
 void AudioFormatStd::setSampleFormat(QAudioFormat::SampleFormat fmt)
 {
-	LOG_WARN("AudioFormatStd", "setSampleFormat: 样本格式转换尚未实现，仅更新字段");
+	spdlog::warn("[AudioFormatStd] setSampleFormat: 样本格式转换尚未实现，仅更新字段");
 	m_standard.sampleFormat = fmt;
 }
 
@@ -95,17 +95,17 @@ QByteArray AudioFormatStd::convertChannels(const QByteArray &pcm, int fromChanne
 										   int bytesPerSample, QAudioFormat::SampleFormat sampleFormat) const
 {
 	if (!channelsSupported(fromChannels) || !channelsSupported(toChannels)) {
-		LOG_WARN("AudioFormatStd", "convertChannels: 仅支持声道数 1 或 2");
+		spdlog::warn("[AudioFormatStd] convertChannels: 仅支持声道数 1 或 2");
 		return {};
 	}
 	if (bytesPerSample <= 0) {
-		LOG_WARN("AudioFormatStd", "convertChannels: bytesPerSample 无效");
+		spdlog::warn("[AudioFormatStd] convertChannels: bytesPerSample 无效");
 		return {};
 	}
 	const int expectedBps = bytesPerSampleForFormat(sampleFormat);
 	if (expectedBps <= 0 || expectedBps != bytesPerSample) {
-		LOG_WARN("AudioFormatStd", "convertChannels: bytesPerSample 与 sampleFormat 不符 (bps="
-				<< bytesPerSample << " expected=" << expectedBps << ")");
+		spdlog::warn("[AudioFormatStd] convertChannels: bytesPerSample 与 sampleFormat 不符 (bps={} expected={})",
+					 bytesPerSample, expectedBps);
 		return {};
 	}
 
@@ -119,7 +119,7 @@ QByteArray AudioFormatStd::convertChannels(const QByteArray &pcm, int fromChanne
 		return {};
 	}
 	if (trailing != 0) {
-		LOG_WARN("AudioFormatStd", "convertChannels: 尾部不完整帧 " << trailing << " 字节已丢弃");
+		spdlog::warn("[AudioFormatStd] convertChannels: 尾部不完整帧 {} 字节已丢弃", trailing);
 	}
 
 	if (fromChannels == 1 && toChannels == 2) {

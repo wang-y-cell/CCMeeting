@@ -1,7 +1,7 @@
 #include "Audio/AudioOutput.h"
 #include "Audio/audiocommon.h"
 #include <mutex>
-#include "logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "network/netheader.h"
 #include <QHostAddress>
 #include <QThread>
@@ -17,14 +17,12 @@ AudioOutput::AudioOutput(QObject *parent)
 	setStandard(wire);
 	if (format.sampleRate() != wire.sampleRate || format.channelCount() != wire.channelCount
 		|| format.sampleFormat() != wire.sampleFormat) {
-		LOG_WARN("AudioOutput", "本机播放格式与线路固定标准不一致（线路为 48kHz 立体声 Float）；"
-				"声道将在写入声卡前对齐；采样率/样本类型差异需后续处理");
+		spdlog::warn("[AudioOutput] 本机播放格式与线路固定标准不一致（线路为 48kHz 立体声 Float）；声道将在写入声卡前对齐；采样率/样本类型差异需后续处理");
 	}
 	m_format = format;
 	const QAudioDevice defaultDevice = QMediaDevices::defaultAudioOutput();
 	audio = new QAudioSink(defaultDevice, format, this);
-	LOG_INFO("AudioOutput", "实际播放格式 sampleRate=" << format.sampleRate() << " ch=" << format.channelCount()
-			<< " format=" << static_cast<int>(format.sampleFormat()));
+	spdlog::info("[AudioOutput] 实际播放格式 sampleRate={} ch={} format={}", format.sampleRate(), format.channelCount(), static_cast<int>(format.sampleFormat()));
 	connect(audio, SIGNAL(stateChanged(QAudio::State)), this, SLOT(handleStateChanged(QAudio::State) ));
 	outputdevice = nullptr;
 }
@@ -76,7 +74,7 @@ void AudioOutput::handleStateChanged(QAudio::State state)
 			{
 				audio->stop();
 				emit audiooutputerror(errorString());
-				LOG_ERROR("AudioOutput", "audio sink error: " << static_cast<int>(audio->error()));
+				spdlog::error("[AudioOutput] audio sink error: {}", static_cast<int>(audio->error()));
 			}
 			break;
 		case QAudio::IdleState:
@@ -90,15 +88,15 @@ void AudioOutput::startPlay()
 {
 	if (!audio)
 	{
-		LOG_ERROR("AudioOutput", "startPlay: audio sink not constructed");
+		spdlog::error("[AudioOutput] startPlay: audio sink not constructed");
 		return;
 	}
 	if (audio->state() == QAudio::ActiveState) return;
-	LOG_INFO("AudioOutput", "start playing audio");
+	spdlog::info("[AudioOutput] start playing audio");
 	outputdevice = audio->start();
 	if (outputdevice)
 	{
-		LOG_DEBUG("AudioOutput", "output device started");
+		spdlog::debug("[AudioOutput] output device started");
 	}
 }
 
@@ -112,7 +110,7 @@ void AudioOutput::stopPlay()
 		outputdevice = nullptr;
 	}
 	audio->stop();
-	LOG_INFO("AudioOutput", "stop playing audio");
+	spdlog::info("[AudioOutput] stop playing audio");
 }
 
 void AudioOutput::run()
@@ -123,11 +121,10 @@ void AudioOutput::run()
 	const int bytesPerSec = m_format.sampleRate() * bpf;
 	// 125ms 块；对齐到整帧，避免立体声/非整数采样时出现相位错乱杂音
 	const int frame125ms = qMax(bpf, bytesPerSec * 125 / 1000);
-	LOG_INFO("AudioOutput", "PCM 播放参数 sampleRate=" << m_format.sampleRate()
-			<< " ch=" << m_format.channelCount() << " format=" << static_cast<int>(m_format.sampleFormat())
-			<< " writeChunk125ms=" << frame125ms);
+	spdlog::info("[AudioOutput] PCM 播放参数 sampleRate={} ch={} format={} writeChunk125ms={}",
+				 m_format.sampleRate(), m_format.channelCount(), static_cast<int>(m_format.sampleFormat()), frame125ms);
 
-	LOG_INFO("AudioOutput", "start playing audio thread " << QThread::currentThreadId());
+	spdlog::info("[AudioOutput] start playing audio thread {}", reinterpret_cast<quintptr>(QThread::currentThreadId()));
 	for (;;)
 	{
 		{
@@ -135,7 +132,7 @@ void AudioOutput::run()
 			if (is_canRun == false)
 			{
 				stopPlay();
-				LOG_INFO("AudioOutput", "stop playing audio thread " << QThread::currentThreadId());
+				spdlog::info("[AudioOutput] stop playing audio thread {}", reinterpret_cast<quintptr>(QThread::currentThreadId()));
 				return;
 			}
 		}
@@ -158,21 +155,21 @@ void AudioOutput::run()
 					if (!forSink.isEmpty())
 						pcm = forSink;
 					else {
-						LOG_WARN("AudioOutput", "声道转换失败，丢弃本包");
+						spdlog::warn("[AudioOutput] 声道转换失败，丢弃本包");
 						if (msg->data)
 							free(msg->data);
 						free(msg);
 						continue;
 					}
 				} else if (!sameLayout && wireSpec.channelCount != m_format.channelCount()) {
-					LOG_WARN("AudioOutput", "线路与播放样本格式不一致，无法做声道变换，按原始缓冲写入（可能异常）");
+					spdlog::warn("[AudioOutput] 线路与播放样本格式不一致，无法做声道变换，按原始缓冲写入（可能异常）");
 				}
 				m_pcmDataBuffer.append(pcm);
 
 				if (m_pcmDataBuffer.size() >= frame125ms) { // 累积约 125ms 再写入，降低 underrun 爆音
 					const std::int64_t ret = outputdevice->write(m_pcmDataBuffer.data(), frame125ms);
 					if (ret < 0) {
-						LOG_ERROR("AudioOutput", "write failed: " << outputdevice->errorString().toStdString());
+						spdlog::error("[AudioOutput] write failed: {}", outputdevice->errorString().toStdString());
 						return;
 					} else {
 						emit speaker(QHostAddress(msg->ip).toString());
@@ -180,7 +177,7 @@ void AudioOutput::run()
 					}
 				}
 			} else {
-				LOG_ERROR("AudioOutput", "output device not started");
+				spdlog::error("[AudioOutput] output device not started");
 				m_pcmDataBuffer.clear();
 			}
 		}
@@ -207,6 +204,6 @@ void AudioOutput::setVolumn(int val)
 
 void AudioOutput::clearQueue()
 {
-	LOG_DEBUG("AudioOutput", "audio_recv queue cleared");
+	spdlog::debug("[AudioOutput] audio_recv queue cleared");
 	audio_recv.clear();
 }

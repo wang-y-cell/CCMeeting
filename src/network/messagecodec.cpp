@@ -1,5 +1,5 @@
 #include "network/messagecodec.h"
-#include "logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include <QBuffer>
 #include <QtEndian>
 #include <cstring>
@@ -36,21 +36,21 @@ std::optional<MessageCodec::ParsedPacket> decodeCreateMeetingResponse(const std:
 
     MESG *msg = allocMesg(msgtype);
     if (!msg) {
-        LOG_ERROR("MessageCodec", "CREATE_MEETING_RESPONSE malloc MESG failed");
+        spdlog::error("[MessageCodec] CREATE_MEETING_RESPONSE malloc MESG failed");
         return std::nullopt;
     }
 
     msg->len = static_cast<std::int64_t>(nBody);
     if (nBody == 0u) {
         msg->data = nullptr;
-        LOG_DEBUG("MessageCodec", "CREATE_MEETING_RESPONSE payload empty (no room)");
+        spdlog::debug("[MessageCodec] CREATE_MEETING_RESPONSE payload empty (no room)");
         return recvPacket(msg);
     }
 
     msg->data = static_cast<std::uint8_t *>(malloc(nBody));
     if (!msg->data) {
         free(msg);
-        LOG_ERROR("MessageCodec", "CREATE_MEETING_RESPONSE malloc MESG.data failed");
+        spdlog::error("[MessageCodec] CREATE_MEETING_RESPONSE malloc MESG.data failed");
         return std::nullopt;
     }
 
@@ -69,14 +69,14 @@ std::optional<MessageCodec::ParsedPacket> decodeJoinMeetingResponse(const std::u
 {
     MESG *msg = allocMesg(msgtype);
     if (!msg) {
-        LOG_ERROR("MessageCodec", "JOIN_MEETING_RESPONSE malloc MESG failed");
+        spdlog::error("[MessageCodec] JOIN_MEETING_RESPONSE malloc MESG failed");
         return std::nullopt;
     }
 
     msg->data = static_cast<std::uint8_t *>(malloc(nBody));
     if (!msg->data) {
         free(msg);
-        LOG_ERROR("MessageCodec", "JOIN_MEETING_RESPONSE malloc MESG.data failed");
+        spdlog::error("[MessageCodec] JOIN_MEETING_RESPONSE malloc MESG.data failed");
         return std::nullopt;
     }
 
@@ -95,7 +95,7 @@ std::optional<MessageCodec::ParsedPacket> decodePartnerJoin2(const std::uint8_t 
 {
     MESG *msg = allocMesg(msgtype);
     if (!msg) {
-        LOG_ERROR("MessageCodec", "PARTNER_JOIN2 malloc MESG failed");
+        spdlog::error("[MessageCodec] PARTNER_JOIN2 malloc MESG failed");
         return std::nullopt;
     }
 
@@ -103,7 +103,7 @@ std::optional<MessageCodec::ParsedPacket> decodePartnerJoin2(const std::uint8_t 
     msg->data = static_cast<std::uint8_t *>(malloc(nBody));
     if (!msg->data) {
         free(msg);
-        LOG_ERROR("MessageCodec", "PARTNER_JOIN2 malloc MESG.data failed");
+        spdlog::error("[MessageCodec] PARTNER_JOIN2 malloc MESG.data failed");
         return std::nullopt;
     }
 
@@ -128,14 +128,14 @@ std::optional<MessageCodec::ParsedPacket> decodeImgRecv(const std::uint8_t *body
 
     MESG *msg = allocMesg(IMG_RECV);
     if (!msg) {
-        LOG_ERROR("MessageCodec", "IMG_RECV malloc MESG failed");
+        spdlog::error("[MessageCodec] IMG_RECV malloc MESG failed");
         return std::nullopt;
     }
 
     msg->data = static_cast<std::uint8_t *>(malloc(static_cast<size_t>(decoded.size())));
     if (!msg->data) {
         free(msg);
-        LOG_ERROR("MessageCodec", "IMG_RECV malloc MESG.data failed");
+        spdlog::error("[MessageCodec] IMG_RECV malloc MESG.data failed");
         return std::nullopt;
     }
 
@@ -150,7 +150,7 @@ std::optional<MessageCodec::ParsedPacket> decodeSimpleIpEvent(MSG_TYPE msgtype, 
 {
     MESG *msg = allocMesg(msgtype);
     if (!msg) {
-        LOG_ERROR("MessageCodec", "PARTNER_JOIN/EXIT/CLOSE malloc MESG failed");
+        spdlog::error("[MessageCodec] PARTNER_JOIN/EXIT/CLOSE malloc MESG failed");
         return std::nullopt;
     }
     msg->ip = ip;
@@ -168,7 +168,7 @@ std::optional<MessageCodec::ParsedPacket> decodeAudioRecv(const std::uint8_t *bo
 
     MESG *msg = allocMesg(AUDIO_RECV);
     if (!msg) {
-        LOG_ERROR("MessageCodec", "AUDIO_RECV malloc MESG failed");
+        spdlog::error("[MessageCodec] AUDIO_RECV malloc MESG failed");
         return std::nullopt;
     }
 
@@ -176,7 +176,7 @@ std::optional<MessageCodec::ParsedPacket> decodeAudioRecv(const std::uint8_t *bo
     msg->data = static_cast<std::uint8_t *>(malloc(static_cast<size_t>(decoded.size())));
     if (!msg->data) {
         free(msg);
-        LOG_ERROR("MessageCodec", "AUDIO_RECV malloc msg.data failed");
+        spdlog::error("[MessageCodec] AUDIO_RECV malloc msg.data failed");
         return std::nullopt;
     }
 
@@ -197,7 +197,7 @@ std::optional<MessageCodec::ParsedPacket> decodeTextRecv(const std::uint8_t *bod
 
     MESG *msg = allocMesg(TEXT_RECV);
     if (!msg) {
-        LOG_ERROR("MessageCodec", "TEXT_RECV malloc MESG failed");
+        spdlog::error("[MessageCodec] TEXT_RECV malloc MESG failed");
         return std::nullopt;
     }
 
@@ -205,7 +205,7 @@ std::optional<MessageCodec::ParsedPacket> decodeTextRecv(const std::uint8_t *bod
     msg->data = static_cast<std::uint8_t *>(malloc(static_cast<size_t>(decoded.size())));
     if (!msg->data) {
         free(msg);
-        LOG_ERROR("MessageCodec", "TEXT_RECV malloc msg.data failed");
+        spdlog::error("[MessageCodec] TEXT_RECV malloc msg.data failed");
         return std::nullopt;
     }
 
@@ -386,7 +386,7 @@ std::optional<MessageCodec::ParsedPacket> MessageCodec::decodeWirePacket(const s
                                                                            MSG_TYPE msgtype)
 {
     const std::uint8_t *body = frame + MSG_HEADER;
-    LOG_DEBUG("MessageCodec", "decode type=" << static_cast<int>(msgtype) << " nBody=" << nBody);
+    spdlog::debug("[MessageCodec] decode type={} nBody={}", static_cast<int>(msgtype), nBody);
 
     switch (msgtype) {
     case CREATE_MEETING_RESPONSE:
@@ -414,7 +414,7 @@ std::optional<MessageCodec::ParsedPacket> MessageCodec::decodeWirePacket(const s
         return decodeTextRecv(body, nBody, ip);
     }
     default:
-        LOG_WARN("MessageCodec", "unsupported message type: " << static_cast<int>(msgtype));
+        spdlog::warn("[MessageCodec] unsupported message type: {}", static_cast<int>(msgtype));
         return std::nullopt;
     }
 }
@@ -431,7 +431,7 @@ std::vector<MessageCodec::ParsedPacket> MessageCodec::WireStreamParser::feed(con
         return {};
 
     if (m_buffer.size() + len > kMaxBuffer) {
-        LOG_WARN("MessageCodec", "receive buffer overflow, resetting");
+        spdlog::warn("[MessageCodec] receive buffer overflow, resetting");
         m_buffer.clear();
     }
 
@@ -455,7 +455,7 @@ std::vector<MessageCodec::ParsedPacket> MessageCodec::WireStreamParser::extractA
             break;
 
         if (raw[0] != '$' || raw[MSG_HEADER + nBody] != '#') {
-            LOG_WARN("MessageCodec", "package delimiter or format error");
+            spdlog::warn("[MessageCodec] package delimiter or format error");
             m_buffer.remove(0, static_cast<int>(packetSize));
             continue;
         }

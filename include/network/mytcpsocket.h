@@ -7,7 +7,6 @@
 #include <mutex>
 #include "netheader.h"
 #include "network/messagecodec.h"
-#include "logger/Logger.h"
 #ifndef MB
 #define MB (1024 * 1024)
 #endif

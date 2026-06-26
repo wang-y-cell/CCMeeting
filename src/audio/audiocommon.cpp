@@ -1,5 +1,5 @@
 #include "audio/audiocommon.h"
-#include "logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include <QAudioDevice>
 #include <QMediaDevices>
 
@@ -38,23 +38,22 @@ QAudioFormat negotiatedPcmFormat()
 		f.setChannelCount(c.ch);
 		f.setSampleFormat(QAudioFormat::Int16);
 		if (inDev.isFormatSupported(f) && outDev.isFormatSupported(f)) {
-			LOG_INFO("AudioCommon", "会话 PCM（输入/输出一致）: sampleRate=" << c.rate
-					<< " ch=" << c.ch << " Int16");
+			spdlog::info("[AudioCommon] 会话 PCM（输入/输出一致）: sampleRate={} ch={} Int16", c.rate, c.ch);
 			return f;
 		}
 	}
 
 	const QAudioFormat inPref = inDev.preferredFormat();
 	if (outDev.isFormatSupported(inPref)) {
-		LOG_WARN("AudioCommon", "未命中候选表，使用输入端 preferred，且输出端也支持该格式");
+		spdlog::warn("[AudioCommon] 未命中候选表，使用输入端 preferred，且输出端也支持该格式");
 		return inPref;
 	}
 	const QAudioFormat outPref = outDev.preferredFormat();
 	if (inDev.isFormatSupported(outPref)) {
-		LOG_WARN("AudioCommon", "未命中候选表，使用输出端 preferred，且输入端也支持该格式");
+		spdlog::warn("[AudioCommon] 未命中候选表，使用输出端 preferred，且输入端也支持该格式");
 		return outPref;
 	}
 
-	LOG_ERROR("AudioCommon", "无法协商输入/输出同时支持的格式，回退输入 preferred（对端若格式不同需统一协议或重采样）");
+	spdlog::error("[AudioCommon] 无法协商输入/输出同时支持的格式，回退输入 preferred（对端若格式不同需统一协议或重采样）");
 	return inPref;
 }

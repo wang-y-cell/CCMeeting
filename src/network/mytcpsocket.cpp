@@ -1,7 +1,7 @@
 #include "network/mytcpsocket.h"
 #include "network/messagecodec.h"
 #include "network/netheader.h"
-#include "logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include <QHostAddress>
 #include <QMetaObject>
 #include <mutex>
@@ -57,7 +57,7 @@ void MyTcpSocketWorker::recvFromSocket() {
     if (chunk.isEmpty())
         return;
 
-    LOG_INFO("MyTcpSocketWorker", "收到服务端数据 bytes=" << chunk.size());
+    spdlog::info("[MyTcpSocketWorker] 收到服务端数据 bytes={}", chunk.size());
     const auto packets = _parser.feed(reinterpret_cast<const std::uint8_t *>(chunk.constData()),
                                       static_cast<std::size_t>(chunk.size()));
     for (const auto &packet : packets) {
@@ -92,12 +92,12 @@ MyTcpSocket::MyTcpSocket(QObject *par):QThread(par) {
 
 void MyTcpSocket::errorDetect(QAbstractSocket::SocketError error)
 {
-    LOG_ERROR("MyTcpSocket", "socket error, tid=" << QThread::currentThreadId());
+    spdlog::error("[MyTcpSocket] socket error, tid={}", reinterpret_cast<quintptr>(QThread::currentThreadId()));
     const MSG_TYPE type = (error == QAbstractSocket::RemoteHostClosedError)
         ? RemoteHostClosedError : OtherNetError;
     MESG *msg = MessageCodec::encodeNetworkError(type);
     if (msg == nullptr) {
-        LOG_ERROR("MyTcpSocket", "errorDetect malloc MESG failed");
+        spdlog::error("[MyTcpSocket] errorDetect malloc MESG failed");
     } else {
         queue_recv.push_msg(msg);
     }
@@ -105,7 +105,7 @@ void MyTcpSocket::errorDetect(QAbstractSocket::SocketError error)
 
 void MyTcpSocket::sendData(MESG* send) {
 	if (_socktcp == nullptr || _socktcp->state() == QAbstractSocket::UnconnectedState) {
-        LOG_INFO("MyTcpSocket", "socket未连接,发送失败");
+        spdlog::info("[MyTcpSocket] socket未连接,发送失败");
         if (send && send->msg_type == TEXT_SEND)
             emit sendTextOver();
 		if (send) {
@@ -120,13 +120,13 @@ void MyTcpSocket::sendData(MESG* send) {
 
 	std::int64_t hastowrite = frame.size();
 	std::int64_t haswrite = 0;
-	LOG_INFO("MyTcpSocket", "开始写入数据 bytes=" << hastowrite);
+	spdlog::info("[MyTcpSocket] 开始写入数据 bytes={}", hastowrite);
 	while (haswrite < hastowrite) {
         const std::int64_t ret = _socktcp->write(frame.constData() + haswrite, hastowrite - haswrite);
 		if (ret < 0) {
             if (_socktcp->error() == QAbstractSocket::TemporaryError)
                 continue;
-			LOG_ERROR("MyTcpSocket", "sendData network write error");
+			spdlog::error("[MyTcpSocket] sendData network write error");
 			break;
 		}
         if (ret == 0)
@@ -145,7 +145,7 @@ void MyTcpSocket::sendData(MESG* send) {
 }
 
 void MyTcpSocket::run() {
-	LOG_INFO("MyTcpSocket", "发送数据线程: " << QThread::currentThreadId());
+	spdlog::info("[MyTcpSocket] 发送数据线程: {}", reinterpret_cast<quintptr>(QThread::currentThreadId()));
     m_isCanRun = true;
     for(;;) {
         {
@@ -155,7 +155,7 @@ void MyTcpSocket::run() {
 
         MESG * send = queue_send.pop_msg();
         if(send == nullptr) continue;
-        LOG_INFO("MyTcpSocket", "从queue_send队列中取出数据");
+        spdlog::info("[MyTcpSocket] 从queue_send队列中取出数据");
         QMetaObject::invokeMethod(_worker, "sendData", Qt::BlockingQueuedConnection, Q_ARG(MESG*, send));
     }
 }
@@ -172,8 +172,7 @@ MyTcpSocket::~MyTcpSocket()
 
 bool MyTcpSocket::connectServerImpl(QString ip, QString port, QIODevice::OpenModeFlag flag)
 {
-	LOG_INFO("MyTcpSocket", "开始连接服务器: " << ip.toStdString() << ":" << port.toStdString()
-             << " tid=" << QThread::currentThreadId());
+	spdlog::info("[MyTcpSocket] 开始连接服务器: {}:{} tid={}", ip.toStdString(), port.toStdString(), reinterpret_cast<quintptr>(QThread::currentThreadId()));
     if (_socktcp != nullptr) {
         _socktcp->abort();
         delete _socktcp;
@@ -189,13 +188,13 @@ bool MyTcpSocket::connectServerImpl(QString ip, QString port, QIODevice::OpenMod
 
     if(_socktcp->waitForConnected(5000)) {
         _localIp = _socktcp->localAddress().toIPv4Address();
-		LOG_INFO("MyTcpSocket", "连接成功,本机ip: " << _localIp);
+		spdlog::info("[MyTcpSocket] 连接成功,本机ip: {}", _localIp);
         _hasLocalIp = true;
         _lastError.clear();
         return true;
     }
     _lastError = _socktcp->errorString();
-	LOG_ERROR("MyTcpSocket", "连接失败: " << _lastError.toStdString());
+	spdlog::error("[MyTcpSocket] 连接失败: {}", _lastError.toStdString());
     delete _socktcp;
     _socktcp = nullptr;
     return false;
@@ -203,7 +202,7 @@ bool MyTcpSocket::connectServerImpl(QString ip, QString port, QIODevice::OpenMod
 
 bool MyTcpSocket::connectToServer(QString ip, QString port, QIODevice::OpenModeFlag flag) {
     Q_UNUSED(flag);
-	LOG_INFO("MyTcpSocket", "连接服务器: " << ip.toStdString() << ":" << port.toStdString());
+	spdlog::info("[MyTcpSocket] 连接服务器: {}:{}", ip.toStdString(), port.toStdString());
 	if (!_sockThread->isRunning()) {
 		QEventLoop loop;
 		QObject::connect(_sockThread, &QThread::started, &loop, &QEventLoop::quit);
@@ -215,7 +214,7 @@ bool MyTcpSocket::connectToServer(QString ip, QString port, QIODevice::OpenModeF
 	const bool invoked = QMetaObject::invokeMethod(_worker, "connectServer", Qt::BlockingQueuedConnection,
         Q_RETURN_ARG(bool, retVal), Q_ARG(QString, ip), Q_ARG(QString, port));
 	if (!invoked) {
-		LOG_ERROR("MyTcpSocket", "connectServer not invoked");
+		spdlog::error("[MyTcpSocket] connectServer not invoked");
 		_lastError = QStringLiteral("internal error: connectServer not invoked");
 		return false;
 	}
@@ -275,13 +274,13 @@ bool MyTcpSocket::IpPortValid(QWidget *parent, QString ip, QString port) {
 		QRegularExpressionValidator ipvalidate(ipreg), portvalidate(portreg);
 		int pos = 0;
 		if(ipvalidate.validate(ip, pos) != QValidator::Acceptable) {
-			LOG_WARN("MyTcpSocket", "Ip Error");
+			spdlog::warn("[MyTcpSocket] Ip Error");
 			QMessageBox::warning(parent, "Input Error", "Ip Error", QMessageBox::Yes, QMessageBox::Yes);
 			return false;
 		}
 
 		if(portvalidate.validate(port, pos) != QValidator::Acceptable) {
-			LOG_WARN("MyTcpSocket", "Port Error");
+			spdlog::warn("[MyTcpSocket] Port Error");
 			QMessageBox::warning(parent, "Input Error", "Port Error", QMessageBox::Yes, QMessageBox::Yes);
 			return false;
 		}

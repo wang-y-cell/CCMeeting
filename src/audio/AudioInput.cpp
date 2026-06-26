@@ -1,6 +1,6 @@
 #include "Audio/AudioInput.h"
 #include "Audio/audiocommon.h"
-#include "logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "network/netheader.h"
 #include <QAudioFormat>
 #include <QThread>
@@ -19,8 +19,7 @@ AudioInput::AudioInput(QObject *parent)
 	setStandard(wire);
 	if (format.sampleRate() != wire.sampleRate || format.channelCount() != wire.channelCount
 		|| format.sampleFormat() != wire.sampleFormat) {
-		LOG_WARN("AudioInput", "本机采集格式与线路固定标准不一致（线路为 48kHz 立体声 Float）"
-				"声道将在发送前对齐；采样率/样本类型差异需后续重采样或另行处理");
+		spdlog::warn("[AudioInput] 本机采集格式与线路固定标准不一致（线路为 48kHz 立体声 Float）声道将在发送前对齐；采样率/样本类型差异需后续重采样或另行处理");
 	}
 	const QAudioDevice defaultDevice = QMediaDevices::defaultAudioInput();
 	audio = new QAudioSource(defaultDevice, format, this);
@@ -36,12 +35,11 @@ AudioInput::~AudioInput()
 void AudioInput::startCollect()
 {
 	if (audio->state() == QAudio::ActiveState) return; //如果音频源状态为活动状态，则返回
-	LOG_INFO("AudioInput", "开始采集音频");
+	spdlog::info("[AudioInput] 开始采集音频");
 	inputdevice = audio->start();
 	if (inputdevice) {
 		const QAudioFormat af = audio->format();
-		LOG_INFO("AudioInput", "实际采集格式 sampleRate=" << af.sampleRate()
-				<< " ch=" << af.channelCount() << " bytesPerFrame=" << af.bytesPerFrame());
+		spdlog::info("[AudioInput] 实际采集格式 sampleRate={} ch={} bytesPerFrame={}", af.sampleRate(), af.channelCount(), af.bytesPerFrame());
 		connect(inputdevice, SIGNAL(readyRead()), this, SLOT(onreadyRead()));
 	}
 }
@@ -53,7 +51,7 @@ void AudioInput::stopCollect()
 		disconnect(inputdevice, SIGNAL(readyRead()), this, SLOT(onreadyRead()));
 	}
 	audio->stop();
-	LOG_INFO("AudioInput", "stop collecting audio");
+	spdlog::info("[AudioInput] stop collecting audio");
 	inputdevice = nullptr;
 }
 
@@ -70,10 +68,10 @@ void AudioInput::onreadyRead()
 		return;
 	}
 	totallen += len;
-	LOG_DEBUG("AudioInput", "音频块 totallen=" << totallen);
+	spdlog::debug("[AudioInput] 音频块 totallen={}", totallen);
 	MESG* msg = (MESG*)malloc(sizeof(MESG));
 	if (msg == nullptr) {
-		LOG_ERROR("AudioInput", "分配内存失败");
+		spdlog::error("[AudioInput] 分配内存失败");
 	} else {
 		memset(msg, 0, sizeof(MESG));
 		msg->msg_type = AUDIO_SEND;
@@ -87,7 +85,7 @@ void AudioInput::onreadyRead()
 			if (!normalized.isEmpty())
 				rr = normalized;
 			else {
-				LOG_WARN("AudioInput", "声道转换失败，跳过本块发送");
+				spdlog::warn("[AudioInput] 声道转换失败，跳过本块发送");
 				free(msg);
 				totallen = 0;
 				num = 0;
@@ -99,7 +97,7 @@ void AudioInput::onreadyRead()
 
 		msg->data = static_cast<std::uint8_t *>(malloc(static_cast<size_t>(msg->len)));
 		if (msg->data == nullptr) {
-			LOG_ERROR("AudioInput", "分配内存失败");
+			spdlog::error("[AudioInput] 分配内存失败");
 		} else {
 			memset(msg->data, 0, msg->len);
 			memcpy_s(msg->data, msg->len, cc.data(), cc.size());
@@ -142,12 +140,12 @@ void AudioInput::handleStateChanged(QAudio::State newState) {
 				emit audioinputerror(errorString());
 			}
 			else {
-				LOG_INFO("AudioInput", "停止录制 (正常)");
+				spdlog::info("[AudioInput] 停止录制 (正常)");
 			}
 			break;
 		case QAudio::ActiveState:
 			//开始录制
-			LOG_INFO("AudioInput", "开始录制");
+			spdlog::info("[AudioInput] 开始录制");
 			break;
 		default:
 			//
@@ -157,6 +155,6 @@ void AudioInput::handleStateChanged(QAudio::State newState) {
 
 void AudioInput::setVolumn(int v)
 {
-	LOG_DEBUG("AudioInput", "设置音量 %=" << v);
+	spdlog::debug("[AudioInput] 设置音量 %={}", v);
 	audio->setVolume(v / 100.0);
 }

@@ -1,6 +1,6 @@
 #include "main_window.h"
 #include "ui_main_window.h"
-#include "logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "selectserver.h"
 #include "joinmeeting.h"
 #include <QMessageBox>
@@ -32,7 +32,7 @@ main_window::~main_window()
 }
 
 void main_window::CreateMeeting_button_clicked() {
-    LOG_INFO("main_window", "点击创建会议按钮");
+    spdlog::info("[main_window] 点击创建会议按钮");
     if (widget == nullptr) {
         QMessageBox::warning(this, "warning", "会议窗口未初始化");
         return;
@@ -44,7 +44,7 @@ void main_window::CreateMeeting_button_clicked() {
 
     widget->show();
     if (widget->on_connServer(this->ip, this->port)) {
-        LOG_INFO("main_window", "连接服务器成功: ip: " << this->ip.toStdString() << " port: " << this->port.toStdString());
+        spdlog::info("[main_window] 连接服务器成功: ip: {} port: {}", this->ip.toStdString(), this->port.toStdString());
         widget->on_createmeetBtn_clicked();
     }else {
         QMessageBox::warning(this, "Connection error","连接服务器失败", QMessageBox::Yes, QMessageBox::Yes);
@@ -53,7 +53,7 @@ void main_window::CreateMeeting_button_clicked() {
 
 
 void main_window::JoinMeeting_button_clicked() {
-    LOG_INFO("main_window", "点击加入会议按钮");
+    spdlog::info("[main_window] 点击加入会议按钮");
     JoinMeeting joinMeeting(this);
     if (joinMeeting.exec() == QDialog::Accepted) {
         QString roomNo = joinMeeting.getRoomNo();
@@ -77,7 +77,7 @@ void main_window::JoinMeeting_button_clicked() {
 
 
 void main_window::ConnectToServer_button_clicked() {
-    LOG_INFO("main_window", "点击连接服务器按钮");
+    spdlog::info("[main_window] 点击连接服务器按钮");
     SelectServer selectServer(this, this->ip, this->port);
     if (selectServer.exec() == QDialog::Accepted) {
         this->ip = selectServer.getIP();

@@ -1,6 +1,6 @@
 #include "text/chatmessage.h"
 #include "configure/configure.h"
-#include "logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include <QString>
 #include <cmath>
 #include <QFontMetrics>
@@ -120,7 +120,7 @@ QSize ChatMessage::fontRect(QString str)
     //根据文本内容和字体计算实际宽高
     QSize size = getRealString(m_msg); // 整个的size
 
-    LOG_DEBUG("ChatMessage", "fontRect size " << size.width() << "x" << size.height());
+    spdlog::debug("[ChatMessage] fontRect size {}x{}", size.width(), size.height());
     int hei = size.height() < minHei ? minHei : size.height(); //如果文本高度小于最小高度,则高度为最小高度,否则为文本高度
     const int sanjiaoHei = qMax(1, hei - m_lineHeight);
 

@@ -1,7 +1,7 @@
 #include "widget.h"
 #include "ui_widget.h"
 #include "screen.h"
-#include "logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include "configure/configure.h"
 #include "network/messagecodec.h"
 #include <QString>
@@ -32,8 +32,8 @@ Widget::Widget(QWidget *parent)
     , ui(new Ui::Widget)
 {
     qRegisterMetaType<MSG_TYPE>();
-    LOG_INFO("Widget", "-------------------------Application Start---------------------------");
-    LOG_INFO("Widget", "main UI thread id: " << QThread::currentThreadId());
+    spdlog::info("[Widget] -------------------------Application Start---------------------------");
+    spdlog::info("[Widget] main UI thread id: {}", reinterpret_cast<quintptr>(QThread::currentThreadId()));
     _createmeet = false;
     _openCamera = false;
     _joinmeet = false;
@@ -54,7 +54,7 @@ Widget::Widget(QWidget *parent)
 }
 
 void Widget::initUI() {
-    LOG_DEBUG("Widget", "初始化UI");
+    spdlog::debug("[Widget] 初始化UI");
     ui->setupUi(this);  //解析ui文件
 
     Widget::pos = QRect(0.1 * Screen::width, 0.1 * Screen::height, 0.8 * Screen::width, 0.8 * Screen::height);
@@ -136,19 +136,19 @@ void Widget::initPermanentWorkers()
 
 Widget::~Widget() {
     shutdownAllWorkers();
-    LOG_INFO("Widget", "-------------------Application End-----------------");
+    spdlog::info("[Widget] -------------------Application End-----------------");
     delete ui;
 }
 
 void Widget::closeEvent(QCloseEvent *event) {
-    LOG_INFO("Widget", "关闭窗口");
+    spdlog::info("[Widget] 关闭窗口");
     hide();
     endMeetingSession();
     event->ignore();
 }
 
 void Widget::resetMeetingUi() {
-    LOG_DEBUG("Widget", "重置会议UI");
+    spdlog::debug("[Widget] 重置会议UI");
     ui->openAudio->setDisabled(true);
     ui->openVedio->setDisabled(true);
     ui->sendmsg->setDisabled(true);
@@ -167,7 +167,7 @@ void Widget::resetMeetingUi() {
 
 void Widget::endMeetingSession()
 {
-    LOG_DEBUG("Widget", "结束会议会话");
+    spdlog::debug("[Widget] 结束会议会话");
     _cameraVideo->endVideo();
 
     _createmeet = false;
@@ -184,7 +184,7 @@ void Widget::endMeetingSession()
 
 void Widget::shutdownAllWorkers()
 {
-    LOG_DEBUG("Widget", "关闭所有工作线程");
+    spdlog::debug("[Widget] 关闭所有工作线程");
     if (_network)
         disconnect(_network, nullptr, this, nullptr);
 
@@ -205,7 +205,7 @@ void Widget::shutdownAllWorkers()
 }
 
 void Widget::on_createmeetBtn_clicked() {
-    LOG_INFO("Widget", "点击创建会议按钮");
+    spdlog::info("[Widget] 点击创建会议按钮");
     if(!_createmeet) {
         ui->openAudio->setDisabled(true);
         ui->openVedio->setDisabled(true);
@@ -227,10 +227,10 @@ void Widget::paintEvent(QPaintEvent *event)
 
 void Widget::on_openVedio_clicked()
 {
-    LOG_DEBUG("Widget", "点击打开摄像头按钮");
+    spdlog::debug("[Widget] 点击打开摄像头按钮");
     if(_cameraVideo->isCameraRunning()) {
         _cameraVideo->stopCamera();
-        LOG_INFO("Widget", "摄像头关闭");
+        spdlog::info("[Widget] 摄像头关闭");
         if (_network)
             _network->clearPendingImages();
         ui->openVedio->setText("摄像头关闭");
@@ -239,7 +239,7 @@ void Widget::on_openVedio_clicked()
             closeImg(_network->localIp());
     } else {
         _cameraVideo->startCamera();
-        LOG_INFO("Widget", "摄像头开启");
+        spdlog::info("[Widget] 摄像头开启");
         ui->openVedio->setText("摄像头开启");
     }
 }
@@ -247,7 +247,7 @@ void Widget::on_openVedio_clicked()
 
 void Widget::on_openAudio_clicked()
 {
-    LOG_INFO("Widget", "点击打开音频按钮");
+    spdlog::info("[Widget] 点击打开音频按钮");
     if (!_createmeet && !_joinmeet) return; //如果未创建会议或未加入会议，则返回
     if (ui->openAudio->text().toUtf8() == QString(OPENAUDIO).toUtf8()){ //如果音频按钮文本为开启音频，则发送开始音频信号
         emit startAudio();
@@ -261,10 +261,10 @@ void Widget::on_openAudio_clicked()
 }
 
 void Widget::closeImg(std::uint32_t ip) {
-    LOG_DEBUG("Widget", "关闭图像: ip = " << ip);
+    spdlog::debug("[Widget] 关闭图像: ip = {}", ip);
     if (partner.find(ip) == partner.end())
     {
-        LOG_WARN("Widget", "closeImg: partner missing for ip");
+        spdlog::warn("[Widget] closeImg: partner missing for ip");
         return;
     }
     _cameraVideo->showAvatarForIp(ip);
@@ -272,9 +272,9 @@ void Widget::closeImg(std::uint32_t ip) {
 
 
 bool Widget::on_connServer(QString ip, QString port) {
-    LOG_DEBUG("Widget", "连接服务器: ip = " << ip.toStdString() << ", port = " << port.toStdString());
+    spdlog::debug("[Widget] 连接服务器: ip = {}, port = {}", ip.toStdString(), port.toStdString());
     if (!_network) {
-        LOG_WARN("Widget", "on_connServer: network not initialized");
+        spdlog::warn("[Widget] on_connServer: network not initialized");
         return false;
     }
     repaint();
@@ -284,11 +284,11 @@ bool Widget::on_connServer(QString ip, QString port) {
         ui->outlog->setText("成功连接到" + ip + ":" + port);
         ui->openAudio->setDisabled(true);
         ui->openVedio->setDisabled(true);
-        LOG_INFO("Widget", "succeed connecting to " << ip.toStdString() << ":" << port.toStdString());
+        spdlog::info("[Widget] succeed connecting to {}:{}", ip.toStdString(), port.toStdString());
         ui->sendmsg->setDisabled(true);
         return true;
     }
-    LOG_WARN("Widget", "failed to connect " << ip.toStdString() << ":" << port.toStdString());
+    spdlog::warn("[Widget] failed to connect {}:{}", ip.toStdString(), port.toStdString());
     hide();
     return false;
 }
@@ -313,7 +313,7 @@ void Widget::handleCreateMeetingResponse(MESG *msg)
     if (msg->data != nullptr && msg->len >= static_cast<long>(sizeof(int))) {
         memcpy(&roomno, msg->data, sizeof(int));
     }
-    LOG_INFO("Widget", "CREATE_MEETING_RESPONSE roomno: " << roomno << " len: " << msg->len);
+    spdlog::info("[Widget] CREATE_MEETING_RESPONSE roomno: {} len: {}", roomno, msg->len);
 
     if (roomno != 0) {
         QMessageBox::information(this, "Room No", QString("房间号：%1").arg(roomno), QMessageBox::Yes, QMessageBox::Yes);
@@ -324,7 +324,7 @@ void Widget::handleCreateMeetingResponse(MESG *msg)
         ui->openVedio->setDisabled(false);
         ui->sendmsg->setDisabled(false);
 
-        LOG_INFO("Widget", "succeed creating room " << roomno);
+        spdlog::info("[Widget] succeed creating room {}", roomno);
         if (_network) {
             const std::uint32_t localIp = _network->localIp();
             addPartner(localIp);
@@ -338,29 +338,29 @@ void Widget::handleCreateMeetingResponse(MESG *msg)
         _createmeet = false;
         QMessageBox::information(this, "Room Information", QString("无可用房间"), QMessageBox::Yes, QMessageBox::Yes);
         ui->outlog->setText(QString("无可用房间"));
-        LOG_WARN("Widget", "no empty room");
+        spdlog::warn("[Widget] no empty room");
     }
 }
 
 void Widget::handleJoinMeetingResponse(MESG *msg) {
-    LOG_INFO("Widget", "JOIN_MEETING_RESPONSE消息类型");
+    spdlog::info("[Widget] JOIN_MEETING_RESPONSE消息类型");
     std::int32_t c;
     memcpy(&c, msg->data, msg->len);
     if (c == 0) {
         QMessageBox::information(this, "Meeting Error", tr("会议不存在"), QMessageBox::Yes, QMessageBox::Yes);
         ui->outlog->setText(QString("会议不存在"));
-        LOG_WARN("Widget", "meeting not exist");
+        spdlog::warn("[Widget] meeting not exist");
         ui->openVedio->setDisabled(true);
         ui->sendmsg->setDisabled(true);
         _joinmeet = false;
     } else if (c == -1) {
         QMessageBox::warning(this, "Meeting information", "成员已满，无法加入", QMessageBox::Yes, QMessageBox::Yes);
         ui->outlog->setText(QString("成员已满，无法加入"));
-        LOG_WARN("Widget", "full room, cannot join");
+        spdlog::warn("[Widget] full room, cannot join");
     } else if (c > 0) {
         QMessageBox::warning(this, "Meeting information", "加入成功", QMessageBox::Yes, QMessageBox::Yes);
         ui->outlog->setText(QString("加入成功"));
-        LOG_INFO("Widget", "succeed joining room");
+        spdlog::info("[Widget] succeed joining room");
         if (_network) {
             const std::uint32_t localIp = _network->localIp();
             addPartner(localIp);
@@ -378,7 +378,7 @@ void Widget::handleJoinMeetingResponse(MESG *msg) {
 void Widget::handleImgRecv(MESG *msg)
 {
     QHostAddress a(msg->ip);
-    LOG_DEBUG("Widget", "IMG_RECV from " << a.toString().toStdString());
+    spdlog::debug("[Widget] IMG_RECV from {}", a.toString().toStdString());
     const QImage img = MessageCodec::decodeImageMessage(msg);
     if (partner.find(msg->ip) == partner.end())
         addPartner(msg->ip);
@@ -423,7 +423,7 @@ void Widget::handlePartnerExit(MESG *msg)
         iplist.erase(it);
         ui->plainTextEdit->setCompleter(iplist);
     } else {
-        LOG_WARN("Widget", "iplist remove failed, ip=" << QHostAddress(msg->ip).toString().toStdString());
+        spdlog::warn("[Widget] iplist remove failed, ip={}", QHostAddress(msg->ip).toString().toStdString());
     }
     ui->outlog->setText(QString("%1 exit meeting").arg(QHostAddress(msg->ip).toString()));
 }
@@ -469,7 +469,7 @@ void Widget::handleOtherNetError()
 }
 
 void Widget::datasolve(MESG *msg) {
-    LOG_INFO("Widget::datasolve", "收到消息: msg_type = " << static_cast<int>(msg->msg_type) << " len = " << msg->len);
+    spdlog::info("[Widget::datasolve] 收到消息: msg_type = {} len = {}", static_cast<int>(msg->msg_type), msg->len);
     switch (msg->msg_type) {
     case CREATE_MEETING_RESPONSE:
         handleCreateMeetingResponse(msg);
@@ -522,11 +522,11 @@ Partner* Widget::addPartner(std::uint32_t ip)
 	if (partner.find(ip) != partner.end()) return nullptr; //如果存在这个ip,返回null
     Partner *p = new Partner(ui->scrollAreaWidgetContents ,ip); //创建一个新的Partner对象
     if (p == nullptr) /*如果创建失败，则返回空*/ {
-        LOG_ERROR("Widget", "创建Partner对象失败");
+        spdlog::error("[Widget] 创建Partner对象失败");
         return nullptr; //返回空
     } else /*如果创建成功，则连接信号和槽*/ {
 		connect(p, &Partner::sendip, this, &Widget::recvip);
-        LOG_DEBUG("Widget", "将这个用户添加到partner中");
+        spdlog::debug("[Widget] 将这个用户添加到partner中");
 		partner.emplace(ip, p);
 		ui->verticalLayout_3->addWidget(p, 1);
         _cameraVideo->addPartnerDisplay(ip, p->displayLabel());
@@ -640,7 +640,7 @@ void Widget::recvip(std::uint32_t ip)
     mainip = ip;
     _cameraVideo->refreshMainForIp(mainip);
     ui->groupBox_2->setTitle(QHostAddress(mainip).toString());
-    LOG_DEBUG("Widget", "mainshow switch mainip=" << ip);
+    spdlog::debug("[Widget] mainshow switch mainip={}", ip);
 }
 
 /*
@@ -648,7 +648,7 @@ void Widget::recvip(std::uint32_t ip)
  */
 
 void Widget::on_joinmeetBtn(QString roomNo) {
-    LOG_INFO("on_joinmeetBtn", "加入会议房间号: " << roomNo.toStdString());
+    spdlog::info("[on_joinmeetBtn] 加入会议房间号: {}", roomNo.toStdString());
 
     QRegularExpression roomreg("^[1-9][0-9]{0,10}$"); //房间号正则表达式
     QRegularExpressionValidator  roomvalidate(roomreg);
@@ -656,7 +656,7 @@ void Widget::on_joinmeetBtn(QString roomNo) {
     if(roomvalidate.validate(roomNo, pos) != QValidator::Acceptable) {
         QMessageBox::warning(this, "RoomNo Error", "房间号不合法" , QMessageBox::Yes, QMessageBox::Yes);
     } else {
-        LOG_INFO("on_joinmeetBtn_clicked", "房间号合法，加入发送队列");
+        spdlog::info("[on_joinmeetBtn_clicked] 房间号合法，加入发送队列");
         _network->sendJoinMeeting(roomNo.toStdString());
     }
 }
@@ -682,10 +682,10 @@ void Widget::on_sendmsg_clicked()
     QString msg = ui->plainTextEdit->toPlainText().trimmed();
     if(msg.size() == 0)
     {
-        LOG_DEBUG("Widget", "sendmsg ignored: empty text");
+        spdlog::debug("[Widget] sendmsg ignored: empty text");
         return;
     }
-    LOG_DEBUG("Widget", "sendmsg chars=" << msg.size());
+    spdlog::debug("[Widget] sendmsg chars={}", msg.size());
     ui->plainTextEdit->setPlainText("");
     QString time = QString::number(QDateTime::currentDateTimeUtc().toSecsSinceEpoch());
     ChatMessage *message = new ChatMessage(ui->listWidget);
@@ -754,7 +754,7 @@ void Widget::dealMessageTime(QString curMsgTime)
         ChatMessage* messageW = (ChatMessage *)ui->listWidget->itemWidget(lastItem); //获得最后一个自定义消息控件widget
         int lastTime = messageW->time().toInt();
         int curTime = curMsgTime.toInt();
-        LOG_DEBUG("Widget", "message time delta sec=" << (curTime - lastTime));
+        spdlog::debug("[Widget] message time delta sec={}", (curTime - lastTime));
         isShowTime = ((curTime - lastTime) > 60); // 两个消息相差一分钟
 //        isShowTime = true;
     } else {
@@ -784,7 +784,7 @@ void Widget::dealMessageTime(QString curMsgTime)
 
 void Widget::textSend()
 {
-    LOG_DEBUG("Widget", "text send completed (TCP)");
+    spdlog::debug("[Widget] text send completed (TCP)");
     //获取最后一行的ListwidgetItem
     QListWidgetItem* lastItem = ui->listWidget->item(ui->listWidget->count() - 1);
 

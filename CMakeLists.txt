@@ -16,14 +16,12 @@ set(CMAKE_PREFIX_PATH
 )
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets Multimedia MultimediaWidgets Network)
-find_package(spdlog REQUIRED)
+find_package(Threads REQUIRED)
 
 file(GLOB_RECURSE PROJECT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/logger/*.h"
 
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/logger/*.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.ui"
 )
 list(SORT PROJECT_SOURCES)
@@ -48,7 +46,7 @@ target_link_libraries(
     Qt6::Multimedia
     Qt6::MultimediaWidgets
     Qt6::Network
-    spdlog::spdlog
+    Threads::Threads
     # Qt6::Core5Compat
 )
 target_include_directories(CloudMeeting PRIVATE
@@ -60,7 +58,7 @@ target_include_directories(CloudMeeting PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include/network
     ${CMAKE_CURRENT_SOURCE_DIR}/include/text
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ui_h
-    ${CMAKE_CURRENT_SOURCE_DIR}/logger
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spdlog/include
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 

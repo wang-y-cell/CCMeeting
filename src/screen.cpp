@@ -3,7 +3,7 @@
 #include <QApplication>
 #include <QScreen>
 #include <QDebug>
-#include "logger/Logger.h"
+#include <spdlog/spdlog.h>
 
 int Screen::width = -1;
 int Screen::height = -1;
@@ -15,5 +15,5 @@ void Screen::init()
 
     Screen::width = s->geometry().width();
     Screen::height = s->geometry().height();
-    LOG_INFO("Screen", "屏幕宽度: " << Screen::width << " 屏幕高度: " << Screen::height);
+    spdlog::info("[Screen] 屏幕宽度: {} 屏幕高度: {}", Screen::width, Screen::height);
 }

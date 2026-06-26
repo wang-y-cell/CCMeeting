@@ -2,7 +2,7 @@
 #include "configure/configure.h"
 #include <QMessageBox>
 #include <QWidget>
-#include "logger/logger.h"
+#include <spdlog/spdlog.h>
 
 CameraVideo::CameraVideo(QWidget *parent) : MyVideoSurface(parent) {
     _parent = parent;
@@ -115,14 +115,14 @@ void CameraVideo::startCamera() {
     if (_isRunning || !_mainVideoImg)
         return;
     _camera->start();
-    LOG_INFO("CameraVideo", "摄像头启动");
+    spdlog::info("[CameraVideo] 摄像头启动");
     _isRunning = true;
 }
 
 void CameraVideo::stopCamera() {
     if (_isRunning && _camera->isActive())
         _camera->stop();
-    LOG_INFO("CameraVideo", "摄像头停止");
+    spdlog::info("[CameraVideo] 摄像头停止");
     _isRunning = false;
 }
 

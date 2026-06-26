@@ -1,7 +1,7 @@
 #include "network/networkmanager.h"
 #include "network/messagecodec.h"
 #include "network/mytcpsocket.h"
-#include "logger/Logger.h"
+#include <spdlog/spdlog.h>
 #include <chrono>
 #include <climits>
 #include <cstdint>
@@ -49,7 +49,7 @@ void SendWorker::stopWorker()
 
 void SendWorker::run()
 {
-    LOG_INFO("NetworkManager::SendWorker", "start " << QThread::currentThreadId());
+    spdlog::info("[NetworkManager::SendWorker] start {}", reinterpret_cast<quintptr>(QThread::currentThreadId()));
     m_canRun = true;
     for (;;) {
         OutgoingItem item;
@@ -60,7 +60,7 @@ void SendWorker::run()
                     == std::cv_status::timeout) {
                     std::lock_guard<std::mutex> runLocker(m_runLock);
                     if (!m_canRun) {
-                        LOG_INFO("NetworkManager::SendWorker", "发送消息线程终止" << QThread::currentThreadId());
+                        spdlog::info("[NetworkManager::SendWorker] 发送消息线程终止{}", reinterpret_cast<quintptr>(QThread::currentThreadId()));
                         return;
                     }
                 }
@@ -87,7 +87,7 @@ void SendWorker::run()
         }
 
         if (!packet) {
-            LOG_ERROR("NetworkManager::SendWorker", "encode failed");
+            spdlog::error("[NetworkManager::SendWorker] encode failed");
             continue;
         }
         queue_send.push_msg(packet);
@@ -107,13 +107,13 @@ void RecvWorker::stopWorker()
 
 void RecvWorker::run()
 {
-    LOG_INFO("NetworkManager::RecvWorker", "start " << QThread::currentThreadId());
+    spdlog::info("[NetworkManager::RecvWorker] start {}", reinterpret_cast<quintptr>(QThread::currentThreadId()));
     m_canRun = true;
     for (;;) {
         {
             std::lock_guard<std::mutex> locker(m_runLock);
             if (!m_canRun) {
-                LOG_INFO("NetworkManager::RecvWorker", "stop " << QThread::currentThreadId());
+                spdlog::info("[NetworkManager::RecvWorker] stop {}", reinterpret_cast<quintptr>(QThread::currentThreadId()));
                 return;
             }
         }
@@ -122,8 +122,7 @@ void RecvWorker::run()
         if (!msg)
             continue;
 
-        LOG_INFO("NetworkManager::RecvWorker",
-                 "dispatch type=" << static_cast<short>(msg->msg_type) << " len=" << msg->len);
+        spdlog::info("[NetworkManager::RecvWorker] dispatch type={} len={}", static_cast<short>(msg->msg_type), msg->len);
         emit packetReady(msg);
     }
 }
