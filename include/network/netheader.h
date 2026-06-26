@@ -64,11 +64,14 @@ enum MSG_TYPE : std::uint8_t {
 };
 Q_DECLARE_METATYPE(MSG_TYPE);
 
-struct MESG //消息结构体
-{
+struct MESG /*消息结构体*/ {
+    /*消息类型*/
     MSG_TYPE msg_type;
+    /*数据*/
     std::uint8_t *data;
+    /*数据长度*/
     std::int64_t len;
+    /*IP地址*/
     std::uint32_t ip;
 };
 Q_DECLARE_METATYPE(MESG *);

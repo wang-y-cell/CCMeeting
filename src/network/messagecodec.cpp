@@ -381,10 +381,9 @@ std::string MessageCodec::decodeTextMessage(const MESG *msg)
                        static_cast<size_t>(msg->len));
 }
 
-std::optional<MessageCodec::ParsedPacket> MessageCodec::decodeWirePacket(const std::uint8_t *frame,
-                                                                           std::uint32_t nBody,
-                                                                           MSG_TYPE msgtype)
-{
+std::optional<MessageCodec::ParsedPacket> 
+MessageCodec::decodeWirePacket
+(const std::uint8_t *frame, std::uint32_t nBody, MSG_TYPE msgtype) {
     const std::uint8_t *body = frame + MSG_HEADER;
     spdlog::debug("[MessageCodec] decode type={} nBody={}", static_cast<int>(msgtype), nBody);
 
@@ -424,9 +423,9 @@ void MessageCodec::WireStreamParser::reset()
     m_buffer.clear();
 }
 
-std::vector<MessageCodec::ParsedPacket> MessageCodec::WireStreamParser::feed(const std::uint8_t *data,
-                                                                             std::size_t len)
-{
+std::vector<MessageCodec::ParsedPacket> 
+MessageCodec::WireStreamParser::feed
+(const std::uint8_t *data, std::size_t len) {
     if (len == 0)
         return {};
 
@@ -435,21 +434,23 @@ std::vector<MessageCodec::ParsedPacket> MessageCodec::WireStreamParser::feed(con
         m_buffer.clear();
     }
 
-    m_buffer.append(reinterpret_cast<const char *>(data), static_cast<int>(len));
+    m_buffer.append(reinterpret_cast<const char *>(data), static_cast<std::size_t>(len));
     return extractAll();
 }
 
-std::vector<MessageCodec::ParsedPacket> MessageCodec::WireStreamParser::extractAll()
-{
+std::vector<MessageCodec::ParsedPacket> 
+MessageCodec::WireStreamParser::extractAll() {
     std::vector<ParsedPacket> packets;
 
     for (;;) {
         if (static_cast<std::size_t>(m_buffer.size()) < MSG_HEADER)
             break;
 
-        const auto *raw = reinterpret_cast<const std::uint8_t *>(m_buffer.constData());
+        const auto *raw = 
+            reinterpret_cast<const std::uint8_t *>(m_buffer.constData());
         const std::uint32_t nBody = qFromBigEndian<std::uint32_t>(raw + 7);
-        const std::size_t packetSize = static_cast<std::size_t>(nBody) + 1 + MSG_HEADER;
+        const std::size_t packetSize = 
+            static_cast<std::size_t>(nBody) + 1 + MSG_HEADER;
 
         if (static_cast<std::size_t>(m_buffer.size()) < packetSize)
             break;

@@ -1,6 +1,6 @@
 #include "networkmanager.h"
 #include "messagecodec.h"
-#include "mytcpsocket.h"
+#include "connection.h"
 #include <spdlog/spdlog.h>
 #include <chrono>
 #include <climits>
@@ -22,6 +22,7 @@ void SendWorker::enqueue(const OutgoingItem &item) {
     while (m_queue.size() > QUEUE_MAXSIZE)
         m_queueCond.wait(locker);
     m_queue.push(item);
+    /*唤醒发送数据线程处理队列中的数据*/
     m_queueCond.notify_one();
 }
 
@@ -47,26 +48,34 @@ void SendWorker::stopWorker()
     m_queueCond.notify_all();
 }
 
-void SendWorker::run()
-{
-    spdlog::info("[NetworkManager::SendWorker] start {}", reinterpret_cast<quintptr>(QThread::currentThreadId()));
+void SendWorker::run() {
+    spdlog::info("[NetworkManager::SendWorker] start {}", 
+        reinterpret_cast<quintptr>(QThread::currentThreadId()));
     m_canRun = true;
     for (;;) {
         OutgoingItem item;
         {
             std::unique_lock<std::mutex> locker(m_queueLock);
+            /*如果队列为空等待数据,超过一定的时间就退出线程*/
             while (m_queue.empty()) {
                 if (m_queueCond.wait_for(locker, std::chrono::seconds(WAITSECONDS))
                     == std::cv_status::timeout) {
                     std::lock_guard<std::mutex> runLocker(m_runLock);
+                    /*如果只是超时就重新判断是否为空,如果为空则继续等待
+                      如果是被唤醒则处理队列中的数据
+                    */
                     if (!m_canRun) {
-                        spdlog::info("[NetworkManager::SendWorker] 发送消息线程终止{}", reinterpret_cast<quintptr>(QThread::currentThreadId()));
+                        /*如果线程已经停止则退出线程*/
+                        spdlog::info("[NetworkManager::SendWorker] 发送消息线程终止{}", 
+                            reinterpret_cast<quintptr>(QThread::currentThreadId()));
                         return;
                     }
                 }
             }
+            /*则取出队列中的数据*/
             item = m_queue.front();
             m_queue.pop();
+            /*通知一个等待的线程*/
             m_queueCond.notify_one();
         }
 
@@ -76,7 +85,8 @@ void SendWorker::run()
             packet = MessageCodec::encodeControl(item.controlType);
             break;
         case OutgoingItem::Kind::JoinRoom:
-            packet = MessageCodec::encodeJoinMeeting(static_cast<std::uint32_t>(std::stoul(item.text)));
+            packet = MessageCodec::encodeJoinMeeting
+                    (static_cast<std::uint32_t>(std::stoul(item.text)));
             break;
         case OutgoingItem::Kind::Text:
             packet = MessageCodec::encodeText(item.text);
@@ -94,10 +104,10 @@ void SendWorker::run()
     }
 }
 
-RecvWorker::RecvWorker(QObject *parent) : QThread(parent) { }
+RecvWorker::RecvWorker(QObject *parent) 
+: QThread(parent) { }
 
-void RecvWorker::stopWorker()
-{
+void RecvWorker::stopWorker() {
     {
         std::lock_guard<std::mutex> locker(m_runLock);
         m_canRun = false;
@@ -105,24 +115,23 @@ void RecvWorker::stopWorker()
     queue_recv.wakeAll();
 }
 
-void RecvWorker::run()
-{
-    spdlog::info("[NetworkManager::RecvWorker] start {}", reinterpret_cast<quintptr>(QThread::currentThreadId()));
+void RecvWorker::run() {
+    spdlog::info("[NetworkManager::RecvWorker] start {}", 
+        reinterpret_cast<quintptr>(QThread::currentThreadId()));
     m_canRun = true;
     for (;;) {
         {
             std::lock_guard<std::mutex> locker(m_runLock);
             if (!m_canRun) {
-                spdlog::info("[NetworkManager::RecvWorker] stop {}", reinterpret_cast<quintptr>(QThread::currentThreadId()));
+                spdlog::info("[NetworkManager::RecvWorker] stop {}", 
+                    reinterpret_cast<quintptr>(QThread::currentThreadId()));
                 return;
             }
         }
-
         MESG *msg = queue_recv.pop_msg();
-        if (!msg)
-            continue;
-
-        spdlog::info("[NetworkManager::RecvWorker] dispatch type={} len={}", static_cast<short>(msg->msg_type), msg->len);
+        if (!msg) continue;
+        spdlog::info("[NetworkManager::RecvWorker] dispatch type={} len={}", 
+            static_cast<short>(msg->msg_type), msg->len);
         emit packetReady(msg);
     }
 }
@@ -132,12 +141,11 @@ NetworkManager::NetworkManager(QObject *parent)
 {
     qRegisterMetaType<MESG *>("MESG*");
 
-    _socket = new MyTcpSocket(this);
+    _connection = new Connection(this);
     _sendWorker = new SendWorker(this);
     _recvWorker = new RecvWorker(this);
 
-    /*发送文本完成之后发送sendTextFinished信号,发送textSend信号*/
-    connect(_socket, &MyTcpSocket::sendTextOver, this, &NetworkManager::sendTextFinished);
+    connect(_connection, &Connection::sendTextOver, this, &NetworkManager::sendTextFinished);
     /*从数据接收队列取出数据之后发送packetReady信号,发送packetReceived信号*/
     connect(_recvWorker, &RecvWorker::packetReady, this, &NetworkManager::packetReceived);
 
@@ -152,21 +160,21 @@ NetworkManager::~NetworkManager()
 
 bool NetworkManager::connectToServer(const QString &ip, const QString &port, QWidget *validateParent)
 {
-    if (!_socket)
+    if (!_connection)
         return false;
-    if (validateParent && !MyTcpSocket::IpPortValid(validateParent, ip, port))
+    if (validateParent && !Connection::validateIpPort(validateParent, ip, port))
         return false;
-    return _socket->connectToServer(ip, port, QIODevice::ReadWrite);
+    return _connection->connectToServer(ip, port);
 }
 
 void NetworkManager::disconnectFromHost()
 {
-    if (_socket)
-        _socket->disconnectFromHost();
+    if (_connection)
+        _connection->disconnectFromHost();
 }
 
 std::uint32_t NetworkManager::localIp() const {
-    return _socket ? _socket->getlocalip() : UINT32_MAX;
+    return _connection ? _connection->localIp() : UINT32_MAX;
 }
 
 void NetworkManager::sendCreateMeeting() {
@@ -229,8 +237,6 @@ void NetworkManager::stop()
             _sendWorker->wait(3000);
         }
     }
-    if (_socket && _socket->isRunning()) {
-        _socket->stopImmediately();
-        _socket->wait(3000);
-    }
+    if (_connection)
+        _connection->stopImmediately();
 }

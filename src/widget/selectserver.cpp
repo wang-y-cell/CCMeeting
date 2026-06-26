@@ -1,6 +1,6 @@
 #include "selectserver.h"
 #include "ui_selectserver.h"
-#include "mytcpsocket.h"
+#include "connection.h"
 #include <spdlog/spdlog.h>
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
@@ -26,7 +26,7 @@ SelectServer::~SelectServer() {
 void SelectServer::on_connServer_clicked() {
     spdlog::info("[SlectServer] 点击连接服务器按钮");
 
-    if(!MyTcpSocket::IpPortValid(this, ui->ip->text(), ui->port->text())) {
+    if (!Connection::validateIpPort(this, ui->ip->text(), ui->port->text())) {
         spdlog::warn("[SelectServer] ip or port 格式错误");
         return;
     }

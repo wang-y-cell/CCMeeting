@@ -46,7 +46,13 @@ public:
     /*解码文本消息,直接解压缩*/
     static std::string decodeTextMessage(const MESG *msg);
 
-    /** 解析完整线上帧（不含 '$' 与 '#' 外的流式缓冲），返回 nullptr 表示忽略该包。 */
+    /** 
+    *@brief 解析完整线上帧（不含 '$' 与 '#' 外的流式缓冲），返回 nullptr 表示忽略该包
+    *@param frame 线上帧数据
+    *@param nBody 线上帧数据长度
+    *@param msgtype 线上帧类型
+    *@return 解析出的MESG
+    */
     static std::optional<ParsedPacket> decodeWirePacket(const std::uint8_t *frame,
                                                         std::uint32_t nBody,
                                                         MSG_TYPE msgtype);
@@ -56,15 +62,23 @@ public:
     public:
         /*重置流式缓冲*/
         void reset();
-        /*追加字节*/
+        /** 
+        *@brief 追加字节,并解析m_buffer中所有的MESG
+        *@param data 字节数据
+        *@param len 字节长度
+        *@return 解析出的MESG
+        */
         std::vector<ParsedPacket> feed(const std::uint8_t *data, std::size_t len);
 
     private:
-        /*提取所有解析出的MESG*/
+        /**
+        *@brief 提取m_buffer中所有的MESG
+        *@return 解析出的MESG
+        */
         std::vector<ParsedPacket> extractAll();
 
         QByteArray m_buffer; /*流式缓冲*/
-        static constexpr std::size_t kMaxBuffer = 4 * 1024 * 1024;
+        static constexpr std::size_t kMaxBuffer = 4 * 1024 * 1024; /*最大缓冲区大小*/
     };
 };
 
