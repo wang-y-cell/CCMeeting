@@ -1,416 +1,315 @@
 #include "messagecodec.h"
-#include <spdlog/spdlog.h>
 #include <QBuffer>
 #include <QtEndian>
+#include <spdlog/spdlog.h>
 #include <cstring>
 
 namespace {
 
-MESG *allocMesg(MSG_TYPE type)
+QByteArray compressTextPayload(const std::string &text)
 {
-    MESG *msg = static_cast<MESG *>(malloc(sizeof(MESG)));
-    if (!msg)
-        return nullptr;
-    memset(msg, 0, sizeof(MESG));
-    msg->msg_type = type;
-    return msg;
+    return qCompress(QByteArray::fromStdString(text));
 }
 
-MessageCodec::ParsedPacket recvPacket(MESG *msg)
+QByteArray compressAudioPayload(const QByteArray &pcm)
 {
-    return {msg, MessageCodec::PacketQueue::Recv};
+    return qCompress(pcm).toBase64();
 }
 
-MessageCodec::ParsedPacket audioPacket(MESG *msg)
+QByteArray compressImagePayload(const QImage &image)
 {
-    return {msg, MessageCodec::PacketQueue::Audio};
+    QByteArray raw;
+    QBuffer buf(&raw);
+    buf.open(QIODevice::WriteOnly);
+    if (!image.save(&buf, "JPEG"))
+        return {};
+    return qCompress(raw).toBase64();
 }
 
-std::optional<MessageCodec::ParsedPacket> decodeCreateMeetingResponse(const std::uint8_t *body,
-                                                                      std::uint32_t nBody,
-                                                                      MSG_TYPE msgtype)
+QByteArray decodeImageWirePayload(const QByteArray &wireBody)
 {
-    std::int32_t roomNo = 0;
-    if (nBody >= 4u)
-        roomNo = qFromBigEndian<std::int32_t>(body);
-
-    MESG *msg = allocMesg(msgtype);
-    if (!msg) {
-        spdlog::error("[MessageCodec] CREATE_MEETING_RESPONSE malloc MESG failed");
-        return std::nullopt;
-    }
-
-    msg->len = static_cast<std::int64_t>(nBody);
-    if (nBody == 0u) {
-        msg->data = nullptr;
-        spdlog::debug("[MessageCodec] CREATE_MEETING_RESPONSE payload empty (no room)");
-        return recvPacket(msg);
-    }
-
-    msg->data = static_cast<std::uint8_t *>(malloc(nBody));
-    if (!msg->data) {
-        free(msg);
-        spdlog::error("[MessageCodec] CREATE_MEETING_RESPONSE malloc MESG.data failed");
-        return std::nullopt;
-    }
-
-    memset(msg->data, 0, nBody);
-    if (nBody >= 4u)
-        memcpy(msg->data, &roomNo, sizeof(std::int32_t));
-    if (nBody > 4u)
-        memcpy(msg->data + sizeof(std::int32_t), body + sizeof(std::int32_t),
-               nBody - sizeof(std::int32_t));
-    return recvPacket(msg);
+    return qUncompress(QByteArray::fromBase64(wireBody));
 }
 
-std::optional<MessageCodec::ParsedPacket> decodeJoinMeetingResponse(const std::uint8_t *body,
-                                                                      std::uint32_t nBody,
-                                                                      MSG_TYPE msgtype)
+QByteArray decodeTextWirePayload(const QByteArray &wireBody)
 {
-    MESG *msg = allocMesg(msgtype);
-    if (!msg) {
-        spdlog::error("[MessageCodec] JOIN_MEETING_RESPONSE malloc MESG failed");
-        return std::nullopt;
-    }
-
-    msg->data = static_cast<std::uint8_t *>(malloc(nBody));
-    if (!msg->data) {
-        free(msg);
-        spdlog::error("[MessageCodec] JOIN_MEETING_RESPONSE malloc MESG.data failed");
-        return std::nullopt;
-    }
-
-    memset(msg->data, 0, nBody);
-    std::int32_t code = 0;
-    if (nBody > 0)
-        memcpy(&code, body, nBody);
-    memcpy(msg->data, &code, nBody);
-    msg->len = static_cast<std::int64_t>(nBody);
-    return recvPacket(msg);
+    return qUncompress(wireBody);
 }
 
-std::optional<MessageCodec::ParsedPacket> decodePartnerJoin2(const std::uint8_t *body,
-                                                             std::uint32_t nBody,
-                                                             MSG_TYPE msgtype)
+QByteArray decodeAudioWirePayload(const QByteArray &wireBody)
 {
-    MESG *msg = allocMesg(msgtype);
-    if (!msg) {
-        spdlog::error("[MessageCodec] PARTNER_JOIN2 malloc MESG failed");
-        return std::nullopt;
-    }
-
-    msg->len = static_cast<std::int64_t>(nBody);
-    msg->data = static_cast<std::uint8_t *>(malloc(nBody));
-    if (!msg->data) {
-        free(msg);
-        spdlog::error("[MessageCodec] PARTNER_JOIN2 malloc MESG.data failed");
-        return std::nullopt;
-    }
-
-    memset(msg->data, 0, nBody);
-    int pos = 0;
-    for (std::uint32_t i = 0; i < nBody / sizeof(std::uint32_t); ++i) {
-        const std::uint32_t ip = qFromBigEndian<std::uint32_t>(body + pos);
-        memcpy(msg->data + pos, &ip, sizeof(std::uint32_t));
-        pos += static_cast<int>(sizeof(std::uint32_t));
-    }
-    return recvPacket(msg);
+    return qUncompress(QByteArray::fromBase64(wireBody));
 }
 
-std::optional<MessageCodec::ParsedPacket> decodeImgRecv(const std::uint8_t *body,
-                                                        std::uint32_t nBody,
-                                                        std::uint32_t ip)
-{
-    const QByteArray wireBody(reinterpret_cast<const char *>(body), static_cast<int>(nBody));
-    const QByteArray decoded = MessageCodec::decodeImageWirePayload(wireBody);
-    if (decoded.isEmpty())
-        return std::nullopt;
-
-    MESG *msg = allocMesg(IMG_RECV);
-    if (!msg) {
-        spdlog::error("[MessageCodec] IMG_RECV malloc MESG failed");
-        return std::nullopt;
-    }
-
-    msg->data = static_cast<std::uint8_t *>(malloc(static_cast<size_t>(decoded.size())));
-    if (!msg->data) {
-        free(msg);
-        spdlog::error("[MessageCodec] IMG_RECV malloc MESG.data failed");
-        return std::nullopt;
-    }
-
-    memset(msg->data, 0, static_cast<size_t>(decoded.size()));
-    memcpy(msg->data, decoded.data(), static_cast<size_t>(decoded.size()));
-    msg->len = decoded.size();
-    msg->ip = ip;
-    return recvPacket(msg);
-}
-
-std::optional<MessageCodec::ParsedPacket> decodeSimpleIpEvent(MSG_TYPE msgtype, std::uint32_t ip)
-{
-    MESG *msg = allocMesg(msgtype);
-    if (!msg) {
-        spdlog::error("[MessageCodec] PARTNER_JOIN/EXIT/CLOSE malloc MESG failed");
-        return std::nullopt;
-    }
-    msg->ip = ip;
-    return recvPacket(msg);
-}
-
-std::optional<MessageCodec::ParsedPacket> decodeAudioRecv(const std::uint8_t *body,
-                                                          std::uint32_t nBody,
-                                                          std::uint32_t ip)
-{
-    const QByteArray wireBody(reinterpret_cast<const char *>(body), static_cast<int>(nBody));
-    const QByteArray decoded = MessageCodec::decodeAudioWirePayload(wireBody);
-    if (decoded.isEmpty())
-        return std::nullopt;
-
-    MESG *msg = allocMesg(AUDIO_RECV);
-    if (!msg) {
-        spdlog::error("[MessageCodec] AUDIO_RECV malloc MESG failed");
-        return std::nullopt;
-    }
-
-    msg->ip = ip;
-    msg->data = static_cast<std::uint8_t *>(malloc(static_cast<size_t>(decoded.size())));
-    if (!msg->data) {
-        free(msg);
-        spdlog::error("[MessageCodec] AUDIO_RECV malloc msg.data failed");
-        return std::nullopt;
-    }
-
-    memset(msg->data, 0, static_cast<size_t>(decoded.size()));
-    memcpy(msg->data, decoded.data(), static_cast<size_t>(decoded.size()));
-    msg->len = decoded.size();
-    return audioPacket(msg);
-}
-
-std::optional<MessageCodec::ParsedPacket> decodeTextRecv(const std::uint8_t *body,
-                                                         std::uint32_t nBody,
-                                                         std::uint32_t ip)
-{
-    const QByteArray wireBody(reinterpret_cast<const char *>(body), static_cast<int>(nBody));
-    const QByteArray decoded = MessageCodec::decodeTextWirePayload(wireBody);
-    if (decoded.isEmpty())
-        return std::nullopt;
-
-    MESG *msg = allocMesg(TEXT_RECV);
-    if (!msg) {
-        spdlog::error("[MessageCodec] TEXT_RECV malloc MESG failed");
-        return std::nullopt;
-    }
-
-    msg->ip = ip;
-    msg->data = static_cast<std::uint8_t *>(malloc(static_cast<size_t>(decoded.size())));
-    if (!msg->data) {
-        free(msg);
-        spdlog::error("[MessageCodec] TEXT_RECV malloc msg.data failed");
-        return std::nullopt;
-    }
-
-    memset(msg->data, 0, static_cast<size_t>(decoded.size()));
-    memcpy(msg->data, decoded.data(), static_cast<size_t>(decoded.size()));
-    msg->len = decoded.size();
-    return recvPacket(msg);
-}
-
-/*判断是否需要长度字段*/
 bool wireFrameNeedsLengthField(MSG_TYPE type)
 {
-    /*根据消息类型判断是否需要长度字段*/
     return type == CREATE_MEETING || type == AUDIO_SEND || type == CLOSE_CAMERA
         || type == IMG_SEND || type == TEXT_SEND || type == JOIN_MEETING;
 }
 
+std::optional<Message> decodeCreateMeetingResponse(const std::uint8_t *body, std::uint32_t nBody)
+{
+    Message msg;
+    msg.kind = Message::Kind::CreateMeetingResponse;
+    if (nBody >= 4u)
+        msg.roomNo = static_cast<std::uint32_t>(qFromBigEndian<std::int32_t>(body));
+    return msg;
+}
+
+std::optional<Message> decodeJoinMeetingResponse(const std::uint8_t *body, std::uint32_t nBody)
+{
+    Message msg;
+    msg.kind = Message::Kind::JoinMeetingResponse;
+    if (nBody >= sizeof(std::int32_t))
+        memcpy(&msg.responseCode, body, sizeof(std::int32_t));
+    return msg;
+}
+
+std::optional<Message> decodePartnerJoin2(const std::uint8_t *body, std::uint32_t nBody)
+{
+    Message msg;
+    msg.kind = Message::Kind::PartnerJoin2;
+    for (std::uint32_t i = 0; i < nBody / sizeof(std::uint32_t); ++i) {
+        const std::uint32_t ip = qFromBigEndian<std::uint32_t>(body + i * sizeof(std::uint32_t));
+        msg.partnerIps.push_back(ip);
+    }
+    return msg;
+}
+
+std::optional<Message> decodeImageRecv(const std::uint8_t *body, std::uint32_t nBody, std::uint32_t ip)
+{
+    const QByteArray wireBody(reinterpret_cast<const char *>(body), static_cast<int>(nBody));
+    const QByteArray decoded = decodeImageWirePayload(wireBody);
+    if (decoded.isEmpty())
+        return std::nullopt;
+
+    Message msg;
+    msg.kind = Message::Kind::RecvImage;
+    msg.ip = ip;
+    msg.image.loadFromData(decoded);
+    if (msg.image.isNull())
+        return std::nullopt;
+    return msg;
+}
+
+std::optional<Message> decodeTextRecv(const std::uint8_t *body, std::uint32_t nBody, std::uint32_t ip)
+{
+    const QByteArray wireBody(reinterpret_cast<const char *>(body), static_cast<int>(nBody));
+    const QByteArray decoded = decodeTextWirePayload(wireBody);
+    if (decoded.isEmpty())
+        return std::nullopt;
+
+    Message msg;
+    msg.kind = Message::Kind::RecvText;
+    msg.ip = ip;
+    msg.text = decoded.toStdString();
+    return msg;
+}
+
+std::optional<Message> decodeAudioRecv(const std::uint8_t *body, std::uint32_t nBody, std::uint32_t ip)
+{
+    const QByteArray wireBody(reinterpret_cast<const char *>(body), static_cast<int>(nBody));
+    const QByteArray decoded = decodeAudioWirePayload(wireBody);
+    if (decoded.isEmpty())
+        return std::nullopt;
+
+    Message msg;
+    msg.kind = Message::Kind::RecvAudio;
+    msg.ip = ip;
+    msg.audio = decoded;
+    return msg;
+}
+
+std::optional<Message> decodeSimpleIpEvent(Message::Kind kind, std::uint32_t ip)
+{
+    Message msg;
+    msg.kind = kind;
+    msg.ip = ip;
+    return msg;
+}
+
+Message::Kind partnerKindFromWire(MSG_TYPE type)
+{
+    switch (type) {
+    case PARTNER_JOIN:
+        return Message::Kind::PartnerJoin;
+    case PARTNER_EXIT:
+        return Message::Kind::PartnerExit;
+    case CLOSE_CAMERA:
+        return Message::Kind::CloseCameraNotify;
+    default:
+        return Message::Kind::PartnerJoin;
+    }
+}
+
 } // namespace
 
-MESG *MessageCodec::encodeControl(MSG_TYPE type)
+MSG_TYPE MessageCodec::toWireType(Message::Kind kind)
 {
-    MESG *send = static_cast<MESG *>(malloc(sizeof(MESG)));
-    if (!send)
-        return nullptr;
-    memset(send, 0, sizeof(MESG));
-    send->msg_type = type;
-    send->len = 0;
-    send->data = nullptr;
-    return send;
-}
-
-MESG *MessageCodec::encodeJoinMeeting(std::uint32_t roomNo)
-{
-    MESG *send = static_cast<MESG *>(malloc(sizeof(MESG)));
-    if (!send)
-        return nullptr;
-    memset(send, 0, sizeof(MESG));
-    send->msg_type = JOIN_MEETING;
-    send->len = 4;
-    send->data = static_cast<std::uint8_t *>(malloc(send->len + 10));
-    if (!send->data) {
-        free(send);
-        return nullptr;
+    switch (kind) {
+    case Message::Kind::CreateMeeting:
+        return CREATE_MEETING;
+    case Message::Kind::JoinMeeting:
+        return JOIN_MEETING;
+    case Message::Kind::ExitMeeting:
+        return EXIT_MEETING;
+    case Message::Kind::CloseCamera:
+        return CLOSE_CAMERA;
+    case Message::Kind::SendText:
+        return TEXT_SEND;
+    case Message::Kind::SendImage:
+        return IMG_SEND;
+    case Message::Kind::SendAudio:
+        return AUDIO_SEND;
+    case Message::Kind::CreateMeetingResponse:
+        return CREATE_MEETING_RESPONSE;
+    case Message::Kind::JoinMeetingResponse:
+        return JOIN_MEETING_RESPONSE;
+    case Message::Kind::RecvText:
+        return TEXT_RECV;
+    case Message::Kind::RecvImage:
+        return IMG_RECV;
+    case Message::Kind::RecvAudio:
+        return AUDIO_RECV;
+    case Message::Kind::PartnerJoin:
+        return PARTNER_JOIN;
+    case Message::Kind::PartnerExit:
+        return PARTNER_EXIT;
+    case Message::Kind::PartnerJoin2:
+        return PARTNER_JOIN2;
+    case Message::Kind::CloseCameraNotify:
+        return CLOSE_CAMERA;
+    case Message::Kind::RemoteHostClosedError:
+        return RemoteHostClosedError;
+    case Message::Kind::OtherNetError:
+        return OtherNetError;
     }
-    memset(send->data, 0, send->len + 10);
-    memcpy(send->data, &roomNo, sizeof(roomNo));
-    return send;
+    return CREATE_MEETING;
 }
 
-MESG *MessageCodec::encodeText(const std::string &text)
+Message::Kind MessageCodec::fromWireType(MSG_TYPE type)
 {
-    MESG *send = static_cast<MESG *>(malloc(sizeof(MESG)));
-    if (!send)
-        return nullptr;
-    memset(send, 0, sizeof(MESG));
-    send->msg_type = TEXT_SEND;
-    const QByteArray data = qCompress(QByteArray::fromStdString(text));
-    send->len = data.size();
-    send->data = static_cast<std::uint8_t *>(malloc(static_cast<size_t>(send->len)));
-    if (!send->data) {
-        free(send);
-        return nullptr;
+    switch (type) {
+    case IMG_SEND:
+        return Message::Kind::SendImage;
+    case IMG_RECV:
+        return Message::Kind::RecvImage;
+    case AUDIO_SEND:
+        return Message::Kind::SendAudio;
+    case AUDIO_RECV:
+        return Message::Kind::RecvAudio;
+    case TEXT_SEND:
+        return Message::Kind::SendText;
+    case TEXT_RECV:
+        return Message::Kind::RecvText;
+    case CREATE_MEETING:
+        return Message::Kind::CreateMeeting;
+    case EXIT_MEETING:
+        return Message::Kind::ExitMeeting;
+    case JOIN_MEETING:
+        return Message::Kind::JoinMeeting;
+    case CLOSE_CAMERA:
+        return Message::Kind::CloseCamera;
+    case CREATE_MEETING_RESPONSE:
+        return Message::Kind::CreateMeetingResponse;
+    case PARTNER_EXIT:
+        return Message::Kind::PartnerExit;
+    case PARTNER_JOIN:
+        return Message::Kind::PartnerJoin;
+    case JOIN_MEETING_RESPONSE:
+        return Message::Kind::JoinMeetingResponse;
+    case PARTNER_JOIN2:
+        return Message::Kind::PartnerJoin2;
+    case RemoteHostClosedError:
+        return Message::Kind::RemoteHostClosedError;
+    case OtherNetError:
+        return Message::Kind::OtherNetError;
     }
-    memset(send->data, 0, static_cast<size_t>(send->len));
-    memcpy(send->data, data.data(), static_cast<size_t>(data.size()));
-    return send;
+    return Message::Kind::OtherNetError;
 }
 
-MESG *MessageCodec::encodeImage(const QImage &image)
+QByteArray MessageCodec::encodeWireFrame(const Message &msg, std::uint32_t localIp)
 {
-    QByteArray byte;
-    QBuffer buf(&byte);
-    buf.open(QIODevice::WriteOnly);
-    if (!image.save(&buf, "JPEG"))
-        return nullptr;
+    const MSG_TYPE wireType = toWireType(msg.kind);
+    QByteArray body;
 
-    const QByteArray compressed = qCompress(byte);
-    const QByteArray payload = compressed.toBase64();
-
-    MESG *send = static_cast<MESG *>(malloc(sizeof(MESG)));
-    if (!send)
-        return nullptr;
-    memset(send, 0, sizeof(MESG));
-    send->msg_type = IMG_SEND;
-    send->len = payload.size();
-    send->data = static_cast<std::uint8_t *>(malloc(static_cast<size_t>(send->len)));
-    if (!send->data) {
-        free(send);
-        return nullptr;
+    switch (msg.kind) {
+    case Message::Kind::JoinMeeting: {
+        std::uint32_t room = msg.roomNo;
+        if (room == 0 && !msg.text.empty())
+            room = static_cast<std::uint32_t>(std::stoul(msg.text));
+        char buf[4];
+        qToBigEndian(room, buf);
+        body.append(buf, 4);
+        break;
     }
-    memset(send->data, 0, static_cast<size_t>(send->len));
-    memcpy(send->data, payload.data(), static_cast<size_t>(payload.size()));
-    return send;
-}
+    case Message::Kind::SendText:
+        body = compressTextPayload(msg.text);
+        break;
+    case Message::Kind::SendImage:
+        body = compressImagePayload(msg.image);
+        break;
+    case Message::Kind::SendAudio:
+        body = compressAudioPayload(msg.audio);
+        break;
+    default:
+        break;
+    }
 
-MESG *MessageCodec::encodeNetworkError(MSG_TYPE type)
-{
-    return encodeControl(type);
-}
-
-QByteArray MessageCodec::encodeWireFrame(const MESG *send, std::uint32_t localIp)
-{
     QByteArray frame;
-    //事先预留空间，避免频繁分配内存
-    frame.reserve(static_cast<int>(1 + 2 + 4 + 4 + send->len + 1));
-    /*首先添加$符号*/
+    frame.reserve(static_cast<int>(1 + 2 + 4 + 4 + body.size() + 1));
     frame.append('$');
 
     char numBuf[4] = {};
-    /*将消息类型转换为大端序*/
-    qToBigEndian(static_cast<std::uint16_t>(send->msg_type), numBuf);
+    qToBigEndian(static_cast<std::uint16_t>(wireType), numBuf);
     frame.append(numBuf, 2);
 
-    /*将本地IP转换为大端序*/
     qToBigEndian(localIp, numBuf);
     frame.append(numBuf, 4);
 
-    /*如果需要长度字段，则添加长度字段*/
-    if (wireFrameNeedsLengthField(send->msg_type)) {
-        qToBigEndian(static_cast<std::uint32_t>(send->len), numBuf);
+    if (wireFrameNeedsLengthField(wireType)) {
+        qToBigEndian(static_cast<std::uint32_t>(body.size()), numBuf);
         frame.append(numBuf, 4);
     }
 
-    /*如果消息有数据段*/
-    if (send->len > 0 && send->data != nullptr) {
-        /*如果消息类型为JOIN_MEETING，并且长度大于4，则添加房间号*/
-        if (send->msg_type == JOIN_MEETING && send->len >= 4) {
-            std::uint32_t room = 0;
-            memcpy(&room, send->data, sizeof(room));
-            qToBigEndian(room, numBuf);
-            frame.append(numBuf, static_cast<int>(send->len));
-        } else {
-            /*否则直接添加数据段*/
-            frame.append(reinterpret_cast<const char *>(send->data), static_cast<int>(send->len));
-        }
-    }
+    if (!body.isEmpty())
+        frame.append(body);
 
     frame.append('#');
     return frame;
 }
 
-QByteArray MessageCodec::decodeImageWirePayload(const QByteArray &wireBody)
+std::optional<Message> MessageCodec::decodeWirePacket(const std::uint8_t *frame,
+                                                      std::uint32_t nBody,
+                                                      MSG_TYPE msgtype)
 {
-    const QByteArray decoded = QByteArray::fromBase64(wireBody);
-    return qUncompress(decoded);
-}
-
-QByteArray MessageCodec::decodeTextWirePayload(const QByteArray &wireBody)
-{
-    return qUncompress(wireBody);
-}
-
-QByteArray MessageCodec::decodeAudioWirePayload(const QByteArray &wireBody)
-{
-    const QByteArray decoded = QByteArray::fromBase64(wireBody);
-    return qUncompress(decoded);
-}
-
-QImage MessageCodec::decodeImageMessage(const MESG *msg)
-{
-    QImage img;
-    if (!msg || !msg->data || msg->len <= 0)
-        return img;
-    img.loadFromData(msg->data, static_cast<int>(msg->len));
-    return img;
-}
-
-std::string MessageCodec::decodeTextMessage(const MESG *msg)
-{
-    if (!msg || !msg->data || msg->len <= 0)
-        return {};
-    return std::string(reinterpret_cast<const char *>(msg->data),
-                       static_cast<size_t>(msg->len));
-}
-
-std::optional<MessageCodec::ParsedPacket> 
-MessageCodec::decodeWirePacket
-(const std::uint8_t *frame, std::uint32_t nBody, MSG_TYPE msgtype) {
     const std::uint8_t *body = frame + MSG_HEADER;
     spdlog::debug("[MessageCodec] decode type={} nBody={}", static_cast<int>(msgtype), nBody);
 
     switch (msgtype) {
     case CREATE_MEETING_RESPONSE:
-        return decodeCreateMeetingResponse(body, nBody, msgtype);
+        return decodeCreateMeetingResponse(body, nBody);
     case JOIN_MEETING_RESPONSE:
-        return decodeJoinMeetingResponse(body, nBody, msgtype);
+        return decodeJoinMeetingResponse(body, nBody);
     case PARTNER_JOIN2:
-        return decodePartnerJoin2(body, nBody, msgtype);
+        return decodePartnerJoin2(body, nBody);
     case IMG_RECV: {
         const std::uint32_t ip = qFromBigEndian<std::uint32_t>(frame + 3);
-        return decodeImgRecv(body, nBody, ip);
+        return decodeImageRecv(body, nBody, ip);
     }
-    case PARTNER_JOIN:
-    case PARTNER_EXIT:
-    case CLOSE_CAMERA: {
+    case TEXT_RECV: {
         const std::uint32_t ip = qFromBigEndian<std::uint32_t>(frame + 3);
-        return decodeSimpleIpEvent(msgtype, ip);
+        return decodeTextRecv(body, nBody, ip);
     }
     case AUDIO_RECV: {
         const std::uint32_t ip = qFromBigEndian<std::uint32_t>(frame + 3);
         return decodeAudioRecv(body, nBody, ip);
     }
-    case TEXT_RECV: {
+    case PARTNER_JOIN:
+    case PARTNER_EXIT:
+    case CLOSE_CAMERA: {
         const std::uint32_t ip = qFromBigEndian<std::uint32_t>(frame + 3);
-        return decodeTextRecv(body, nBody, ip);
+        return decodeSimpleIpEvent(partnerKindFromWire(msgtype), ip);
     }
     default:
         spdlog::warn("[MessageCodec] unsupported message type: {}", static_cast<int>(msgtype));
@@ -423,34 +322,31 @@ void MessageCodec::WireStreamParser::reset()
     m_buffer.clear();
 }
 
-std::vector<MessageCodec::ParsedPacket> 
-MessageCodec::WireStreamParser::feed
-(const std::uint8_t *data, std::size_t len) {
+std::vector<Message> MessageCodec::WireStreamParser::feed(const std::uint8_t *data, std::size_t len)
+{
     if (len == 0)
         return {};
 
-    if (m_buffer.size() + len > kMaxBuffer) {
+    if (m_buffer.size() + static_cast<int>(len) > static_cast<int>(kMaxBuffer)) {
         spdlog::warn("[MessageCodec] receive buffer overflow, resetting");
         m_buffer.clear();
     }
 
-    m_buffer.append(reinterpret_cast<const char *>(data), static_cast<std::size_t>(len));
+    m_buffer.append(reinterpret_cast<const char *>(data), static_cast<int>(len));
     return extractAll();
 }
 
-std::vector<MessageCodec::ParsedPacket> 
-MessageCodec::WireStreamParser::extractAll() {
-    std::vector<ParsedPacket> packets;
+std::vector<Message> MessageCodec::WireStreamParser::extractAll()
+{
+    std::vector<Message> packets;
 
     for (;;) {
         if (static_cast<std::size_t>(m_buffer.size()) < MSG_HEADER)
             break;
 
-        const auto *raw = 
-            reinterpret_cast<const std::uint8_t *>(m_buffer.constData());
+        const auto *raw = reinterpret_cast<const std::uint8_t *>(m_buffer.constData());
         const std::uint32_t nBody = qFromBigEndian<std::uint32_t>(raw + 7);
-        const std::size_t packetSize = 
-            static_cast<std::size_t>(nBody) + 1 + MSG_HEADER;
+        const std::size_t packetSize = static_cast<std::size_t>(nBody) + 1 + MSG_HEADER;
 
         if (static_cast<std::size_t>(m_buffer.size()) < packetSize)
             break;
@@ -463,10 +359,8 @@ MessageCodec::WireStreamParser::extractAll() {
 
         const std::uint16_t rawKind = qFromBigEndian<std::uint16_t>(raw + 1);
         const MSG_TYPE msgtype = static_cast<MSG_TYPE>(rawKind);
-        if (auto packet = decodeWirePacket(raw, nBody, msgtype)) {
-            if (packet->msg)
-                packets.push_back(*packet);
-        }
+        if (auto packet = decodeWirePacket(raw, nBody, msgtype))
+            packets.push_back(*packet);
 
         m_buffer.remove(0, static_cast<int>(packetSize));
     }

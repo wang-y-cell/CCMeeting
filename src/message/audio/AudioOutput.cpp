@@ -1,12 +1,10 @@
 #include "AudioOutput.h"
 #include "audiocommon.h"
+#include "network/messagehub.h"
 #include <mutex>
 #include <spdlog/spdlog.h>
-#include "netheader.h"
 #include <QHostAddress>
 #include <QThread>
-
-extern QUEUE_DATA<MESG> audio_recv;
 
 AudioOutput::AudioOutput(QObject *parent)
 	: QThread(parent)
@@ -33,61 +31,40 @@ AudioOutput::~AudioOutput()
 	audio = nullptr;
 }
 
+void AudioOutput::setMessageHub(MessageHub *hub)
+{
+	m_hub = hub;
+}
+
 QString AudioOutput::errorString()
 {
 	if (!audio)
 		return QStringLiteral("AudioOutput not initialized");
 	if (audio->error() == QAudio::OpenError)
-	{
 		return QString("AudioOutput An error occurred opening the audio device").toUtf8();
-	}
-	else if (audio->error() == QAudio::IOError)
-	{
+	if (audio->error() == QAudio::IOError)
 		return QString("AudioOutput An error occurred during read/write of audio device").toUtf8();
-	}
-	else if (audio->error() == QAudio::UnderrunError)
-	{
+	if (audio->error() == QAudio::UnderrunError)
 		return QString("AudioOutput Audio data is not being fed to the audio device at a fast enough rate").toUtf8();
-	}
-	else if (audio->error() == QAudio::FatalError)
-	{
+	if (audio->error() == QAudio::FatalError)
 		return QString("AudioOutput A non-recoverable error has occurred, the audio device is not usable at this time.");
-	}
-	else
-	{
-		return QString("AudioOutput No errors have occurred").toUtf8();
-	}
+	return QString("AudioOutput No errors have occurred").toUtf8();
 }
 
 void AudioOutput::handleStateChanged(QAudio::State state)
 {
 	if (!audio)
 		return;
-	switch (state)
-	{
-		case QAudio::ActiveState:
-			break;
-		case QAudio::SuspendedState:
-			break;
-		case QAudio::StoppedState:
-			if (audio->error() != QAudio::NoError)
-			{
-				audio->stop();
-				emit audiooutputerror(errorString());
-				spdlog::error("[AudioOutput] audio sink error: {}", static_cast<int>(audio->error()));
-			}
-			break;
-		case QAudio::IdleState:
-			break;
-		default:
-			break;
+	if (state == QAudio::StoppedState && audio->error() != QAudio::NoError) {
+		audio->stop();
+		emit audiooutputerror(errorString());
+		spdlog::error("[AudioOutput] audio sink error: {}", static_cast<int>(audio->error()));
 	}
 }
 
 void AudioOutput::startPlay()
 {
-	if (!audio)
-	{
+	if (!audio) {
 		spdlog::error("[AudioOutput] startPlay: audio sink not constructed");
 		return;
 	}
@@ -95,9 +72,7 @@ void AudioOutput::startPlay()
 	spdlog::info("[AudioOutput] start playing audio");
 	outputdevice = audio->start();
 	if (outputdevice)
-	{
 		spdlog::debug("[AudioOutput] output device started");
-	}
 }
 
 void AudioOutput::stopPlay()
@@ -119,29 +94,33 @@ void AudioOutput::run()
 	QByteArray m_pcmDataBuffer;
 	const int bpf = m_format.bytesPerFrame();
 	const int bytesPerSec = m_format.sampleRate() * bpf;
-	// 125ms 块；对齐到整帧，避免立体声/非整数采样时出现相位错乱杂音
 	const int frame125ms = qMax(bpf, bytesPerSec * 125 / 1000);
 	spdlog::info("[AudioOutput] PCM 播放参数 sampleRate={} ch={} format={} writeChunk125ms={}",
 				 m_format.sampleRate(), m_format.channelCount(), static_cast<int>(m_format.sampleFormat()), frame125ms);
 
 	spdlog::info("[AudioOutput] start playing audio thread {}", reinterpret_cast<quintptr>(QThread::currentThreadId()));
-	for (;;)
-	{
+	for (;;) {
 		{
 			std::lock_guard<std::mutex> lock(m_lock);
-			if (is_canRun == false)
-			{
+			if (is_canRun == false) {
 				stopPlay();
 				spdlog::info("[AudioOutput] stop playing audio thread {}", reinterpret_cast<quintptr>(QThread::currentThreadId()));
 				return;
 			}
 		}
-		MESG* msg = audio_recv.pop_msg();
-		if (msg == NULL) continue;
+
+		if (!m_hub)
+			continue;
+
+		auto msgOpt = m_hub->popRecvAudio();
+		if (!msgOpt)
+			continue;
+
+		Message msg = std::move(*msgOpt);
 		{
 			std::lock_guard<std::mutex> lock(device_lock);
 			if (outputdevice != nullptr) {
-				QByteArray pcm(reinterpret_cast<const char *>(msg->data), static_cast<int>(msg->len));
+				QByteArray pcm = msg.audio;
 				const AudioFormatStd::Spec wireSpec = standard();
 				const bool sameLayout = wireSpec.sampleFormat == m_format.sampleFormat()
 					&& AudioFormatStd::bytesPerSampleForFormat(wireSpec.sampleFormat) == m_format.bytesPerSample();
@@ -156,44 +135,36 @@ void AudioOutput::run()
 						pcm = forSink;
 					else {
 						spdlog::warn("[AudioOutput] 声道转换失败，丢弃本包");
-						if (msg->data)
-							free(msg->data);
-						free(msg);
 						continue;
 					}
-				} else if (!sameLayout && wireSpec.channelCount != m_format.channelCount()) {
-					spdlog::warn("[AudioOutput] 线路与播放样本格式不一致，无法做声道变换，按原始缓冲写入（可能异常）");
 				}
 				m_pcmDataBuffer.append(pcm);
 
-				if (m_pcmDataBuffer.size() >= frame125ms) { // 累积约 125ms 再写入，降低 underrun 爆音
+				if (m_pcmDataBuffer.size() >= frame125ms) {
 					const std::int64_t ret = outputdevice->write(m_pcmDataBuffer.data(), frame125ms);
 					if (ret < 0) {
 						spdlog::error("[AudioOutput] write failed: {}", outputdevice->errorString().toStdString());
 						return;
-					} else {
-						emit speaker(QHostAddress(msg->ip).toString());
-						m_pcmDataBuffer = m_pcmDataBuffer.right(m_pcmDataBuffer.size() - static_cast<int>(ret));
 					}
+					emit speaker(QHostAddress(msg.ip).toString());
+					m_pcmDataBuffer = m_pcmDataBuffer.right(m_pcmDataBuffer.size() - static_cast<int>(ret));
 				}
 			} else {
-				spdlog::error("[AudioOutput] output device not started");
 				m_pcmDataBuffer.clear();
 			}
 		}
-		if (msg->data) free(msg->data);
-		if (msg) free(msg);
 	}
 }
+
 void AudioOutput::stopImmediately()
 {
 	{
 		std::lock_guard<std::mutex> lock(m_lock);
 		is_canRun = false;
 	}
-	audio_recv.wakeAll();
+	if (m_hub)
+		m_hub->wakeRecvAudio();
 }
-
 
 void AudioOutput::setVolumn(int val)
 {
@@ -204,6 +175,5 @@ void AudioOutput::setVolumn(int val)
 
 void AudioOutput::clearQueue()
 {
-	spdlog::debug("[AudioOutput] audio_recv queue cleared");
-	audio_recv.clear();
+	spdlog::debug("[AudioOutput] audio recv queue cleared");
 }

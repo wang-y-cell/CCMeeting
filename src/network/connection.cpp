@@ -1,5 +1,5 @@
 #include "connection.h"
-#include "messagecodec.h"
+#include "messagehub.h"
 #include <QHostAddress>
 #include <QMessageBox>
 #include <QMetaObject>
@@ -8,14 +8,9 @@
 #include <climits>
 #include <spdlog/spdlog.h>
 
-extern QUEUE_DATA<MESG> queue_send;
-extern QUEUE_DATA<MESG> queue_recv;
-extern QUEUE_DATA<MESG> audio_recv;
-
 Connection::Connection(QObject *parent)
     : QObject(parent)
 {
-    qRegisterMetaType<MESG *>("MESG*");
     qRegisterMetaType<QAbstractSocket::SocketError>();
 
     moveToThread(&m_ioThread);
@@ -28,6 +23,11 @@ Connection::~Connection()
     disconnectFromHost();
     m_ioThread.quit();
     m_ioThread.wait(3000);
+}
+
+void Connection::setMessageHub(MessageHub *hub)
+{
+    m_hub = hub;
 }
 
 bool Connection::connectToServer(const QString &ip, const QString &port)
@@ -46,7 +46,7 @@ bool Connection::connectToServer(const QString &ip, const QString &port)
     }
 
     if (ok)
-        startSendThread();
+        emit connected();
     return ok;
 }
 
@@ -78,68 +78,20 @@ bool Connection::connectOnIoThread(const QString &ip, const QString &port)
     return true;
 }
 
-void Connection::startSendThread() {
-    if (m_sendThread && m_sendThread->isRunning()) return;
-    {
-        std::lock_guard<std::mutex> lock(m_sendMutex);
-        m_sendRunning = true;
+bool Connection::sendWireData(const QByteArray &frame)
+{
+    if (QThread::currentThread() != thread()) {
+        bool ok = false;
+        const bool invoked = QMetaObject::invokeMethod(
+            this, "sendWireData", Qt::BlockingQueuedConnection,
+            Q_RETURN_ARG(bool, ok), Q_ARG(QByteArray, frame));
+        return invoked && ok;
     }
 
-    m_sendThread = QThread::create([this]() { sendLoop(); });
-    m_sendThread->start();
-    spdlog::info("[Connection] 发送线程启动 tid={}",
-                 reinterpret_cast<quintptr>(m_sendThread->currentThreadId()));
-}
-
-void Connection::stopSendThread()
-{
-    {
-        std::lock_guard<std::mutex> lock(m_sendMutex);
-        m_sendRunning = false;
-    }
-    queue_send.wakeAll();
-
-    if (!m_sendThread)
-        return;
-
-    m_sendThread->wait(3000);
-    delete m_sendThread;
-    m_sendThread = nullptr;
-}
-
-void Connection::sendLoop()
-{
-    for (;;) {
-        {
-            std::lock_guard<std::mutex> lock(m_sendMutex);
-            if (!m_sendRunning)
-                return;
-        }
-
-        MESG *msg = queue_send.pop_msg();
-        if (!msg)
-            continue;
-
-        spdlog::info("[Connection] 从 queue_send 取出待发消息 type={}",
-                     static_cast<int>(msg->msg_type));
-        QMetaObject::invokeMethod(this, "sendMessage", Qt::BlockingQueuedConnection,
-                                  Q_ARG(MESG *, msg));
-    }
-}
-
-void Connection::sendMessage(MESG *msg)
-{
-    if (!msg)return;
     if (m_socket == nullptr || m_socket->state() == QAbstractSocket::UnconnectedState) {
         spdlog::info("[Connection] socket 未连接, 发送失败");
-        if (msg->msg_type == TEXT_SEND)
-            emit sendTextOver();
-        releaseMessage(msg);
-        return;
+        return false;
     }
-
-    const std::uint32_t localIp = m_socket->localAddress().toIPv4Address();
-    const QByteArray frame = MessageCodec::encodeWireFrame(msg, localIp);
 
     std::int64_t remaining = frame.size();
     std::int64_t written = 0;
@@ -151,7 +103,7 @@ void Connection::sendMessage(MESG *msg)
             if (m_socket->error() == QAbstractSocket::TemporaryError)
                 continue;
             spdlog::error("[Connection] 网络写入失败");
-            break;
+            return false;
         }
         if (ret == 0)
             break;
@@ -159,16 +111,12 @@ void Connection::sendMessage(MESG *msg)
     }
 
     m_socket->waitForBytesWritten();
-
-    if (msg->msg_type == TEXT_SEND)
-        emit sendTextOver();
-
-    releaseMessage(msg);
+    return true;
 }
 
 void Connection::onReadyRead()
 {
-    if (m_socket == nullptr)
+    if (m_socket == nullptr || m_hub == nullptr)
         return;
 
     const QByteArray chunk = m_socket->readAll();
@@ -178,31 +126,24 @@ void Connection::onReadyRead()
     spdlog::info("[Connection] 收到服务端数据 bytes={}", chunk.size());
     const auto packets = m_parser.feed(reinterpret_cast<const std::uint8_t *>(chunk.constData()),
                                        static_cast<std::size_t>(chunk.size()));
-    for (const auto &packet : packets) {
-        if (!packet.msg)
-            continue;
-        if (packet.queue == MessageCodec::PacketQueue::Audio)
-            audio_recv.push_msg(packet.msg);
-        else
-            queue_recv.push_msg(packet.msg);
-    }
+    for (const auto &packet : packets)
+        m_hub->routeIncoming(packet);
 }
 
 void Connection::onSocketError(QAbstractSocket::SocketError error)
 {
+    if (!m_hub)
+        return;
+
     spdlog::error("[Connection] socket 错误 code={} tid={}",
                   static_cast<int>(error),
                   reinterpret_cast<quintptr>(QThread::currentThreadId()));
 
-    const MSG_TYPE type = (error == QAbstractSocket::RemoteHostClosedError)
-        ? RemoteHostClosedError
-        : OtherNetError;
-    MESG *msg = MessageCodec::encodeNetworkError(type);
-    if (msg == nullptr) {
-        spdlog::error("[Connection] 分配网络错误 MESG 失败");
-        return;
-    }
-    queue_recv.push_msg(msg);
+    Message msg;
+    msg.kind = (error == QAbstractSocket::RemoteHostClosedError)
+        ? Message::Kind::RemoteHostClosedError
+        : Message::Kind::OtherNetError;
+    m_hub->routeIncoming(std::move(msg));
 }
 
 void Connection::destroySocket()
@@ -216,38 +157,24 @@ void Connection::destroySocket()
     m_socket = nullptr;
 }
 
-void Connection::releaseMessage(MESG *msg)
-{
-    if (!msg)
-        return;
-    if (msg->data)
-        free(msg->data);
-    free(msg);
-}
-
 void Connection::stopImmediately()
 {
-    stopSendThread();
-    if (m_ioThread.isRunning()) {
+    if (m_ioThread.isRunning())
         QMetaObject::invokeMethod(this, "destroySocket", Qt::BlockingQueuedConnection);
-    }
 }
 
-void Connection::disconnectFromHost() {
+void Connection::disconnectFromHost()
+{
     m_hasLocalIp = false;
     m_localIp = 0;
 
-    stopSendThread();
-
-    if (m_ioThread.isRunning()) {
+    if (m_ioThread.isRunning())
         QMetaObject::invokeMethod(this, "destroySocket", Qt::BlockingQueuedConnection);
-    }
 
-    queue_send.clear();
-    queue_recv.clear();
-    queue_recv.wakeAll();
-    audio_recv.clear();
-    audio_recv.wakeAll();
+    if (m_hub)
+        m_hub->clearAll();
+
+    emit disconnected();
 }
 
 QString Connection::errorString() const

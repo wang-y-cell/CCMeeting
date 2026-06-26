@@ -5,15 +5,12 @@
 #include <QTcpSocket>
 #include <QThread>
 #include <cstdint>
-#include <mutex>
 #include "messagecodec.h"
-#include "netheader.h"
 
 class QWidget;
+class MessageHub;
 
-/** 
- *@brief 连接类,用于连接服务器,并开启读取数据线程
- */
+/** TCP 连接：在 IO 线程读写 socket，收到消息后交给 MessageHub 分类入队。 */
 class Connection : public QObject {
     Q_OBJECT
 
@@ -21,82 +18,36 @@ public:
     explicit Connection(QObject *parent = nullptr);
     ~Connection();
 
-    /**
-    *@brief 连接服务器,并开启读取数据线程 
-    *@param ip 服务器IP地址
-    *@param port 服务器端口号
-    *@return 是否连接成功
-    */
+    void setMessageHub(MessageHub *hub);
+
     bool connectToServer(const QString &ip, const QString &port);
-    /**
-    *@brief 断开与服务器的连接
-    */
     void disconnectFromHost();
-    /**
-    *@brief 立即停止连接
-    */
     void stopImmediately();
 
-    /**
-    *@brief 获取错误信息
-    *@return 错误信息
-    */
     QString errorString() const;
-    /**
-    *@brief 获取本地IP地址
-    *@return 本地IP地址
-    */
     std::uint32_t localIp() const;
 
-    /**
-    *@brief 验证IP地址和端口号是否有效
-    *@param parent 父窗口
-    *@param ip IP地址
-    *@param port 端口号
-    *@return 是否有效
-    */
     static bool validateIpPort(QWidget *parent, const QString &ip, const QString &port);
 
 signals:
-    /**
-    *@brief 发送文本完成,结束发送动画
-    */
-    void sendTextOver();
+    void connected();
+    void disconnected();
 
 private slots:
     bool connectOnIoThread(const QString &ip, const QString &port);
-    void sendMessage(MESG *msg);
+    bool sendWireData(const QByteArray &frame);
     void onReadyRead();
     void onSocketError(QAbstractSocket::SocketError error);
     void destroySocket();
 
 private:
-    void startSendThread();
-    void stopSendThread();
-    void sendLoop();
-    void releaseMessage(MESG *msg);
-
-    /*io线程*/
+    MessageHub *m_hub = nullptr;
     QThread m_ioThread;
-    /*发送线程*/
-    QThread *m_sendThread = nullptr;
-    /*socket*/
     QTcpSocket *m_socket = nullptr;
-    /*解析器*/
-
-    /*解析器*/
     MessageCodec::WireStreamParser m_parser;
 
-    /*发送互斥锁*/
-    std::mutex m_sendMutex;
-    /*发送线程是否运行*/
-    bool m_sendRunning = false;
-    /*最后错误信息*/
-
     QString m_lastError;
-    /*本地IP地址*/
     std::uint32_t m_localIp = 0;
-    /*是否有本地IP地址*/
     bool m_hasLocalIp = false;
 };
 

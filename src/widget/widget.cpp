@@ -2,8 +2,9 @@
 #include "ui_widget.h"
 #include "screen.h"
 #include <spdlog/spdlog.h>
-#include "configure.h"
-#include "messagecodec.h"
+#include "configure/configure.h"
+#include "network/message.h"
+#include "network/netheader.h"
 #include <QString>
 #include <QCamera>
 #include <QMediaDevices>
@@ -30,7 +31,7 @@ QRect  Widget::pos = QRect(-1, -1, -1, -1);
 Widget::Widget(QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::Widget) {
-    qRegisterMetaType<MSG_TYPE>();
+    qRegisterMetaType<Message>("Message");
     spdlog::info("[Widget] -------------------------Application Start---------------------------");
     spdlog::info("[Widget] main UI thread id: {}", reinterpret_cast<quintptr>(QThread::currentThreadId()));
     _createmeet = false;
@@ -115,13 +116,18 @@ void Widget::initUI() {
 
 void Widget::initPermanentWorkers() {
     _network = new NetworkManager(this);
-    connect(_network, &NetworkManager::packetReceived, this, &Widget::datasolve, Qt::QueuedConnection);
+    connect(_network, &NetworkManager::requestMessageReady, this, &Widget::onRequestMessage, Qt::QueuedConnection);
+    connect(_network, &NetworkManager::userInfoMessageReady, this, &Widget::onUserInfoMessage, Qt::QueuedConnection);
+    connect(_network, &NetworkManager::textMessageReady, this, &Widget::onTextMessage, Qt::QueuedConnection);
+    connect(_network, &NetworkManager::videoMessageReady, this, &Widget::onVideoMessage, Qt::QueuedConnection);
     connect(_network, &NetworkManager::sendTextFinished, this, &Widget::textSend);
 
     _ainput = new AudioInput();
+    _ainput->setMessageHub(_network->messageHub());
     _ainputThread = new QThread();
     _ainput->moveToThread(_ainputThread);
     _aoutput = new AudioOutput(this);
+    _aoutput->setMessageHub(_network->messageHub());
     _ainputThread->start();
     _aoutput->start();
 
@@ -300,12 +306,9 @@ void Widget::audioError(QString err) {
 
 
 
-void Widget::handleCreateMeetingResponse(MESG *msg) {
-    int roomno = 0;
-    if (msg->data != nullptr && msg->len >= static_cast<long>(sizeof(int))) {
-        memcpy(&roomno, msg->data, sizeof(int));
-    }
-    spdlog::info("[Widget] CREATE_MEETING_RESPONSE roomno: {} len: {}", roomno, msg->len);
+void Widget::handleCreateMeetingResponse(const Message &msg) {
+    const int roomno = static_cast<int>(msg.roomNo);
+    spdlog::info("[Widget] CREATE_MEETING_RESPONSE roomno: {}", roomno);
 
     if (roomno != 0) {
         QMessageBox::information(this, "Room No", QString("房间号：%1").arg(roomno), QMessageBox::Yes, QMessageBox::Yes);
@@ -334,10 +337,9 @@ void Widget::handleCreateMeetingResponse(MESG *msg) {
     }
 }
 
-void Widget::handleJoinMeetingResponse(MESG *msg) {
+void Widget::handleJoinMeetingResponse(const Message &msg) {
     spdlog::info("[Widget] JOIN_MEETING_RESPONSE消息类型");
-    std::int32_t c;
-    memcpy(&c, msg->data, msg->len);
+    const std::int32_t c = msg.responseCode;
     if (c == 0) {
         QMessageBox::information(this, "Meeting Error", tr("会议不存在"), QMessageBox::Yes, QMessageBox::Yes);
         ui->outlog->setText(QString("会议不存在"));
@@ -367,65 +369,59 @@ void Widget::handleJoinMeetingResponse(MESG *msg) {
     }
 }
 
-void Widget::handleImgRecv(MESG *msg) {
-    QHostAddress a(msg->ip);
+void Widget::handleImgRecv(const Message &msg) {
+    QHostAddress a(msg.ip);
     spdlog::debug("[Widget] IMG_RECV from {}", a.toString().toStdString());
-    const QImage img = MessageCodec::decodeImageMessage(msg);
-    if (partner.find(msg->ip) == partner.end())
-        addPartner(msg->ip);
+    if (partner.find(msg.ip) == partner.end())
+        addPartner(msg.ip);
 
-    _cameraVideo->showImageForIp(msg->ip, img);
+    _cameraVideo->showImageForIp(msg.ip, msg.image);
     repaint();
 }
 
-void Widget::handleTextRecv(MESG *msg) {
-    const std::string text = MessageCodec::decodeTextMessage(msg);
-    const QString str = QString::fromUtf8(text.c_str(), static_cast<int>(text.size()));
+void Widget::handleTextRecv(const Message &msg) {
+    const QString str = QString::fromUtf8(msg.text.c_str(), static_cast<int>(msg.text.size()));
     QString time = QString::number(QDateTime::currentDateTimeUtc().toSecsSinceEpoch());
     ChatMessage *message = new ChatMessage(ui->listWidget);
     QListWidgetItem *item = new QListWidgetItem();
     dealMessageTime(time);
-    dealMessage(message, item, str, time, QHostAddress(msg->ip).toString(), ChatMessage::User_She);
+    dealMessage(message, item, str, time, QHostAddress(msg.ip).toString(), ChatMessage::User_She);
     if (str.contains('@' + QHostAddress(_network ? _network->localIp() : 0).toString())) {
         _soundEffect->play();
     }
 }
 
-void Widget::handlePartnerJoin(MESG *msg) {
-    Partner *p = addPartner(msg->ip);
+void Widget::handlePartnerJoin(const Message &msg) {
+    Partner *p = addPartner(msg.ip);
     if (p) {
-        _cameraVideo->showAvatarForIp(msg->ip);
-        ui->outlog->setText(QString("%1 join meeting").arg(QHostAddress(msg->ip).toString()));
-        iplist.push_back(QString("@") + QHostAddress(msg->ip).toString());
+        _cameraVideo->showAvatarForIp(msg.ip);
+        ui->outlog->setText(QString("%1 join meeting").arg(QHostAddress(msg.ip).toString()));
+        iplist.push_back(QString("@") + QHostAddress(msg.ip).toString());
         ui->plainTextEdit->setCompleter(iplist);
     }
 }
 
-void Widget::handlePartnerExit(MESG *msg) {
-    removePartner(msg->ip);
-    if (mainip == msg->ip)
+void Widget::handlePartnerExit(const Message &msg) {
+    removePartner(msg.ip);
+    if (mainip == msg.ip)
         _cameraVideo->showMainAvatar();
-    const QString atTag = QString("@") + QHostAddress(msg->ip).toString();
+    const QString atTag = QString("@") + QHostAddress(msg.ip).toString();
     const auto it = std::find(iplist.begin(), iplist.end(), atTag);
     if (it != iplist.end()) {
         iplist.erase(it);
         ui->plainTextEdit->setCompleter(iplist);
     } else {
-        spdlog::warn("[Widget] iplist remove failed, ip={}", QHostAddress(msg->ip).toString().toStdString());
+        spdlog::warn("[Widget] iplist remove failed, ip={}", QHostAddress(msg.ip).toString().toStdString());
     }
-    ui->outlog->setText(QString("%1 exit meeting").arg(QHostAddress(msg->ip).toString()));
+    ui->outlog->setText(QString("%1 exit meeting").arg(QHostAddress(msg.ip).toString()));
 }
 
-void Widget::handleCloseCamera(MESG *msg) {
-    closeImg(msg->ip);
+void Widget::handleCloseCamera(const Message &msg) {
+    closeImg(msg.ip);
 }
 
-void Widget::handlePartnerJoin2(MESG *msg) {
-    uint32_t ip;
-    int other = msg->len / sizeof(uint32_t), pos = 0;
-    for (int i = 0; i < other; i++) {
-        memcpy_s(&ip, sizeof(uint32_t), msg->data + pos, sizeof(uint32_t));
-        pos += sizeof(uint32_t);
+void Widget::handlePartnerJoin2(const Message &msg) {
+    for (const std::uint32_t ip : msg.partnerIps) {
         Partner *p = addPartner(ip);
         if (p) {
             _cameraVideo->showAvatarForIp(ip);
@@ -453,54 +449,53 @@ void Widget::handleOtherNetError()
         QMessageBox::warning(this, "Network Error", "网络异常", QMessageBox::Yes, QMessageBox::Yes);
 }
 
-void Widget::datasolve(MESG *msg) {
-    spdlog::info("[Widget::datasolve] 收到消息: msg_type = {} len = {}", static_cast<int>(msg->msg_type), msg->len);
-    switch (msg->msg_type) {
-    case CREATE_MEETING_RESPONSE:
+void Widget::onRequestMessage(Message msg) {
+    spdlog::info("[Widget] 请求/响应消息 kind={}", static_cast<int>(msg.kind));
+    switch (msg.kind) {
+    case Message::Kind::CreateMeetingResponse:
         handleCreateMeetingResponse(msg);
         break;
-    case JOIN_MEETING_RESPONSE:
+    case Message::Kind::JoinMeetingResponse:
         handleJoinMeetingResponse(msg);
         break;
-    case IMG_RECV:
-        handleImgRecv(msg);
-        break;
-    case TEXT_RECV:
-        handleTextRecv(msg);
-        break;
-    case PARTNER_JOIN:
-        handlePartnerJoin(msg);
-        break;
-    case PARTNER_EXIT:
-        handlePartnerExit(msg);
-        break;
-    case CLOSE_CAMERA:
-        handleCloseCamera(msg);
-        break;
-    case PARTNER_JOIN2:
-        handlePartnerJoin2(msg);
-        break;
-    case RemoteHostClosedError:
+    case Message::Kind::RemoteHostClosedError:
         handleRemoteHostClosedError();
         break;
-    case OtherNetError:
+    case Message::Kind::OtherNetError:
         handleOtherNetError();
         break;
     default:
         break;
     }
-    if (msg->data) {
-        free(msg->data);
-        msg->data = NULL;
-    }
-    if (msg) {
-        free(msg);
-        msg = NULL;
+}
+
+void Widget::onUserInfoMessage(Message msg) {
+    spdlog::info("[Widget] 用户信息消息 kind={}", static_cast<int>(msg.kind));
+    switch (msg.kind) {
+    case Message::Kind::PartnerJoin:
+        handlePartnerJoin(msg);
+        break;
+    case Message::Kind::PartnerExit:
+        handlePartnerExit(msg);
+        break;
+    case Message::Kind::CloseCameraNotify:
+        handleCloseCamera(msg);
+        break;
+    case Message::Kind::PartnerJoin2:
+        handlePartnerJoin2(msg);
+        break;
+    default:
+        break;
     }
 }
 
+void Widget::onTextMessage(Message msg) {
+    handleTextRecv(msg);
+}
 
-
+void Widget::onVideoMessage(Message msg) {
+    handleImgRecv(msg);
+}
 
 Partner* Widget::addPartner(std::uint32_t ip)
 {

@@ -6,9 +6,9 @@
 #include <QVideoFrame>
 #include <QCamera>
 #include <QMediaCaptureSession>
-#include "network/partner.h"
-#include "network/netheader.h"
 #include "network/networkmanager.h"
+#include "network/message.h"
+#include "network/partner.h"
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
@@ -61,14 +61,14 @@ private:
     void dealMessage(ChatMessage *messageW, QListWidgetItem *item, QString text, QString time, QString ip ,ChatMessage::User_Type type); //用户发送文本
     void dealMessageTime(QString curMsgTime); //处理时间
     void relayoutChatMessages();
-    void handleCreateMeetingResponse(MESG *msg);//创建会议响应
-    void handleJoinMeetingResponse(MESG *msg);//加入会议响应
-    void handleImgRecv(MESG *msg);//图像接收
-    void handleTextRecv(MESG *msg);//文本接收
-    void handlePartnerJoin(MESG *msg);//人员加入
-    void handlePartnerExit(MESG *msg);//人员退出
-    void handleCloseCamera(MESG *msg);//关闭摄像头
-    void handlePartnerJoin2(MESG *msg);//人员加入2
+    void handleCreateMeetingResponse(const Message &msg);
+    void handleJoinMeetingResponse(const Message &msg);
+    void handleImgRecv(const Message &msg);
+    void handleTextRecv(const Message &msg);
+    void handlePartnerJoin(const Message &msg);
+    void handlePartnerExit(const Message &msg);
+    void handleCloseCamera(const Message &msg);
+    void handlePartnerJoin2(const Message &msg);
     void handleRemoteHostClosedError();//远程主机关闭错误
     void handleOtherNetError();//其他网络错误
 
@@ -89,7 +89,10 @@ public slots:
 private slots:
     void on_horizontalSlider_valueChanged(int value); //音量改变
     void audioError(QString); //音频错误处理
-    void datasolve(MESG *); //数据处理
+    void onRequestMessage(Message msg);
+    void onUserInfoMessage(Message msg);
+    void onTextMessage(Message msg);
+    void onVideoMessage(Message msg);
     void recvip(std::uint32_t); //接收IP
     void onLocalFrameCaptured(const QImage &image);
     void speaks(QString); //说话
