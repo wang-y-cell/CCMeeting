@@ -67,16 +67,14 @@ std::optional<Message> MessageQueue::pop(int waitMs)
     return msg;
 }
 
-void MessageQueue::clear()
-{
+void MessageQueue::clear() {
     std::lock_guard<std::mutex> lock(m_mutex);
     while (!m_queue.empty())
         m_queue.pop();
 }
 
-void MessageQueue::wakeAll()
-{
-    m_cond.notify_all();
+void MessageQueue::wakeAll() {
+    m_cond.notify_all(); //唤醒所有被条件变量阻塞的线程
 }
 
 void MessageQueue::clearVideo()

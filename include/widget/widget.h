@@ -47,7 +47,7 @@ private:
     int m_lastChatListWidth = -1;
     bool m_inChatRelayout = false;
     CameraVideo *_cameraVideo; //统一处理图像/视频显示
-
+private:
     void initUI(); //初始化UI
     void paintEvent(QPaintEvent *event) override;
     void initPermanentWorkers();//初始化永久工作线程

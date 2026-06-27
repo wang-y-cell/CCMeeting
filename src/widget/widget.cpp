@@ -170,7 +170,7 @@ void Widget::resetMeetingUi() {
 }
 
 void Widget::endMeetingSession() {
-    spdlog::debug("[Widget] 结束会议会话");
+    spdlog::info("[Widget] 结束会议会话");
     _cameraVideo->endVideo();
 
     _createmeet = false;
@@ -186,7 +186,7 @@ void Widget::endMeetingSession() {
 }
 
 void Widget::shutdownAllWorkers() {
-    spdlog::debug("[Widget] 关闭所有工作线程");
+    spdlog::info("[Widget] 关闭所有工作线程");
     if (_network)
         disconnect(_network, nullptr, this, nullptr);
 
@@ -252,8 +252,7 @@ void Widget::on_openAudio_clicked() {
         emit startAudio();
         ui->openAudio->setText(QString(CLOSEAUDIO).toUtf8());
     }
-    else if(ui->openAudio->text().toUtf8() == QString(CLOSEAUDIO).toUtf8())
-    {
+    else if(ui->openAudio->text().toUtf8() == QString(CLOSEAUDIO).toUtf8()) {
         emit stopAudio();
         ui->openAudio->setText(QString(OPENAUDIO).toUtf8());
     }
@@ -554,9 +553,9 @@ void Widget::removePartner(std::uint32_t ip)
 
 
 
-void Widget::clearPartner()
-{
+void Widget::clearPartner() {
     //m_videoImg.clear();
+    spdlog::info("[Widget] 清空房间人数");
     if(partner.size() == 0) return;
 
     _cameraVideo->clearAllPartnerDisplays();

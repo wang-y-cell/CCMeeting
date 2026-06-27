@@ -58,8 +58,24 @@ struct Message {
     std::int32_t responseCode = 0;
     std::vector<std::uint32_t> partnerIps;
 
+    /**
+    根据消息类型获取通道
+    @param kind 消息类型
+    @return 通道
+    */
     static Channel channelFor(Kind kind);
+    /**
+    根据消息类型获取发送通道
+    @param kind 消息类型
+    @return 发送通道
+    */
     static Channel sendChannelFor(Kind kind);
+    /**
+    根据消息类型获取接收通道
+    @param kind 消息类型
+    @return 接收通道
+    */
+    static Channel recvChannelFor(Kind kind);
 };
 
 Q_DECLARE_METATYPE(Message)

@@ -115,14 +115,14 @@ void MessageHub::sendLoop(Message::Channel channel)
             continue;
         }
 
-        const std::uint32_t localIp = m_connection->localIp();
-        const QByteArray frame = MessageCodec::encodeWireFrame(*msg, localIp);
+        const std::uint32_t localIp = m_connection->localIp(); /*获取本地IP*/
+        const QByteArray frame = MessageCodec::encodeWireFrame(*msg, localIp); /*编码消息*/
         if (frame.isEmpty()) {
             spdlog::error("[MessageHub] 编码失败 kind={}", static_cast<int>(msg->kind));
             continue;
         }
 
-        const bool textKind = msg->kind == Message::Kind::SendText;
+        const bool textKind = msg->kind == Message::Kind::SendText; /*判断是否是文本消息*/
         bool ok = false;
         QMetaObject::invokeMethod(m_connection, "sendWireData", Qt::BlockingQueuedConnection,
                                   Q_RETURN_ARG(bool, ok), Q_ARG(QByteArray, frame));
@@ -135,14 +135,16 @@ void MessageHub::sendLoop(Message::Channel channel)
 
 void MessageHub::recvLoop(Message::Channel channel)
 {
+    /*获得对应的接收队列*/
     auto &queue = recvQueueFor(channel);
     spdlog::info("[MessageHub] 接收分发线程启动 channel={} tid={}",
                  static_cast<int>(channel),
                  reinterpret_cast<quintptr>(QThread::currentThreadId()));
 
+    /*循环接收消息*/
     while (m_recvRunning.load()) {
         auto msg = queue.pop();
-        if (!msg)
+        if (!msg) /*pop超时返回空，则继续循环*/
             continue;
 
         spdlog::info("[MessageHub] 分发消息 kind={} channel={}",
@@ -203,11 +205,14 @@ void MessageHub::startRecvWorkers()
     m_recvVideoThread->start();
 }
 
-void MessageHub::stopSendWorkers()
-{
+void MessageHub::stopSendWorkers() {
+    /**设置发送运行状态为false,唤醒所有线程之后
+      退出循环
+    */
     if (!m_sendRunning.exchange(false))
         return;
 
+    /**唤醒所有被条件变量阻塞的线程*/
     m_sendRequest.wakeAll();
     m_sendText.wakeAll();
     m_sendVideo.wakeAll();
