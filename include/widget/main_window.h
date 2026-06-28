@@ -3,6 +3,7 @@
 
 #include <QWidget>
 #include "widget.h"
+#include "stack_create_meet.h"
 
 namespace Ui {
 class main_window;
@@ -19,15 +20,15 @@ public:
 
 private slots:
     void CreateMeeting_button_clicked(); //创建会议槽函数
-    void JoinMeeting_button_clicked(); //加入会议槽函数
-    void ConnectToServer_button_clicked(); //连接服务器槽函数
+    //void JoinMeeting_button_clicked(); //加入会议槽函数
+    //void ConnectToServer_button_clicked(); //连接服务器槽函数
 private:
     //Ui::main_window *ui;
     Widget *widget = nullptr; //视频会议窗口
 
-    Widget* create_meeting_widget = nullptr; //创建会议窗口
-    Widget* join_meeting_widget = nullptr; //加入会议窗口
-    Widget* connect_to_server_widget = nullptr; //连接服务器窗口
+    stack_create_meet* create_meeting_widget = nullptr; //创建会议窗口
+    QWidget* join_meeting_widget = nullptr; //加入会议窗口
+    QWidget* connect_to_server_widget = nullptr; //连接服务器窗口
 protected:
     QString ip = "127.0.0.1"; ///< 服务器IP
     QString port = "8888"; ///< 服务器端口

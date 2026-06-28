@@ -11,10 +11,12 @@ main_window::main_window(QWidget *parent)
 : QWidget(parent) {
     init_ui();
     widget = new Widget(nullptr);
+
     //widget->setWindowFlags(Qt::Window);
     widget->hide();
 
-    //connect(ui->CreateMeeting_button, &QPushButton::clicked, this, &main_window::CreateMeeting_button_clicked);
+    connect(create_meeting_widget, &stack_create_meet::createMeetingClicked,
+            this, &main_window::CreateMeeting_button_clicked);
     //connect(ui->JoinMeeting_button, &QPushButton::clicked, this, &main_window::JoinMeeting_button_clicked);
     //connect(ui->ConnectToServer_button, &QPushButton::clicked, this, &main_window::ConnectToServer_button_clicked);
 
@@ -33,6 +35,8 @@ void main_window::init_ui() {
     setMinimumSize(400, 300); //设置窗口最小大小
     QHBoxLayout *mainLayout = new QHBoxLayout(this);
     QListWidget* left_bar = new QListWidget(this); 
+    left_bar->setFrameShape(QListWidget::NoFrame);
+    left_bar->setFocusPolicy(Qt::NoFocus); 
     left_bar->setFixedWidth(200); //设置左侧菜单栏固定宽度
     left_bar->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
@@ -42,7 +46,7 @@ void main_window::init_ui() {
     /*设置左侧菜单栏按钮*/
     for(const auto& item : left_bar_items) {
         QListWidgetItem* listWidgetItem = new QListWidgetItem(item.c_str());
-        listWidgetItem->setSizeHint(QSize(0, 40));
+        listWidgetItem->setSizeHint(QSize(0, 50));
         listWidgetItem->setTextAlignment(Qt::AlignCenter);
         QFont font = listWidgetItem->font();
         font.setPointSize(16);
@@ -54,6 +58,11 @@ void main_window::init_ui() {
     QStackedWidget* stackedWidget = new QStackedWidget(this);
     mainLayout->addWidget(left_bar);
     mainLayout->addWidget(stackedWidget);
+
+    create_meeting_widget = new stack_create_meet(this);
+    stackedWidget->addWidget(create_meeting_widget);
+
+    connect(left_bar, &QListWidget::currentRowChanged, stackedWidget, &QStackedWidget::setCurrentIndex);
 }
 
 void main_window::CreateMeeting_button_clicked() {

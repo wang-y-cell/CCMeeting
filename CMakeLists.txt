@@ -56,6 +56,7 @@ target_include_directories(CloudMeeting PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/include/configure
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party/spdlog/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/message
     ${CMAKE_CURRENT_SOURCE_DIR}/include/message/audio 
     ${CMAKE_CURRENT_SOURCE_DIR}/include/message/video
     ${CMAKE_CURRENT_SOURCE_DIR}/include/message/text
