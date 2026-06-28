@@ -1,4 +1,5 @@
 #include "main_window.h"
+#include "stack_join_meet.h"
 #include <qnamespace.h>
 #include <spdlog/spdlog.h>
 #include <QMessageBox>
@@ -76,8 +77,13 @@ void main_window::init_ui() {
     mainLayout->addWidget(left_bar);
     mainLayout->addWidget(stackedWidget);
 
+    /*创建房间窗口*/
     create_meeting_widget = new stack_create_meet(this);
     stackedWidget->addWidget(create_meeting_widget);
+
+    /*加入房间窗口*/
+    join_meeting_widget = new stack_join_meet(this);
+    stackedWidget->addWidget(join_meeting_widget);
 
     connect(left_bar, &QListWidget::currentRowChanged, stackedWidget, &QStackedWidget::setCurrentIndex);
 }
