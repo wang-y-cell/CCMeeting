@@ -15,6 +15,7 @@ public:
     explicit login(QWidget *parent = nullptr);
     ~login();
     void Login();
+    void set_style();
 
 private:
     Ui::login *ui;

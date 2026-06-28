@@ -5,11 +5,13 @@
 #include <QListWidget>
 #include <QStackedWidget>
 #include <QHBoxLayout>
+#include <QFile>
 
 
 main_window::main_window(QWidget *parent)
 : QWidget(parent) {
     init_ui();
+    set_style();
     widget = new Widget(nullptr);
 
     //widget->setWindowFlags(Qt::Window);
@@ -22,6 +24,18 @@ main_window::main_window(QWidget *parent)
 
 }
 
+void main_window::set_style() {
+    QFile file(":/Style/source/main_window.qss");
+    if (file.open(QFile::ReadOnly)) {
+        spdlog::info("main_window.qss loaded");
+        QString styleSheet = file.readAll();
+        this->setStyleSheet(styleSheet);
+        file.close();
+    } else {
+        spdlog::warn("main_window.qss not found");
+    }
+}
+
 main_window::~main_window() {
     if (widget != nullptr) {
         delete widget;
@@ -32,9 +46,11 @@ main_window::~main_window() {
 
 void main_window::init_ui() {
     resize(800, 600); //设置窗口初始大小
-    setMinimumSize(400, 300); //设置窗口最小大小
+    setMinimumSize(600, 360); //设置窗口最小大小
+    setMaximumSize(1200, 720); //设置窗口最大大小
     QHBoxLayout *mainLayout = new QHBoxLayout(this);
     QListWidget* left_bar = new QListWidget(this); 
+    left_bar->setSpacing(10); //设置每个item之间间隔位10px
     left_bar->setFrameShape(QListWidget::NoFrame);
     left_bar->setFocusPolicy(Qt::NoFocus); 
     left_bar->setFixedWidth(200); //设置左侧菜单栏固定宽度
@@ -49,7 +65,8 @@ void main_window::init_ui() {
         listWidgetItem->setSizeHint(QSize(0, 50));
         listWidgetItem->setTextAlignment(Qt::AlignCenter);
         QFont font = listWidgetItem->font();
-        font.setPointSize(16);
+        font.setPointSize(10);
+        font.setWeight(QFont::Bold);
         listWidgetItem->setFont(font);
         left_bar->addItem(listWidgetItem);
     }

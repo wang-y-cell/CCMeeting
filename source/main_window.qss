@@ -1,0 +1,48 @@
+QWidget {
+    border-radius: 15px;
+}
+
+QListWidget {
+    background-color: #2E303D;
+    border: 0px;
+}
+
+QListWidget::item {
+    color: white;
+    border-radius: 15px;
+}
+
+QListWidget::item:hover {
+    background-color: #545D6E;
+}
+
+QListWidget::item:selected {
+    background-color: #214D81;
+    color: white;
+}
+
+QFrame#frame {
+    background-color: #2E303D;
+}
+
+QLabel {
+    background-color: #2E303D;
+}
+
+QPushButton {
+    background-color: #214D81;
+    color: white;
+}
+
+QPushButton:hover {
+    background-color: #545D6E;
+}
+
+QLineEdit {
+    border: 1px solid #214D81;
+    border-radius: 5px;
+}
+
+QLineEdit:focus {
+    border: 1px solid #0015FF;
+}

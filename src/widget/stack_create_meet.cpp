@@ -10,7 +10,6 @@ stack_create_meet::stack_create_meet(QWidget *parent)
             this, &stack_create_meet::createMeetingClicked);
 }
 
-stack_create_meet::~stack_create_meet()
-{
+stack_create_meet::~stack_create_meet() {
     delete ui;
 }

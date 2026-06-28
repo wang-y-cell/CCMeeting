@@ -2,34 +2,30 @@
 #include "ui_login.h"
 #include <qmessagebox.h>
 #include <QMessageBox>
+#include <QFile>
+#include <spdlog/spdlog.h>
 
 login::login(QWidget *parent)
     : QDialog(parent)
     , ui(new Ui::login)
 {
     ui->setupUi(this);
+    set_style();
 
     connect(ui->login_button, &QPushButton::clicked, this, &login::Login);
 
-    ui->account_line->setStyleSheet(R"(
-        QLineEdit {
-            border-radius: 4px;
-            padding: 5px;
-        }
-        QLineEdit:focus {
-            border: 1px solid #2f54eb; /* 获取焦点时高亮边框 */
-        }
-    )");
+}
 
-    ui->password_line->setStyleSheet(R"(
-        QLineEdit {
-            border-radius: 4px;
-            padding: 5px;
-        }
-        QLineEdit:focus {
-            border: 1px solid #2f54eb; /* 获取焦点时高亮边框 */
-        }
-    )");
+void login::set_style() {
+    QFile file(":/Style/source/login.qss");
+    if (file.open(QFile::ReadOnly)) {
+        spdlog::info("login.qss loaded");
+        QString styleSheet = file.readAll();
+        this->setStyleSheet(styleSheet);
+        file.close();
+    } else {
+        spdlog::warn("login.qss not found");
+    }
 }
 
 login::~login()

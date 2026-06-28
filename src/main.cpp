@@ -10,13 +10,6 @@
 #include "main_window.h"
 
 int main(int argc, char* argv[]) {
-    QApplication app(argc, argv);
-    QFile style_file(":/myEffect/source/style.qss");
-    if(style_file.open(QFile::ReadOnly)) {
-        QString style_sheet = QLatin1String(style_file.readAll());
-        app.setStyleSheet(style_sheet);
-        style_file.close();
-    }
 
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
     auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>("log.txt", true);
@@ -27,6 +20,17 @@ int main(int argc, char* argv[]) {
     logger->set_pattern("%Y-%m-%d %H:%M:%S.%e [%^%l%$] [tid:%t] %v");
     spdlog::set_default_logger(std::move(logger));
     spdlog::set_level(spdlog::level::debug);
+
+    QApplication app(argc, argv);
+    QFile style_file(":/Style/source/style.qss");
+    if(style_file.open(QFile::ReadOnly)) {
+        spdlog::info("style.qss loaded");
+        QString style_sheet = QLatin1String(style_file.readAll());
+        app.setStyleSheet(style_sheet);
+        style_file.close();
+    } else {
+        spdlog::warn("style.qss not found");
+    }
 
     Screen::init();
 

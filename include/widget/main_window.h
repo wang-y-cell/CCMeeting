@@ -17,6 +17,7 @@ public:
     explicit main_window(QWidget *parent = nullptr);
     ~main_window();
     void init_ui();
+    void set_style();
 
 private slots:
     void CreateMeeting_button_clicked(); //创建会议槽函数

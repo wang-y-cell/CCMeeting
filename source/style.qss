@@ -1,5 +1,5 @@
 QWidget {
-    background-color: #1e1e24; /* 深色背景 */
+    background-color: #1E1F27; /* 深色背景 */
     color: #ffffff;            /* 白色文字 */
     font-family: "Segoe UI", "Microsoft YaHei";
 }
