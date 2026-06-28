@@ -95,7 +95,6 @@ bool Connection::sendWireData(const QByteArray &frame)
 
     std::int64_t remaining = frame.size();
     std::int64_t written = 0;
-    spdlog::info("[Connection] 写入数据 bytes={}", remaining);
 
     while (written < remaining) {
         const std::int64_t ret = m_socket->write(frame.constData() + written, remaining - written);

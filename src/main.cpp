@@ -3,14 +3,20 @@
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <vector>
+#include <QFile>
 
 #include "screen.h"
 #include "login.h"
 #include "main_window.h"
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
     QApplication app(argc, argv);
+    QFile style_file(":/myEffect/source/style.qss");
+    if(style_file.open(QFile::ReadOnly)) {
+        QString style_sheet = QLatin1String(style_file.readAll());
+        app.setStyleSheet(style_sheet);
+        style_file.close();
+    }
 
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
     auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>("log.txt", true);

@@ -1,34 +1,59 @@
 #include "main_window.h"
-#include "ui_main_window.h"
+#include <qnamespace.h>
 #include <spdlog/spdlog.h>
-#include "selectserver.h"
-#include "joinmeeting.h"
 #include <QMessageBox>
+#include <QListWidget>
+#include <QStackedWidget>
+#include <QHBoxLayout>
 
 
 main_window::main_window(QWidget *parent)
-    : QWidget(parent)
-    , ui(new Ui::main_window)
-{
-    ui->setupUi(this);
-
+: QWidget(parent) {
+    init_ui();
     widget = new Widget(nullptr);
     //widget->setWindowFlags(Qt::Window);
     widget->hide();
 
-    connect(ui->CreateMeeting_button, &QPushButton::clicked, this, &main_window::CreateMeeting_button_clicked);
-    connect(ui->JoinMeeting_button, &QPushButton::clicked, this, &main_window::JoinMeeting_button_clicked);
-    connect(ui->ConnectToServer_button, &QPushButton::clicked, this, &main_window::ConnectToServer_button_clicked);
+    //connect(ui->CreateMeeting_button, &QPushButton::clicked, this, &main_window::CreateMeeting_button_clicked);
+    //connect(ui->JoinMeeting_button, &QPushButton::clicked, this, &main_window::JoinMeeting_button_clicked);
+    //connect(ui->ConnectToServer_button, &QPushButton::clicked, this, &main_window::ConnectToServer_button_clicked);
 
 }
 
-main_window::~main_window()
-{
+main_window::~main_window() {
     if (widget != nullptr) {
         delete widget;
         widget = nullptr;
     }
-    delete ui;
+    //delete ui;
+}
+
+void main_window::init_ui() {
+    resize(800, 600); //设置窗口初始大小
+    setMinimumSize(400, 300); //设置窗口最小大小
+    QHBoxLayout *mainLayout = new QHBoxLayout(this);
+    QListWidget* left_bar = new QListWidget(this); 
+    left_bar->setFixedWidth(200); //设置左侧菜单栏固定宽度
+    left_bar->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+
+    /*设置左侧菜单栏按钮字样*/
+    std::string left_bar_items[] = {"创建会议", "加入会议", "连接服务器"};
+
+    /*设置左侧菜单栏按钮*/
+    for(const auto& item : left_bar_items) {
+        QListWidgetItem* listWidgetItem = new QListWidgetItem(item.c_str());
+        listWidgetItem->setSizeHint(QSize(0, 40));
+        listWidgetItem->setTextAlignment(Qt::AlignCenter);
+        QFont font = listWidgetItem->font();
+        font.setPointSize(16);
+        listWidgetItem->setFont(font);
+        left_bar->addItem(listWidgetItem);
+    }
+
+    /*设置右侧内容区*/
+    QStackedWidget* stackedWidget = new QStackedWidget(this);
+    mainLayout->addWidget(left_bar);
+    mainLayout->addWidget(stackedWidget);
 }
 
 void main_window::CreateMeeting_button_clicked() {
@@ -51,37 +76,4 @@ void main_window::CreateMeeting_button_clicked() {
     }
 }
 
-
-void main_window::JoinMeeting_button_clicked() {
-    spdlog::info("[main_window] 点击加入会议按钮");
-    JoinMeeting joinMeeting(this);
-    if (joinMeeting.exec() == QDialog::Accepted) {
-        QString roomNo = joinMeeting.getRoomNo();
-        if (widget == nullptr) {
-            QMessageBox::warning(this, "warning", "会议窗口未初始化");
-            return;
-        }
-        if (widget->isVisible()) {
-            QMessageBox::warning(this, "warning", "目前有一打开的会议");
-            return;
-        }
-        widget->show();
-        if (widget->on_connServer(this->ip, this->port)) {
-            widget->on_joinmeetBtn(roomNo);
-        }else {
-            widget->hide();
-        }
-    }
-}
-
-
-
-void main_window::ConnectToServer_button_clicked() {
-    spdlog::info("[main_window] 点击连接服务器按钮");
-    SelectServer selectServer(this, this->ip, this->port);
-    if (selectServer.exec() == QDialog::Accepted) {
-        this->ip = selectServer.getIP();
-        this->port = selectServer.getPort();
-    }
-}
 
