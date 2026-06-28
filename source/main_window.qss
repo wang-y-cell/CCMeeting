@@ -2,7 +2,7 @@
 QListWidget { 
     background-color: #2E303D; /*设置背景颜色*/
     border-radius: 15px; /*设置圆角*/
-    border: 0px; /*设置没有边框*/
+    border: none; /*设置没有边框*/
 }
 
 QListWidget::item {
@@ -37,7 +37,7 @@ QPushButton {
 }
 
 QPushButton#joinMeeting_btn{ /*joinMeeting_btn单独设置 */
-    border-radius: 5px;
+    border-radius: 15px;
 }
 
 QPushButton:hover {
@@ -52,3 +52,4 @@ QLineEdit {
 QLineEdit:focus {
     border: 1px solid #0015FF;
 }
+

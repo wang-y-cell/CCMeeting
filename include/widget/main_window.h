@@ -22,7 +22,7 @@ public:
 
 private slots:
     void CreateMeeting_button_clicked(); //创建会议槽函数
-    //void JoinMeeting_button_clicked(); //加入会议槽函数
+    void JoinMeeting_button_clicked(const QString &roomNo); //加入会议槽函数
     //void ConnectToServer_button_clicked(); //连接服务器槽函数
 private:
     //Ui::main_window *ui;

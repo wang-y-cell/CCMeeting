@@ -2,6 +2,7 @@
 #define STACK_JOIN_MEET_H
 
 #include <QWidget>
+#include <QString>
 
 namespace Ui {
 class stack_join_meet;
@@ -20,7 +21,7 @@ private:
 
 signals:
     /*加入房间按钮点击*/
-    void joinMeetingClicked();
+    void joinMeetingClicked(const QString &roomNo);
 };
 
 #endif // STACK_JOIN_MEET_H
