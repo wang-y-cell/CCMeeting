@@ -1,14 +1,12 @@
-QWidget {
-    border-radius: 15px;
-}
 
-QListWidget {
-    background-color: #2E303D;
-    border: 0px;
+QListWidget { 
+    background-color: #2E303D; /*设置背景颜色*/
+    border-radius: 15px; /*设置圆角*/
+    border: 0px; /*设置没有边框*/
 }
 
 QListWidget::item {
-    color: white;
+    color: white; /*设置内容颜色,这里可以是文字*/
     border-radius: 15px;
 }
 
@@ -22,16 +20,24 @@ QListWidget::item:selected {
 }
 
 QFrame#frame {
+    border-radius: 15px;
     background-color: #2E303D;
 }
 
 QLabel {
+    border-radius: 15px;
     background-color: #2E303D;
 }
 
 QPushButton {
+    border-radius: 15px;
     background-color: #214D81;
     color: white;
+
+}
+
+QPushButton#joinMeeting_btn{ /*joinMeeting_btn单独设置 */
+    border-radius: 5px;
 }
 
 QPushButton:hover {
