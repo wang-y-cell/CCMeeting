@@ -1,5 +1,7 @@
 #include "main_window.h"
+#include "stack_conn_server.h"
 #include "stack_join_meet.h"
+#include "connection.h"
 #include <qnamespace.h>
 #include <spdlog/spdlog.h>
 #include <QMessageBox>
@@ -22,9 +24,10 @@ main_window::main_window(QWidget *parent)
             this, &main_window::CreateMeeting_button_clicked);
 
     connect(join_meeting_widget, &stack_join_meet::joinMeetingClicked,
-            this,&main_window::JoinMeeting_button_clicked);
-    //connect(ui->JoinMeeting_button, &QPushButton::clicked, this, &main_window::JoinMeeting_button_clicked);
-    //connect(ui->ConnectToServer_button, &QPushButton::clicked, this, &main_window::ConnectToServer_button_clicked);
+            this, &main_window::JoinMeeting_button_clicked);
+
+    connect(connect_to_server_widget, &stack_conn_server::ConnServerClicked,
+            this, &main_window::ConnectToServer_button_clicked);
 
 }
 
@@ -88,6 +91,10 @@ void main_window::init_ui() {
     join_meeting_widget = new stack_join_meet(this);
     stackedWidget->addWidget(join_meeting_widget);
 
+    /*连接服务器*/
+    connect_to_server_widget = new stack_conn_server(this);
+    stackedWidget->addWidget(connect_to_server_widget); 
+
     connect(left_bar, &QListWidget::currentRowChanged, stackedWidget, &QStackedWidget::setCurrentIndex);
 }
 
@@ -135,3 +142,34 @@ void main_window::JoinMeeting_button_clicked(const QString &roomNo) {
     }
 }
 
+void main_window::ConnectToServer_button_clicked(QString ip, QString port) {
+    spdlog::info("[main_window] 点击连接服务器, ip: {} port: {}", ip.toStdString(), port.toStdString());
+    if (widget == nullptr) {
+        QMessageBox::warning(this, "warning", "会议窗口未初始化");
+        return;
+    }
+    if (widget->isVisible()) {
+        QMessageBox::warning(this, "warning", "目前有一打开的会议");
+        return;
+    }
+
+    ip = ip.trimmed();
+    port = port.trimmed();
+    if (ip.isEmpty() || port.isEmpty()) {
+        QMessageBox::warning(this, "Input Error", "请输入 IP 和端口");
+        return;
+    }
+    if (!Connection::validateIpPort(this, ip, port)) {
+        return;
+    }
+
+    if (widget->on_connServer(ip, port)) {
+        this->ip = ip;
+        this->port = port;
+        widget->on_disconnectServer();
+        spdlog::info("[main_window] 连接服务器成功并已断开: ip: {} port: {}", ip.toStdString(), port.toStdString());
+        QMessageBox::information(this, "Connection", QString("成功连接到 %1:%2").arg(ip, port));
+    } else {
+        QMessageBox::warning(this, "Connection error", "连接服务器失败", QMessageBox::Yes, QMessageBox::Yes);
+    }
+}

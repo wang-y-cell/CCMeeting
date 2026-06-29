@@ -85,6 +85,7 @@ public slots:
     void on_openVedio_clicked(); //点击打开视频按钮
     void on_openAudio_clicked();  //点击打开音频按钮
     bool on_connServer(QString ip, QString port); //点击连接服务器按钮，成功返回 true
+    void on_disconnectServer(); //断开服务器连接
     void on_joinmeetBtn(QString roomNo); //点击加入会议按钮
 private slots:
     void on_horizontalSlider_valueChanged(int value); //音量改变

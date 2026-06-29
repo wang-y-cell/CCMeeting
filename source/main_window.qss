@@ -37,7 +37,7 @@ QPushButton {
 }
 
 QPushButton#joinMeeting_btn{ /*joinMeeting_btn单独设置 */
-    border-radius: 15px;
+    border-radius: 5px;
 }
 
 QPushButton:hover {

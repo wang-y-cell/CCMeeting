@@ -291,6 +291,14 @@ bool Widget::on_connServer(QString ip, QString port) {
     return false;
 }
 
+void Widget::on_disconnectServer() {
+    if (_network && _sessionActive) {
+        _network->disconnectFromHost();
+        _sessionActive = false;
+        spdlog::info("[Widget] 断开服务器连接");
+    }
+}
+
 
 // void Widget::cameraError(QCamera::Error, const QString &errorString) {
 //     const QString msg = errorString.isEmpty() ? _camera->errorString() : errorString;

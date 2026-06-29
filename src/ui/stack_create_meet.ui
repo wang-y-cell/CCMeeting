@@ -67,7 +67,7 @@
          <property name="minimumSize">
           <size>
            <width>0</width>
-           <height>150</height>
+           <height>200</height>
           </size>
          </property>
          <property name="frameShape">
@@ -79,6 +79,18 @@
          <layout class="QGridLayout" name="gridLayout">
           <item row="0" column="1">
            <layout class="QHBoxLayout" name="time_layout" stretch="1,5">
+            <property name="leftMargin">
+             <number>9</number>
+            </property>
+            <property name="topMargin">
+             <number>9</number>
+            </property>
+            <property name="rightMargin">
+             <number>9</number>
+            </property>
+            <property name="bottomMargin">
+             <number>9</number>
+            </property>
             <item>
              <widget class="QLabel" name="label_3">
               <property name="sizePolicy">
@@ -103,7 +115,7 @@
               <property name="minimumSize">
                <size>
                 <width>0</width>
-                <height>40</height>
+                <height>30</height>
                </size>
               </property>
              </widget>
@@ -112,6 +124,18 @@
           </item>
           <item row="0" column="0">
            <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="1,5">
+            <property name="leftMargin">
+             <number>9</number>
+            </property>
+            <property name="topMargin">
+             <number>9</number>
+            </property>
+            <property name="rightMargin">
+             <number>9</number>
+            </property>
+            <property name="bottomMargin">
+             <number>9</number>
+            </property>
             <item>
              <widget class="QLabel" name="label_2">
               <property name="sizePolicy">
@@ -160,7 +184,7 @@
               <property name="minimumSize">
                <size>
                 <width>0</width>
-                <height>40</height>
+                <height>30</height>
                </size>
               </property>
               <property name="maximumSize">
