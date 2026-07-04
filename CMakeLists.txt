@@ -60,7 +60,8 @@ target_include_directories(CloudMeeting PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include/message/audio 
     ${CMAKE_CURRENT_SOURCE_DIR}/include/message/video
     ${CMAKE_CURRENT_SOURCE_DIR}/include/message/text
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/network
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/network/messageNet/
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/network/infoNet/
     ${CMAKE_CURRENT_SOURCE_DIR}/include/widget 
 )
 

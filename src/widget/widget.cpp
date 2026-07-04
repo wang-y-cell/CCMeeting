@@ -2,9 +2,9 @@
 #include "ui_widget.h"
 #include "screen.h"
 #include <spdlog/spdlog.h>
-#include "configure/configure.h"
-#include "network/message.h"
-#include "network/netheader.h"
+#include "configure.h"
+#include "message.h"
+#include "netheader.h"
 #include <QString>
 #include <QCamera>
 #include <QMediaDevices>

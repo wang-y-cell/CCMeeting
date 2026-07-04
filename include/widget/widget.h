@@ -6,9 +6,9 @@
 #include <QVideoFrame>
 #include <QCamera>
 #include <QMediaCaptureSession>
-#include "network/networkmanager.h"
-#include "network/message.h"
-#include "network/partner.h"
+#include "networkmanager.h"
+#include "message.h"
+#include "partner.h"
 #include <cstdint>
 #include <unordered_map>
 #include <vector>

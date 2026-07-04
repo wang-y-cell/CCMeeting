@@ -1,6 +1,6 @@
 #include "AudioOutput.h"
 #include "audiocommon.h"
-#include "network/messagehub.h"
+#include "messagehub.h"
 #include <mutex>
 #include <spdlog/spdlog.h>
 #include <QHostAddress>
