@@ -18,8 +18,6 @@ MyTextEdit::MyTextEdit(QWidget *parent)
 void MyTextEdit::initConnect() const {
     /*当输入文本内容发生改变的时候*/
     connect(edit, &QPlainTextEdit::textChanged, this, &MyTextEdit::complete);
-    //当用户选择一个选项时,调用changeCompletion槽函数
-    connect(completer, qOverload<const QString &>(&QCompleter::activated), this, &MyTextEdit::changeCompletion);
 }
 
 void MyTextEdit::initUI() {
@@ -132,6 +130,9 @@ void MyTextEdit::setCompleter(const std::vector<QString> &items) {
         completer->setWidget(this); //指定补全弹窗在哪个窗口显示
         completer->setCompletionMode(QCompleter::PopupCompletion);//使用下拉列表弹出选项
         completer->setCaseSensitivity(Qt::CaseInsensitive);//不区分大小写
+        //当用户选择一个选项时,调用changeCompletion槽函数
+        connect(completer, qOverload<const QString &>(&QCompleter::activated), 
+                this, &MyTextEdit::changeCompletion);
     } else {
         delete completer->model(); //删除原来的模型
         //就是上次传入的stringlist

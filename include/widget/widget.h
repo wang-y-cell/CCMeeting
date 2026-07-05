@@ -33,22 +33,24 @@ class Widget : public QWidget
 private:
     static QRect pos; //窗口位置
     std::uint32_t mainip; //主屏幕IP
-    bool  _createmeet; //是否创建会议
-    bool _joinmeet; //是否加入会议
-    bool _openCamera; //是否打开摄像头
-    bool _sessionActive; //是否已连接服务器（会议会话）
-    NetworkManager *_network; //统一网络收发
+    bool  _createmeet = false; //是否创建会议
+    bool _joinmeet = false; //是否加入会议
+    bool _openCamera = false; //是否打开摄像头
+    bool _sessionActive = false; //是否已连接服务器（会议会话）
+    NetworkManager *_network = nullptr; //统一网络收发
     std::unordered_map<std::uint32_t, Partner *> partner; //用于记录房间用户
-    AudioInput* _ainput;
-    QThread* _ainputThread;
-    AudioOutput* _aoutput;
+    AudioInput* _ainput = nullptr;
+    QThread* _ainputThread = nullptr;
+    AudioOutput* _aoutput = nullptr;
     std::vector<QString> iplist;
-    QSoundEffect* _soundEffect;
+    QSoundEffect* _soundEffect = nullptr;
     int m_lastChatListWidth = -1;
     bool m_inChatRelayout = false;
-    CameraVideo *_cameraVideo; //统一处理图像/视频显示
+    CameraVideo *_cameraVideo = nullptr; //统一处理图像/视频显示
 private:
     void initUI(); //初始化UI
+    void initConnect(); //初始化信号与槽
+    void initPartnerConnect(Partner *p); //连接 Partner 信号
     void paintEvent(QPaintEvent *event) override;
     void initPermanentWorkers();//初始化永久工作线程
     void endMeetingSession(); //结束会议会话

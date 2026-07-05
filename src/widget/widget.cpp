@@ -34,29 +34,52 @@ Widget::Widget(QWidget *parent)
     qRegisterMetaType<Message>("Message");
     spdlog::info("[Widget] -------------------------Application Start---------------------------");
     spdlog::info("[Widget] main UI thread id: {}", reinterpret_cast<quintptr>(QThread::currentThreadId()));
-    _createmeet = false;
-    _openCamera = false;
-    _joinmeet = false;
-    _sessionActive = false;
-    _network = nullptr;
-    _ainput = nullptr;
-    _ainputThread = nullptr;
-    _aoutput = nullptr;
     //将窗口的位置设置为我的电脑频幕的相对位置
-
     initUI();  //初始化UI
 
     mainip = 0; //主屏幕显示的用户IP图像
     _cameraVideo = new CameraVideo(this);
     _cameraVideo->setMainTarget(ui->mainshow_label);
-    connect(_cameraVideo, &CameraVideo::frameCaptured, this, &Widget::onLocalFrameCaptured);
+
+    _soundEffect = new QSoundEffect(this);
+    _soundEffect->setSource(QUrl("qrc:/myEffect/2.wav"));
+    _soundEffect->setVolume(1.0);
+
     initPermanentWorkers();
+    initConnect();
+}
+
+void Widget::initConnect() {
+    spdlog::debug("[Widget] 初始化信号与槽");
+    connect(_cameraVideo, &CameraVideo::frameCaptured, this, &Widget::onLocalFrameCaptured);
+
+    connect(_network, &NetworkManager::requestMessageReady, this, &Widget::onRequestMessage, Qt::QueuedConnection);
+    connect(_network, &NetworkManager::userInfoMessageReady, this, &Widget::onUserInfoMessage, Qt::QueuedConnection);
+    connect(_network, &NetworkManager::textMessageReady, this, &Widget::onTextMessage, Qt::QueuedConnection);
+    connect(_network, &NetworkManager::videoMessageReady, this, &Widget::onVideoMessage, Qt::QueuedConnection);
+    connect(_network, &NetworkManager::sendTextFinished, this, &Widget::textSend);
+
+    connect(this, &Widget::startAudio, _ainput, &AudioInput::startCollect);
+    connect(this, &Widget::stopAudio, _ainput, &AudioInput::stopCollect);
+    connect(_ainput, &AudioInput::audioinputerror, this, &Widget::audioError);
+    connect(_aoutput, &AudioOutput::audiooutputerror, this, &Widget::audioError);
+    connect(_aoutput, &AudioOutput::speaker, this, &Widget::speaks);
+
+    const Qt::ConnectionType uniqueAuto =
+        static_cast<Qt::ConnectionType>(int(Qt::AutoConnection) | int(Qt::UniqueConnection));
+    connect(this, SIGNAL(volumnChange(int)), _ainput, SLOT(setVolumn(int)), uniqueAuto);
+    connect(this, SIGNAL(volumnChange(int)), _aoutput, SLOT(setVolumn(int)), uniqueAuto);
+}
+
+void Widget::initPartnerConnect(Partner *p) {
+    connect(p, &Partner::sendip, this, &Widget::recvip);
 }
 
 void Widget::initUI() {
     spdlog::debug("[Widget] 初始化UI");
     ui->setupUi(this);  //解析ui文件
 
+    /*根据显示器大小动态调整窗口大小*/
     Widget::pos = QRect(0.1 * Screen::width, 0.1 * Screen::height, 0.8 * Screen::width, 0.8 * Screen::height);
     //设置打开视频和音频的按钮
     ui->openAudio->setText(QString(OPENAUDIO).toUtf8());
@@ -78,49 +101,18 @@ void Widget::initUI() {
     ui->openAudio->setDisabled(true);
     ui->openVedio->setDisabled(true);
     ui->sendmsg->setDisabled(true);
-    _soundEffect = new QSoundEffect(this);
-    _soundEffect->setSource(QUrl("qrc:/myEffect/2.wav"));
-    _soundEffect->setVolume(1.0);
-    //设置滚动条（竖条样式相同，抽出共用字符串）
-    // const QString verticalScrollBarStyle =
-    //     QStringLiteral(
-    //         "QScrollBar:vertical { width:8px; background:rgba(0,0,0,0%); margin:0px 0px 0px 0px; padding-top:9px; padding-bottom:9px; }"
-    //         "QScrollBar::handle:vertical { width:8px; background:rgba(0,0,0,25%); border-radius:4px; min-height:20px; } "
-    //         "QScrollBar::handle:vertical:hover { width:8px; background:rgba(0,0,0,50%); border-radius:4px; min-height:20px; } "
-    //         "QScrollBar::add-line:vertical { height:9px; width:8px; border-image:url(:/images/a/3.png); subcontrol-position:bottom; } "
-    //         "QScrollBar::sub-line:vertical { height:9px; width:8px; border-image:url(:/images/a/1.png); subcontrol-position:top; } "
-    //         "QScrollBar::add-line:vertical:hover { height:9px; width:8px; border-image:url(:/images/a/4.png); subcontrol-position:bottom; } "
-    //         "QScrollBar::sub-line:vertical:hover { height:9px; width:8px; border-image:url(:/images/a/2.png); subcontrol-position:top; } "
-    //         "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background:rgba(0,0,0,10%); border-radius:4px; }"
-    //     );
-    // // 始终显示竖向滚动条，避免 Partner 在临界宽度下因滚动条显隐导致可用宽度 ±8px 振荡
-    // ui->scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-    // ui->scrollArea->verticalScrollBar()->setStyleSheet(verticalScrollBarStyle);
-    // ui->listWidget->setStyleSheet(verticalScrollBarStyle);
 
-    // QFont te_font = this->font();
-    // te_font.setFamily("MicrosoftYaHei");
-    // te_font.setPointSize(12);
-
-    //ui->listWidget->setFont(te_font);
 
     ui->tabWidget->setCurrentIndex(0);
 
     ui->main_box->setSizes(QList<int>{300, 700});
     ui->listWidget->viewport()->installEventFilter(this);
 
-    //ui->plainTextEdit->setPlaceholderText("可@对方私信");
-    //ui->plainTextEdit->setStyleSheet("color: #AAAAAA;");
-    //this->setStyleSheet("background-color:rgb(46, 46, 46)");
 }
 
 void Widget::initPermanentWorkers() {
+    spdlog::debug("[Widget] 初始化永久工作线程");
     _network = new NetworkManager(this);
-    connect(_network, &NetworkManager::requestMessageReady, this, &Widget::onRequestMessage, Qt::QueuedConnection);
-    connect(_network, &NetworkManager::userInfoMessageReady, this, &Widget::onUserInfoMessage, Qt::QueuedConnection);
-    connect(_network, &NetworkManager::textMessageReady, this, &Widget::onTextMessage, Qt::QueuedConnection);
-    connect(_network, &NetworkManager::videoMessageReady, this, &Widget::onVideoMessage, Qt::QueuedConnection);
-    connect(_network, &NetworkManager::sendTextFinished, this, &Widget::textSend);
 
     _ainput = new AudioInput();
     _ainput->setMessageHub(_network->messageHub());
@@ -131,11 +123,6 @@ void Widget::initPermanentWorkers() {
     _ainputThread->start();
     _aoutput->start();
 
-    connect(this, SIGNAL(startAudio()), _ainput, SLOT(startCollect()));
-    connect(this, SIGNAL(stopAudio()), _ainput, SLOT(stopCollect()));
-    connect(_ainput, SIGNAL(audioinputerror(QString)), this, SLOT(audioError(QString)));
-    connect(_aoutput, SIGNAL(audiooutputerror(QString)), this, SLOT(audioError(QString)));
-    connect(_aoutput, SIGNAL(speaker(QString)), this, SLOT(speaks(QString)));
 }
 
 Widget::~Widget() {
@@ -512,7 +499,7 @@ Partner* Widget::addPartner(std::uint32_t ip)
         spdlog::error("[Widget] 创建Partner对象失败");
         return nullptr; //返回空
     } else /*如果创建成功，则连接信号和槽*/ {
-		connect(p, &Partner::sendip, this, &Widget::recvip);
+        initPartnerConnect(p);
         spdlog::debug("[Widget] 将这个用户添加到partner中");
 		partner.emplace(ip, p);
 		ui->verticalLayout_3->addWidget(p, 1);
@@ -520,10 +507,6 @@ Partner* Widget::addPartner(std::uint32_t ip)
 
 		//当有人员加入时，开启滑动条滑动事件，开启输入(只有自己时，不打开)
         if (partner.size() > 1 && _ainput && _aoutput) {
-			const Qt::ConnectionType uniqueAuto =
-				static_cast<Qt::ConnectionType>(int(Qt::AutoConnection) | int(Qt::UniqueConnection));
-			connect(this, SIGNAL(volumnChange(int)), _ainput, SLOT(setVolumn(int)), uniqueAuto);
-			connect(this, SIGNAL(volumnChange(int)), _aoutput, SLOT(setVolumn(int)), uniqueAuto);
             ui->openAudio->setDisabled(false);
             ui->sendmsg->setDisabled(false);
             _aoutput->startPlay();
@@ -549,8 +532,6 @@ void Widget::removePartner(std::uint32_t ip)
         //只有自已一个人时，关闭传输音频
         if (partner.size() <= 1 && _ainput && _aoutput)
         {
-			disconnect(_ainput, SLOT(setVolumn(int)));
-			disconnect(_aoutput, SLOT(setVolumn(int)));
 			_ainput->stopCollect();
             _aoutput->stopPlay();
             ui->openAudio->setText(QString(OPENAUDIO).toUtf8());
@@ -577,10 +558,6 @@ void Widget::clearPartner() {
     }
 
     //关闭传输音频
-    if (_ainput)
-	    disconnect(_ainput, SLOT(setVolumn(int)));
-    if (_aoutput)
-        disconnect(_aoutput, SLOT(setVolumn(int)));
     if (_ainput)
 	    _ainput->stopCollect();
     if (_aoutput)
