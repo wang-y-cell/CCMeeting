@@ -48,13 +48,13 @@ private:
     void initConnect() const;
     /*初始化ui界面*/
     void initUI();
-    /*返回光标下的文本*/
+    /*返回光标对应的整个单词*/
     QString textUnderCursor();
     /*拦截事件*/
-    bool eventFilter(QObject *, QEvent *) override;
+    bool eventFilter(QObject *obj, QEvent *event) override;
 
 private slots:
-    void changeCompletion(const QString &);
+    void changeCompletion(const QString & text);
 public slots:
     void complete();
 signals:
