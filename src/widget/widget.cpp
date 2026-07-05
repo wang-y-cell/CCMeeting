@@ -62,17 +62,17 @@ void Widget::initUI() {
     ui->openAudio->setText(QString(OPENAUDIO).toUtf8());
     ui->openVedio->setText(QString(OPENVIDEO).toUtf8());
 
-    QRect size = QRect(Widget::pos.x(),
-                       Widget::pos.y(), 
-                       Widget::pos.width() * 0.5, 
-                       Widget::pos.height() * 0.5
-                    );
+    QRect size = QRect(
+        Widget::pos.x(),
+        Widget::pos.y(), 
+        Widget::pos.width() * 0.5, 
+        Widget::pos.height() * 0.5
+    );
 
     this->setGeometry(size); //设置我的窗口位置
     //设置窗口最大最小值
     this->setMinimumSize(QSize(Widget::pos.width() * 0.7, Widget::pos.height() * 0.7));
     this->setMaximumSize(QSize(Widget::pos.width(), Widget::pos.height()));
-    //this->resize(QSize(Widget::pos.width() * 0.5, Widget::pos.height() * 0.5));
 
     //初始化这些按钮是不能点击的状态
     ui->openAudio->setDisabled(true);
@@ -82,35 +82,35 @@ void Widget::initUI() {
     _soundEffect->setSource(QUrl("qrc:/myEffect/2.wav"));
     _soundEffect->setVolume(1.0);
     //设置滚动条（竖条样式相同，抽出共用字符串）
-    const QString verticalScrollBarStyle =
-        QStringLiteral(
-            "QScrollBar:vertical { width:8px; background:rgba(0,0,0,0%); margin:0px 0px 0px 0px; padding-top:9px; padding-bottom:9px; }"
-            "QScrollBar::handle:vertical { width:8px; background:rgba(0,0,0,25%); border-radius:4px; min-height:20px; } "
-            "QScrollBar::handle:vertical:hover { width:8px; background:rgba(0,0,0,50%); border-radius:4px; min-height:20px; } "
-            "QScrollBar::add-line:vertical { height:9px; width:8px; border-image:url(:/images/a/3.png); subcontrol-position:bottom; } "
-            "QScrollBar::sub-line:vertical { height:9px; width:8px; border-image:url(:/images/a/1.png); subcontrol-position:top; } "
-            "QScrollBar::add-line:vertical:hover { height:9px; width:8px; border-image:url(:/images/a/4.png); subcontrol-position:bottom; } "
-            "QScrollBar::sub-line:vertical:hover { height:9px; width:8px; border-image:url(:/images/a/2.png); subcontrol-position:top; } "
-            "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background:rgba(0,0,0,10%); border-radius:4px; }"
-        );
-    // 始终显示竖向滚动条，避免 Partner 在临界宽度下因滚动条显隐导致可用宽度 ±8px 振荡
-    ui->scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-    ui->scrollArea->verticalScrollBar()->setStyleSheet(verticalScrollBarStyle);
-    ui->listWidget->setStyleSheet(verticalScrollBarStyle);
+    // const QString verticalScrollBarStyle =
+    //     QStringLiteral(
+    //         "QScrollBar:vertical { width:8px; background:rgba(0,0,0,0%); margin:0px 0px 0px 0px; padding-top:9px; padding-bottom:9px; }"
+    //         "QScrollBar::handle:vertical { width:8px; background:rgba(0,0,0,25%); border-radius:4px; min-height:20px; } "
+    //         "QScrollBar::handle:vertical:hover { width:8px; background:rgba(0,0,0,50%); border-radius:4px; min-height:20px; } "
+    //         "QScrollBar::add-line:vertical { height:9px; width:8px; border-image:url(:/images/a/3.png); subcontrol-position:bottom; } "
+    //         "QScrollBar::sub-line:vertical { height:9px; width:8px; border-image:url(:/images/a/1.png); subcontrol-position:top; } "
+    //         "QScrollBar::add-line:vertical:hover { height:9px; width:8px; border-image:url(:/images/a/4.png); subcontrol-position:bottom; } "
+    //         "QScrollBar::sub-line:vertical:hover { height:9px; width:8px; border-image:url(:/images/a/2.png); subcontrol-position:top; } "
+    //         "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background:rgba(0,0,0,10%); border-radius:4px; }"
+    //     );
+    // // 始终显示竖向滚动条，避免 Partner 在临界宽度下因滚动条显隐导致可用宽度 ±8px 振荡
+    // ui->scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+    // ui->scrollArea->verticalScrollBar()->setStyleSheet(verticalScrollBarStyle);
+    // ui->listWidget->setStyleSheet(verticalScrollBarStyle);
 
-    QFont te_font = this->font();
-    te_font.setFamily("MicrosoftYaHei");
-    te_font.setPointSize(12);
+    // QFont te_font = this->font();
+    // te_font.setFamily("MicrosoftYaHei");
+    // te_font.setPointSize(12);
 
-    ui->listWidget->setFont(te_font);
+    //ui->listWidget->setFont(te_font);
 
     ui->tabWidget->setCurrentIndex(0);
 
     ui->main_box->setSizes(QList<int>{300, 700});
     ui->listWidget->viewport()->installEventFilter(this);
 
-    ui->plainTextEdit->setPlaceholderText("可@对方私信");
-    ui->plainTextEdit->setStyleSheet("color: #AAAAAA;");
+    //ui->plainTextEdit->setPlaceholderText("可@对方私信");
+    //ui->plainTextEdit->setStyleSheet("color: #AAAAAA;");
     //this->setStyleSheet("background-color:rgb(46, 46, 46)");
 }
 

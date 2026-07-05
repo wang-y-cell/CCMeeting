@@ -5,49 +5,73 @@
 #include <QAbstractItemView>
 #include <QScrollBar>
 
-Completer::Completer(QWidget *parent): QCompleter(parent)
-{
+Completer::Completer(QWidget *parent)
+: QCompleter(parent) { }
 
+MyTextEdit::MyTextEdit(QWidget *parent)
+: QWidget(parent) {
+    initUI();
+    initConnect();
+    completer = nullptr;
 }
 
-MyTextEdit::MyTextEdit(QWidget *parent): QWidget(parent)
-{
-    QVBoxLayout *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(0, 0, 0, 0);
-    edit = new QPlainTextEdit();
-    edit->setPlaceholderText(QString::fromUtf8("&#x8F93;&#x5165;@&#x53EF;&#x4EE5;&#x5411;&#x5BF9;&#x5E94;&#x7684;IP&#x53D1;&#x9001;&#x6570;&#x636E;"));
+void MyTextEdit::initConnect() const {
+    /*当输入文本内容发生改变的时候*/
+    connect(edit, &QPlainTextEdit::textChanged, this, &MyTextEdit::complete);
+    //当用户选择一个选项时,调用changeCompletion槽函数
+    connect(completer, qOverload<const QString &>(&QCompleter::activated), this, &MyTextEdit::changeCompletion);
+}
+
+void MyTextEdit::initUI() {
+    QVBoxLayout *layout = new QVBoxLayout(this); //创建垂直布局
+    layout->setContentsMargins(0, 0, 0, 0); //设置布局中上下左右边界
+    edit = new QPlainTextEdit(); //创建输入框控件
+    /*设置输入框控件中提示字段*/
+    edit->setPlaceholderText(QString::fromUtf8("点击发送信息..."));
+    /*将控件加入布局中*/
     layout->addWidget(edit);
-    completer = nullptr;
-    connect(edit, SIGNAL(textChanged()), this, SLOT(complete()));
+    /*
+    在 edit 控件自己处理任何事件（如鼠标点击、键盘按键）之前，
+    先让 this 拦截并检查一遍。 
+    这允许你修改、拦截甚至完全丢弃发往 edit 的事件
+    */
     edit->installEventFilter(this);
 }
 
-QString MyTextEdit::textUnderCursor()
-{
+QString MyTextEdit::textUnderCursor() {
     QTextCursor tc = edit->textCursor();
     tc.select(QTextCursor::WordUnderCursor);
     return tc.selectedText();
 }
 
-void MyTextEdit::complete()
-{
+void MyTextEdit::complete(){
+    /*如果文本为空或completer为空，则返回*/
     if(edit->toPlainText().size() == 0 || completer == nullptr) return;
-    QChar tail =  edit->toPlainText().at(edit->toPlainText().size()-1);
-    if(tail == '@')
-    {
+    /*获取文本最后一个字符*/
+    QChar tail =  edit->toPlainText().at(edit->toPlainText().size() - 1);
+    /*如果最后一个字符为@，则显示补全*/
+    if(tail == '@') {
+        /*设置补全前缀*/
         completer->setCompletionPrefix(tail);
+        /*获取补全弹窗视图对象*/
         QAbstractItemView *view = completer->popup();
+        /*设置当前索引*/
         view->setCurrentIndex(completer->completionModel()->index(0, 0));
+        /*获取光标矩形*/
         QRect cr = edit->cursorRect();
+        /*获取垂直滚动条*/
         QScrollBar *bar = completer->popup()->verticalScrollBar();
+        /*设置矩形宽度*/
         cr.setWidth(completer->popup()->sizeHintForColumn(0) + bar->sizeHint().width());
+        /*显示补全*/
         completer->complete(cr);
     }
 }
 
-void MyTextEdit::changeCompletion(QString text)
-{
+void MyTextEdit::changeCompletion(const QString &text) {
+    /*获取光标*/
     QTextCursor tc = edit->textCursor();
+    /*获取文本长度*/
     int len = text.size() - completer->completionPrefix().size();
     tc.movePosition(QTextCursor::EndOfWord);
     tc.insertText(text.right(len));
@@ -78,18 +102,15 @@ void MyTextEdit::changeCompletion(QString text)
 
 }
 
-QString MyTextEdit::toPlainText()
-{
+QString MyTextEdit::toPlainText() {
     return edit->toPlainText();
 }
 
-void MyTextEdit::setPlainText(QString str)
-{
+void MyTextEdit::setPlainText(QString str) {
     edit->setPlainText(str);
 }
 
-void MyTextEdit::setPlaceholderText(QString str)
-{
+void MyTextEdit::setPlaceholderText(QString str) {
     edit->setPlaceholderText(str);
 }
 
@@ -100,9 +121,6 @@ void MyTextEdit::setCompleter(const std::vector<QString> &items) {
         completer->setWidget(this); //指定补全弹窗在哪个窗口显示
         completer->setCompletionMode(QCompleter::PopupCompletion);//使用下拉列表弹出选项
         completer->setCaseSensitivity(Qt::CaseInsensitive);//不区分大小写
-
-        //当用户选择一个选项时,调用changeCompletion槽函数
-        connect(completer, SIGNAL(activated(QString)), this, SLOT(changeCompletion(QString)));
     } else {
         delete completer->model(); //删除原来的模型
         //就是上次传入的stringlist
