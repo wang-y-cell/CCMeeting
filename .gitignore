@@ -2,4 +2,3 @@ build/
 .cache/
 .qtcreator/
 log.txt
-third_party/
