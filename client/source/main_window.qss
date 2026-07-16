@@ -1,108 +1,108 @@
-QWidget#main_window {
-    background-color: #14161c;
+QWidget#main_window { /* 主窗口 */
+    background-color: #14161c; /* 背景颜色 */
 }
 
-QListWidget#sideNav {
-    background-color: #1c1f28;
-    border: 1px solid #2a2e38;
-    border-radius: 14px;
-    padding: 10px 8px;
-    outline: none;
+QListWidget#sideNav { /* 侧边栏 */
+    background-color: #1c1f28; /* 背景颜色 */
+    border: 1px solid #2a2e38; /* 边框颜色 */
+    border-radius: 14px; /* 圆角 */
+    padding: 10px 8px; /* 内边距 */
+    outline: none; /* 轮廓 */
 }
 
-QListWidget#sideNav::item {
-    color: #a9b1c3;
-    border-radius: 10px;
-    margin: 4px 2px;
-    padding: 4px;
+QListWidget#sideNav::item { /* 侧边栏项 */
+    color: #a9b1c3; /* 文字颜色 */
+    border-radius: 10px; /* 圆角 */
+    margin: 4px 2px; /* 外边距 */
+    padding: 4px; /* 内边距 */
 }
 
-QListWidget#sideNav::item:hover {
-    background-color: #2a3040;
-    color: #ffffff;
+QListWidget#sideNav::item:hover { /* 侧边栏项悬停时背景颜色 */
+    background-color: #2a3040; /* 背景颜色 */
+    color: #ffffff; /* 文字颜色 */
 }
 
-QListWidget#sideNav::item:selected {
-    background-color: #2f6fed;
-    color: #ffffff;
+QListWidget#sideNav::item:selected { /* 侧边栏项选中时背景颜色 */
+    background-color: #2f6fed; /* 背景颜色 */
+    color: #ffffff; /* 文字颜色 */
 }
 
-QStackedWidget#contentStack {
-    background-color: transparent;
-    border: none;
+QStackedWidget#contentStack { /* 内容堆叠窗口 */
+    background-color: transparent; /* 背景颜色 */
+    border: none; /* 边框 */
 }
 
-QFrame#frame {
-    background-color: #1c1f28;
-    border: 1px solid #2a2e38;
-    border-radius: 16px;
+QFrame#frame { /* 框架 */
+    background-color: #1c1f28; /* 背景颜色 */
+    border: 1px solid #2a2e38; /* 边框颜色 */
+    border-radius: 16px; /* 圆角 */
 }
 
-QLabel {
-    background: transparent;
-    border: none;
-    color: #c5ccd9;
+QLabel { /* 标签 */
+    background: transparent; /* 背景颜色 */
+    border: none; /* 边框 */
+    color: #c5ccd9; /* 文字颜色 */
 }
 
-QLabel#pageTitle {
-    color: #f3f5f8;
-    font-size: 22px;
-    font-weight: 700;
+QLabel#pageTitle { /* 页面标题 */
+    color: #f3f5f8; /* 文字颜色 */
+    font-size: 22px; /* 字体大小 */
+    font-weight: 700; /* 字体粗细 */
 }
 
-QLabel#pageDesc {
-    color: #7f8799;
-    font-size: 13px;
+QLabel#pageDesc { /* 页面描述 */
+    color: #7f8799; /* 文字颜色 */
+    font-size: 13px; /* 字体大小 */
 }
 
 QLabel#fieldLabel,
-QLabel#fieldLabel_2 {
-    color: #aeb6c7;
-    font-size: 13px;
-    font-weight: 600;
+QLabel#fieldLabel_2 { /* 字段标签 */
+    color: #aeb6c7; /* 文字颜色 */
+    font-size: 13px; /* 字体大小 */
+    font-weight: 600; /* 字体粗细 */
 }
 
-QLineEdit {
-    background-color: #232733;
-    color: #eef1f6;
-    border: 1px solid #343a48;
-    border-radius: 10px;
-    padding: 0 14px;
-    min-height: 40px;
-    font-size: 14px;
+QLineEdit { /* 输入框 */
+    background-color: #232733; /* 背景颜色 */
+    color: #eef1f6; /* 文字颜色 */
+    border: 1px solid #343a48; /* 边框颜色 */
+    border-radius: 10px; /* 圆角 */
+    padding: 0 14px; /* 内边距 */
+    min-height: 40px; /* 最小高度 */
+    font-size: 14px; /* 字体大小 */
 }
 
-QLineEdit:hover {
-    border-color: #455066;
+QLineEdit:hover { /* 输入框悬停时边框颜色 */
+    border-color: #455066; /* 边框颜色 */
 }
 
-QLineEdit:focus {
-    border: 1px solid #3b82f6;
-    background-color: #262b38;
+QLineEdit:focus { /* 输入框聚焦时边框颜色 */
+    border: 1px solid #3b82f6; /* 边框颜色 */
+    background-color: #262b38; /* 背景颜色 */
 }
 
-QPushButton {
-    background-color: #2f6fed;
-    color: #ffffff;
-    border: none;
-    border-radius: 10px;
-    min-height: 44px;
-    font-size: 14px;
-    font-weight: 600;
+QPushButton { /* 按钮 */
+    background-color: #2f6fed; /* 背景颜色 */
+    color: #ffffff; /* 文字颜色 */
+    border: none; /* 边框 */
+    border-radius: 10px; /* 圆角 */
+    min-height: 44px; /* 最小高度 */
+    font-size: 14px; /* 字体大小 */
+    font-weight: 600; /* 字体粗细 */
 }
 
-QPushButton:hover {
+QPushButton:hover { /* 按钮悬停时背景颜色 */
     background-color: #3b7fff;
 }
 
-QPushButton:pressed {
+QPushButton:pressed { /* 按钮按下时背景颜色 */
     background-color: #255fd4;
 }
 
 QPushButton#joinMeeting_btn,
 QPushButton#create_meeting_btn,
 QPushButton#connServer_btn {
-    min-height: 46px;
+    min-height: 46px; /* 最小高度 */
 }
 
 QScrollArea {
@@ -112,4 +112,18 @@ QScrollArea {
 
 QScrollArea > QWidget > QWidget {
     background: transparent;
+}
+
+QPushButton#framelessCloseBtn { /* 关闭按钮 */
+    background-color: transparent; /* 背景颜色 */
+    border: none; /* 边框 */
+    color: #8b93a7; /* 文字颜色 */
+    font-size: 16px; /* 字体大小 */
+    font-weight: bold; /* 字体粗细 */
+    border-radius: 6px; /* 圆角 */
+}
+
+QPushButton#framelessCloseBtn:hover { /* 关闭按钮悬停时背景颜色 */
+    background-color: #e81123; /* 背景颜色 */
+    color: #ffffff; /* 文字颜色 */
 }

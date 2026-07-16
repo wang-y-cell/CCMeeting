@@ -1,82 +1,82 @@
-QDialog#login {
-    background-color: #17191f;
-    border: 1px solid #2a2e38;
-    border-radius: 14px;
+QDialog#login { /* 登录对话框 */
+    background-color: #17191f; /* 背景颜色 */
+    border: 1px solid #2a2e38; /* 边框颜色 */
+    border-radius: 0px; /* 圆角 */
 }
 
-QLabel#brandLabel {
-    color: #f3f5f8;
-    font-size: 28px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    background: transparent;
-    border: none;
+QLabel#brandLabel { /* 品牌标签 */
+    color: #f3f5f8; /* 品牌标签颜色 */
+    font-size: 28px; /* 字体大小 */
+    font-weight: 700; /* 字体粗细 */
+    letter-spacing: 1px; /* 字间距 */
+    background: transparent; /* 背景颜色 */
+    border: none; /* 边框 */
 }
 
-QLabel#subtitleLabel {
-    color: #8b93a7;
-    font-size: 13px;
-    background: transparent;
-    border: none;
+QLabel#subtitleLabel { /* 副标题标签 */
+    color: #8b93a7; /* 文字颜色 */
+    font-size: 13px; /* 字体大小 */
+    background: transparent; /* 背景颜色 */
+    border: none; /* 边框 */
 }
 
-QLabel#hintLabel {
-    color: #5f677a;
-    font-size: 11px;
-    background: transparent;
-    border: none;
+QLabel#hintLabel { /* 提示标签 */
+    color: #5f677a; /* 文字颜色 */
+    font-size: 11px; /* 字体大小 */
+    background: transparent; /* 背景颜色 */
+    border: none; /* 边框 */
 }
 
-QLineEdit {
-    background-color: #232733;
-    color: #eef1f6;
-    border: 1px solid #343a48;
-    border-radius: 10px;
-    padding: 0 14px;
-    font-size: 14px;
-    selection-background-color: #2f6fed;
+QLineEdit { /* 输入框 */
+    background-color: #232733; /* 背景颜色 */
+    color: #eef1f6; /* 文字颜色 */
+    border: 1px solid #343a48; /* 边框颜色 */
+    border-radius: 10px; /* 圆角 */
+    padding: 0 14px; /* 内边距 */
+    font-size: 14px; /* 字体大小 */
+    selection-background-color: #2f6fed; /* 选中背景颜色 */
 }
 
-QLineEdit:hover {
-    border-color: #455066;
+QLineEdit:hover { /* 输入框悬停时边框颜色 */
+    border-color: #455066; /* 边框颜色 */
 }
 
-QLineEdit:focus {
-    border: 1px solid #3b82f6;
-    background-color: #262b38;
+QLineEdit:focus { /* 输入框聚焦时边框颜色 */
+    border: 1px solid #3b82f6; /* 边框颜色 */
+    background-color: #262b38; /* 背景颜色 */
 }
 
-QLineEdit::placeholder {
-    color: #6d7588;
+QLineEdit::placeholder { /* 输入框占位符颜色 */
+    color: #6d7588; /* 占位符颜色 */
 }
 
-QPushButton#login_button {
-    background-color: #2f6fed;
-    color: #ffffff;
-    border: none;
-    border-radius: 10px;
-    font-size: 15px;
-    font-weight: 600;
+QPushButton#login_button { /* 登录按钮 */
+    background-color: #2f6fed; /* 背景颜色 */
+    color: #ffffff; /* 文字颜色 */
+    border: none; /* 边框 */
+    border-radius: 10px; /* 圆角 */
+    font-size: 15px; /* 字体大小 */
+    font-weight: 600; /* 字体粗细 */
 }
 
-QPushButton#login_button:hover {
-    background-color: #3b7fff;
+QPushButton#login_button:hover { /* 登录按钮悬停时背景颜色 */
+    background-color: #3b7fff; /* 背景颜色 */
 }
 
-QPushButton#login_button:pressed {
-    background-color: #255fd4;
+QPushButton#login_button:pressed { /* 登录按钮按下时背景颜色 */
+    background-color: #255fd4; /* 背景颜色 */
 }
 
-QPushButton#framelessCloseBtn {
-    background-color: transparent;
-    border: none;
-    color: #8b93a7;
-    font-size: 16px;
-    font-weight: bold;
-    border-radius: 6px;
+QPushButton#framelessCloseBtn { /* 关闭按钮 */
+    background-color: transparent; /* 背景颜色 */
+    border: none; /* 边框 */
+    color: #8b93a7; /* 文字颜色 */
+    font-size: 16px; /* 字体大小 */
+    font-weight: bold; /* 字体粗细 */
+    border-radius: 6px; /* 圆角 */
 }
 
-QPushButton#framelessCloseBtn:hover {
-    background-color: #e81123;
-    color: #ffffff;
+QPushButton#framelessCloseBtn:hover { /* 关闭按钮悬停时背景颜色 */
+    background-color: #e81123; /* 背景颜色 */
+    color: #ffffff; /* 文字颜色 */
 }

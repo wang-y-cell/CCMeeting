@@ -44,7 +44,7 @@
    <item>
     <widget class="QLabel" name="brandLabel">
      <property name="text">
-      <string>CloudMeeting</string>
+      <string>云会议</string>
      </property>
      <property name="alignment">
       <set>Qt::AlignmentFlag::AlignCenter</set>
