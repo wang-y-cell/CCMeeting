@@ -173,10 +173,17 @@ void MessageHub::recvLoop(Message::Channel channel)
 
 void MessageHub::startSendWorkers()
 {
+    // 已在运行则不重复启动
     if (m_sendRunning.load())
         return;
 
-    m_sendRunning.store(true);
+    // 回收上次异步停止残留的线程
+    joinSendThreads();
+
+    if (m_sendRunning.exchange(true))
+        return;
+
+    std::lock_guard<std::mutex> lock(m_sendThreadMutex);
     m_sendRequestThread = QThread::create([this]() { sendLoop(Message::Channel::Request); });
     m_sendTextThread = QThread::create([this]() { sendLoop(Message::Channel::Text); });
     m_sendVideoThread = QThread::create([this]() { sendLoop(Message::Channel::Video); });
@@ -186,6 +193,54 @@ void MessageHub::startSendWorkers()
     m_sendTextThread->start();
     m_sendVideoThread->start();
     m_sendAudioThread->start();
+}
+
+void MessageHub::joinSendThreads()
+{
+    std::lock_guard<std::mutex> lock(m_sendThreadMutex);
+    auto join = [](QThread *&thread) {
+        if (!thread)
+            return;
+        thread->wait(3000);
+        delete thread;
+        thread = nullptr;
+    };
+
+    join(m_sendRequestThread);
+    join(m_sendTextThread);
+    join(m_sendVideoThread);
+    join(m_sendAudioThread);
+}
+
+void MessageHub::stopSendWorkers() {
+    if (!m_sendRunning.exchange(false)) {
+        joinSendThreads();
+        return;
+    }
+
+    m_sendRequest.wakeAll();
+    m_sendText.wakeAll();
+    m_sendVideo.wakeAll();
+    m_sendAudio.wakeAll();
+    joinSendThreads();
+}
+
+void MessageHub::stopSendWorkersAsync()
+{
+    if (!m_sendRunning.exchange(false))
+        return;
+
+    m_sendRequest.wakeAll();
+    m_sendText.wakeAll();
+    m_sendVideo.wakeAll();
+    m_sendAudio.wakeAll();
+
+    // 在后台线程 join，避免阻塞 UI
+    QThread *joiner = QThread::create([this]() {
+        joinSendThreads();
+    });
+    QObject::connect(joiner, &QThread::finished, joiner, &QObject::deleteLater);
+    joiner->start();
 }
 
 void MessageHub::startRecvWorkers()
@@ -203,33 +258,6 @@ void MessageHub::startRecvWorkers()
     m_recvUserInfoThread->start();
     m_recvTextThread->start();
     m_recvVideoThread->start();
-}
-
-void MessageHub::stopSendWorkers() {
-    /**设置发送运行状态为false,唤醒所有线程之后
-      退出循环
-    */
-    if (!m_sendRunning.exchange(false))
-        return;
-
-    /**唤醒所有被条件变量阻塞的线程*/
-    m_sendRequest.wakeAll();
-    m_sendText.wakeAll();
-    m_sendVideo.wakeAll();
-    m_sendAudio.wakeAll();
-
-    auto join = [](QThread *&thread) {
-        if (!thread)
-            return;
-        thread->wait(3000);
-        delete thread;
-        thread = nullptr;
-    };
-
-    join(m_sendRequestThread);
-    join(m_sendTextThread);
-    join(m_sendVideoThread);
-    join(m_sendAudioThread);
 }
 
 void MessageHub::stopRecvWorkers()

@@ -40,6 +40,7 @@ signals:
     void textMessageReady(Message msg);
     void videoMessageReady(Message msg);
     void sendTextFinished();
+    void disconnected();
 
 private:
     MessageHub *_hub = nullptr;

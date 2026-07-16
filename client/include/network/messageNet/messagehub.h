@@ -27,9 +27,13 @@ public:
     */
     void startSendWorkers();
     /** 
-    停止发送工作线程
+    停止发送工作线程（同步等待，析构用）
     */
     void stopSendWorkers();
+    /** 
+    停止发送工作线程（异步 join，不阻塞调用方）
+    */
+    void stopSendWorkersAsync();
     /** 
     停止消息中心
     */
@@ -116,6 +120,8 @@ private:
     @param channel 通道
     */
     void recvLoop(Message::Channel channel);
+    /** 等待并回收发送线程 */
+    void joinSendThreads();
 
     MessageQueue m_sendRequest;
     MessageQueue m_sendText;
@@ -143,6 +149,8 @@ private:
     QThread *m_recvTextThread = nullptr;
     QThread *m_recvVideoThread = nullptr;
     QThread *m_recvAudioThread = nullptr;
+
+    std::mutex m_sendThreadMutex;
 };
 
 #endif // MESSAGEHUB_H

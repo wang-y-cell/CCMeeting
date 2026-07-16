@@ -37,6 +37,7 @@ private:
     bool _joinmeet = false; //是否加入会议
     bool _openCamera = false; //是否打开摄像头
     bool _sessionActive = false; //是否已连接服务器（会议会话）
+    bool _sessionEnding = false; //是否正在异步结束会议
     NetworkManager *_network = nullptr; //统一网络收发
     std::unordered_map<std::uint32_t, Partner *> partner; //用于记录房间用户
     AudioInput* _ainput = nullptr;
@@ -104,6 +105,7 @@ private slots:
     void speaks(QString); //说话
     void on_sendmsg_clicked(); //发送消息
     void textSend(); //发送文本
+    void onNetworkDisconnected(); //异步断线完成
 signals:
     void stopAudio();
     void startAudio();

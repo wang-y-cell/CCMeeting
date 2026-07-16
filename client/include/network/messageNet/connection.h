@@ -21,7 +21,9 @@ public:
     void setMessageHub(MessageHub *hub);
 
     bool connectToServer(const QString &ip, const QString &port);
+    /** 异步断开：投递到 IO 线程销毁 socket，完成后发出 disconnected */
     void disconnectFromHost();
+    /** 同步销毁 socket（析构/强制停止用） */
     void stopImmediately();
 
     QString errorString() const;
@@ -39,6 +41,7 @@ private slots:
     void onReadyRead();
     void onSocketError(QAbstractSocket::SocketError error);
     void destroySocket();
+    void disconnectOnIoThread();
 
 private:
     MessageHub *m_hub = nullptr;

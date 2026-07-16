@@ -24,6 +24,7 @@
 #include <QCloseEvent>
 #include <QEvent>
 #include <QFile>
+#include <QTimer>
 #include <cstdarg>
 #include <qnamespace.h>
 #include <QSplitter>
@@ -59,6 +60,7 @@ void Widget::initConnect() {
     connect(_network, &NetworkManager::textMessageReady, this, &Widget::onTextMessage, Qt::QueuedConnection);
     connect(_network, &NetworkManager::videoMessageReady, this, &Widget::onVideoMessage, Qt::QueuedConnection);
     connect(_network, &NetworkManager::sendTextFinished, this, &Widget::textSend);
+    connect(_network, &NetworkManager::disconnected, this, &Widget::onNetworkDisconnected, Qt::QueuedConnection);
 
     connect(this, &Widget::startAudio, _ainput, &AudioInput::startCollect);
     connect(this, &Widget::stopAudio, _ainput, &AudioInput::stopCollect);
@@ -149,8 +151,23 @@ Widget::~Widget() {
 void Widget::closeEvent(QCloseEvent *event) {
     spdlog::info("[Widget] 关闭窗口");
     hide();
-    endMeetingSession();
     event->ignore();
+
+    if (_sessionEnding)
+        return;
+    _sessionEnding = true;
+
+    // 先返回事件循环，再清理；断线在 IO 线程异步完成
+    QTimer::singleShot(0, this, [this]() {
+        endMeetingSession();
+    });
+}
+
+void Widget::onNetworkDisconnected() {
+    _sessionActive = false;
+    _sessionEnding = false;
+    spdlog::info("[Widget] 网络已异步断开");
+    updateMeetingInfo();
 }
 
 void Widget::resetMeetingUi() {
@@ -201,18 +218,29 @@ void Widget::updateMeetingInfo() {
 
 void Widget::endMeetingSession() {
     spdlog::info("[Widget] 结束会议会话");
-    _cameraVideo->endVideo();
+
+    // 摄像头/音频尽快停，音频走跨线程信号，避免在 UI 线程直接调 QAudio
+    if (_cameraVideo)
+        _cameraVideo->endVideo();
+    emit stopAudio();
 
     _createmeet = false;
     _joinmeet = false;
-    clearPartner();
 
+    // 先异步断线（IO 线程），不在这里 wait 任何工作线程
     if (_network && _sessionActive) {
+        _sessionEnding = true;
         _network->disconnectFromHost();
         _sessionActive = false;
+    } else {
+        _sessionEnding = false;
     }
 
-    resetMeetingUi();
+    // UI 清理尽量轻量；拆到下一拍，尽快把控制权交回事件循环
+    QTimer::singleShot(0, this, [this]() {
+        clearPartner();
+        resetMeetingUi();
+    });
 }
 
 void Widget::shutdownAllWorkers() {
@@ -305,10 +333,16 @@ bool Widget::on_connServer(QString ip, QString port) {
         spdlog::warn("[Widget] on_connServer: network not initialized");
         return false;
     }
+    if (_sessionEnding) {
+        spdlog::warn("[Widget] on_connServer: session is ending, try later");
+        QMessageBox::information(this, tr("提示"), tr("会议正在关闭，请稍后再试"));
+        return false;
+    }
     repaint();
 
     if(_network->connectToServer(ip, port, this)) {
         _sessionActive = true;
+        _sessionEnding = false;
         _serverAddr = ip + ":" + port;
         updateMeetingInfo();
         ui->openAudio->setDisabled(true);
@@ -324,11 +358,12 @@ bool Widget::on_connServer(QString ip, QString port) {
 
 void Widget::on_disconnectServer() {
     if (_network && _sessionActive) {
+        _sessionEnding = true;
         _network->disconnectFromHost();
         _sessionActive = false;
         _serverAddr.clear();
         updateMeetingInfo();
-        spdlog::info("[Widget] 断开服务器连接");
+        spdlog::info("[Widget] 断开服务器连接（异步）");
     }
 }
 
@@ -579,7 +614,7 @@ void Widget::removePartner(std::uint32_t ip)
         //只有自已一个人时，关闭传输音频
         if (partner.size() <= 1 && _ainput && _aoutput)
         {
-			_ainput->stopCollect();
+            emit stopAudio();
             _aoutput->stopPlay();
             ui->openAudio->setText(QString(OPENAUDIO).toUtf8());
             ui->openAudio->setDisabled(true);
@@ -604,9 +639,8 @@ void Widget::clearPartner() {
         it = partner.erase(it);
     }
 
-    //关闭传输音频
-    if (_ainput)
-	    _ainput->stopCollect();
+    //关闭传输音频（通过信号投递到音频线程）
+    emit stopAudio();
     if (_aoutput)
         _aoutput->stopPlay();
 	ui->openAudio->setText(QString(CLOSEAUDIO).toUtf8());

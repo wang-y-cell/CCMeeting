@@ -20,7 +20,6 @@ Connection::Connection(QObject *parent)
 Connection::~Connection()
 {
     stopImmediately();
-    disconnectFromHost();
     m_ioThread.quit();
     m_ioThread.wait(3000);
 }
@@ -167,12 +166,20 @@ void Connection::disconnectFromHost()
     m_hasLocalIp = false;
     m_localIp = 0;
 
-    if (m_ioThread.isRunning())
-        QMetaObject::invokeMethod(this, "destroySocket", Qt::BlockingQueuedConnection);
-
     if (m_hub)
         m_hub->clearAll();
 
+    if (m_ioThread.isRunning()) {
+        // 异步投递到 IO 线程，不阻塞调用方（通常是 UI 线程）
+        QMetaObject::invokeMethod(this, "disconnectOnIoThread", Qt::QueuedConnection);
+    } else {
+        emit disconnected();
+    }
+}
+
+void Connection::disconnectOnIoThread()
+{
+    destroySocket();
     emit disconnected();
 }
 
