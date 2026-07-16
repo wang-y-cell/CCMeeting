@@ -1,7 +1,7 @@
 #ifndef MAIN_WINDOW_H
 #define MAIN_WINDOW_H
 
-#include <QWidget>
+#include "frameless_window.h"
 #include "stack_conn_server.h"
 #include "widget.h"
 #include "stack_create_meet.h"
@@ -11,7 +11,7 @@ namespace Ui {
 class main_window;
 }
 
-class main_window : public QWidget
+class main_window : public FramelessWindow<QWidget>
 {
     Q_OBJECT
 

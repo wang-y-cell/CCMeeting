@@ -9,8 +9,10 @@ option(BUILD_SERVER "Build CloudMeeting server" OFF)
 
 # 至少一个构建选项被选中
 if(NOT BUILD_CLIENT AND NOT BUILD_SERVER)
-    message(FATAL_ERROR "At least one of BUILD_CLIENT or BUILD_SERVER must be ON.")
+    message(FATAL_ERROR "[message] At least one of BUILD_CLIENT or BUILD_SERVER must be ON.")
 endif()
+
+list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/third_party/spdlog")
 
 # 设置编译选项
 if(MSVC)

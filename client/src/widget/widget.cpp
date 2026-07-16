@@ -29,7 +29,7 @@
 QRect  Widget::pos = QRect(-1, -1, -1, -1);
 
 Widget::Widget(QWidget *parent)
-    : QWidget(parent)
+    : FramelessWindow<QWidget>(parent)
     , ui(new Ui::Widget) {
     qRegisterMetaType<Message>("Message");
     spdlog::info("[Widget] -------------------------Application Start---------------------------");

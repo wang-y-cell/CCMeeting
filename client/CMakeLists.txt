@@ -9,8 +9,10 @@ set(CMAKE_AUTOUIC_SEARCH_PATHS
 if(NOT QT_INSTALL_PATH)
     if(DEFINED ENV{Qt6_DIR}) # 如果Qt6_DIR环境变量存在，则使用该路径
         get_filename_component(QT_INSTALL_PATH "$ENV{Qt6_DIR}/../.." ABSOLUTE)
+        message(STATUS "[message] QT_INSTALL_PATH: ${QT_INSTALL_PATH}")
     else()
         set(QT_INSTALL_PATH "F:/Qt/6.8.3/mingw_64")
+        message(STATUS "[message] QT_INSTALL_PATH not found use default: ${QT_INSTALL_PATH}")
     endif()
 endif()
 list(PREPEND CMAKE_PREFIX_PATH "${QT_INSTALL_PATH}") # 将Qt安装路径添加到CMAKE_PREFIX_PATH前面

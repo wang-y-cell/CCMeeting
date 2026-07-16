@@ -9,11 +9,13 @@
 #include <QStackedWidget>
 #include <QHBoxLayout>
 #include <QFile>
+#include <QStringList>
 
 
 main_window::main_window(QWidget *parent)
-: QWidget(parent) {
+: FramelessWindow<QWidget>(parent) {
     init_ui();
+    setWindowTitle(tr("CloudMeeting"));
     set_style();
     widget = new Widget(nullptr);
 
@@ -52,49 +54,56 @@ main_window::~main_window() {
 }
 
 void main_window::init_ui() {
-    resize(800, 600); //设置窗口初始大小
-    setMinimumSize(600, 360); //设置窗口最小大小
-    setMaximumSize(1200, 720); //设置窗口最大大小
-    QHBoxLayout *mainLayout = new QHBoxLayout(this);
-    QListWidget* left_bar = new QListWidget(this); 
-    left_bar->setSpacing(10); //设置每个item之间间隔位10px
+    setObjectName(QStringLiteral("main_window"));
+    resize(960, 640);
+    setMinimumSize(760, 480);
+    setMaximumSize(1280, 800);
+
+    auto *mainLayout = new QHBoxLayout(this);
+    mainLayout->setContentsMargins(18, 42, 18, 18);
+    mainLayout->setSpacing(16);
+
+    auto *left_bar = new QListWidget(this);
+    left_bar->setObjectName(QStringLiteral("sideNav"));
+    left_bar->setSpacing(4);
     left_bar->setFrameShape(QListWidget::NoFrame);
-    left_bar->setFocusPolicy(Qt::NoFocus); 
-    left_bar->setFixedWidth(200); //设置左侧菜单栏固定宽度
+    left_bar->setFocusPolicy(Qt::NoFocus);
+    left_bar->setFixedWidth(196);
     left_bar->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    left_bar->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
-    /*设置左侧菜单栏按钮字样*/
-    std::string left_bar_items[] = {"创建会议", "加入会议", "连接服务器"};
+    const QStringList left_bar_items = {
+        QStringLiteral("创建会议"),
+        QStringLiteral("加入会议"),
+        QStringLiteral("连接服务器"),
+    };
 
-    /*设置左侧菜单栏按钮*/
-    for(const auto& item : left_bar_items) {
-        QListWidgetItem* listWidgetItem = new QListWidgetItem(item.c_str());
-        listWidgetItem->setSizeHint(QSize(0, 50));
+    for (const auto &item : left_bar_items) {
+        auto *listWidgetItem = new QListWidgetItem(item);
+        listWidgetItem->setSizeHint(QSize(0, 48));
         listWidgetItem->setTextAlignment(Qt::AlignCenter);
         QFont font = listWidgetItem->font();
-        font.setPointSize(10);
-        font.setWeight(QFont::Bold);
+        font.setPointSize(11);
+        font.setWeight(QFont::DemiBold);
         listWidgetItem->setFont(font);
         left_bar->addItem(listWidgetItem);
     }
 
-    /*设置右侧内容区*/
-    QStackedWidget* stackedWidget = new QStackedWidget(this);
+    auto *stackedWidget = new QStackedWidget(this);
+    stackedWidget->setObjectName(QStringLiteral("contentStack"));
     mainLayout->addWidget(left_bar);
-    mainLayout->addWidget(stackedWidget);
+    mainLayout->addWidget(stackedWidget, 1);
 
-    /*创建房间窗口*/
     create_meeting_widget = new stack_create_meet(this);
     stackedWidget->addWidget(create_meeting_widget);
 
-    /*加入房间窗口*/
     join_meeting_widget = new stack_join_meet(this);
     stackedWidget->addWidget(join_meeting_widget);
 
-    /*连接服务器*/
     connect_to_server_widget = new stack_conn_server(this);
-    stackedWidget->addWidget(connect_to_server_widget); 
+    stackedWidget->addWidget(connect_to_server_widget);
 
+    left_bar->setCurrentRow(0);
     connect(left_bar, &QListWidget::currentRowChanged, stackedWidget, &QStackedWidget::setCurrentIndex);
 }
 

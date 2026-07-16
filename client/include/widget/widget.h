@@ -2,7 +2,7 @@
 #define WIDGET_H
 
 #include "AudioInput.h"
-#include <QWidget>
+#include "frameless_window.h"
 #include <QVideoFrame>
 #include <QCamera>
 #include <QMediaCaptureSession>
@@ -27,7 +27,7 @@ QT_END_NAMESPACE
 class QListWidgetItem;
 
 
-class Widget : public QWidget 
+class Widget : public FramelessWindow<QWidget>
 {
     Q_OBJECT
 private:

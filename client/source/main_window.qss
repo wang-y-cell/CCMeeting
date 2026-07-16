@@ -1,55 +1,115 @@
-
-QListWidget { 
-    background-color: #2E303D; /*设置背景颜色*/
-    border-radius: 15px; /*设置圆角*/
-    border: none; /*设置没有边框*/
+QWidget#main_window {
+    background-color: #14161c;
 }
 
-QListWidget::item {
-    color: white; /*设置内容颜色,这里可以是文字*/
-    border-radius: 15px;
+QListWidget#sideNav {
+    background-color: #1c1f28;
+    border: 1px solid #2a2e38;
+    border-radius: 14px;
+    padding: 10px 8px;
+    outline: none;
 }
 
-QListWidget::item:hover {
-    background-color: #545D6E;
+QListWidget#sideNav::item {
+    color: #a9b1c3;
+    border-radius: 10px;
+    margin: 4px 2px;
+    padding: 4px;
 }
 
-QListWidget::item:selected {
-    background-color: #214D81;
-    color: white;
+QListWidget#sideNav::item:hover {
+    background-color: #2a3040;
+    color: #ffffff;
+}
+
+QListWidget#sideNav::item:selected {
+    background-color: #2f6fed;
+    color: #ffffff;
+}
+
+QStackedWidget#contentStack {
+    background-color: transparent;
+    border: none;
 }
 
 QFrame#frame {
-    border-radius: 15px;
-    background-color: #2E303D;
+    background-color: #1c1f28;
+    border: 1px solid #2a2e38;
+    border-radius: 16px;
 }
 
 QLabel {
-    border-radius: 15px;
-    background-color: #2E303D;
+    background: transparent;
+    border: none;
+    color: #c5ccd9;
 }
 
-QPushButton {
-    border-radius: 15px;
-    background-color: #214D81;
-    color: white;
-
+QLabel#pageTitle {
+    color: #f3f5f8;
+    font-size: 22px;
+    font-weight: 700;
 }
 
-QPushButton#joinMeeting_btn{ /*joinMeeting_btn单独设置 */
-    border-radius: 5px;
+QLabel#pageDesc {
+    color: #7f8799;
+    font-size: 13px;
 }
 
-QPushButton:hover {
-    background-color: #545D6E;
+QLabel#fieldLabel,
+QLabel#fieldLabel_2 {
+    color: #aeb6c7;
+    font-size: 13px;
+    font-weight: 600;
 }
 
 QLineEdit {
-    border: 1px solid #214D81;
-    border-radius: 5px;
+    background-color: #232733;
+    color: #eef1f6;
+    border: 1px solid #343a48;
+    border-radius: 10px;
+    padding: 0 14px;
+    min-height: 40px;
+    font-size: 14px;
+}
+
+QLineEdit:hover {
+    border-color: #455066;
 }
 
 QLineEdit:focus {
-    border: 1px solid #0015FF;
+    border: 1px solid #3b82f6;
+    background-color: #262b38;
 }
 
+QPushButton {
+    background-color: #2f6fed;
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    min-height: 44px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+QPushButton:hover {
+    background-color: #3b7fff;
+}
+
+QPushButton:pressed {
+    background-color: #255fd4;
+}
+
+QPushButton#joinMeeting_btn,
+QPushButton#create_meeting_btn,
+QPushButton#connServer_btn {
+    min-height: 46px;
+}
+
+QScrollArea {
+    background: transparent;
+    border: none;
+}
+
+QScrollArea > QWidget > QWidget {
+    background: transparent;
+}

@@ -1,5 +1,113 @@
+* {
+    font-family: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei";
+    outline: none;
+}
+
 QWidget {
-    background-color: #1E1F27; /* 深色背景 */
-    color: #ffffff;            /* 白色文字 */
-    font-family: "Segoe UI", "Microsoft YaHei";
+    background-color: #17191f;
+    color: #e8ebf2;
+}
+
+QLabel {
+    background: transparent;
+    color: #d7dce8;
+}
+
+QToolTip {
+    background-color: #2a2f3c;
+    color: #e8ebf2;
+    border: 1px solid #3a4152;
+    padding: 6px 8px;
+    border-radius: 6px;
+}
+
+QScrollArea {
+    background: transparent;
+    border: none;
+}
+
+QScrollBar:vertical {
+    background: transparent;
+    width: 8px;
+    margin: 2px;
+}
+
+QScrollBar::handle:vertical {
+    background: #3a4152;
+    border-radius: 4px;
+    min-height: 24px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: #4b5468;
+}
+
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical,
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background: none;
+    height: 0;
+}
+
+QLineEdit {
+    background-color: #232733;
+    color: #eef1f6;
+    border: 1px solid #343a48;
+    border-radius: 8px;
+    padding: 0 12px;
+    selection-background-color: #2f6fed;
+}
+
+QLineEdit:focus {
+    border: 1px solid #3b82f6;
+}
+
+QPushButton {
+    background-color: #2f6fed;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-weight: 600;
+}
+
+QPushButton:hover {
+    background-color: #3b7fff;
+}
+
+QPushButton:pressed {
+    background-color: #255fd4;
+}
+
+QPushButton:disabled {
+    background-color: #343a48;
+    color: #7a8294;
+}
+
+QPushButton#framelessCloseBtn {
+    background-color: transparent;
+    border: none;
+    color: #8b93a7;
+    font-size: 16px;
+    font-weight: bold;
+    padding: 0;
+    border-radius: 6px;
+}
+
+QPushButton#framelessCloseBtn:hover {
+    background-color: #e81123;
+    color: #ffffff;
+}
+
+QPushButton#framelessCloseBtn:pressed {
+    background-color: #c50f1f;
+}
+
+QMessageBox {
+    background-color: #1e2129;
+}
+
+QMessageBox QLabel {
+    color: #e8ebf2;
 }

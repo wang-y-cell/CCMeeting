@@ -6,14 +6,14 @@
 #include <spdlog/spdlog.h>
 
 login::login(QWidget *parent)
-    : QDialog(parent)
+    : FramelessWindow<QDialog>(parent)
     , ui(new Ui::login)
 {
     ui->setupUi(this);
+    setWindowTitle(tr("登录"));
     set_style();
 
     connect(ui->login_button, &QPushButton::clicked, this, &login::Login);
-
 }
 
 void login::set_style() {
@@ -34,8 +34,8 @@ login::~login()
 }
 
 void login::Login() {
-    QString username = ui->account_line->text();
-    QString password = ui->password_line->text();
+    QString username = ui->account_line->text(); //获得账号输入框的内容
+    QString password = ui->password_line->text(); //获得密码输入框的内容
 
     if(username == "root" && password == "123456") {
         accept();
