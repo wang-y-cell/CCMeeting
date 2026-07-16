@@ -1,6 +1,6 @@
 build/
+build-server/
 .cache/
 .qtcreator/
 log.txt
 third_party/
-build-server/

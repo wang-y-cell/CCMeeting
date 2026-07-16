@@ -5,19 +5,21 @@ set(CMAKE_AUTOUIC_SEARCH_PATHS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui"
 )
 
+# 设置Qt安装路径, 在命令行中使用 -DQT_INSTALL_PATH=路径 指定Qt安装路径
 if(NOT QT_INSTALL_PATH)
-    if(DEFINED ENV{Qt6_DIR})
+    if(DEFINED ENV{Qt6_DIR}) # 如果Qt6_DIR环境变量存在，则使用该路径
         get_filename_component(QT_INSTALL_PATH "$ENV{Qt6_DIR}/../.." ABSOLUTE)
     else()
         set(QT_INSTALL_PATH "F:/Qt/6.8.3/mingw_64")
     endif()
 endif()
-list(PREPEND CMAKE_PREFIX_PATH "${QT_INSTALL_PATH}")
+list(PREPEND CMAKE_PREFIX_PATH "${QT_INSTALL_PATH}") # 将Qt安装路径添加到CMAKE_PREFIX_PATH前面
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets Multimedia MultimediaWidgets Network)
 find_package(Threads REQUIRED)
 find_package(spdlog REQUIRED)
 
+# 获取客户端源文件
 file(GLOB_RECURSE CLIENT_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
@@ -26,7 +28,7 @@ file(GLOB_RECURSE CLIENT_SOURCES CONFIGURE_DEPENDS
 list(SORT CLIENT_SOURCES)
 
 qt_add_executable(CloudMeetingClient
-    MANUAL_FINALIZATION
+    MANUAL_FINALIZATION # 先不自动完成 Qt 可执行文件的收尾，要手动调用 qt_finalize_executable
     ${CLIENT_SOURCES}
     resource.qrc
 )
