@@ -104,6 +104,21 @@ QPushButton#framelessCloseBtn:pressed {
     background-color: #c50f1f;
 }
 
+QPushButton#framelessMaxBtn {
+    background-color: transparent;
+    border: none;
+    color: #8b93a7;
+    font-size: 14px;
+    font-weight: bold;
+    padding: 0;
+    border-radius: 6px;
+}
+
+QPushButton#framelessMaxBtn:hover {
+    background-color: #2a3040;
+    color: #ffffff;
+}
+
 QMessageBox {
     background-color: #1e2129;
 }

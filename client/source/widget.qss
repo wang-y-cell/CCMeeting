@@ -1,6 +1,6 @@
 QWidget#meetingWidget {
     background-color: #17191f;
-    border: 1px solid #3a4152;
+    border: 2px solid #2f6fed;
     border-radius: 12px;
 }
 
@@ -96,5 +96,20 @@ QPushButton#framelessCloseBtn {
 
 QPushButton#framelessCloseBtn:hover {
     background-color: #e81123;
+    color: #ffffff;
+}
+
+QPushButton#framelessMaxBtn {
+    background-color: transparent;
+    border: none;
+    color: #8b93a7;
+    font-size: 14px;
+    font-weight: bold;
+    padding: 0;
+    border-radius: 6px;
+}
+
+QPushButton#framelessMaxBtn:hover {
+    background-color: #2a3040;
     color: #ffffff;
 }

@@ -57,7 +57,7 @@ void main_window::init_ui() {
     setObjectName(QStringLiteral("main_window"));
     resize(960, 640);
     setMinimumSize(760, 480);
-    setMaximumSize(1280, 800);
+    setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
 
     auto *mainLayout = new QHBoxLayout(this);
     mainLayout->setContentsMargins(18, 42, 18, 18);

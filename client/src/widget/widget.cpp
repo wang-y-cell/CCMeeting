@@ -108,9 +108,9 @@ void Widget::initUI() {
     );
 
     this->setGeometry(size); //设置我的窗口位置
-    //设置窗口最大最小值
+    //设置窗口最小尺寸，最大不限制以便缩放/最大化
     this->setMinimumSize(QSize(Widget::pos.width() * 0.7, Widget::pos.height() * 0.7));
-    this->setMaximumSize(QSize(Widget::pos.width(), Widget::pos.height()));
+    this->setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
 
     //初始化这些按钮是不能点击的状态
     ui->openAudio->setDisabled(true);

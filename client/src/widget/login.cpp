@@ -11,6 +11,9 @@ login::login(QWidget *parent)
 {
     ui->setupUi(this);
     setWindowTitle(tr("登录"));
+    setResizable(false);
+    if (maximizeButton())
+        maximizeButton()->hide();
     set_style();
 
     connect(ui->login_button, &QPushButton::clicked, this, &login::Login);
