@@ -11,5 +11,6 @@
         <file>source/style.qss</file>
         <file>source/login.qss</file>
         <file>source/main_window.qss</file>
+        <file>source/widget.qss</file>
     </qresource>
 </RCC>

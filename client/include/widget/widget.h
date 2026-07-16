@@ -47,6 +47,8 @@ private:
     int m_lastChatListWidth = -1;
     bool m_inChatRelayout = false;
     CameraVideo *_cameraVideo = nullptr; //统一处理图像/视频显示
+    int _roomNo = 0; //当前会议房间号
+    QString _serverAddr; //当前服务器地址 ip:port
 private:
     void initUI(); //初始化UI
     void initConnect(); //初始化信号与槽
@@ -55,6 +57,7 @@ private:
     void initPermanentWorkers();//初始化永久工作线程
     void endMeetingSession(); //结束会议会话
     void resetMeetingUi(); //重置会议UI
+    void updateMeetingInfo(); //刷新会议信息页
     void shutdownAllWorkers(); //关闭所有工作线程
    Partner* addPartner(std::uint32_t); //添加用户
     void removePartner(std::uint32_t); //删除用户

@@ -1,0 +1,100 @@
+QWidget#meetingWidget {
+    background-color: #17191f;
+    border: 1px solid #3a4152;
+    border-radius: 12px;
+}
+
+QGroupBox {
+    background-color: #1c1f28;
+    border: 1px solid #2a2e38;
+    border-radius: 10px;
+    margin-top: 14px;
+    padding-top: 10px;
+    color: #aeb6c7;
+    font-weight: 600;
+}
+
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: 12px;
+    padding: 0 6px;
+    color: #aeb6c7;
+    background-color: #1c1f28;
+}
+
+QGroupBox#groupBox_2 {
+    background-color: #1a1d25;
+    border: 1px solid #323846;
+}
+
+QGroupBox#groupBox_2::title {
+    color: #c5ccd9;
+}
+
+QGroupBox#groupBox_5,
+QGroupBox#groupBox_6 {
+    background-color: #1c1f28;
+    border: 1px solid #2a2e38;
+}
+
+QTabWidget::pane {
+    background-color: #1c1f28;
+    border: 1px solid #2a2e38;
+    border-radius: 8px;
+    top: -1px;
+}
+
+QTabBar::tab {
+    background-color: #232733;
+    color: #8b93a7;
+    border: 1px solid #2a2e38;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin: 2px;
+}
+
+QTabBar::tab:selected {
+    background-color: #2f6fed;
+    color: #ffffff;
+    border-color: #2f6fed;
+}
+
+QTabBar::tab:hover:!selected {
+    background-color: #2a3040;
+    color: #e8ebf2;
+}
+
+QSplitter::handle:horizontal {
+    background-color: #2a2e38;
+    width: 2px;
+    margin: 4px 1px;
+}
+
+QListWidget {
+    background-color: #1a1d25;
+    border: 1px solid #2a2e38;
+    border-radius: 8px;
+    color: #e8ebf2;
+}
+
+QLabel#mainshow_label {
+    background-color: #12141a;
+    border: 1px solid #2a2e38;
+    border-radius: 8px;
+}
+
+QPushButton#framelessCloseBtn {
+    background-color: transparent;
+    border: none;
+    color: #8b93a7;
+    font-size: 16px;
+    font-weight: bold;
+    padding: 0;
+    border-radius: 6px;
+}
+
+QPushButton#framelessCloseBtn:hover {
+    background-color: #e81123;
+    color: #ffffff;
+}

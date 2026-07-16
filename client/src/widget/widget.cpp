@@ -23,6 +23,7 @@
 #include <QSoundEffect>
 #include <QCloseEvent>
 #include <QEvent>
+#include <QFile>
 #include <cstdarg>
 #include <qnamespace.h>
 #include <QSplitter>
@@ -78,6 +79,20 @@ void Widget::initPartnerConnect(Partner *p) {
 void Widget::initUI() {
     spdlog::debug("[Widget] 初始化UI");
     ui->setupUi(this);  //解析ui文件
+    setObjectName(QStringLiteral("meetingWidget"));
+
+    QFile styleFile(":/Style/source/widget.qss");
+    if (styleFile.open(QFile::ReadOnly)) {
+        setStyleSheet(QLatin1String(styleFile.readAll()));
+        styleFile.close();
+        spdlog::info("[Widget] widget.qss loaded");
+    } else {
+        spdlog::warn("[Widget] widget.qss not found");
+    }
+
+    /* 四周留白；顶部加大，给无边框关闭按钮留空间 */
+    ui->verticalLayout->setContentsMargins(18, 42, 18, 18);
+    setTitleBarHeight(42);
 
     /*根据显示器大小动态调整窗口大小*/
     Widget::pos = QRect(0.1 * Screen::width, 0.1 * Screen::height, 0.8 * Screen::width, 0.8 * Screen::height);
@@ -107,7 +122,7 @@ void Widget::initUI() {
 
     ui->main_box->setSizes(QList<int>{300, 700});
     ui->listWidget->viewport()->installEventFilter(this);
-
+    updateMeetingInfo();
 }
 
 void Widget::initPermanentWorkers() {
@@ -144,7 +159,9 @@ void Widget::resetMeetingUi() {
     ui->openVedio->setDisabled(true);
     ui->sendmsg->setDisabled(true);
     ui->groupBox_2->setTitle(QString("主屏幕"));
-    ui->outlog->setText(tr("已退出会议"));
+    _roomNo = 0;
+    _serverAddr.clear();
+    updateMeetingInfo();
     while (ui->listWidget->count() > 0) {
         QListWidgetItem *item = ui->listWidget->takeItem(0);
         ChatMessage *chat = (ChatMessage *)ui->listWidget->itemWidget(item);
@@ -154,6 +171,32 @@ void Widget::resetMeetingUi() {
     m_lastChatListWidth = -1;
     iplist.clear();
     ui->plainTextEdit->setCompleter(iplist);
+}
+
+void Widget::updateMeetingInfo() {
+    const bool inMeeting = _createmeet || _joinmeet;
+    if (!inMeeting) {
+        ui->labelMeetStatus->setText(tr("未加入会议"));
+        ui->labelRoomNo->setText(QStringLiteral("-"));
+        ui->labelMemberCount->setText(QStringLiteral("0"));
+        ui->labelLocalIp->setText(QStringLiteral("-"));
+        ui->labelSpeaker->setText(QStringLiteral("-"));
+    } else {
+        ui->labelMeetStatus->setText(_createmeet ? tr("已创建会议") : tr("已加入会议"));
+        ui->labelRoomNo->setText(_roomNo > 0 ? QString::number(_roomNo) : QStringLiteral("-"));
+        ui->labelMemberCount->setText(QString::number(static_cast<int>(partner.size())));
+        if (_network && _network->localIp() != 0)
+            ui->labelLocalIp->setText(QHostAddress(_network->localIp()).toString());
+        else
+            ui->labelLocalIp->setText(QStringLiteral("-"));
+    }
+
+    if (_sessionActive && !_serverAddr.isEmpty())
+        ui->labelServer->setText(_serverAddr);
+    else if (_sessionActive)
+        ui->labelServer->setText(tr("已连接"));
+    else
+        ui->labelServer->setText(tr("未连接"));
 }
 
 void Widget::endMeetingSession() {
@@ -266,7 +309,8 @@ bool Widget::on_connServer(QString ip, QString port) {
 
     if(_network->connectToServer(ip, port, this)) {
         _sessionActive = true;
-        ui->outlog->setText("成功连接到" + ip + ":" + port);
+        _serverAddr = ip + ":" + port;
+        updateMeetingInfo();
         ui->openAudio->setDisabled(true);
         ui->openVedio->setDisabled(true);
         spdlog::info("[Widget] succeed connecting to {}:{}", ip.toStdString(), port.toStdString());
@@ -282,6 +326,8 @@ void Widget::on_disconnectServer() {
     if (_network && _sessionActive) {
         _network->disconnectFromHost();
         _sessionActive = false;
+        _serverAddr.clear();
+        updateMeetingInfo();
         spdlog::info("[Widget] 断开服务器连接");
     }
 }
@@ -308,7 +354,7 @@ void Widget::handleCreateMeetingResponse(const Message &msg) {
         QMessageBox::information(this, "Room No", QString("房间号：%1").arg(roomno), QMessageBox::Yes, QMessageBox::Yes);
 
         ui->groupBox_2->setTitle(QString("主屏幕(房间号: %1)").arg(roomno));
-        ui->outlog->setText(QString("创建成功 房间号: %1").arg(roomno));
+        _roomNo = roomno;
         _createmeet = true;
         ui->openVedio->setDisabled(false);
         ui->sendmsg->setDisabled(false);
@@ -323,10 +369,11 @@ void Widget::handleCreateMeetingResponse(const Message &msg) {
             ui->groupBox_2->setTitle(QHostAddress(mainip).toString());
             _cameraVideo->showMainAvatar();
         }
+        updateMeetingInfo();
     } else {
         _createmeet = false;
         QMessageBox::information(this, "Room Information", QString("无可用房间"), QMessageBox::Yes, QMessageBox::Yes);
-        ui->outlog->setText(QString("无可用房间"));
+        updateMeetingInfo();
         spdlog::warn("[Widget] no empty room");
     }
 }
@@ -336,18 +383,18 @@ void Widget::handleJoinMeetingResponse(const Message &msg) {
     const std::int32_t c = msg.responseCode;
     if (c == 0) {
         QMessageBox::information(this, "Meeting Error", tr("会议不存在"), QMessageBox::Yes, QMessageBox::Yes);
-        ui->outlog->setText(QString("会议不存在"));
         spdlog::warn("[Widget] meeting not exist");
         ui->openVedio->setDisabled(true);
         ui->sendmsg->setDisabled(true);
         _joinmeet = false;
+        _roomNo = 0;
+        updateMeetingInfo();
     } else if (c == -1) {
         QMessageBox::warning(this, "Meeting information", "成员已满，无法加入", QMessageBox::Yes, QMessageBox::Yes);
-        ui->outlog->setText(QString("成员已满，无法加入"));
         spdlog::warn("[Widget] full room, cannot join");
+        updateMeetingInfo();
     } else if (c > 0) {
         QMessageBox::warning(this, "Meeting information", "加入成功", QMessageBox::Yes, QMessageBox::Yes);
-        ui->outlog->setText(QString("加入成功"));
         spdlog::info("[Widget] succeed joining room");
         if (_network) {
             const std::uint32_t localIp = _network->localIp();
@@ -360,6 +407,7 @@ void Widget::handleJoinMeetingResponse(const Message &msg) {
         }
         ui->sendmsg->setDisabled(false);
         _joinmeet = true;
+        updateMeetingInfo();
     }
 }
 
@@ -389,9 +437,9 @@ void Widget::handlePartnerJoin(const Message &msg) {
     Partner *p = addPartner(msg.ip);
     if (p) {
         _cameraVideo->showAvatarForIp(msg.ip);
-        ui->outlog->setText(QString("%1 join meeting").arg(QHostAddress(msg.ip).toString()));
         iplist.push_back(QString("@") + QHostAddress(msg.ip).toString());
         ui->plainTextEdit->setCompleter(iplist);
+        updateMeetingInfo();
     }
 }
 
@@ -407,7 +455,7 @@ void Widget::handlePartnerExit(const Message &msg) {
     } else {
         spdlog::warn("[Widget] iplist remove failed, ip={}", QHostAddress(msg.ip).toString().toStdString());
     }
-    ui->outlog->setText(QString("%1 exit meeting").arg(QHostAddress(msg.ip).toString()));
+    updateMeetingInfo();
 }
 
 void Widget::handleCloseCamera(const Message &msg) {
@@ -424,12 +472,12 @@ void Widget::handlePartnerJoin2(const Message &msg) {
     }
     ui->plainTextEdit->setCompleter(iplist);
     ui->openVedio->setDisabled(false);
+    updateMeetingInfo();
 }
 
 void Widget::handleRemoteHostClosedError() {
     const bool wasInMeeting = _createmeet || _joinmeet;
     endMeetingSession();
-    ui->outlog->setText(QString("关闭与服务器的连接"));
     if (wasInMeeting)
         QMessageBox::warning(this, "Meeting Information", "会议结束", QMessageBox::Yes, QMessageBox::Yes);
 }
@@ -438,7 +486,6 @@ void Widget::handleOtherNetError()
 {
     const bool wasInMeeting = _createmeet || _joinmeet;
     endMeetingSession();
-    ui->outlog->setText(QString("网络异常......"));
     if (wasInMeeting)
         QMessageBox::warning(this, "Network Error", "网络异常", QMessageBox::Yes, QMessageBox::Yes);
 }
@@ -621,7 +668,9 @@ void Widget::on_joinmeetBtn(QString roomNo) {
         QMessageBox::warning(this, "RoomNo Error", "房间号不合法" , QMessageBox::Yes, QMessageBox::Yes);
     } else {
         spdlog::info("[on_joinmeetBtn_clicked] 房间号合法，加入发送队列");
+        _roomNo = roomNo.toInt();
         _network->sendJoinMeeting(roomNo.toStdString());
+        updateMeetingInfo();
     }
 }
 
@@ -636,7 +685,7 @@ void Widget::on_horizontalSlider_valueChanged(int value)
 
 void Widget::speaks(QString ip)
 {
-    ui->outlog->setText(QString(ip + " 正在说话").toUtf8());
+    ui->labelSpeaker->setText(ip);
 }
 
 
