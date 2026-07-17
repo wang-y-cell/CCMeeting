@@ -170,7 +170,7 @@ void Connection::disconnectFromHost()
         m_hub->clearAll();
 
     if (m_ioThread.isRunning()) {
-        // 异步投递到 IO 线程，不阻塞调用方（通常是 UI 线程）
+        /// 异步投递到 IO 线程，不阻塞调用方（通常是 UI 线程）
         QMetaObject::invokeMethod(this, "disconnectOnIoThread", Qt::QueuedConnection);
     } else {
         emit disconnected();

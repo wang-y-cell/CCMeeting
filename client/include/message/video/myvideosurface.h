@@ -7,22 +7,38 @@
 #include <QImage>
 
 /**
-* 
-*/
+ * @brief 摄像头视频帧接收桥接：通过 QVideoSink 获取帧并转发
+ */
 class MyVideoSurface : public QObject {
     Q_OBJECT
 public:
-    MyVideoSurface(QObject *parent = nullptr); //构造函数
-    QVideoSink* getVideoSink() const; //获取视频输出
+    /**
+     * @brief 构造视频表面
+     * @param parent 父对象
+     */
+    MyVideoSurface(QObject *parent = nullptr);
+    /**
+     * @brief 获取视频输出 sink
+     * @return QVideoSink 指针
+     */
+    QVideoSink* getVideoSink() const;
 
 private:
-    QVideoSink *m_videoSink; //视频输出
+    QVideoSink *m_videoSink; ///< 视频输出
 
 public slots:
-    void handleVideoFrame(const QVideoFrame &frame); //处理视频帧
+    /**
+     * @brief 处理视频帧
+     * @param frame 视频帧
+     */
+    void handleVideoFrame(const QVideoFrame &frame);
 
 signals:
-    void frameAvailable(QVideoFrame); //视频帧可用信号
+    /**
+     * @brief 视频帧可用
+     * @param frame 视频帧
+     */
+    void frameAvailable(QVideoFrame);
 };
 
 #endif // MYVIDEOSURFACE_H

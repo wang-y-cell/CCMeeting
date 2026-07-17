@@ -9,54 +9,91 @@
 #include <vector>
 
 /**
-* @param 用来补全信息的类
-*/
+ * @brief 用于 @ 成员补全的 Completer
+ */
 class Completer
 : public QCompleter {
     Q_OBJECT
 public:
-    explicit Completer(QWidget *parent= nullptr);
+    /**
+     * @brief 构造补全器
+     * @param parent 父控件
+     */
+    explicit Completer(QWidget *parent = nullptr);
 };
 
 /**
-由QWidget提升上来的控件
-主要用来发送消息,@成员的作用
-*/
-class MyTextEdit 
+ * @brief 会议聊天输入框（由 QWidget 提升）
+ *
+ * 内部组合 QPlainTextEdit，支持：
+ * - 输入 @ 弹出成员补全
+ * - @IP 段高亮
+ * - Backspace/Delete 整块删除 @ 段
+ */
+class MyTextEdit
 : public QWidget {
     Q_OBJECT
 private:
-    /*发送消息控件*/
-    QPlainTextEdit *edit;
-    /*信息补全*/
-    Completer *completer;
-    /*ip范围*/
-    std::vector<std::pair<int, int>> ipspan;
+    QPlainTextEdit *edit; ///< 实际文本输入控件
+    Completer *completer; ///< @ 补全器，懒创建
+    std::vector<std::pair<int, int>> ipspan; ///< 各 @IP 段在文本中的 [first, second) 范围
+
 public:
+    /**
+     * @brief 构造输入框
+     * @param parent 父控件
+     */
     explicit MyTextEdit(QWidget *parent = nullptr);
-    /*返回输入框中的文本*/
-    QString toPlainText(); 
-    /*修改输入框中的文本*/
-    void setPlainText(QString str); 
-    /*设置文本提示词*/
+
+    /** @brief 返回输入框纯文本 */
+    QString toPlainText();
+    /**
+     * @brief 设置输入框文本
+     * @param str 文本内容
+     */
+    void setPlainText(QString str);
+    /**
+     * @brief 设置占位提示
+     * @param str 提示文案
+     */
     void setPlaceholderText(QString str);
-    void setCenterOnScroll(bool on){edit->setCenterOnScroll(on);}
-    /*设置信息补全列表*/
+    /**
+     * @brief 是否滚动时将光标行居中
+     * @param on true 开启
+     */
+    void setCenterOnScroll(bool on) { edit->setCenterOnScroll(on); }
+    /**
+     * @brief 设置/更新 @ 补全列表
+     * @param items 补全项（如 "@192.168.1.1"）
+     */
     void setCompleter(const std::vector<QString> &items);
+
 private:
-    /*初始化connect*/
+    /** @brief 连接 textChanged 等信号（completer 需在创建后再连 activated） */
     void initConnect() const;
-    /*初始化ui界面*/
+    /** @brief 创建内部 QPlainTextEdit 与布局 */
     void initUI();
-    /*返回光标对应的整个单词*/
+    /** @brief 返回光标下当前单词 */
     QString textUnderCursor();
-    /*拦截事件*/
+    /**
+     * @brief 拦截编辑器按键，实现 @ 段原子删除
+     * @param obj 事件对象
+     * @param event 事件
+     * @return true 表示已处理
+     */
     bool eventFilter(QObject *obj, QEvent *event) override;
 
 private slots:
-    void changeCompletion(const QString & text);
+    /**
+     * @brief 用户选中补全项后插入并高亮
+     * @param text 选中的完整补全字符串
+     */
+    void changeCompletion(const QString &text);
+
 public slots:
+    /** @brief 文本变化时，若末尾为 @ 则弹出补全 */
     void complete();
+
 signals:
 };
 

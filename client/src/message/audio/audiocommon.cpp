@@ -8,7 +8,7 @@ AudioFormatStd::Spec sessionWirePcmSpec()
 	AudioFormatStd::Spec s;
 	s.sampleRate = 48000;
 	s.channelCount = 2;
-	// 与对端统一即可；当前与多数 Qt preferred（Float32）一致，便于免转换测试互通
+	/// 与对端统一即可；当前与多数 Qt preferred（Float32）一致，便于免转换测试互通
 	s.sampleFormat = QAudioFormat::Float;
 	return s;
 }
@@ -22,7 +22,7 @@ QAudioFormat negotiatedPcmFormat()
 		int rate;
 		int ch;
 	};
-	// 优先窄带语音，再常见 48k/44.1k；声道先单声道再立体声，减少与 half-duplex 设备冲突
+	/// 优先窄带语音，再常见 48k/44.1k；声道先单声道再立体声，减少与 half-duplex 设备冲突
 	const Spec kCandidates[] = {
 		{8000, 1},
 		{16000, 1},

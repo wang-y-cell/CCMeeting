@@ -6,36 +6,79 @@
 
 class QMovie;
 
-/// 聊天列表中单条消息视图：自绘头像、三角、气泡、正文与时间/IP；配合 QListWidgetItem 的 sizeHint 使用。
+/**
+ * @brief 聊天列表中单条消息视图：自绘头像、三角、气泡、正文与时间/IP；配合 QListWidgetItem 的 sizeHint 使用
+ */
 class ChatMessage : public QWidget
 {
     Q_OBJECT
 public:
+    /**
+     * @brief 构造聊天消息控件
+     * @param parent 父控件
+     */
     explicit ChatMessage(QWidget *parent = nullptr);
 
-    /// 消息类型：系统通知 / 本人 / 对方 / 仅时间分隔行
+    /**
+     * @brief 消息类型：系统通知 / 本人 / 对方 / 仅时间分隔行
+     */
     enum User_Type{
-        User_System,//系统
-        User_Me,    //自己
-        User_She,   //用户
-        User_Time,  //时间
+        User_System, ///< 系统
+        User_Me,     ///< 自己
+        User_She,    ///< 用户
+        User_Time,   ///< 时间
     };
-    /// 标记本人消息已发送成功，隐藏「发送中」动画
+    /** @brief 标记本人消息已发送成功，隐藏「发送中」动画 */
     void setTextSuccess();
-    /// 设置文案、时间戳、列表项整体尺寸、可选 IP 与角色；会触发重绘并在本人未成功时显示加载动画
+    /**
+     * @brief 设置文案、时间戳、列表项整体尺寸、可选 IP 与角色；会触发重绘并在本人未成功时显示加载动画
+     * @param text 消息正文
+     * @param time 时间戳字符串
+     * @param allSize 列表/容器尺寸
+     * @param ip 可选 IP
+     * @param userType 消息角色
+     */
     void setText(QString text, QString time, QSize allSize, QString ip = "",  User_Type userType = User_Time);
 
-    /// 按当前字体与折行宽度计算文本排版后的逻辑宽高（供 fontRect 使用）
+    /**
+     * @brief 按当前字体与折行宽度计算文本排版后的逻辑宽高（供 fontRect 使用）
+     * @param src 源文本
+     * @return 逻辑宽高
+     */
     QSize getRealString(QString src);
-    /// 根据文本更新各类 QRect，并返回供 QListWidgetItem::setSizeHint 使用的建议尺寸
+    /**
+     * @brief 根据文本更新各类 QRect，并返回供 QListWidgetItem::setSizeHint 使用的建议尺寸
+     * @param str 文本
+     * @return 建议尺寸
+     */
     QSize fontRect(QString str);
-    /// splitter/窗口尺寸变化后，按新宽度重新排版并返回行高
+    /**
+     * @brief splitter/窗口尺寸变化后，按新宽度重新排版并返回行高
+     * @param width 新宽度
+     * @return 排版后尺寸
+     */
     QSize relayoutForWidth(int width);
 
+    /**
+     * @brief 消息正文
+     * @return 正文
+     */
     inline QString text() {return m_msg;}
+    /**
+     * @brief 原始时间字段
+     * @return 时间字符串
+     */
     inline QString time() {return m_time;}
+    /**
+     * @brief 消息角色
+     * @return User_Type
+     */
     inline User_Type userType() {return m_userType;}
 protected:
+    /**
+     * @brief 自绘气泡、头像、三角与正文
+     * @param event 绘制事件
+     */
     void paintEvent(QPaintEvent *event);
 private:
     QString m_msg;       ///< 消息正文
@@ -44,7 +87,7 @@ private:
     QString m_ip;        ///< 可选，用于在气泡旁显示 IP
 
     QSize m_allSize;     ///< 所属列表/容器尺寸，用于布局参考
-    User_Type m_userType = User_System;
+    User_Type m_userType = User_System; ///< 消息角色
 
     int m_kuangWidth;    ///< 气泡框总宽度
     int m_textWidth;     ///< 文本区域宽度（已扣除内边距）
@@ -64,7 +107,7 @@ private:
     QPixmap m_leftPixmap;    ///< 左侧头像图
     QPixmap m_rightPixmap;   ///< 右侧头像图
     QLabel* m_loading = Q_NULLPTR;   ///< 「发送中」GIF 容器
-    QMovie* m_loadingMovie = Q_NULLPTR;
+    QMovie* m_loadingMovie = Q_NULLPTR; ///< 「发送中」动画
     bool m_isSending = false; ///< 本人消息是否已标记发送成功（与 setTextSuccess 配合）
 };
 

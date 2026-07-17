@@ -74,7 +74,7 @@ void MessageQueue::clear() {
 }
 
 void MessageQueue::wakeAll() {
-    m_cond.notify_all(); //唤醒所有被条件变量阻塞的线程
+    m_cond.notify_all(); ///< 唤醒所有被条件变量阻塞的线程
 }
 
 void MessageQueue::clearVideo()

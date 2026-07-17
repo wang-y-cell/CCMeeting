@@ -9,118 +9,128 @@
 
 class Connection;
 
-/** 统一管理分类队列及各队列的消费线程。 */
+/**
+ * @brief 统一管理分类消息队列及各队列的收发工作线程
+ */
 class MessageHub : public QObject {
     Q_OBJECT
 
 public:
+    /**
+     * @brief 构造消息中心
+     * @param parent 父对象
+     */
     explicit MessageHub(QObject *parent = nullptr);
-    ~MessageHub();
+    ~MessageHub() override;
 
-    /** 
-    启动消息中心
-    @param connection 连接
-    */
+    /**
+     * @brief 启动消息中心（绑定连接并启动接收线程）
+     * @param connection TCP 连接
+     */
     void start(Connection *connection);
-    /** 
-    启动发送工作线程
-    */
+
+    /** @brief 启动发送工作线程 */
     void startSendWorkers();
-    /** 
-    停止发送工作线程（同步等待，析构用）
-    */
+
+    /** @brief 停止发送工作线程（同步等待，析构用） */
     void stopSendWorkers();
-    /** 
-    停止发送工作线程（异步 join，不阻塞调用方）
-    */
+
+    /** @brief 停止发送工作线程（异步 join，不阻塞调用方） */
     void stopSendWorkersAsync();
-    /** 
-    停止消息中心
-    */
+
+    /** @brief 停止消息中心（发送 + 接收） */
     void stop();
 
-    /** 
-    入队发送消息
-    @param msg 消息
-    */
+    /**
+     * @brief 入队待发送消息
+     * @param msg 消息
+     */
     void enqueueSend(Message msg);
-    /** 
-    路由接收消息
-    @param msg 消息
-    */
+
+    /**
+     * @brief 将收到的消息路由到对应接收队列
+     * @param msg 消息
+     */
     void routeIncoming(Message msg);
-    /** 
-    清空未发送的视频消息
-    */
+
+    /** @brief 清空未发送的视频消息 */
     void clearPendingVideo();
-    /** 
-    清空所有消息
-    */
+
+    /** @brief 清空所有收发队列并唤醒等待线程 */
     void clearAll();
 
+    /**
+     * @brief 从音频接收队列弹出一条消息
+     * @param waitMs 最长等待毫秒
+     * @return 有消息则返回，超时返回 nullopt
+     */
     std::optional<Message> popRecvAudio(int waitMs = WAITSECONDS * 1000);
+
+    /** @brief 唤醒阻塞在音频接收队列上的线程 */
     void wakeRecvAudio();
 
 signals:
-    /** 
-    请求消息就绪
-    @param msg 消息
-    */
+    /**
+     * @brief 请求类消息就绪（创建/加入会议响应、网络错误等）
+     * @param msg 消息
+     */
     void requestMessageReady(Message msg);
-    /** 
-    用户信息消息就绪
-    @param msg 消息
-    */
+
+    /**
+     * @brief 用户信息类消息就绪（成员进出等）
+     * @param msg 消息
+     */
     void userInfoMessageReady(Message msg);
-    /** 
-    文本消息就绪
-    @param msg 消息
-    */
+
+    /**
+     * @brief 文本消息就绪
+     * @param msg 消息
+     */
     void textMessageReady(Message msg);
-    /** 
-    视频消息就绪
-    @param msg 消息
-    */
+
+    /**
+     * @brief 视频消息就绪
+     * @param msg 消息
+     */
     void videoMessageReady(Message msg);
-    /** 
-    文本发送完成
-    */
+
+    /** @brief 一条文本发送完成 */
     void textSendFinished();
 
 private:
-    /** 
-    根据通道获取发送队列
-    @param channel 通道
-    @return 发送队列
-    */
+    /**
+     * @brief 按通道取发送队列
+     * @param channel 通道
+     * @return 队列引用
+     */
     MessageQueue &sendQueueFor(Message::Channel channel);
 
-    /** 
-    根据通道获取接收队列
-    @param channel 通道
-    @return 接收队列
-    */
+    /**
+     * @brief 按通道取接收队列
+     * @param channel 通道
+     * @return 队列引用
+     */
     MessageQueue &recvQueueFor(Message::Channel channel);
 
-    /** 
-    启动接收工作线程
-    */
+    /** @brief 启动接收分发工作线程 */
     void startRecvWorkers();
-    /** 
-    停止接收工作线程
-    */
+
+    /** @brief 停止接收分发工作线程（同步） */
     void stopRecvWorkers();
-    /** 
-    发送循环
-    @param channel 通道
-    */
+
+    /**
+     * @brief 发送循环
+     * @param channel 发送通道
+     */
     void sendLoop(Message::Channel channel);
-    /** 
-    接收循环
-    @param channel 通道
-    */
+
+    /**
+     * @brief 接收分发循环
+     * @param channel 接收通道
+     */
     void recvLoop(Message::Channel channel);
-    /** 等待并回收发送线程 */
+
+    /** @brief 等待并回收发送线程 */
     void joinSendThreads();
 
     MessageQueue m_sendRequest;
@@ -134,10 +144,10 @@ private:
     MessageQueue m_recvVideo;
     MessageQueue m_recvAudio;
 
-    Connection *m_connection = nullptr;
+    Connection *m_connection = nullptr; ///< 当前 TCP 连接
 
-    std::atomic<bool> m_sendRunning{false};
-    std::atomic<bool> m_recvRunning{false};
+    std::atomic<bool> m_sendRunning{false}; ///< 发送线程运行标志
+    std::atomic<bool> m_recvRunning{false}; ///< 接收线程运行标志
 
     QThread *m_sendRequestThread = nullptr;
     QThread *m_sendTextThread = nullptr;
@@ -150,7 +160,7 @@ private:
     QThread *m_recvVideoThread = nullptr;
     QThread *m_recvAudioThread = nullptr;
 
-    std::mutex m_sendThreadMutex;
+    std::mutex m_sendThreadMutex; ///< 保护发送线程指针的创建/回收
 };
 
 #endif // MESSAGEHUB_H

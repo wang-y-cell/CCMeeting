@@ -21,7 +21,9 @@
 #define WAITSECONDS 2
 #endif
 
-/** 应用层统一消息（替代原 OutgoingItem / MESG）。 */
+/**
+ * @brief 应用层统一消息（替代原 OutgoingItem / MESG）
+ */
 struct Message {
     enum class Kind {
         CreateMeeting,
@@ -59,34 +61,48 @@ struct Message {
     std::vector<std::uint32_t> partnerIps;
 
     /**
-    根据消息类型获取通道
-    @param kind 消息类型
-    @return 通道
-    */
+     * @brief 根据消息类型获取通道
+     * @param kind 消息类型
+     * @return 通道
+     */
     static Channel channelFor(Kind kind);
     /**
-    根据消息类型获取发送通道
-    @param kind 消息类型
-    @return 发送通道
-    */
+     * @brief 根据消息类型获取发送通道
+     * @param kind 消息类型
+     * @return 发送通道
+     */
     static Channel sendChannelFor(Kind kind);
     /**
-    根据消息类型获取接收通道
-    @param kind 消息类型
-    @return 接收通道
-    */
+     * @brief 根据消息类型获取接收通道
+     * @param kind 消息类型
+     * @return 接收通道
+     */
     static Channel recvChannelFor(Kind kind);
 };
 
 Q_DECLARE_METATYPE(Message)
 
-/** 线程安全 Message 队列（值语义）。 */
+/**
+ * @brief 线程安全 Message 队列（值语义）
+ */
 class MessageQueue {
 public:
+    /**
+     * @brief 入队一条消息
+     * @param msg 消息
+     */
     void push(Message msg);
+    /**
+     * @brief 出队一条消息
+     * @param waitMs 最长等待毫秒
+     * @return 有消息则返回，超时返回 nullopt
+     */
     std::optional<Message> pop(int waitMs = WAITSECONDS * 1000);
+    /** @brief 清空队列 */
     void clear();
+    /** @brief 唤醒所有等待出队的线程 */
     void wakeAll();
+    /** @brief 清空队列中的视频类消息 */
     void clearVideo();
 
 private:

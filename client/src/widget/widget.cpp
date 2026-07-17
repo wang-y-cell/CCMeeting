@@ -36,10 +36,10 @@ Widget::Widget(QWidget *parent)
     qRegisterMetaType<Message>("Message");
     spdlog::info("[Widget] -------------------------Application Start---------------------------");
     spdlog::info("[Widget] main UI thread id: {}", reinterpret_cast<quintptr>(QThread::currentThreadId()));
-    //将窗口的位置设置为我的电脑频幕的相对位置
-    initUI();  //初始化UI
+    /// 将窗口的位置设置为我的电脑频幕的相对位置
+    initUI();  ///< 初始化UI
 
-    mainip = 0; //主屏幕显示的用户IP图像
+    mainip = 0; ///< 主屏幕显示的用户IP图像
     _cameraVideo = new CameraVideo(this);
     _cameraVideo->setMainTarget(ui->mainshow_label);
 
@@ -80,7 +80,7 @@ void Widget::initPartnerConnect(Partner *p) {
 
 void Widget::initUI() {
     spdlog::debug("[Widget] 初始化UI");
-    ui->setupUi(this);  //解析ui文件
+    ui->setupUi(this);  ///< 解析ui文件
     setAttribute(Qt::WA_StyledBackground, true);
     setObjectName(QStringLiteral("meetingWidget"));
 
@@ -93,13 +93,13 @@ void Widget::initUI() {
         spdlog::warn("[Widget] widget.qss not found");
     }
 
-    /* 四周留白；顶部加大，给无边框关闭按钮留空间 */
+    /// 四周留白；顶部加大，给无边框关闭按钮留空间
     ui->verticalLayout->setContentsMargins(18, 42, 18, 18);
     setTitleBarHeight(42);
 
-    /*根据显示器大小动态调整窗口大小*/
+    /// 根据显示器大小动态调整窗口大小
     Widget::pos = QRect(0.1 * Screen::width, 0.1 * Screen::height, 0.8 * Screen::width, 0.8 * Screen::height);
-    //设置打开视频和音频的按钮
+    /// 设置打开视频和音频的按钮
     ui->openAudio->setText(QString(OPENAUDIO).toUtf8());
     ui->openVedio->setText(QString(OPENVIDEO).toUtf8());
 
@@ -110,12 +110,12 @@ void Widget::initUI() {
         Widget::pos.height() * 0.5
     );
 
-    this->setGeometry(size); //设置我的窗口位置
-    //设置窗口最小尺寸，最大不限制以便缩放/最大化
+    this->setGeometry(size); ///< 设置我的窗口位置
+    /// 设置窗口最小尺寸，最大不限制以便缩放/最大化
     this->setMinimumSize(QSize(Widget::pos.width() * 0.7, Widget::pos.height() * 0.7));
     this->setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
 
-    //初始化这些按钮是不能点击的状态
+    /// 初始化这些按钮是不能点击的状态
     ui->openAudio->setDisabled(true);
     ui->openVedio->setDisabled(true);
     ui->sendmsg->setDisabled(true);
@@ -158,7 +158,7 @@ void Widget::closeEvent(QCloseEvent *event) {
         return;
     _sessionEnding = true;
 
-    // 先返回事件循环，再清理；断线在 IO 线程异步完成
+    /// 先返回事件循环，再清理；断线在 IO 线程异步完成
     QTimer::singleShot(0, this, [this]() {
         endMeetingSession();
     });
@@ -220,7 +220,7 @@ void Widget::updateMeetingInfo() {
 void Widget::endMeetingSession() {
     spdlog::info("[Widget] 结束会议会话");
 
-    // 摄像头/音频尽快停，音频走跨线程信号，避免在 UI 线程直接调 QAudio
+    /// 摄像头/音频尽快停，音频走跨线程信号，避免在 UI 线程直接调 QAudio
     if (_cameraVideo)
         _cameraVideo->endVideo();
     emit stopAudio();
@@ -228,7 +228,7 @@ void Widget::endMeetingSession() {
     _createmeet = false;
     _joinmeet = false;
 
-    // 先异步断线（IO 线程），不在这里 wait 任何工作线程
+    /// 先异步断线（IO 线程），不在这里 wait 任何工作线程
     if (_network && _sessionActive) {
         _sessionEnding = true;
         _network->disconnectFromHost();
@@ -237,7 +237,7 @@ void Widget::endMeetingSession() {
         _sessionEnding = false;
     }
 
-    // UI 清理尽量轻量；拆到下一拍，尽快把控制权交回事件循环
+    /// UI 清理尽量轻量；拆到下一拍，尽快把控制权交回事件循环
     QTimer::singleShot(0, this, [this]() {
         clearPartner();
         resetMeetingUi();
@@ -274,14 +274,14 @@ void Widget::on_createmeetBtn_clicked() {
     }
 }
 
+/**
+ * @brief 触发事件(3条， 一般使用第二条进行触发)
+ * 1. 窗口部件第一次显示时，系统会自动产生一个绘图事件。从而强制绘制这个窗口部件，主窗口起来会绘制一次
+ * 2. 当重新调整窗口部件的大小时，系统也会产生一个绘制事件--QWidget::update()或者QWidget::repaint()
+ * 3. 当窗口部件被其它窗口部件遮挡，然后又再次显示出来时，就会对那些隐藏的区域产生一个绘制事件
+ */
 void Widget::paintEvent(QPaintEvent *event) {
     Q_UNUSED(event);
-    /*
-     * 触发事件(3条， 一般使用第二条进行触发)
-     * 1. 窗口部件第一次显示时，系统会自动产生一个绘图事件。从而强制绘制这个窗口部件，主窗口起来会绘制一次
-     * 2. 当重新调整窗口部件的大小时，系统也会产生一个绘制事件--QWidget::update()或者QWidget::repaint()
-     * 3. 当窗口部件被其它窗口部件遮挡，然后又再次显示出来时，就会对那些隐藏的区域产生一个绘制事件
-    */
 }
 
 
@@ -306,8 +306,8 @@ void Widget::on_openVedio_clicked() {
 
 void Widget::on_openAudio_clicked() {
     spdlog::info("[Widget] 点击打开音频按钮");
-    if (!_createmeet && !_joinmeet) return; //如果未创建会议或未加入会议，则返回
-    if (ui->openAudio->text().toUtf8() == QString(OPENAUDIO).toUtf8()){ //如果音频按钮文本为开启音频，则发送开始音频信号
+    if (!_createmeet && !_joinmeet) return; ///< 如果未创建会议或未加入会议，则返回
+    if (ui->openAudio->text().toUtf8() == QString(OPENAUDIO).toUtf8()){ ///< 如果音频按钮文本为开启音频，则发送开始音频信号
         emit startAudio();
         ui->openAudio->setText(QString(CLOSEAUDIO).toUtf8());
     }
@@ -576,19 +576,19 @@ void Widget::onVideoMessage(Message msg) {
 
 Partner* Widget::addPartner(std::uint32_t ip)
 {
-	if (partner.find(ip) != partner.end()) return nullptr; //如果存在这个ip,返回null
-    Partner *p = new Partner(ui->scrollAreaWidgetContents ,ip); //创建一个新的Partner对象
-    if (p == nullptr) /*如果创建失败，则返回空*/ {
+	if (partner.find(ip) != partner.end()) return nullptr; ///< 如果存在这个ip,返回null
+    Partner *p = new Partner(ui->scrollAreaWidgetContents ,ip); ///< 创建一个新的Partner对象
+    if (p == nullptr) { ///< 如果创建失败，则返回空
         spdlog::error("[Widget] 创建Partner对象失败");
-        return nullptr; //返回空
-    } else /*如果创建成功，则连接信号和槽*/ {
+        return nullptr; ///< 返回空
+    } else { ///< 如果创建成功，则连接信号和槽
         initPartnerConnect(p);
         spdlog::debug("[Widget] 将这个用户添加到partner中");
 		partner.emplace(ip, p);
 		ui->verticalLayout_3->addWidget(p, 1);
         _cameraVideo->addPartnerDisplay(ip, p->displayLabel());
 
-		//当有人员加入时，开启滑动条滑动事件，开启输入(只有自己时，不打开)
+		/// 当有人员加入时，开启滑动条滑动事件，开启输入(只有自己时，不打开)
         if (partner.size() > 1 && _ainput && _aoutput) {
             ui->openAudio->setDisabled(false);
             ui->sendmsg->setDisabled(false);
@@ -612,7 +612,7 @@ void Widget::removePartner(std::uint32_t ip)
         delete p;
         partner.erase(it);
 
-        //只有自已一个人时，关闭传输音频
+        /// 只有自已一个人时，关闭传输音频
         if (partner.size() <= 1 && _ainput && _aoutput)
         {
             emit stopAudio();
@@ -640,7 +640,7 @@ void Widget::clearPartner() {
         it = partner.erase(it);
     }
 
-    //关闭传输音频（通过信号投递到音频线程）
+    /// 关闭传输音频（通过信号投递到音频线程）
     emit stopAudio();
     if (_aoutput)
         _aoutput->stopPlay();
@@ -689,14 +689,13 @@ void Widget::recvip(std::uint32_t ip)
     spdlog::debug("[Widget] mainshow switch mainip={}", ip);
 }
 
-/*
- * 加入会议
+/**
+ * @brief 加入会议
  */
-
 void Widget::on_joinmeetBtn(QString roomNo) {
     spdlog::info("[on_joinmeetBtn] 加入会议房间号: {}", roomNo.toStdString());
 
-    QRegularExpression roomreg("^[1-9][0-9]{0,10}$"); //房间号正则表达式
+    QRegularExpression roomreg("^[1-9][0-9]{0,10}$"); ///< 房间号正则表达式
     QRegularExpressionValidator  roomvalidate(roomreg);
     int pos = 0;
     if(roomvalidate.validate(roomNo, pos) != QValidator::Acceptable) {
@@ -797,24 +796,24 @@ void Widget::dealMessageTime(QString curMsgTime)
 {
     bool isShowTime = false;
     if(ui->listWidget->count() > 0) {
-        //如果消息框发送了不止一个消息,则判断是否显示时间
-        QListWidgetItem* lastItem = ui->listWidget->item(ui->listWidget->count() - 1); //获取最后一行的列表项
-        ChatMessage* messageW = (ChatMessage *)ui->listWidget->itemWidget(lastItem); //获得最后一个自定义消息控件widget
+        /// 如果消息框发送了不止一个消息,则判断是否显示时间
+        QListWidgetItem* lastItem = ui->listWidget->item(ui->listWidget->count() - 1); ///< 获取最后一行的列表项
+        ChatMessage* messageW = (ChatMessage *)ui->listWidget->itemWidget(lastItem); ///< 获得最后一个自定义消息控件widget
         int lastTime = messageW->time().toInt();
         int curTime = curMsgTime.toInt();
         spdlog::debug("[Widget] message time delta sec={}", (curTime - lastTime));
-        isShowTime = ((curTime - lastTime) > 60); // 两个消息相差一分钟
+        isShowTime = ((curTime - lastTime) > 60); ///< 两个消息相差一分钟
 //        isShowTime = true;
     } else {
-        //如果消息框没有消息,则显示时间
+        /// 如果消息框没有消息,则显示时间
         isShowTime = true;
     }
     if(isShowTime) {
-        // 新建 ChatMessage：这一行上要画的自定义控件；parent 用 listWidget（QListWidgetItem 不能当父控件）
+        /// 新建 ChatMessage：这一行上要画的自定义控件；parent 用 listWidget（QListWidgetItem 不能当父控件）
         ChatMessage* messageTime = new ChatMessage(ui->listWidget);
-        // QListWidgetItem：列表里「一行」的槽位（数据/尺寸提示），本身不是 QWidget
+        /// QListWidgetItem：列表里「一行」的槽位（数据/尺寸提示），本身不是 QWidget
         QListWidgetItem* itemTime = new QListWidgetItem();
-        // 把这行追加到列表末尾
+        /// 把这行追加到列表末尾
         ui->listWidget->addItem(itemTime);
         const int listWidth = ui->listWidget->viewport()->width();
         const int w = listWidth > 0 ? listWidth : ui->listWidget->width();
@@ -823,7 +822,7 @@ void Widget::dealMessageTime(QString curMsgTime)
         messageTime->resize(size);
         itemTime->setSizeHint(size);
         messageTime->setText(curMsgTime, curMsgTime, size);
-        // 把控件绑定到该行：列表这一行显示的就是 messageTime（绑定靠此 API，不靠 parent 指向 item）
+        /// 把控件绑定到该行：列表这一行显示的就是 messageTime（绑定靠此 API，不靠 parent 指向 item）
         ui->listWidget->setItemWidget(itemTime, messageTime);
     }
 }
@@ -833,10 +832,10 @@ void Widget::dealMessageTime(QString curMsgTime)
 void Widget::textSend()
 {
     spdlog::debug("[Widget] text send completed (TCP)");
-    //获取最后一行的ListwidgetItem
+    /// 获取最后一行的ListwidgetItem
     QListWidgetItem* lastItem = ui->listWidget->item(ui->listWidget->count() - 1);
 
     ChatMessage* messageW = (ChatMessage *)ui->listWidget->itemWidget(lastItem);
-    messageW->setTextSuccess(); //表示发送成功,取消一些图像显示和设置标志
-    ui->sendmsg->setDisabled(false); //发送按钮设置可以点击
+    messageW->setTextSuccess(); ///< 表示发送成功,取消一些图像显示和设置标志
+    ui->sendmsg->setDisabled(false); ///< 发送按钮设置可以点击
 }

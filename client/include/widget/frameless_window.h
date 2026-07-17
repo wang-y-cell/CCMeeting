@@ -40,7 +40,7 @@
 
 template <typename Base>
 class FramelessWindow : public Base {
-    // Base 必须是 QWidget 或其子类（如 QDialog）
+    /// Base 必须是 QWidget 或其子类（如 QDialog）
     static_assert(std::is_base_of_v<QWidget, Base>, "Base must derive from QWidget");
 
 public:
@@ -50,11 +50,11 @@ public:
      */
     explicit FramelessWindow(QWidget *parent = nullptr)
         : Base(parent) {
-        // FramelessWindowHint：去掉系统边框与标题栏
+        /// FramelessWindowHint：去掉系统边框与标题栏
         Base::setWindowFlags(Qt::FramelessWindowHint | Base::windowFlags());
-        // 未按下鼠标时也要收到 move，用于更新边缘光标形状
+        /// 未按下鼠标时也要收到 move，用于更新边缘光标形状
         Base::setMouseTracking(true);
-        // 启用 Hover 事件（配合 event() 里处理 HoverMove）
+        /// 启用 Hover 事件（配合 event() 里处理 HoverMove）
         Base::setAttribute(Qt::WA_Hover, true);
         setupTitleButtons();
     }
@@ -115,38 +115,38 @@ protected:
             return;
         }
 
-        const QPoint pos = event->position().toPoint(); // 窗口客户区内坐标
+        const QPoint pos = event->position().toPoint(); ///< 窗口客户区内坐标
 
-        // ---------- 1) 边缘缩放 ----------
+        /// ---------- 1) 边缘缩放 ----------
         if (m_resizable && !Base::isMaximized()) {
             m_resizeRegion = hitTest(pos);
             if (m_resizeRegion != ResizeRegion::None) {
                 m_resizing = true;
-                m_dragGlobalPos = event->globalPosition().toPoint(); // 按下时屏幕坐标
-                m_dragGeometry = Base::geometry();                  // 按下时窗口矩形（锚点）
-                Base::grabMouse(); // 缩小后光标可能离开窗口，仍需收到 move
+                m_dragGlobalPos = event->globalPosition().toPoint(); ///< 按下时屏幕坐标
+                m_dragGeometry = Base::geometry();                  ///< 按下时窗口矩形（锚点）
+                Base::grabMouse(); ///< 缩小后光标可能离开窗口，仍需收到 move
                 event->accept();
                 return;
             }
         }
 
-        // ---------- 2) 标题栏拖动 ----------
+        /// ---------- 2) 标题栏拖动 ----------
         if (isInTitleBar(pos) && !isOverTitleButton(pos)) {
             const QPoint globalPos = event->globalPosition().toPoint();
             if (Base::isMaximized() && m_maximizable) {
-                // 最大化下拖动：先按鼠标水平相对位置还原，再进入拖动
+                /// 最大化下拖动：先按鼠标水平相对位置还原，再进入拖动
                 restoreFromMaximizedAt(globalPos, pos);
                 m_dragging = true;
             } else if (!Base::isMaximized()) {
                 m_dragging = true;
-                // 偏移 = 鼠标全局坐标 - 窗口左上角，后续 move(global - offset)
+                /// 偏移 = 鼠标全局坐标 - 窗口左上角，后续 move(global - offset)
                 m_dragOffset = globalPos - Base::frameGeometry().topLeft();
             }
             event->accept();
             return;
         }
 
-        // ---------- 3) 其它点击交给基类 ----------
+        /// ---------- 3) 其它点击交给基类 ----------
         Base::mousePressEvent(event);
     }
 
@@ -171,7 +171,7 @@ protected:
             return;
         }
 
-        // 未按下时，悬停在边缘则切换光标形状
+        /// 未按下时，悬停在边缘则切换光标形状
         if (m_resizable && !Base::isMaximized() && !(event->buttons() & Qt::LeftButton)) {
             updateCursor(hitTest(event->position().toPoint()));
         }
@@ -281,18 +281,18 @@ private:
      * @note objectName 供 QSS 选择：#framelessMaxBtn / #framelessCloseBtn
      */
     void setupTitleButtons() {
-        // ----- 最大化按钮 -----
+        /// ----- 最大化按钮 -----
         m_maxBtn = new QPushButton(this);
         m_maxBtn->setObjectName(QStringLiteral("framelessMaxBtn"));
         m_maxBtn->setFixedSize(32, 28);
         m_maxBtn->setCursor(Qt::PointingHandCursor);
-        m_maxBtn->setFocusPolicy(Qt::NoFocus); // 避免抢输入框焦点
+        m_maxBtn->setFocusPolicy(Qt::NoFocus); ///< 避免抢输入框焦点
         m_maxBtn->setToolTip(QStringLiteral("最大化"));
         QObject::connect(m_maxBtn, &QPushButton::clicked, this, [this]() {
             toggleMaximize();
         });
 
-        // ----- 关闭按钮 -----
+        /// ----- 关闭按钮 -----
         m_closeBtn = new QPushButton(QStringLiteral("×"), this);
         m_closeBtn->setObjectName(QStringLiteral("framelessCloseBtn"));
         m_closeBtn->setFixedSize(32, 28);
@@ -300,7 +300,7 @@ private:
         m_closeBtn->setFocusPolicy(Qt::NoFocus);
         m_closeBtn->setToolTip(QStringLiteral("关闭"));
         QObject::connect(m_closeBtn, &QPushButton::clicked, this, [this]() {
-            // Dialog 用 reject() 结束模态；普通窗口用 close()
+            /// Dialog 用 reject() 结束模态；普通窗口用 close()
             if constexpr (std::is_base_of_v<QDialog, Base>) {
                 this->reject();
             } else {
@@ -327,9 +327,9 @@ private:
         if (m_maxBtn && m_maxBtn->isVisible()) {
             const int maxX = closeX - m_maxBtn->width() - kBtnGap;
             m_maxBtn->move(maxX, kBtnMargin);
-            m_maxBtn->raise();   // 先抬起最大化
+            m_maxBtn->raise();   ///< 先抬起最大化
         }
-        m_closeBtn->raise();     // 再抬起关闭，关闭在最上层
+        m_closeBtn->raise();     ///< 再抬起关闭，关闭在最上层
     }
 
     /**
@@ -370,7 +370,7 @@ private:
                 Base::setGeometry(m_normalGeometry);
             }
         } else {
-            m_normalGeometry = Base::geometry(); // 记住最大化前的位置与尺寸
+            m_normalGeometry = Base::geometry(); ///< 记住最大化前的位置与尺寸
             m_savedMaxSize = Base::maximumSize();
             Base::setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
             Base::showMaximized();
@@ -397,13 +397,13 @@ private:
         const int maximizedWidth = qMax(Base::width(), 1);
         const double xRatio = qBound(0.0, static_cast<double>(localPos.x()) / maximizedWidth, 1.0);
 
-        // 还原尺寸：优先用最大化前保存的几何
+        /// 还原尺寸：优先用最大化前保存的几何
         QRect restoreGeo = m_normalGeometry.isValid() ? m_normalGeometry : Base::normalGeometry();
         if (!restoreGeo.isValid() || restoreGeo.width() <= 0 || restoreGeo.height() <= 0) {
-            restoreGeo = QRect(0, 0, 800, 600); // 兜底，避免无效尺寸
+            restoreGeo = QRect(0, 0, 800, 600); ///< 兜底，避免无效尺寸
         }
 
-        // 恢复最大化前临时放开的 maximumSize
+        /// 恢复最大化前临时放开的 maximumSize
         if (m_savedMaxSize.isValid()) {
             Base::setMaximumSize(m_savedMaxSize);
             m_savedMaxSize = QSize();
@@ -411,14 +411,14 @@ private:
 
         const int restoreW = restoreGeo.width();
         const int restoreH = restoreGeo.height();
-        // 鼠标相对还原后窗口左上角的偏移（水平按比例，垂直用标题栏内 y）
+        /// 鼠标相对还原后窗口左上角的偏移（水平按比例，垂直用标题栏内 y）
         const int offsetX = static_cast<int>(restoreW * xRatio);
         const int offsetY = qBound(0, localPos.y(), qMax(m_titleBarHeight - 1, 0));
 
         int newX = globalPos.x() - offsetX;
         int newY = globalPos.y() - offsetY;
 
-        // 限制在当前屏幕工作区内，避免拖出屏幕外
+        /// 限制在当前屏幕工作区内，避免拖出屏幕外
         if (QScreen *screen = QGuiApplication::screenAt(globalPos)) {
             const QRect avail = screen->availableGeometry();
             newX = qBound(avail.left(), newX, avail.right() - restoreW + 1);
@@ -428,7 +428,7 @@ private:
         Base::setWindowState(Base::windowState() & ~Qt::WindowMaximized);
         Base::setGeometry(newX, newY, restoreW, restoreH);
 
-        // 后续 mouseMove 使用同一偏移，鼠标粘在标题栏相对位置上
+        /// 后续 mouseMove 使用同一偏移，鼠标粘在标题栏相对位置上
         m_dragOffset = QPoint(offsetX, offsetY);
         m_normalGeometry = Base::geometry();
 
@@ -472,19 +472,19 @@ private:
         switch (region) {
         case ResizeRegion::Left:
         case ResizeRegion::Right:
-            Base::setCursor(Qt::SizeHorCursor);   // 左右拉伸
+            Base::setCursor(Qt::SizeHorCursor);   ///< 左右拉伸
             break;
         case ResizeRegion::Top:
         case ResizeRegion::Bottom:
-            Base::setCursor(Qt::SizeVerCursor);   // 上下拉伸
+            Base::setCursor(Qt::SizeVerCursor);   ///< 上下拉伸
             break;
         case ResizeRegion::TopLeft:
         case ResizeRegion::BottomRight:
-            Base::setCursor(Qt::SizeFDiagCursor); // 主对角线
+            Base::setCursor(Qt::SizeFDiagCursor); ///< 主对角线
             break;
         case ResizeRegion::TopRight:
         case ResizeRegion::BottomLeft:
-            Base::setCursor(Qt::SizeBDiagCursor); // 副对角线
+            Base::setCursor(Qt::SizeBDiagCursor); ///< 副对角线
             break;
         default:
             Base::unsetCursor();
@@ -505,7 +505,7 @@ private:
         const QPoint delta = globalPos - m_dragGlobalPos;
         const int region = static_cast<int>(m_resizeRegion);
 
-        // 按下时窗口右/下边界（开区间），左/上缩放时保持不动
+        /// 按下时窗口右/下边界（开区间），左/上缩放时保持不动
         const int fixedRight = m_dragGeometry.x() + m_dragGeometry.width();
         const int fixedBottom = m_dragGeometry.y() + m_dragGeometry.height();
 
@@ -528,7 +528,7 @@ private:
             h = m_dragGeometry.height() + delta.y();
         }
 
-        // 最小尺寸：minimumSize、sizeHint、热区宽度三者取大
+        /// 最小尺寸：minimumSize、sizeHint、热区宽度三者取大
         const QSize minSize = Base::minimumSize()
                                   .expandedTo(Base::minimumSizeHint())
                                   .expandedTo(QSize(kBorderWidth * 2, kBorderWidth * 2));
@@ -540,7 +540,7 @@ private:
             maxSize.setHeight(QWIDGETSIZE_MAX);
         }
 
-        // 宽度钳制：拖左边时改 x，保证右边不动
+        /// 宽度钳制：拖左边时改 x，保证右边不动
         if (w < minSize.width()) {
             w = minSize.width();
             if (region & static_cast<int>(ResizeRegion::Left)) {
@@ -553,7 +553,7 @@ private:
             }
         }
 
-        // 高度钳制：拖上边时改 y，保证下边不动
+        /// 高度钳制：拖上边时改 y，保证下边不动
         if (h < minSize.height()) {
             h = minSize.height();
             if (region & static_cast<int>(ResizeRegion::Top)) {
@@ -576,10 +576,10 @@ private:
      */
     bool isInTitleBar(const QPoint &pos) const {
         if (m_titleBarHeight <= 0) {
-            return true; // 整窗拖动模式
+            return true; ///< 整窗拖动模式
         }
         if (m_resizable && !Base::isMaximized() && hitTest(pos) != ResizeRegion::None) {
-            return false; // 边缘留给缩放
+            return false; ///< 边缘留给缩放
         }
         return pos.y() >= 0 && pos.y() < m_titleBarHeight;
     }
@@ -599,20 +599,20 @@ private:
     }
 
 private:
-    // ----- 交互状态 -----
+    /// ----- 交互状态 -----
     bool m_dragging = false;              ///< 是否正在拖动移动窗口
     bool m_resizing = false;              ///< 是否正在拖边缩放
     bool m_resizable = true;              ///< 是否允许边缘缩放
     bool m_maximizable = true;            ///< 是否允许最大化（按钮/双击）
 
-    // ----- 拖动 / 缩放锚点 -----
+    /// ----- 拖动 / 缩放锚点 -----
     QPoint m_dragOffset;                  ///< 拖动时：鼠标相对窗口左上角的偏移
     QPoint m_dragGlobalPos;               ///< 开始缩放时鼠标的全局坐标
     QRect m_dragGeometry;                 ///< 开始缩放时窗口的几何（计算基准）
     QRect m_normalGeometry;               ///< 最大化前的几何，用于还原与按比例定位
     ResizeRegion m_resizeRegion = ResizeRegion::None; ///< 当前缩放的边/角
 
-    // ----- 标题栏控件 -----
+    /// ----- 标题栏控件 -----
     QPushButton *m_closeBtn = nullptr;    ///< 关闭按钮
     QPushButton *m_maxBtn = nullptr;      ///< 最大化/还原按钮
     QSize m_savedMaxSize;                 ///< 最大化前备份的 maximumSize

@@ -6,19 +6,26 @@
 #include <QWidget>
 
 
+/**
+ * @brief 创建会议入口页
+ */
 class stack_create_meet : public QWidget {
     Q_OBJECT
 
 public:
+    /**
+     * @brief 构造创建会议页
+     * @param parent 父控件
+     */
     explicit stack_create_meet(QWidget *parent = nullptr);
     ~stack_create_meet();
 
 signals:
-    /*点击按钮发送信号,通知主窗口创建会议*/
+    /** @brief 点击按钮发送信号，通知主窗口创建会议 */
     void createMeetingClicked();
 
 private:
-    Ui::stack_create_meet *ui;
+    Ui::stack_create_meet *ui; ///< UI
 };
 
 #endif // STACK_CREATE_MEET_H

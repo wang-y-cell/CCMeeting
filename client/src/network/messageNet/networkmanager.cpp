@@ -16,7 +16,7 @@ NetworkManager::NetworkManager(QObject *parent)
         _hub->startSendWorkers();
     });
     connect(_connection, &Connection::disconnected, this, [this]() {
-        // 异步停止发送线程，避免 thread->wait 卡死 UI
+        /// 异步停止发送线程，避免 thread->wait 卡死 UI
         _hub->stopSendWorkersAsync();
         emit disconnected();
     });

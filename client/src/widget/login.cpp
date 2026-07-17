@@ -11,8 +11,8 @@ login::login(QWidget *parent)
 {
     ui->setupUi(this);
     setWindowTitle(tr("登录"));
-    setResizable(false);   // 禁止拖边缩放
-    setMaximizable(false); // 禁止最大化按钮与双击标题栏
+    setResizable(false);   ///< 禁止拖边缩放
+    setMaximizable(false); ///< 禁止最大化按钮与双击标题栏
     set_style();
 
     connect(ui->login_button, &QPushButton::clicked, this, &login::Login);
@@ -36,8 +36,8 @@ login::~login()
 }
 
 void login::Login() {
-    QString username = ui->account_line->text(); //获得账号输入框的内容
-    QString password = ui->password_line->text(); //获得密码输入框的内容
+    QString username = ui->account_line->text(); ///< 获得账号输入框的内容
+    QString password = ui->password_line->text(); ///< 获得密码输入框的内容
 
     if(username == "root" && password == "123456") {
         accept();

@@ -23,6 +23,9 @@
 #define CLOSEAUDIO "关闭音频"
 #endif
 
+/**
+ * @brief 线上协议消息类型（与对端约定的 MSG_TYPE）
+ */
 enum MSG_TYPE : std::uint8_t {
     IMG_SEND = 0,
     IMG_RECV,
