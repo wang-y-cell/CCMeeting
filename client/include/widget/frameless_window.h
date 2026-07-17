@@ -7,6 +7,8 @@
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QResizeEvent>
+#include <QScreen>
+#include <QGuiApplication>
 #include <QShowEvent>
 #include <QWidget>
 #include <type_traits>
@@ -42,7 +44,21 @@ public:
     void setResizable(bool enabled) { m_resizable = enabled; }
     bool isResizable() const { return m_resizable; }
 
+    /** 是否允许最大化（最大化按钮 + 双击标题栏） */
+    void setMaximizable(bool enabled) {
+        m_maximizable = enabled;
+        if (m_maxBtn) {
+            m_maxBtn->setVisible(enabled);
+            updateTitleButtonsGeometry();
+        }
+    }
+    bool isMaximizable() const { return m_maximizable; }
+
 protected:
+    /**
+     * @brief 鼠标按下：边缘缩放优先，其次标题栏拖动
+     * 最大化状态下拖动标题栏：按鼠标 x 相对比例还原窗口，再开始拖动
+     */
     void mousePressEvent(QMouseEvent *event) override {
         if (event->button() != Qt::LeftButton) {
             Base::mousePressEvent(event);
@@ -50,30 +66,30 @@ protected:
         }
 
         const QPoint pos = event->position().toPoint();
+
+        // 1) 边缘缩放
         if (m_resizable && !Base::isMaximized()) {
             m_resizeRegion = hitTest(pos);
             if (m_resizeRegion != ResizeRegion::None) {
                 m_resizing = true;
                 m_dragGlobalPos = event->globalPosition().toPoint();
                 m_dragGeometry = Base::geometry();
+                Base::grabMouse();
                 event->accept();
                 return;
             }
         }
 
+        // 2) 标题栏拖动
         if (isInTitleBar(pos) && !isOverTitleButton(pos)) {
-            if (Base::isMaximized()) {
-                // 最大化时拖动标题栏：先还原再拖动
-                const QPoint globalPos = event->globalPosition().toPoint();
-                const double xRatio = static_cast<double>(pos.x()) / qMax(Base::width(), 1);
-                toggleMaximize();
-                const int newX = globalPos.x() - static_cast<int>(Base::width() * xRatio);
-                Base::move(newX, globalPos.y() - pos.y());
+            const QPoint globalPos = event->globalPosition().toPoint();
+            if (Base::isMaximized() && m_maximizable) {
+                // 最大化拖动还原：保持鼠标在标题栏上的水平相对位置
+                restoreFromMaximizedAt(globalPos, pos);
+                m_dragging = true;
+            } else if (!Base::isMaximized()) {
                 m_dragging = true;
                 m_dragOffset = globalPos - Base::frameGeometry().topLeft();
-            } else {
-                m_dragging = true;
-                m_dragOffset = event->globalPosition().toPoint() - Base::frameGeometry().topLeft();
             }
             event->accept();
             return;
@@ -107,6 +123,9 @@ protected:
     void mouseReleaseEvent(QMouseEvent *event) override {
         if (event->button() == Qt::LeftButton) {
             if (m_dragging || m_resizing) {
+                if (m_resizing) {
+                    Base::releaseMouse();
+                }
                 m_dragging = false;
                 m_resizing = false;
                 m_resizeRegion = ResizeRegion::None;
@@ -117,8 +136,10 @@ protected:
         Base::mouseReleaseEvent(event);
     }
 
+    /** 双击标题栏：切换最大化 / 还原（需 setMaximizable(true)） */
     void mouseDoubleClickEvent(QMouseEvent *event) override {
-        if (event->button() == Qt::LeftButton
+        if (m_maximizable
+            && event->button() == Qt::LeftButton
             && isInTitleBar(event->position().toPoint())
             && !isOverTitleButton(event->position().toPoint())) {
             toggleMaximize();
@@ -203,14 +224,17 @@ private:
     }
 
     void updateTitleButtonsGeometry() {
-        if (!m_closeBtn || !m_maxBtn) {
+        if (!m_closeBtn) {
             return;
         }
         const int closeX = Base::width() - m_closeBtn->width() - kBtnMargin;
-        const int maxX = closeX - m_maxBtn->width() - kBtnGap;
         m_closeBtn->move(closeX, kBtnMargin);
-        m_maxBtn->move(maxX, kBtnMargin);
-        m_maxBtn->raise();
+
+        if (m_maxBtn && m_maxBtn->isVisible()) {
+            const int maxX = closeX - m_maxBtn->width() - kBtnGap;
+            m_maxBtn->move(maxX, kBtnMargin);
+            m_maxBtn->raise();
+        }
         m_closeBtn->raise();
     }
 
@@ -228,17 +252,74 @@ private:
     }
 
     void toggleMaximize() {
+        if (!m_maximizable) {
+            return;
+        }
         if (Base::isMaximized()) {
             Base::showNormal();
             if (m_savedMaxSize.isValid()) {
                 Base::setMaximumSize(m_savedMaxSize);
                 m_savedMaxSize = QSize();
             }
+            if (m_normalGeometry.isValid()) {
+                Base::setGeometry(m_normalGeometry);
+            }
         } else {
+            m_normalGeometry = Base::geometry(); // 记住最大化前的位置与尺寸
             m_savedMaxSize = Base::maximumSize();
             Base::setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
             Base::showMaximized();
         }
+        updateMaximizeButtonIcon();
+        updateTitleButtonsGeometry();
+    }
+
+    /**
+     * @brief 从最大化拖动还原：按鼠标在标题栏的水平相对位置放置窗口
+     * @param globalPos 鼠标屏幕坐标
+     * @param localPos  鼠标在最大化窗口内的坐标（用于算 xRatio 与标题栏内 y）
+     *
+     * 例如鼠标在最大化窗口 70% 宽度处，还原后窗口左上角会放到
+     * globalX - restoreWidth*0.7，保证鼠标仍压在标题栏同一相对位置。
+     */
+    void restoreFromMaximizedAt(const QPoint &globalPos, const QPoint &localPos) {
+        const int maximizedWidth = qMax(Base::width(), 1);
+        const double xRatio = qBound(0.0, static_cast<double>(localPos.x()) / maximizedWidth, 1.0);
+
+        // 还原尺寸：优先用最大化前保存的几何，否则用 Qt 的 normalGeometry
+        QRect restoreGeo = m_normalGeometry.isValid() ? m_normalGeometry : Base::normalGeometry();
+        if (!restoreGeo.isValid() || restoreGeo.width() <= 0 || restoreGeo.height() <= 0) {
+            restoreGeo = QRect(0, 0, 800, 600);
+        }
+
+        if (m_savedMaxSize.isValid()) {
+            Base::setMaximumSize(m_savedMaxSize);
+            m_savedMaxSize = QSize();
+        }
+
+        const int restoreW = restoreGeo.width();
+        const int restoreH = restoreGeo.height();
+        const int offsetX = static_cast<int>(restoreW * xRatio);
+        const int offsetY = qBound(0, localPos.y(), qMax(m_titleBarHeight - 1, 0));
+
+        int newX = globalPos.x() - offsetX;
+        int newY = globalPos.y() - offsetY;
+
+        // 尽量保证窗口仍在当前屏幕可见区域内
+        if (QScreen *screen = QGuiApplication::screenAt(globalPos)) {
+            const QRect avail = screen->availableGeometry();
+            newX = qBound(avail.left(), newX, avail.right() - restoreW + 1);
+            newY = qBound(avail.top(), newY, avail.bottom() - restoreH + 1);
+        }
+
+        // 先清最大化状态，再设到计算出的几何，避免 showNormal 跳回旧位置
+        Base::setWindowState(Base::windowState() & ~Qt::WindowMaximized);
+        Base::setGeometry(newX, newY, restoreW, restoreH);
+
+        // 后续拖动：偏移量 = 鼠标相对还原后窗口左上角的位置（保持相对比例）
+        m_dragOffset = QPoint(offsetX, offsetY);
+        m_normalGeometry = Base::geometry();
+
         updateMaximizeButtonIcon();
         updateTitleButtonsGeometry();
     }
@@ -291,62 +372,72 @@ private:
 
     void doResize(const QPoint &globalPos) {
         const QPoint delta = globalPos - m_dragGlobalPos;
-        QRect geo = m_dragGeometry;
         const int region = static_cast<int>(m_resizeRegion);
 
+        const int fixedRight = m_dragGeometry.x() + m_dragGeometry.width();
+        const int fixedBottom = m_dragGeometry.y() + m_dragGeometry.height();
+
+        int x = m_dragGeometry.x();
+        int y = m_dragGeometry.y();
+        int w = m_dragGeometry.width();
+        int h = m_dragGeometry.height();
+
         if (region & static_cast<int>(ResizeRegion::Left)) {
-            geo.setLeft(m_dragGeometry.left() + delta.x());
+            x = m_dragGeometry.x() + delta.x();
+            w = fixedRight - x;
+        } else if (region & static_cast<int>(ResizeRegion::Right)) {
+            w = m_dragGeometry.width() + delta.x();
         }
-        if (region & static_cast<int>(ResizeRegion::Right)) {
-            geo.setRight(m_dragGeometry.right() + delta.x());
-        }
+
         if (region & static_cast<int>(ResizeRegion::Top)) {
-            geo.setTop(m_dragGeometry.top() + delta.y());
-        }
-        if (region & static_cast<int>(ResizeRegion::Bottom)) {
-            geo.setBottom(m_dragGeometry.bottom() + delta.y());
+            y = m_dragGeometry.y() + delta.y();
+            h = fixedBottom - y;
+        } else if (region & static_cast<int>(ResizeRegion::Bottom)) {
+            h = m_dragGeometry.height() + delta.y();
         }
 
-        const QSize minSize = Base::minimumSize();
-        if (geo.width() < minSize.width()) {
+        const QSize minSize = Base::minimumSize()
+                                  .expandedTo(Base::minimumSizeHint())
+                                  .expandedTo(QSize(kBorderWidth * 2, kBorderWidth * 2));
+        QSize maxSize = Base::maximumSize();
+        if (maxSize.width() <= 0) {
+            maxSize.setWidth(QWIDGETSIZE_MAX);
+        }
+        if (maxSize.height() <= 0) {
+            maxSize.setHeight(QWIDGETSIZE_MAX);
+        }
+
+        if (w < minSize.width()) {
+            w = minSize.width();
             if (region & static_cast<int>(ResizeRegion::Left)) {
-                geo.setLeft(geo.right() - minSize.width() + 1);
-            } else {
-                geo.setWidth(minSize.width());
+                x = fixedRight - w;
             }
-        }
-        if (geo.height() < minSize.height()) {
-            if (region & static_cast<int>(ResizeRegion::Top)) {
-                geo.setTop(geo.bottom() - minSize.height() + 1);
-            } else {
-                geo.setHeight(minSize.height());
-            }
-        }
-
-        const QSize maxSize = Base::maximumSize();
-        if (maxSize.width() < QWIDGETSIZE_MAX && geo.width() > maxSize.width()) {
+        } else if (w > maxSize.width()) {
+            w = maxSize.width();
             if (region & static_cast<int>(ResizeRegion::Left)) {
-                geo.setLeft(geo.right() - maxSize.width() + 1);
-            } else {
-                geo.setWidth(maxSize.width());
-            }
-        }
-        if (maxSize.height() < QWIDGETSIZE_MAX && geo.height() > maxSize.height()) {
-            if (region & static_cast<int>(ResizeRegion::Top)) {
-                geo.setTop(geo.bottom() - maxSize.height() + 1);
-            } else {
-                geo.setHeight(maxSize.height());
+                x = fixedRight - w;
             }
         }
 
-        Base::setGeometry(geo);
+        if (h < minSize.height()) {
+            h = minSize.height();
+            if (region & static_cast<int>(ResizeRegion::Top)) {
+                y = fixedBottom - h;
+            }
+        } else if (h > maxSize.height()) {
+            h = maxSize.height();
+            if (region & static_cast<int>(ResizeRegion::Top)) {
+                y = fixedBottom - h;
+            }
+        }
+
+        Base::setGeometry(x, y, w, h);
     }
 
     bool isInTitleBar(const QPoint &pos) const {
         if (m_titleBarHeight <= 0) {
             return true;
         }
-        // 边缘用于缩放时，不触发标题栏拖动
         if (m_resizable && !Base::isMaximized() && hitTest(pos) != ResizeRegion::None) {
             return false;
         }
@@ -354,21 +445,24 @@ private:
     }
 
     bool isOverTitleButton(const QPoint &pos) const {
-        if (m_closeBtn && m_closeBtn->geometry().contains(pos)) {
+        if (m_closeBtn && m_closeBtn->isVisible() && m_closeBtn->geometry().contains(pos)) {
             return true;
         }
-        if (m_maxBtn && m_maxBtn->geometry().contains(pos)) {
+        if (m_maxBtn && m_maxBtn->isVisible() && m_maxBtn->geometry().contains(pos)) {
             return true;
         }
         return false;
     }
 
+private:
     bool m_dragging = false;
     bool m_resizing = false;
     bool m_resizable = true;
+    bool m_maximizable = true;
     QPoint m_dragOffset;
     QPoint m_dragGlobalPos;
     QRect m_dragGeometry;
+    QRect m_normalGeometry; // 最大化前的窗口几何，用于拖动还原时按比例定位
     ResizeRegion m_resizeRegion = ResizeRegion::None;
     QPushButton *m_closeBtn = nullptr;
     QPushButton *m_maxBtn = nullptr;
