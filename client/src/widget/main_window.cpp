@@ -59,6 +59,8 @@ void main_window::init_ui() {
     setMinimumSize(760, 480);
     setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
 
+    setAttribute(Qt::WA_StyledBackground, true);
+
     auto *mainLayout = new QHBoxLayout(this);
     mainLayout->setContentsMargins(18, 42, 18, 18);
     mainLayout->setSpacing(16);

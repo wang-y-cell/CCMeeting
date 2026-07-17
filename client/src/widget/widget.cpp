@@ -81,6 +81,7 @@ void Widget::initPartnerConnect(Partner *p) {
 void Widget::initUI() {
     spdlog::debug("[Widget] 初始化UI");
     ui->setupUi(this);  //解析ui文件
+    setAttribute(Qt::WA_StyledBackground, true);
     setObjectName(QStringLiteral("meetingWidget"));
 
     QFile styleFile(":/Style/source/widget.qss");
