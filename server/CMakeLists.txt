@@ -1,4 +1,3 @@
-cmake_policy(SET CMP0167 OLD)
 
 set(BOOST_ROOT "" CACHE PATH "Boost 安装路径（包含 include/boost 的目录）")
 if(BOOST_ROOT)
