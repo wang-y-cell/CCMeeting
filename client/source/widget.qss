@@ -1,7 +1,7 @@
 QWidget#meetingWidget {
     background-color: #17191f;
-    border: 2px solid #2f6fed;
-    border-radius: 12px;
+    border: 1px solid #2f6fed;
+    border-radius: 0px;
 }
 
 QGroupBox {
