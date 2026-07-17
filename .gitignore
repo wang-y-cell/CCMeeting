@@ -3,6 +3,7 @@ build-server/
 .cache/
 .qtcreator/
 log.txt
-third_party/
+# 可选本地 spdlog 源码目录（也可用 FetchContent，不必提交）
+# third_party/
 docs/
 Doxyfile

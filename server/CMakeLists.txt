@@ -5,13 +5,8 @@ if(BOOST_ROOT)
     list(PREPEND CMAKE_PREFIX_PATH "${BOOST_ROOT}")
 endif()
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_need/spdlog/lib/cmake/spdlog")
-    list(PREPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/third_need/spdlog")
-endif()
-
 find_package(Boost 1.70 REQUIRED COMPONENTS system)
 find_package(Threads REQUIRED)
-find_package(spdlog REQUIRED)
 
 file(GLOB_RECURSE SERVER_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"

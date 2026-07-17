@@ -29,7 +29,7 @@
 
 构建工具：**CMake ≥ 3.16**
 
-> 说明：仓库根目录 `third_party/spdlog` 为本地 spdlog 安装前缀（含 `include`、`lib`），已在 `.gitignore` 中忽略，需自行准备后放入，或通过系统/包管理器安装并由 CMake 找到。
+> 说明：spdlog 由根 `CMakeLists.txt` 自动引入。若存在 `third_party/spdlog` 源码（含其 `CMakeLists.txt`）则直接 `add_subdirectory`；否则配置阶段通过 FetchContent 拉取 **v1.17.0**。不再需要预编译安装前缀或 `find_package(spdlog)`。
 
 ## 目录结构
 
@@ -44,7 +44,7 @@ CloudMeeting-master/
 │   ├── include/
 │   ├── src/
 │   └── CMakeLists.txt
-├── third_party/            # 本地第三方（如 spdlog，默认不入库）
+├── third_party/            # 可选：放入 spdlog 源码后优先本地构建（默认被 .gitignore）
 ├── docs/                   # Doxygen 生成输出（默认不入库）
 └── Doxyfile                # Doxygen 配置（可选）
 ```
@@ -53,7 +53,7 @@ CloudMeeting-master/
 
 1. 安装 **CMake**、**C++17** 编译器（MSVC / MinGW / GCC / Clang）
 2. 安装 **Qt 6**（建议 6.x，需含 Multimedia、Network 等模块）
-3. 准备 **spdlog**（安装到 `third_party/spdlog`，或保证 `find_package(spdlog)` 能找到）
+3. **spdlog**：无需预装；首次配置需能访问 GitHub（或事先把源码放到 `third_party/spdlog`）
 4. 若构建服务端：安装 **Boost**（含 `system` 组件，≥ 1.70）
 
 ## 编译

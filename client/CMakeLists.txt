@@ -19,7 +19,6 @@ list(PREPEND CMAKE_PREFIX_PATH "${QT_INSTALL_PATH}") # 将Qt安装路径添加�
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets Multimedia MultimediaWidgets Network)
 find_package(Threads REQUIRED)
-find_package(spdlog REQUIRED)
 
 # 获取客户端源文件
 file(GLOB_RECURSE CLIENT_SOURCES CONFIGURE_DEPENDS
