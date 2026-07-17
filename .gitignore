@@ -4,3 +4,4 @@ build-server/
 .qtcreator/
 log.txt
 third_party/
+docs/
