@@ -9,9 +9,13 @@ namespace repository {
 UserRepository::UserRepository(db::MysqlClient mysql)
     : mysql_(std::move(mysql)) {}
 
+/**
+ * @details 根据用户名连接数据库查询凭证UserCredential,查询成功返回凭证,查询失败返回空
+ * 凭证是一个包含用户id,用户名,密码哈希,状态的结构体
+*/
 std::optional<UserCredential> UserRepository::find_credential_by_username(
     const std::string& username) const {
-    auto conn = mysql_.create_connection();
+    auto conn = mysql_.create_connection(); //创建数据库连接
     std::unique_ptr<sql::PreparedStatement> stmt(conn->prepareStatement(
         "SELECT user_id, username, password_hash, status "
         "FROM sys_users WHERE username = ? LIMIT 1"));
@@ -30,6 +34,10 @@ std::optional<UserCredential> UserRepository::find_credential_by_username(
     return credential;
 }
 
+/**
+ * @details 根据用户id连接数据库查询用户信息UserInfo,查询成功返回用户信息,查询失败返回空
+ * 用户信息是一个包含用户id,用户名,头像,简介的结构体
+*/
 model::UserInfo UserRepository::load_user_info(
     std::uint64_t user_id,
     const std::string& fallback_name) const {

@@ -19,7 +19,7 @@
 namespace {
 
 /**
- * @brief 从环境变量覆盖配置（可选）
+ * @brief 从环境变量覆盖配置, 从环境变量中获得需要的数据库信息,如密码,用户名等
  * @param config 待填充配置
  */
 void apply_env_overrides(config::AuthServerConfig& config) {

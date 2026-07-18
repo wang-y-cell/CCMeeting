@@ -21,19 +21,19 @@ namespace db {
 class MysqlClient {
 public:
     /**
-     * @brief 构造连接工厂
+     * @brief 构造连接工厂,负责将config中的信息存入类中,以便后续使用
      * @param config 含主机、账号、库名等配置
      */
     explicit MysqlClient(config::AuthServerConfig config);
 
     /**
-     * @brief 打开一条新的数据库连接
+     * @brief 根据构造函数传入的config信息,打开一条新的数据库连接
      * @return 成功时返回连接智能指针，失败抛出 sql::SQLException
      */
     std::unique_ptr<sql::Connection> create_connection() const;
 
 private:
-    config::AuthServerConfig config_;
+    config::AuthServerConfig config_; ///< 配置信息,包含数据库需要的信息,如主机,端口,用户名,密码,库名等
 };
 
 }  // namespace db

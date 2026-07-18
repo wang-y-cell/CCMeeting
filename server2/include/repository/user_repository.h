@@ -31,7 +31,8 @@ struct UserCredential {
 class UserRepository {
 public:
     /**
-     * @brief 构造仓储
+     * @brief 构造仓储,负责将mysql_client中的信息存入类中,之后可以使用这个数据库
+     * 连接数据库,查询凭证,查询用户信息,写入登录日志
      * @param mysql MySQL 连接工厂
      */
     explicit UserRepository(db::MysqlClient mysql);
