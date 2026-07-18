@@ -8,6 +8,7 @@
 #include "screen.h"
 #include "login.h"
 #include "main_window.h"
+#include "configure/user_session.h"
 
 int main(int argc, char* argv[]) {
 
@@ -38,6 +39,12 @@ int main(int argc, char* argv[]) {
     main_window main_windowDialog;
     loginDialog.show();
     if(loginDialog.exec() == QDialog::Accepted) {
+        const auto& session = UserSession::instance();
+        spdlog::info("logged in user id={} name={} avatar={} info={}",
+                     session.userId(),
+                     session.name().toStdString(),
+                     session.avatar().toStdString(),
+                     session.info().toStdString());
         main_windowDialog.show();
         const int ret = app.exec();
         spdlog::shutdown();

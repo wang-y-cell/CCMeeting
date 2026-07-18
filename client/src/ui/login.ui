@@ -186,7 +186,7 @@
    <item>
     <widget class="QLabel" name="hintLabel">
      <property name="text">
-      <string>演示账号 root / 123456</string>
+      <string>演示账号 demo / demo123</string>
      </property>
      <property name="alignment">
       <set>Qt::AlignmentFlag::AlignCenter</set>
