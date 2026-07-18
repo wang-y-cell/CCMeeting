@@ -23,16 +23,16 @@ namespace {
  * @param config 待填充配置
  */
 void apply_env_overrides(config::AuthServerConfig& config) {
-    if (const char* port = std::getenv("AUTH_HTTP_PORT")) {
-        config.listen_port = static_cast<std::uint16_t>(std::atoi(port));
+    if (const char* port = std::getenv("AUTH_HTTP_PORT")) { //从环境变量中获取HTTP端口
+        config.listen_port = static_cast<std::uint16_t>(std::atoi(port)); //将字符串转换为整数
     }
-    if (const char* host = std::getenv("AUTH_MYSQL_HOST")) {
+    if (const char* host = std::getenv("AUTH_MYSQL_HOST")) { //从环境变量中获取MySQL主机
         config.mysql_host = host;
     }
-    if (const char* user = std::getenv("AUTH_MYSQL_USER")) {
+    if (const char* user = std::getenv("AUTH_MYSQL_USER")) { //从环境变量中获取MySQL用户名
         config.mysql_user = user;
     }
-    if (const char* password = std::getenv("AUTH_MYSQL_PASSWORD")) {
+    if (const char* password = std::getenv("AUTH_MYSQL_PASSWORD")) { //从环境变量中获取MySQL密码
         config.mysql_password = password;
     }
     if (const char* database = std::getenv("AUTH_MYSQL_DATABASE")) {
@@ -43,8 +43,8 @@ void apply_env_overrides(config::AuthServerConfig& config) {
 }  // namespace
 
 int main() {
-    spdlog::set_level(spdlog::level::info);
-    spdlog::set_pattern("%Y-%m-%d %H:%M:%S.%e [%^%l%$] %v");
+    spdlog::set_level(spdlog::level::info); //设置日志级别为info
+    spdlog::set_pattern("%Y-%m-%d %H:%M:%S.%e [%^%l%$] %v"); //设置日志格式
 
     config::AuthServerConfig config;
     apply_env_overrides(config);
