@@ -5,7 +5,9 @@
 #include "configure.h"
 #include "message.h"
 #include "netheader.h"
+#include "partner_tile.h"
 #include <QString>
+#include <QLabel>
 #include <QCamera>
 #include <QMediaDevices>
 #include <QPainter>
@@ -75,7 +77,7 @@ void Widget::initConnect() {
 }
 
 void Widget::initPartnerConnect(Partner *p) {
-    connect(p, &Partner::sendip, this, &Widget::recvip);
+    connect(p, &Partner::clicked, this, &Widget::recvip);
 }
 
 void Widget::initUI() {
@@ -200,16 +202,23 @@ void Widget::updateMeetingInfo() {
         ui->labelLocalIp->setText(QStringLiteral("-"));
         ui->labelSpeaker->setText(QStringLiteral("-"));
     } else {
-        ui->labelMeetStatus->setText(_createmeet ? tr("已创建会议") : tr("已加入会议"));
+        if (_offlineMode)
+            ui->labelMeetStatus->setText(tr("离线调试中"));
+        else
+            ui->labelMeetStatus->setText(_createmeet ? tr("已创建会议") : tr("已加入会议"));
         ui->labelRoomNo->setText(_roomNo > 0 ? QString::number(_roomNo) : QStringLiteral("-"));
         ui->labelMemberCount->setText(QString::number(static_cast<int>(partner.size())));
-        if (_network && _network->localIp() != 0)
+        if (_offlineMode)
+            ui->labelLocalIp->setText(QStringLiteral("127.0.0.1"));
+        else if (_network && _network->localIp() != 0)
             ui->labelLocalIp->setText(QHostAddress(_network->localIp()).toString());
         else
             ui->labelLocalIp->setText(QStringLiteral("-"));
     }
 
-    if (_sessionActive && !_serverAddr.isEmpty())
+    if (_offlineMode)
+        ui->labelServer->setText(tr("离线模式"));
+    else if (_sessionActive && !_serverAddr.isEmpty())
         ui->labelServer->setText(_serverAddr);
     else if (_sessionActive)
         ui->labelServer->setText(tr("已连接"));
@@ -227,6 +236,7 @@ void Widget::endMeetingSession() {
 
     _createmeet = false;
     _joinmeet = false;
+    _offlineMode = false;
 
     /// 先异步断线（IO 线程），不在这里 wait 任何工作线程
     if (_network && _sessionActive) {
@@ -274,6 +284,65 @@ void Widget::on_createmeetBtn_clicked() {
     }
 }
 
+void Widget::enterOfflineMode() {
+    spdlog::info("[Widget] 进入离线调试模式");
+    if (_sessionActive || _createmeet || _joinmeet) {
+        QMessageBox::warning(this, tr("提示"), tr("当前已有会议会话，请先关闭后再进入离线模式"));
+        return;
+    }
+
+    _offlineMode = true;
+    _createmeet = true;
+    _joinmeet = false;
+    _sessionActive = false;
+    _sessionEnding = false;
+    _roomNo = 9001;
+    _serverAddr = QStringLiteral("offline");
+
+    // 本机 + 两个假远端成员，方便测左侧小窗 / 主画面切换
+    const std::uint32_t localIp = QHostAddress(QStringLiteral("127.0.0.1")).toIPv4Address();
+    const std::uint32_t fakeA = QHostAddress(QStringLiteral("10.0.0.2")).toIPv4Address();
+    const std::uint32_t fakeB = QHostAddress(QStringLiteral("10.0.0.3")).toIPv4Address();
+
+    show(); ///< 显示窗口
+    raise(); ///< 将窗口置于顶层
+    activateWindow(); ///< 激活窗口,使其可以接收键盘事件
+
+    ///< 设置本地摄像头IP
+    if (_cameraVideo) {
+        _cameraVideo->setLocalIp(localIp);
+        _cameraVideo->setMainIp(localIp);
+    }
+    mainip = localIp;
+
+    addPartner(localIp); ///< 添加本地成员
+    addPartner(fakeA); ///< 添加假远端成员A
+    addPartner(fakeB); ///< 添加假远端成员B
+    _cameraVideo->showAvatarForIp(localIp);
+    _cameraVideo->showAvatarForIp(fakeA);
+    _cameraVideo->showAvatarForIp(fakeB);
+    _cameraVideo->showMainAvatar();
+
+    iplist.clear();
+    iplist.push_back(QStringLiteral("@127.0.0.1"));
+    iplist.push_back(QStringLiteral("@10.0.0.2"));
+    iplist.push_back(QStringLiteral("@10.0.0.3"));
+    ui->plainTextEdit->setCompleter(iplist);
+
+    ui->openVedio->setDisabled(false);
+    ui->openAudio->setDisabled(false);
+    ui->sendmsg->setDisabled(false);
+    ui->groupBox_2->setTitle(tr("主屏幕(离线调试)"));
+    updateMeetingInfo();
+
+    QMessageBox::information(
+        this,
+        tr("离线调试"),
+        tr("已进入离线模式：未连接服务器。\n"
+           "可测试摄像头、成员小窗点击切换主画面等 UI。\n"
+           "关闭会议窗口即可退出。"));
+}
+
 /**
  * @brief 触发事件(3条， 一般使用第二条进行触发)
  * 1. 窗口部件第一次显示时，系统会自动产生一个绘图事件。从而强制绘制这个窗口部件，主窗口起来会绘制一次
@@ -290,12 +359,16 @@ void Widget::on_openVedio_clicked() {
     if(_cameraVideo->isCameraRunning()) {
         _cameraVideo->stopCamera();
         spdlog::info("[Widget] 摄像头关闭");
-        if (_network)
+        if (_network && !_offlineMode)
             _network->clearPendingImages();
         ui->openVedio->setText("摄像头关闭");
-        _network->sendCloseCamera();
-        if (_network)
+        if (_network && !_offlineMode)
+            _network->sendCloseCamera();
+        if (_offlineMode) {
+            closeImg(QHostAddress(QStringLiteral("127.0.0.1")).toIPv4Address());
+        } else if (_network) {
             closeImg(_network->localIp());
+        }
     } else {
         _cameraVideo->startCamera();
         spdlog::info("[Widget] 摄像头开启");
@@ -576,26 +649,29 @@ void Widget::onVideoMessage(Message msg) {
 
 Partner* Widget::addPartner(std::uint32_t ip)
 {
-	if (partner.find(ip) != partner.end()) return nullptr; ///< 如果存在这个ip,返回null
-    Partner *p = new Partner(ui->scrollAreaWidgetContents ,ip); ///< 创建一个新的Partner对象
-    if (p == nullptr) { ///< 如果创建失败，则返回空
+	if (partner.find(ip) != partner.end()) return nullptr;
+    Partner *p = new Partner(ip, this);
+    if (p == nullptr) {
         spdlog::error("[Widget] 创建Partner对象失败");
-        return nullptr; ///< 返回空
-    } else { ///< 如果创建成功，则连接信号和槽
-        initPartnerConnect(p);
-        spdlog::debug("[Widget] 将这个用户添加到partner中");
-		partner.emplace(ip, p);
-		ui->verticalLayout_3->addWidget(p, 1);
-        _cameraVideo->addPartnerDisplay(ip, p->displayLabel());
-
-		/// 当有人员加入时，开启滑动条滑动事件，开启输入(只有自己时，不打开)
-        if (partner.size() > 1 && _ainput && _aoutput) {
-            ui->openAudio->setDisabled(false);
-            ui->sendmsg->setDisabled(false);
-            _aoutput->startPlay();
-        }
-		return p;
+        return nullptr;
     }
+
+    auto *tile = new PartnerTile(p, ui->scrollAreaWidgetContents);
+    initPartnerConnect(p);
+    spdlog::debug("[Widget] 将这个用户添加到partner中");
+    partner.emplace(ip, p);
+    ui->verticalLayout_3->addWidget(tile, 1);
+
+    if (QLabel *label = p->displayLabel())
+        _cameraVideo->addPartnerDisplay(ip, label);
+
+    /// 当有人员加入时，开启滑动条滑动事件，开启输入(只有自己时，不打开)
+    if (partner.size() > 1 && _ainput && _aoutput) {
+        ui->openAudio->setDisabled(false);
+        ui->sendmsg->setDisabled(false);
+        _aoutput->startPlay();
+    }
+    return p;
 }
 
 
@@ -606,9 +682,14 @@ void Widget::removePartner(std::uint32_t ip)
     if (it != partner.end())
     {
         Partner *p = it->second;
-        disconnect(p, &Partner::sendip, this, &Widget::recvip);
+        disconnect(p, &Partner::clicked, this, &Widget::recvip);
         _cameraVideo->removePartnerDisplay(ip);
-        ui->verticalLayout_3->removeWidget(p);
+
+        if (PartnerTile *tile = p->tile()) {
+            ui->verticalLayout_3->removeWidget(tile);
+            p->setTile(nullptr);
+            delete tile;
+        }
         delete p;
         partner.erase(it);
 
@@ -634,8 +715,12 @@ void Widget::clearPartner() {
 
     for (auto it = partner.begin(); it != partner.end(); ) {
         Partner *p = it->second;
-        disconnect(p, &Partner::sendip, this, &Widget::recvip);
-        ui->verticalLayout_3->removeWidget(p);
+        disconnect(p, &Partner::clicked, this, &Widget::recvip);
+        if (PartnerTile *tile = p->tile()) {
+            ui->verticalLayout_3->removeWidget(tile);
+            p->setTile(nullptr);
+            delete tile;
+        }
         delete p;
         it = partner.erase(it);
     }
@@ -657,7 +742,18 @@ void Widget::clearPartner() {
 
 void Widget::onLocalFrameCaptured(const QImage &image)
 {
-    if (!_cameraVideo || !_cameraVideo->isCameraRunning() || !_network)
+    if (!_cameraVideo || !_cameraVideo->isCameraRunning())
+        return;
+
+    if (_offlineMode) {
+        const std::uint32_t localIp = QHostAddress(QStringLiteral("127.0.0.1")).toIPv4Address();
+        _cameraVideo->showImageForIp(localIp, image);
+        if (mainip == localIp)
+            _cameraVideo->showMainImage(image);
+        return;
+    }
+
+    if (!_network)
         return;
     if (partner.size() <= 1)
         return;
@@ -668,20 +764,10 @@ void Widget::onLocalFrameCaptured(const QImage &image)
 void Widget::recvip(std::uint32_t ip)
 {
     if (partner.find(mainip) != partner.end()) {
-        Partner* p = partner[mainip];
-        p->setStyleSheet(
-            "border-width: 1px; "
-            "border-style: solid; "
-            "border-color:rgba(0, 0, 255, 0.7)"
-        );
+        partner[mainip]->resetBorder();
     }
 	if (partner.find(ip) != partner.end()) {
-		Partner* p = partner[ip];
-		p->setStyleSheet(
-            "border-width: 1px; "
-            "border-style: solid; "
-            "border-color:rgba(255, 0, 0, 0.7)"
-        );
+		partner[ip]->setSelected(true);
 	}
     mainip = ip;
     _cameraVideo->refreshMainForIp(mainip);
@@ -738,7 +824,14 @@ void Widget::on_sendmsg_clicked()
     ChatMessage *message = new ChatMessage(ui->listWidget);
     QListWidgetItem *item = new QListWidgetItem();
     dealMessageTime(time);
-    dealMessage(message, item, msg, time, QHostAddress(_network ? _network->localIp() : 0).toString() ,ChatMessage::User_Me);
+    const QString myIp = _offlineMode
+        ? QStringLiteral("127.0.0.1")
+        : QHostAddress(_network ? _network->localIp() : 0).toString();
+    dealMessage(message, item, msg, time, myIp, ChatMessage::User_Me);
+    if (_offlineMode || !_network) {
+        ui->sendmsg->setDisabled(false);
+        return;
+    }
     _network->sendText(msg.toStdString());
     ui->sendmsg->setDisabled(true);
 }

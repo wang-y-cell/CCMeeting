@@ -1,42 +1,48 @@
 #include "partner.h"
-#include <QLabel>
+#include "partner_tile.h"
 #include <QHostAddress>
-#include <QMouseEvent>
-#include <QResizeEvent>
+#include <QLabel>
 
-Partner::Partner(QWidget *parent, std::uint32_t p) : QWidget(parent), ip(p)
+Partner::Partner(std::uint32_t ip, QObject *parent)
+    : QObject(parent)
+    , m_ip(ip)
 {
-    m_displayLabel = new QLabel(this);
-    m_displayLabel->setAlignment(Qt::AlignCenter);
-    m_displayLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
-
-    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
-    w = parent ? qMax(parent->width(), 40) : 40;
-    setFixedHeight(w);
-    updateLabelGeometry();
-
-    setStyleSheet("border-width: 1px; border-style: solid; border-color:rgba(0, 0, 255, 0.7)");
-    setToolTip(QHostAddress(ip).toString());
 }
 
-void Partner::resizeEvent(QResizeEvent *event)
+QString Partner::ipString() const
 {
-    QWidget::resizeEvent(event);
-    const int newW = event->size().width();
-    if (newW <= 10 || newW == w)
+    return QHostAddress(m_ip).toString();
+}
+
+void Partner::setTile(PartnerTile *tile)
+{
+    if (m_tile == tile)
         return;
-    w = newW;
-    setFixedHeight(w);
-    updateLabelGeometry();
+
+    if (m_tile) {
+        disconnect(m_tile, &PartnerTile::clicked, this, &Partner::clicked);
+    }
+
+    m_tile = tile;
+
+    if (m_tile) {
+        connect(m_tile, &PartnerTile::clicked, this, &Partner::clicked);
+    }
 }
 
-void Partner::updateLabelGeometry()
+QLabel *Partner::displayLabel() const
 {
-    const int margin = 5;
-    m_displayLabel->setGeometry(margin, margin, qMax(w - margin * 2, 1), qMax(w - margin * 2, 1));
+    return m_tile ? m_tile->displayLabel() : nullptr;
 }
 
-void Partner::mousePressEvent(QMouseEvent *)
+void Partner::setSelected(bool selected)
 {
-    emit sendip(ip);
+    if (m_tile)
+        m_tile->setSelected(selected);
+}
+
+void Partner::resetBorder()
+{
+    if (m_tile)
+        m_tile->resetBorder();
 }

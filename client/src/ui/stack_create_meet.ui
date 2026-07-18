@@ -150,6 +150,25 @@
         </property>
        </widget>
       </item>
+      <item>
+       <widget class="QPushButton" name="offline_debug_btn">
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>44</height>
+         </size>
+        </property>
+        <property name="cursor">
+         <cursorShape>PointingHandCursor</cursorShape>
+        </property>
+        <property name="toolTip">
+         <string>不连接服务器，打开会议窗口并预置假成员，便于调试 UI / 摄像头</string>
+        </property>
+        <property name="text">
+         <string>离线调试模式</string>
+        </property>
+       </widget>
+      </item>
      </layout>
     </widget>
    </item>

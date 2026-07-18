@@ -9,6 +9,7 @@
 #include "networkmanager.h"
 #include "message.h"
 #include "partner.h"
+#include "partner_tile.h"
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
@@ -43,6 +44,7 @@ private:
     bool _openCamera = false; ///< 是否打开摄像头
     bool _sessionActive = false; ///< 是否已连接服务器（会议会话）
     bool _sessionEnding = false; ///< 是否正在异步结束会议
+    bool _offlineMode = false; ///< 离线调试模式（不连服务器）
     NetworkManager *_network = nullptr; ///< 统一网络收发
     std::unordered_map<std::uint32_t, Partner *> partner; ///< 房间内成员（IP → Partner）
     AudioInput* _ainput = nullptr; ///< 麦克风采集
@@ -62,8 +64,8 @@ private:
     /** @brief 初始化信号与槽连接 */
     void initConnect();
     /**
-     * @brief 连接 Partner 的点击信号
-     * @param p 成员控件
+     * @brief 连接 Partner 点击信号（由 PartnerTile 转发）
+     * @param p 成员对象
      */
     void initPartnerConnect(Partner *p);
     void paintEvent(QPaintEvent *event) override;
@@ -148,6 +150,10 @@ protected:
 public slots:
     /** @brief 点击创建会议 */
     void on_createmeetBtn_clicked();
+    /**
+     * @brief 进入离线调试模式：不连服务器，预置假成员，便于测 UI / 摄像头
+     */
+    void enterOfflineMode();
     /** @brief 点击开关摄像头 */
     void on_openVedio_clicked();
     /** @brief 点击开关麦克风 */

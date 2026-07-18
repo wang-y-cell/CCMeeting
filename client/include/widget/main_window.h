@@ -33,6 +33,8 @@ public:
 private slots:
     /** @brief 创建会议槽函数 */
     void CreateMeeting_button_clicked();
+    /** @brief 离线调试：不连服务器打开会议窗 */
+    void OfflineDebug_button_clicked();
     /**
      * @brief 加入会议槽函数
      * @param roomNo 房间号
