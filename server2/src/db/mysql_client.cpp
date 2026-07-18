@@ -17,8 +17,8 @@ std::unique_ptr<sql::Connection> MysqlClient::create_connection() const {
     url << "tcp://" << config_.mysql_host << ":" << config_.mysql_port;
 
     std::unique_ptr<sql::Connection> conn(
-        driver->connect(url.str(), config_.mysql_user, config_.mysql_password));
-    conn->setSchema(config_.mysql_database);
+        driver->connect(url.str(), config_.mysql_user, config_.mysql_password)); //连接数据库
+    conn->setSchema(config_.mysql_database); //设置数据库
     return conn;
 }
 
