@@ -1,5 +1,6 @@
 build/
 build-server/
+build-server2/
 .cache/
 .qtcreator/
 log.txt
@@ -7,3 +8,4 @@ log.txt
 # third_party/
 docs/
 Doxyfile
+need.md

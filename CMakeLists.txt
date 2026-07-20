@@ -7,10 +7,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(BUILD_CLIENT "Build CloudMeeting Qt client" ON)
 option(BUILD_SERVER "Build CloudMeeting server" OFF)
+option(BUILD_SERVER2 "Build CloudMeeting auth HTTP server (server2)" OFF)
 
 # 至少一个构建选项被选中
-if(NOT BUILD_CLIENT AND NOT BUILD_SERVER)
-    message(FATAL_ERROR "[message] At least one of BUILD_CLIENT or BUILD_SERVER must be ON.")
+if(NOT BUILD_CLIENT AND NOT BUILD_SERVER AND NOT BUILD_SERVER2)
+    message(FATAL_ERROR "[message] At least one of BUILD_CLIENT, BUILD_SERVER or BUILD_SERVER2 must be ON.")
 endif()
 
 # spdlog：优先使用仓库内 third_party/spdlog 源码，否则 FetchContent 拉取固定版本
@@ -48,4 +49,8 @@ endif()
 
 if(BUILD_SERVER)
     add_subdirectory(server)
+endif()
+
+if(BUILD_SERVER2)
+    add_subdirectory(server2)
 endif()
