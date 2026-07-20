@@ -14,6 +14,7 @@ namespace service {
 
 /**
  * @brief 编排登录校验、资料加载与审计日志
+ * 提供一个login函数,主要用于登录认证,根据提供的用户名和密码等信息,进行登录认证,并返回登录结果
  */
 class AuthService {
 public:

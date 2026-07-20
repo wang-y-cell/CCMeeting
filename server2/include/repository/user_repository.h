@@ -55,7 +55,7 @@ public:
                                    const std::string& fallback_name) const;
 
     /**
-     * @brief 写入登录审计日志
+     * @brief 写入登录审计日志,记录登录记录
      * @param user_id 用户 ID（失败且未知用户时可传 0，此时跳过）
      * @param login_ip 客户端 IP
      * @param device_info 设备/UA 信息

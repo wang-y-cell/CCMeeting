@@ -71,6 +71,10 @@ model::UserInfo UserRepository::load_user_info(
     return info;
 }
 
+/**
+ * @details 连接数据库之后写入
+ * user_id, login_ip, device_info, status登录日志表,记录登录记录
+*/
 void UserRepository::insert_login_log(std::uint64_t user_id,
                                       const std::string& login_ip,
                                       const std::string& device_info,
