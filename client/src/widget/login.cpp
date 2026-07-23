@@ -60,20 +60,20 @@ void login::Login() {
         QMessageBox::warning(this, tr("Login Error"), tr("请输入账号和密码"));
         return;
     }
-
+    ///< 获得登录 URL
     QUrl url;
     url.setScheme(QStringLiteral("http"));
     url.setHost(QString::fromUtf8(AuthConfig::host));
     url.setPort(AuthConfig::port);
     url.setPath(QString::fromUtf8(AuthConfig::login_path));
 
-    QNetworkRequest request(url);
+    QNetworkRequest request(url); ///< 创建网络请求
     request.setHeader(QNetworkRequest::ContentTypeHeader,
                       QStringLiteral("application/json; charset=utf-8"));
     request.setHeader(QNetworkRequest::UserAgentHeader,
                       QStringLiteral("CloudMeetingClient/1.0"));
 
-    QJsonObject body;
+    QJsonObject body; ///< 创建请求体: json 格式
     body.insert(QStringLiteral("username"), username);
     body.insert(QStringLiteral("password"), password);
 
