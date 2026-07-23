@@ -12,6 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_QT_PATH = Path("F:/Qt/6.8.3/mingw_64")
+DEFAULT_QT_CXX_COMPILER = Path("F:/Qt/Tools/mingw1310_64")
 
 # 目标名 -> (构建目录, CMake 开关)
 TARGETS = {
@@ -42,9 +43,43 @@ TARGETS = {
 }
 
 
-def run(cmd: list[str], cwd: Path | None = None) -> None:
+def resolve_mingw_root(mingw_path: str | None) -> Path | None:
+    """解析 MinGW 根目录：优先参数，否则使用 DEFAULT_QT_CXX_COMPILER。"""
+    if mingw_path:
+        root = Path(mingw_path)
+    elif DEFAULT_QT_CXX_COMPILER.is_dir():
+        root = DEFAULT_QT_CXX_COMPILER
+    else:
+        return None
+    return root if root.is_dir() else None
+
+
+def mingw_compilers(mingw_root: Path) -> tuple[Path, Path]:
+    """返回 (gcc, g++) 可执行文件路径。"""
+    bin_dir = mingw_root / "bin"
+    gcc = bin_dir / ("gcc.exe" if os.name == "nt" else "gcc")
+    gxx = bin_dir / ("g++.exe" if os.name == "nt" else "g++")
+    return gcc, gxx
+
+
+def with_mingw_path(mingw_root: Path | None) -> dict[str, str]:
+    """将 MinGW bin 置于 PATH 前端，便于 cmake/ninja 找到编译器工具链。"""
+    env = os.environ.copy()
+    if mingw_root is None:
+        return env
+    bin_dir = str(mingw_root / "bin")
+    env["PATH"] = bin_dir + os.pathsep + env.get("PATH", "")
+    return env
+
+
+def run(
+    cmd: list[str],
+    cwd: Path | None = None,
+    *,
+    env: dict[str, str] | None = None,
+) -> None:
     print("+", " ".join(cmd), flush=True)
-    subprocess.run(cmd, cwd=cwd or ROOT, check=True)
+    subprocess.run(cmd, cwd=cwd or ROOT, check=True, env=env)
 
 
 def prefer_ninja() -> str | None:
@@ -58,8 +93,10 @@ def cmake_configure(
     qt_path: str | None,
     boost_root: str | None,
     generator: str | None,
+    mingw_root: Path | None,
 ) -> None:
     build_dir.mkdir(parents=True, exist_ok=True)
+    env = with_mingw_path(mingw_root)
 
     cmd = [
         "cmake",
@@ -81,17 +118,31 @@ def cmake_configure(
     elif not os.environ.get("Qt6_DIR") and DEFAULT_QT_PATH.is_dir():
         cmd.append(f"-DQT_INSTALL_PATH={DEFAULT_QT_PATH.as_posix()}")
 
+    if mingw_root is not None:
+        gcc, gxx = mingw_compilers(mingw_root)
+        if not gxx.is_file():
+            raise FileNotFoundError(2, "No such file or directory", str(gxx))
+        cmd.append(f"-DCMAKE_C_COMPILER={gcc.as_posix()}")
+        cmd.append(f"-DCMAKE_CXX_COMPILER={gxx.as_posix()}")
+        print(f"使用 MinGW 编译器: {gxx}")
+
     if boost_root:
         cmd.append(f"-DBOOST_ROOT={boost_root}")
 
-    run(cmd)
+    run(cmd, env=env)
 
 
-def cmake_build(build_dir: Path, *, jobs: int, config: str) -> None:
+def cmake_build(
+    build_dir: Path,
+    *,
+    jobs: int,
+    config: str,
+    mingw_root: Path | None,
+) -> None:
     cmd = ["cmake", "--build", str(build_dir), "--config", config]
     if jobs > 0:
         cmd.extend(["--parallel", str(jobs)])
-    run(cmd)
+    run(cmd, env=with_mingw_path(mingw_root))
 
 
 def build_target(
@@ -103,9 +154,11 @@ def build_target(
     jobs: int,
     config: str,
     generator: str | None,
+    mingw_path: str | None,
 ) -> None:
     target = TARGETS[name]
     build_dir: Path = target["build_dir"]
+    mingw_root = resolve_mingw_root(mingw_path)
 
     if clean and build_dir.exists():
         print(f"清理构建目录: {build_dir}")
@@ -118,10 +171,11 @@ def build_target(
         qt_path=qt_path,
         boost_root=boost_root,
         generator=generator,
+        mingw_root=mingw_root,
     )
 
     print(f"编译 {name} ...")
-    cmake_build(build_dir, jobs=jobs, config=config)
+    cmake_build(build_dir, jobs=jobs, config=config, mingw_root=mingw_root)
     print(f"完成: {name}")
 
 
@@ -153,6 +207,14 @@ def parse_args() -> argparse.Namespace:
         "--qt-path",
         default=os.environ.get("QT_INSTALL_PATH"),
         help="Qt 安装路径（也可设环境变量 QT_INSTALL_PATH / Qt6_DIR）",
+    )
+    parser.add_argument(
+        "--mingw-path",
+        default=os.environ.get("MINGW_PATH"),
+        help=(
+            "Qt MinGW 工具链根目录（含 bin/g++.exe）；"
+            f"默认 {DEFAULT_QT_CXX_COMPILER.as_posix()}"
+        ),
     )
     parser.add_argument(
         "--boost-root",
@@ -192,6 +254,7 @@ def main() -> int:
         "jobs": args.jobs,
         "config": args.config,
         "generator": args.generator,
+        "mingw_path": args.mingw_path,
     }
 
     try:

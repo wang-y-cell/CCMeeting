@@ -1,6 +1,7 @@
 #include "cameravideo.h"
 #include "configure/configure.h"
 #include <QMessageBox>
+#include <QVideoSink>
 #include <QWidget>
 #include <spdlog/spdlog.h>
 
@@ -53,22 +54,28 @@ void CameraVideo::addPartnerDisplay(std::uint32_t ip, QWidget *label) {
     showAvatarForIp(ip);
 }
 
+void CameraVideo::clearAllPartnerDisplays() {
+    for (auto it = _partnerDisplays.begin(); it != _partnerDisplays.end(); ++it) {
+        ImgDisplay *display = it->second;
+        if (!display)
+            continue;
+        display->setTarget(nullptr);
+        display->deleteLater();
+    }
+    _partnerDisplays.clear();
+    _lastImages.clear();
+}
+
 void CameraVideo::removePartnerDisplay(std::uint32_t ip) {
     auto it = _partnerDisplays.find(ip);
     if (it != _partnerDisplays.end()) {
         ImgDisplay *display = it->second;
-        delete display;
+        if (display) {
+            display->setTarget(nullptr);
+            display->deleteLater();
+        }
         _partnerDisplays.erase(it);
     }
-}
-
-void CameraVideo::clearAllPartnerDisplays() {
-    for (auto it = _partnerDisplays.begin(); it != _partnerDisplays.end(); ++it) {
-        ImgDisplay *display = it->second;
-        delete display;
-    }
-    _partnerDisplays.clear();
-    _lastImages.clear();
 }
 
 void CameraVideo::showImageForIp(std::uint32_t ip, const QImage &image) {
@@ -76,8 +83,9 @@ void CameraVideo::showImageForIp(std::uint32_t ip, const QImage &image) {
         return;
 
     _lastImages[ip] = image;
-    if (ImgDisplay *display = _partnerDisplays[ip])
-        display->showImage(image);
+    auto it = _partnerDisplays.find(ip);
+    if (it != _partnerDisplays.end() && it->second)
+        it->second->showImage(image);
     if (ip == _mainIp)
         showMainImage(image);
 }
@@ -91,8 +99,9 @@ void CameraVideo::showMainImage(const QImage &image) {
 void CameraVideo::showAvatarForIp(std::uint32_t ip) {
     _lastImages.erase(ip); ///< 删除ip对应的图像
     const QImage avatar = defaultAvatar(); ///< 获取默认头像
-    if (ImgDisplay *display = _partnerDisplays[ip]) ///< 获得ip对应的显示区域
-        display->showImage(avatar); ///< 显示默认头像
+    auto it = _partnerDisplays.find(ip);
+    if (it != _partnerDisplays.end() && it->second)
+        it->second->showImage(avatar); ///< 显示默认头像
     if (ip == _mainIp)
         showMainAvatar(); ///< 显示主头像
 }
@@ -114,6 +123,7 @@ void CameraVideo::refreshMainForIp(std::uint32_t ip) {
 void CameraVideo::startCamera() {
     if (_isRunning || !_mainVideoImg)
         return;
+    reconnectFrameSink();
     _camera->start();
     spdlog::info("[CameraVideo] 摄像头启动");
     _isRunning = true;
@@ -127,14 +137,18 @@ void CameraVideo::stopCamera() {
 }
 
 void CameraVideo::endVideo() {
+    /// 先断开帧回调，避免清理显示对象时仍有帧进入
+    if (QVideoSink *sink = getVideoSink())
+        disconnect(sink, nullptr, this, nullptr);
+
     stopCamera();
     if (_mainVideoImg)
         _mainVideoImg->clear();
     if (_mainAvatarImg)
         _mainAvatarImg->clear();
     for (auto it = _partnerDisplays.begin(); it != _partnerDisplays.end(); ++it) {
-        ImgDisplay *display = it->second;
-        display->clear();
+        if (ImgDisplay *display = it->second)
+            display->clear();
     }
 }
 
@@ -145,6 +159,13 @@ void CameraVideo::cameraError(QCamera::Error, const QString &errorString) {
 void CameraVideo::initConnection() {
     connect(_camera, &QCamera::errorOccurred, this, &CameraVideo::cameraError);
     connect(this, &MyVideoSurface::frameAvailable, this, &CameraVideo::cameraImageCapture);
+}
+
+void CameraVideo::reconnectFrameSink() {
+    if (QVideoSink *sink = getVideoSink()) {
+        disconnect(sink, nullptr, this, nullptr);
+        connect(sink, &QVideoSink::videoFrameChanged, this, &MyVideoSurface::handleVideoFrame);
+    }
 }
 
 void CameraVideo::cameraImageCapture(const QVideoFrame &frame) {

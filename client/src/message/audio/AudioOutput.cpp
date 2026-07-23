@@ -79,12 +79,15 @@ void AudioOutput::stopPlay()
 {
 	if (!audio)
 		return;
-	if (audio->state() == QAudio::StoppedState) return;
+
+	/// 先 stop，打断可能卡在 write() 里的音频线程，再清指针；避免 UI 持锁等 write 而死锁
+	if (audio->state() != QAudio::StoppedState)
+		audio->stop();
+
 	{
 		std::lock_guard<std::mutex> lock(device_lock);
 		outputdevice = nullptr;
 	}
-	audio->stop();
 	spdlog::info("[AudioOutput] stop playing audio");
 }
 

@@ -98,6 +98,8 @@ public:
     bool isCameraRunning() const { return _isRunning; }
     /** @brief 结束视频会话（停采集并清理显示） */
     void endVideo();
+    /** @brief 重新连接视频帧 sink（endVideo 会断开） */
+    void reconnectFrameSink();
 
 signals:
     /**

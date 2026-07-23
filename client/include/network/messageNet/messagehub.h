@@ -59,6 +59,9 @@ public:
     /** @brief 清空所有收发队列并唤醒等待线程 */
     void clearAll();
 
+    /** @brief 仅唤醒所有队列等待者（不断开锁清理，供 UI 断线路径使用） */
+    void wakeAllQueues();
+
     /**
      * @brief 从音频接收队列弹出一条消息
      * @param waitMs 最长等待毫秒
@@ -133,16 +136,16 @@ private:
     /** @brief 等待并回收发送线程 */
     void joinSendThreads();
 
-    MessageQueue m_sendRequest;
-    MessageQueue m_sendText;
-    MessageQueue m_sendVideo;
-    MessageQueue m_sendAudio;
+    MessageQueue m_sendRequest; /// 请求类消息队列
+    MessageQueue m_sendText; /// 文本消息队列
+    MessageQueue m_sendVideo; /// 视频消息队列
+    MessageQueue m_sendAudio; /// 音频消息队列
 
-    MessageQueue m_recvRequest;
-    MessageQueue m_recvUserInfo;
-    MessageQueue m_recvText;
-    MessageQueue m_recvVideo;
-    MessageQueue m_recvAudio;
+    MessageQueue m_recvRequest; /// 请求类消息队列
+    MessageQueue m_recvUserInfo; /// 用户信息类消息队列
+    MessageQueue m_recvText; /// 文本消息队列
+    MessageQueue m_recvVideo; /// 视频消息队列
+    MessageQueue m_recvAudio; /// 音频消息队列
 
     Connection *m_connection = nullptr; ///< 当前 TCP 连接
 
