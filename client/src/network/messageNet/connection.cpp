@@ -80,11 +80,9 @@ bool Connection::connectOnIoThread(const QString &ip, const QString &port)
 bool Connection::sendWireData(const QByteArray &frame)
 {
     if (QThread::currentThread() != thread()) {
-        bool ok = false;
-        const bool invoked = QMetaObject::invokeMethod(
-            this, "sendWireData", Qt::BlockingQueuedConnection,
-            Q_RETURN_ARG(bool, ok), Q_ARG(QByteArray, frame));
-        return invoked && ok;
+        /// 只投递、不阻塞调用方（发送工作线程 / UI 断线路径都可能走到这里）
+        return QMetaObject::invokeMethod(
+            this, "sendWireData", Qt::QueuedConnection, Q_ARG(QByteArray, frame));
     }
 
     if (m_socket == nullptr || m_socket->state() == QAbstractSocket::UnconnectedState) {
@@ -108,7 +106,7 @@ bool Connection::sendWireData(const QByteArray &frame)
         written += ret;
     }
 
-    m_socket->waitForBytesWritten();
+    m_socket->flush();
     return true;
 }
 
@@ -166,13 +164,16 @@ void Connection::disconnectFromHost()
     m_hasLocalIp = false;
     m_localIp = 0;
 
+    /// 不在 UI 线程 clearAll：队列锁可能被发送/音频线程持有，叠加断线易卡死主窗口
     if (m_hub)
-        m_hub->clearAll();
+        m_hub->wakeAllQueues();
 
     if (m_ioThread.isRunning()) {
         /// 异步投递到 IO 线程，不阻塞调用方（通常是 UI 线程）
         QMetaObject::invokeMethod(this, "disconnectOnIoThread", Qt::QueuedConnection);
     } else {
+        if (m_hub)
+            m_hub->clearAll();
         emit disconnected();
     }
 }
@@ -180,6 +181,8 @@ void Connection::disconnectFromHost()
 void Connection::disconnectOnIoThread()
 {
     destroySocket();
+    if (m_hub)
+        m_hub->clearAll();
     emit disconnected();
 }
 

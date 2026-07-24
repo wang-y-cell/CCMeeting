@@ -71,7 +71,7 @@ private:
     void paintEvent(QPaintEvent *event) override;
     /** @brief 初始化网络与音视频工作对象 */
     void initPermanentWorkers();
-    /** @brief 结束会议会话（停采集、异步断线、清 UI） */
+    /** @brief 结束会议会话,退出会议的时候调用（停采集、异步断线、清 UI） */
     void endMeetingSession();
     /** @brief 重置会议相关 UI 到初始态 */
     void resetMeetingUi();
@@ -144,6 +144,7 @@ public:
     ~Widget() override;
 
 protected:
+    /** @brief 窗口关闭事件,点击窗口叉号的时候调用 */
     void closeEvent(QCloseEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
 

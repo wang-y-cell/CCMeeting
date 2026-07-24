@@ -53,6 +53,9 @@ bool NetworkManager::connectToServer(const QString &ip, const QString &port, QWi
 
 void NetworkManager::disconnectFromHost()
 {
+    /// 先停发送线程，避免其 BlockingQueued 发送与 IO 断线清理互相卡住
+    if (_hub)
+        _hub->stopSendWorkersAsync();
     if (_connection)
         _connection->disconnectFromHost();
 }
@@ -112,8 +115,7 @@ void NetworkManager::sendAudio(const QByteArray &pcm)
     _hub->enqueueSend(std::move(msg));
 }
 
-void NetworkManager::clearPendingImages()
-{
+void NetworkManager::clearPendingImages() {
     _hub->clearPendingVideo();
 }
 

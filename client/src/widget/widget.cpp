@@ -153,17 +153,15 @@ Widget::~Widget() {
 
 void Widget::closeEvent(QCloseEvent *event) {
     spdlog::info("[Widget] 关闭窗口");
-    hide();
-    event->ignore();
+    releaseMouse(); //结束这个窗口对鼠标的独占状态
+    unsetCursor(); //取消当前控件设置的自定义光标,使用默认光标
+    hide(); //隐藏窗口
+    event->ignore(); //忽略关闭事件
 
-    if (_sessionEnding)
-        return;
+    if (_sessionEnding) return; //如果会议正在结束，则返回
     _sessionEnding = true;
 
-    /// 先返回事件循环，再清理；断线在 IO 线程异步完成
-    QTimer::singleShot(0, this, [this]() {
-        endMeetingSession();
-    });
+    endMeetingSession();
 }
 
 void Widget::onNetworkDisconnected() {
@@ -238,20 +236,20 @@ void Widget::endMeetingSession() {
     _joinmeet = false;
     _offlineMode = false;
 
-    /// 先异步断线（IO 线程），不在这里 wait 任何工作线程
+    /// 先清 UI，再异步断线；断线路径不得阻塞 UI 事件循环
+    clearPartner();
+    resetMeetingUi();
+    spdlog::info("[Widget] 会议 UI 已重置");
+
     if (_network && _sessionActive) {
         _sessionEnding = true;
+        spdlog::info("[Widget] 异步断开网络");
         _network->disconnectFromHost();
         _sessionActive = false;
     } else {
         _sessionEnding = false;
+        spdlog::info("[Widget] 会议会话结束（无活跃连接）");
     }
-
-    /// UI 清理尽量轻量；拆到下一拍，尽快把控制权交回事件循环
-    QTimer::singleShot(0, this, [this]() {
-        clearPartner();
-        resetMeetingUi();
-    });
 }
 
 void Widget::shutdownAllWorkers() {
@@ -356,7 +354,7 @@ void Widget::paintEvent(QPaintEvent *event) {
 
 void Widget::on_openVedio_clicked() {
     spdlog::debug("[Widget] 点击打开摄像头按钮");
-    if(_cameraVideo->isCameraRunning()) {
+    if(_cameraVideo->isCameraRunning()) { //关闭摄像头
         _cameraVideo->stopCamera();
         spdlog::info("[Widget] 摄像头关闭");
         if (_network && !_offlineMode)
@@ -408,9 +406,16 @@ bool Widget::on_connServer(QString ip, QString port) {
         return false;
     }
     if (_sessionEnding) {
-        spdlog::warn("[Widget] on_connServer: session is ending, try later");
-        QMessageBox::information(this, tr("提示"), tr("会议正在关闭，请稍后再试"));
-        return false;
+        /// 若上次清理异常卡住，允许在窗口已隐藏时强制复位，避免主窗口永久无法再建会
+        if (!isVisible()) {
+            spdlog::warn("[Widget] on_connServer: clear stale _sessionEnding");
+            _sessionEnding = false;
+            _sessionActive = false;
+        } else {
+            spdlog::warn("[Widget] on_connServer: session is ending, try later");
+            QMessageBox::information(this, tr("提示"), tr("会议正在关闭，请稍后再试"));
+            return false;
+        }
     }
     repaint();
 
@@ -460,8 +465,7 @@ void Widget::handleCreateMeetingResponse(const Message &msg) {
     spdlog::info("[Widget] CREATE_MEETING_RESPONSE roomno: {}", roomno);
 
     if (roomno != 0) {
-        QMessageBox::information(this, "Room No", QString("房间号：%1").arg(roomno), QMessageBox::Yes, QMessageBox::Yes);
-
+        /// 先更新会议状态与人数，再弹窗（避免弹窗被挡住时界面一直像未入会）
         ui->groupBox_2->setTitle(QString("主屏幕(房间号: %1)").arg(roomno));
         _roomNo = roomno;
         _createmeet = true;
@@ -479,10 +483,11 @@ void Widget::handleCreateMeetingResponse(const Message &msg) {
             _cameraVideo->showMainAvatar();
         }
         updateMeetingInfo();
+        QMessageBox::information(this, "Room No", QString("房间号：%1").arg(roomno), QMessageBox::Yes, QMessageBox::Yes);
     } else {
         _createmeet = false;
-        QMessageBox::information(this, "Room Information", QString("无可用房间"), QMessageBox::Yes, QMessageBox::Yes);
         updateMeetingInfo();
+        QMessageBox::information(this, "Room Information", QString("无可用房间"), QMessageBox::Yes, QMessageBox::Yes);
         spdlog::warn("[Widget] no empty room");
     }
 }
@@ -503,7 +508,6 @@ void Widget::handleJoinMeetingResponse(const Message &msg) {
         spdlog::warn("[Widget] full room, cannot join");
         updateMeetingInfo();
     } else if (c > 0) {
-        QMessageBox::warning(this, "Meeting information", "加入成功", QMessageBox::Yes, QMessageBox::Yes);
         spdlog::info("[Widget] succeed joining room");
         if (_network) {
             const std::uint32_t localIp = _network->localIp();
@@ -517,6 +521,7 @@ void Widget::handleJoinMeetingResponse(const Message &msg) {
         ui->sendmsg->setDisabled(false);
         _joinmeet = true;
         updateMeetingInfo();
+        QMessageBox::information(this, "Meeting information", "加入成功", QMessageBox::Yes, QMessageBox::Yes);
     }
 }
 
@@ -688,16 +693,16 @@ void Widget::removePartner(std::uint32_t ip)
         if (PartnerTile *tile = p->tile()) {
             ui->verticalLayout_3->removeWidget(tile);
             p->setTile(nullptr);
-            delete tile;
+            tile->deleteLater();
         }
-        delete p;
+        p->deleteLater();
         partner.erase(it);
 
         /// 只有自已一个人时，关闭传输音频
         if (partner.size() <= 1 && _ainput && _aoutput)
         {
             emit stopAudio();
-            _aoutput->stopPlay();
+            QMetaObject::invokeMethod(_aoutput, [this]() { _aoutput->stopPlay(); }, Qt::QueuedConnection);
             ui->openAudio->setText(QString(OPENAUDIO).toUtf8());
             ui->openAudio->setDisabled(true);
         }
@@ -707,35 +712,42 @@ void Widget::removePartner(std::uint32_t ip)
 
 
 void Widget::clearPartner() {
-    //m_videoImg.clear();
-    spdlog::info("[Widget] 清空房间人数");
-    if(partner.size() == 0) return;
+    spdlog::info("[Widget] 清空房间人数 size={}", partner.size());
+    if (partner.empty())
+        return;
 
-    _cameraVideo->clearAllPartnerDisplays();
+    if (_cameraVideo) {
+        spdlog::info("[Widget] clearPartner: clear displays");
+        _cameraVideo->clearAllPartnerDisplays();
+    }
 
+    spdlog::info("[Widget] clearPartner: remove tiles");
     for (auto it = partner.begin(); it != partner.end(); ) {
         Partner *p = it->second;
         disconnect(p, &Partner::clicked, this, &Widget::recvip);
         if (PartnerTile *tile = p->tile()) {
             ui->verticalLayout_3->removeWidget(tile);
             p->setTile(nullptr);
-            delete tile;
+            tile->hide();
+            tile->deleteLater();
         }
-        delete p;
+        p->deleteLater();
         it = partner.erase(it);
     }
 
-    /// 关闭传输音频（通过信号投递到音频线程）
+    /// 音频停播放不得阻塞 UI（与 AudioOutput 工作线程可能死锁）
     emit stopAudio();
     if (_aoutput)
-        _aoutput->stopPlay();
-	ui->openAudio->setText(QString(CLOSEAUDIO).toUtf8());
-	ui->openAudio->setDisabled(true);
+        QMetaObject::invokeMethod(_aoutput, [this]() { _aoutput->stopPlay(); }, Qt::QueuedConnection);
+
+    ui->openAudio->setText(QString(CLOSEAUDIO).toUtf8());
+    ui->openAudio->setDisabled(true);
 
     if (_network)
         _network->clearPendingImages();
     ui->openVedio->setText(QString(OPENVIDEO).toUtf8());
     ui->openVedio->setDisabled(true);
+    spdlog::info("[Widget] clearPartner: done");
 }
 
 
