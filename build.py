@@ -11,8 +11,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-DEFAULT_QT_PATH = Path("F:/Qt/6.8.3/mingw_64")
-DEFAULT_QT_CXX_COMPILER = Path("F:/Qt/Tools/mingw1310_64")
+DEFAULT_QT_PATH = Path("F:/qt515/6.11.1/mingw_64")
+DEFAULT_QT_CXX_COMPILER = Path("F:/qt515/Tools/mingw1310_64")
 
 # 目标名 -> (构建目录, CMake 开关)
 TARGETS = {

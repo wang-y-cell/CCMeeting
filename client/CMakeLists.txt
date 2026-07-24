@@ -53,6 +53,7 @@ target_include_directories(CloudMeetingClient PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include/message/text"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/network/messageNet"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/widget"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/widget/meeting"
 )
 
 if(${Qt6_VERSION} VERSION_LESS 6.1.0)

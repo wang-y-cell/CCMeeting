@@ -98,8 +98,8 @@ void MessageQueue::clearVideo() {
     std::queue<Message> discarded;
     {
         /// UI 线程也会调用：不能在发送线程持锁时无限等待，否则主界面卡死
-        std::unique_lock<std::mutex> lock(m_mutex, std::try_to_lock);
-        if (!lock.owns_lock())
+        std::unique_lock<std::mutex> lock(m_mutex, std::try_to_lock); //尝试加锁
+        if (!lock.owns_lock()) //如果锁没有被持有，则返回
             return;
 
         std::queue<Message> kept;

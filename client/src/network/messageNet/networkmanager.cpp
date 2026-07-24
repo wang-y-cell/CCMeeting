@@ -65,8 +65,7 @@ std::uint32_t NetworkManager::localIp() const
     return _connection ? _connection->localIp() : UINT32_MAX;
 }
 
-void NetworkManager::sendCreateMeeting()
-{
+void NetworkManager::sendCreateMeeting() {
     Message msg;
     msg.kind = Message::Kind::CreateMeeting;
     _hub->enqueueSend(std::move(msg));

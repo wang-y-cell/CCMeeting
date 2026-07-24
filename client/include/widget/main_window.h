@@ -3,7 +3,7 @@
 
 #include "frameless_window.h"
 #include "stack_conn_server.h"
-#include "widget.h"
+#include "meeting_widget.h"
 #include "stack_create_meet.h"
 #include "stack_join_meet.h"
 
@@ -46,9 +46,17 @@ private slots:
      * @param port 服务器端口
      */
     void ConnectToServer_button_clicked(QString ip, QString port);
+    /**
+     * @brief Widget 异步连接结果回调
+     * @param ok 是否成功
+     * @param ip 服务器 IP
+     * @param port 端口
+     * @param action 连接后续动作
+     */
+    void onConnectServerFinished(bool ok, QString ip, QString port, ConnectAction action);
 private:
     //Ui::main_window *ui;
-    Widget *widget = nullptr; ///< 视频会议窗口
+    MeetingWidget *widget = nullptr; ///< 视频会议窗口
 
     stack_create_meet* create_meeting_widget = nullptr; ///< 创建会议窗口
     stack_join_meet* join_meeting_widget = nullptr; ///< 加入会议窗口
