@@ -43,6 +43,7 @@ TARGETS = {
 }
 
 
+# 读取设置的mingw路径或者默认的mingw路径位置并返回，如果路径不存在则返回None
 def resolve_mingw_root(mingw_path: str | None) -> Path | None:
     """解析 MinGW 根目录：优先参数，否则使用 DEFAULT_QT_CXX_COMPILER。"""
     if mingw_path:
@@ -54,6 +55,7 @@ def resolve_mingw_root(mingw_path: str | None) -> Path | None:
     return root if root.is_dir() else None
 
 
+# 读取mingw路径下的bin目录下的gcc.exe和g++.exe文件并返回，如果文件不存在则返回None
 def mingw_compilers(mingw_root: Path) -> tuple[Path, Path]:
     """返回 (gcc, g++) 可执行文件路径。"""
     bin_dir = mingw_root / "bin"
@@ -62,6 +64,7 @@ def mingw_compilers(mingw_root: Path) -> tuple[Path, Path]:
     return gcc, gxx
 
 
+# 将mingw路径下的bin目录置于PATH环境变量前端，便于cmake/ninja找到编译器工具链
 def with_mingw_path(mingw_root: Path | None) -> dict[str, str]:
     """将 MinGW bin 置于 PATH 前端，便于 cmake/ninja 找到编译器工具链。"""
     env = os.environ.copy()
@@ -72,6 +75,7 @@ def with_mingw_path(mingw_root: Path | None) -> dict[str, str]:
     return env
 
 
+# 运行命令，并打印命令行
 def run(
     cmd: list[str],
     cwd: Path | None = None,
@@ -82,10 +86,12 @@ def run(
     subprocess.run(cmd, cwd=cwd or ROOT, check=True, env=env)
 
 
+# 优先使用ninja，如果ninja不存在则返回None
 def prefer_ninja() -> str | None:
     return "Ninja" if shutil.which("ninja") else None
 
 
+# 配置CMake，创建构建目录，设置环境变量，运行cmake命令
 def cmake_configure(
     build_dir: Path,
     cmake_flags: dict[str, str],
@@ -132,6 +138,7 @@ def cmake_configure(
     run(cmd, env=env)
 
 
+# 构建CMake，运行cmake命令
 def cmake_build(
     build_dir: Path,
     *,
@@ -145,6 +152,7 @@ def cmake_build(
     run(cmd, env=with_mingw_path(mingw_root))
 
 
+# 构建目标，构建目录，设置环境变量，运行cmake命令
 def build_target(
     name: str,
     *,
@@ -179,29 +187,36 @@ def build_target(
     print(f"完成: {name}")
 
 
+# 构建客户端，构建目标，设置环境变量，运行cmake命令
 def build_client(**kwargs) -> None:
     build_target("client", **kwargs)
 
 
+# 构建消息服务器，构建目标，设置环境变量，运行cmake命令
 def build_message_server(**kwargs) -> None:
     build_target("message_server", **kwargs)
 
 
+# 构建数据服务器，构建目标，设置环境变量，运行cmake命令
 def build_data_server(**kwargs) -> None:
     build_target("data_server", **kwargs)
 
 
+# 解析命令行参数
 def parse_args() -> argparse.Namespace:
+    # 创建解析器
     parser = argparse.ArgumentParser(
         description="构建 CCMeeting(客户端 / 消息服务器 / 数据服务器)",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
+    # 添加互斥组
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--client", action="store_true", help="构建 Qt 客户端")
     group.add_argument("--message_server", action="store_true", help="构建消息服务器 (server)")
     group.add_argument("--data_server", action="store_true", help="构建数据/认证服务器 (server2)")
     group.add_argument("--all", action="store_true", help="依次构建全部目标")
 
+    # 添加选项,通用组
     parser.add_argument("--clean", action="store_true", help="先删除对应构建目录再配置")
     parser.add_argument(
         "--qt-path",
@@ -212,7 +227,7 @@ def parse_args() -> argparse.Namespace:
         "--mingw-path",
         default=os.environ.get("MINGW_PATH"),
         help=(
-            "Qt MinGW 工具链根目录（含 bin/g++.exe）；"
+            "Qt MinGW 工具链根目录 (含 bin/g++.exe): "
             f"默认 {DEFAULT_QT_CXX_COMPILER.as_posix()}"
         ),
     )
