@@ -8,8 +8,6 @@ stack_create_meet::stack_create_meet(QWidget *parent)
     ui->setupUi(this);
     connect(ui->create_meeting_btn, &QPushButton::clicked,
             this, &stack_create_meet::createMeetingClicked);
-    connect(ui->offline_debug_btn, &QPushButton::clicked,
-            this, &stack_create_meet::offlineDebugClicked);
 }
 
 stack_create_meet::~stack_create_meet() {

@@ -106,20 +106,6 @@ QPushButton#connServer_btn {
     min-height: 46px; /* 最小高度 */
 }
 
-QPushButton#offline_debug_btn {
-    min-height: 44px;
-    background-color: #3a4152;
-    color: #e8ebf2;
-}
-
-QPushButton#offline_debug_btn:hover {
-    background-color: #4b5468;
-}
-
-QPushButton#offline_debug_btn:pressed {
-    background-color: #2a3040;
-}
-
 QScrollArea {
     background: transparent;
     border: none;

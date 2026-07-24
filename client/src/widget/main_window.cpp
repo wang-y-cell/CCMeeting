@@ -25,9 +25,6 @@ main_window::main_window(QWidget *parent)
     connect(create_meeting_widget, &stack_create_meet::createMeetingClicked,
             this, &main_window::CreateMeeting_button_clicked);
 
-    connect(create_meeting_widget, &stack_create_meet::offlineDebugClicked,
-            this, &main_window::OfflineDebug_button_clicked);
-
     connect(join_meeting_widget, &stack_join_meet::joinMeetingClicked,
             this, &main_window::JoinMeeting_button_clicked);
 
@@ -128,19 +125,6 @@ void main_window::CreateMeeting_button_clicked() {
 
     widget->show();
     widget->request_connect_to_server_slot(this->ip, this->port, ConnectAction::CreateMeeting);
-}
-
-void main_window::OfflineDebug_button_clicked() {
-    spdlog::info("[main_window] 点击离线调试模式");
-    if (widget == nullptr) {
-        QMessageBox::warning(this, "warning", "会议窗口未初始化");
-        return;
-    }
-    if (widget->isVisible()) {
-        QMessageBox::warning(this, "warning", "目前有一打开的会议");
-        return;
-    }
-    widget->enter_offline_mode();
 }
 
 void main_window::JoinMeeting_button_clicked(const QString &roomNo) {

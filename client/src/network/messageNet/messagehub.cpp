@@ -7,350 +7,247 @@
 MessageHub::MessageHub(QObject *parent)
     : QObject(parent)
 {
-    qRegisterMetaType<Message>("Message");
+    qRegisterMetaType<MessagePtr>("MessagePtr");
 }
 
-MessageHub::~MessageHub() {
+MessageHub::~MessageHub()
+{
     stop();
 }
 
-MessageQueue &MessageHub::sendQueueFor(Message::Channel channel)
+void MessageHub::enqueue_send(MessagePtr msg)
 {
-    switch (channel) {
-    case Message::Channel::Text:
-        return m_sendText;
-    case Message::Channel::Video:
-        return m_sendVideo;
-    case Message::Channel::Audio:
-        return m_sendAudio;
-    case Message::Channel::Request:
-    case Message::Channel::UserInfo:
+    if (!msg)
+        return;
+    const MessageKind kind = msg->kind();
+    if (kind == MessageKind::CreateMeeting || kind == MessageKind::JoinMeeting
+        || kind == MessageKind::CloseCamera || kind == MessageKind::SendText) {
+        spdlog::info("[MessageHub] 入队发送 kind={}", static_cast<int>(kind));
+    }
+    send_queue_.push(std::move(msg));
+}
+
+void MessageHub::emit_incoming(MessagePtr msg)
+{
+    if (!msg)
+        return;
+
+    switch (msg->kind()) {
+    case MessageKind::CreateMeetingResponse:
+    case MessageKind::JoinMeetingResponse:
+    case MessageKind::RemoteHostClosedError:
+    case MessageKind::OtherNetError:
+        spdlog::info("[MessageHub] 分发请求/错误 kind={}", static_cast<int>(msg->kind()));
+        emit request_message_ready(msg);
+        break;
+    case MessageKind::PartnerJoin:
+    case MessageKind::PartnerExit:
+    case MessageKind::PartnerJoin2:
+    case MessageKind::CloseCameraNotify:
+        emit user_info_message_ready(msg);
+        break;
+    case MessageKind::RecvText:
+        emit text_message_ready(msg);
+        break;
+    case MessageKind::RecvImage:
+        emit video_message_ready(msg);
+        break;
+    case MessageKind::RecvAudio:
+        recv_audio_queue_.push(std::move(msg));
+        break;
     default:
-        return m_sendRequest;
+        spdlog::warn("[MessageHub] 未处理的入站 kind={}", static_cast<int>(msg->kind()));
+        break;
     }
 }
 
-MessageQueue &MessageHub::recvQueueFor(Message::Channel channel)
+void MessageHub::route_incoming(MessagePtr msg)
 {
-    switch (channel) {
-    case Message::Channel::UserInfo:
-        return m_recvUserInfo;
-    case Message::Channel::Text:
-        return m_recvText;
-    case Message::Channel::Video:
-        return m_recvVideo;
-    case Message::Channel::Audio:
-        return m_recvAudio;
-    case Message::Channel::Request:
-    default:
-        return m_recvRequest;
-    }
-}
+    if (!msg)
+        return;
 
-void MessageHub::enqueueSend(Message msg) {
-    sendQueueFor(Message::sendChannelFor(msg.kind)).push(std::move(msg));
-}
-
-void MessageHub::routeIncoming(Message msg)
-{
-    const Message::Channel channel = Message::channelFor(msg.kind);
-    /// 控制面消息直接投递到 MessageHub 所在线程发射信号，避免依赖 recv 工作线程出队
-    if (channel == Message::Channel::Request) {
-        spdlog::info("[MessageHub] routeIncoming Request kind={}", static_cast<int>(msg.kind));
-        QMetaObject::invokeMethod(this, [this, msg = std::move(msg)]() mutable {
-            spdlog::info("[MessageHub] 分发消息 kind={} channel={}",
-                         static_cast<int>(msg.kind), static_cast<int>(Message::Channel::Request));
-            emit requestMessageReady(msg);
-        }, Qt::QueuedConnection);
+    /// 控制面与 UI 消息：投递到 MessageHub 所在线程发信号，不另开接收线程
+    const MessageKind k = msg->kind();
+    if (k == MessageKind::RecvAudio) {
+        recv_audio_queue_.push(std::move(msg));
         return;
     }
-    recvQueueFor(channel).push(std::move(msg));
+
+    if (k == MessageKind::CreateMeetingResponse || k == MessageKind::JoinMeetingResponse
+        || k == MessageKind::RemoteHostClosedError || k == MessageKind::OtherNetError) {
+        spdlog::info("[MessageHub] route_incoming Request kind={}", static_cast<int>(k));
+    }
+
+    QMetaObject::invokeMethod(
+        this,
+        [this, msg = std::move(msg)]() mutable { emit_incoming(std::move(msg)); },
+        Qt::QueuedConnection);
 }
 
-
-
-void MessageHub::clearPendingVideo() {
-    m_sendVideo.clearVideo();
-}
-
-void MessageHub::clearAll()
+void MessageHub::clear_pending_video()
 {
-    m_sendRequest.clear();
-    m_sendText.clear();
-    m_sendVideo.clear();
-    m_sendAudio.clear();
-
-    m_recvRequest.clear();
-    m_recvUserInfo.clear();
-    m_recvText.clear();
-    m_recvVideo.clear();
-    m_recvAudio.clear();
-
-    m_sendRequest.wakeAll();
-    m_sendText.wakeAll();
-    m_sendVideo.wakeAll();
-    m_sendAudio.wakeAll();
-
-    m_recvRequest.wakeAll();
-    m_recvUserInfo.wakeAll();
-    m_recvText.wakeAll();
-    m_recvVideo.wakeAll();
-    m_recvAudio.wakeAll();
+    send_queue_.clear_video();
 }
 
-void MessageHub::wakeAllQueues()
+void MessageHub::clear_all()
 {
-    m_sendRequest.wakeAll();
-    m_sendText.wakeAll();
-    m_sendVideo.wakeAll();
-    m_sendAudio.wakeAll();
-    m_recvRequest.wakeAll();
-    m_recvUserInfo.wakeAll();
-    m_recvText.wakeAll();
-    m_recvVideo.wakeAll();
-    m_recvAudio.wakeAll();
+    send_queue_.clear();
+    recv_audio_queue_.clear();
+    send_queue_.wake_all();
+    recv_audio_queue_.wake_all();
 }
 
-std::optional<Message> MessageHub::popRecvAudio(int waitMs)
+void MessageHub::wake_all_queues()
 {
-    return m_recvAudio.pop(waitMs);
+    send_queue_.wake_all();
+    recv_audio_queue_.wake_all();
 }
 
-void MessageHub::wakeRecvAudio()
+std::optional<MessagePtr> MessageHub::pop_recv_audio(int wait_ms)
 {
-    m_recvAudio.wakeAll();
+    return recv_audio_queue_.pop(wait_ms);
 }
 
-void MessageHub::sendLoop(Message::Channel channel)
+void MessageHub::wake_recv_audio()
 {
-    auto &queue = sendQueueFor(channel);
-    spdlog::info("[MessageHub] 发送线程启动 channel={} tid={}",
-                 static_cast<int>(channel),
-                 reinterpret_cast<quintptr>(QThread::currentThreadId()));
+    recv_audio_queue_.wake_all();
+}
 
-    while (m_sendRunning.load()) {
-        auto msg = queue.pop();
-        if (!msg)
+void MessageHub::send_loop(std::uint64_t epoch)
+{
+    spdlog::info("[MessageHub] 发送线程启动 tid={} epoch={}",
+                 reinterpret_cast<quintptr>(QThread::currentThreadId()), epoch);
+
+    while (send_running_.load() && send_epoch_.load() == epoch) {
+        /// 短超时，便于 epoch/stop 后尽快退出，避免与新会话发送线程重叠
+        auto msg = send_queue_.pop(100);
+        if (send_epoch_.load() != epoch) {
+            /// 已被新世代取代：若已取出控制包则放回，避免创建/加入会议请求丢失
+            if (msg && *msg) {
+                const MessageKind kind = (*msg)->kind();
+                if (kind == MessageKind::CreateMeeting || kind == MessageKind::JoinMeeting
+                    || kind == MessageKind::CloseCamera || kind == MessageKind::SendText) {
+                    spdlog::warn("[MessageHub] 旧发送线程归还控制包 kind={}", static_cast<int>(kind));
+                    send_queue_.push(std::move(*msg));
+                }
+            }
+            break;
+        }
+        if (!msg || !*msg)
             continue;
 
-        if (!m_connection) {
+        if (!connection_) {
             spdlog::warn("[MessageHub] 无 Connection，丢弃待发消息");
             continue;
         }
 
-        const std::uint32_t localIp = m_connection->localIp(); ///< 获取本地IP
-        const QByteArray frame = MessageCodec::encodeWireFrame(*msg, localIp); ///< 编码消息
+        const MessageKind kind = (*msg)->kind();
+        const std::uint32_t local_ip = connection_->localIp();
+        const QByteArray frame = MessageCodec::encode_wire_frame(**msg, local_ip);
         if (frame.isEmpty()) {
-            spdlog::error("[MessageHub] 编码失败 kind={}", static_cast<int>(msg->kind));
+            spdlog::error("[MessageHub] 编码失败 kind={}", static_cast<int>(kind));
             continue;
         }
 
-        const bool textKind = msg->kind == Message::Kind::SendText; ///< 判断是否是文本消息
-        /// 禁止 BlockingQueued：发送线程等 IO、UI 若同时清队列/断线会死锁卡死主窗口
-        QMetaObject::invokeMethod(m_connection, "sendWireData", Qt::QueuedConnection,
+        if (kind == MessageKind::CreateMeeting || kind == MessageKind::JoinMeeting) {
+            spdlog::info("[MessageHub] 发出控制包 kind={} bytes={}", static_cast<int>(kind), frame.size());
+        }
+
+        const bool text_kind = kind == MessageKind::SendText;
+        QMetaObject::invokeMethod(connection_, "sendWireData", Qt::QueuedConnection,
                                   Q_ARG(QByteArray, frame));
-        if (textKind)
-            emit textSendFinished();
-
+        if (text_kind)
+            emit text_send_finished();
     }
 
-
-
-    spdlog::info("[MessageHub] 发送线程结束 channel={}", static_cast<int>(channel));
-
+    spdlog::info("[MessageHub] 发送线程结束 tid={} epoch={}",
+                 reinterpret_cast<quintptr>(QThread::currentThreadId()), epoch);
 }
 
-
-
-void MessageHub::recvLoop(Message::Channel channel)
+void MessageHub::signal_send_stop()
 {
-    /// 获得对应的接收队列
-    auto &queue = recvQueueFor(channel);
-    spdlog::info("[MessageHub] 接收分发线程启动 channel={} tid={}",
-                 static_cast<int>(channel),
-                 reinterpret_cast<quintptr>(QThread::currentThreadId()));
-
-    /// 循环接收消息
-    while (m_recvRunning.load()) {
-        auto msg = queue.pop();
-        if (!msg) ///< pop超时返回空，则继续循环
-            continue;
-
-        spdlog::info("[MessageHub] 分发消息 kind={} channel={}",
-                     static_cast<int>(msg->kind), static_cast<int>(channel));
-
-        switch (channel) {
-        case Message::Channel::Request:
-            emit requestMessageReady(*msg);
-            break;
-        case Message::Channel::UserInfo:
-            emit userInfoMessageReady(*msg);
-            break;
-        case Message::Channel::Text:
-            emit textMessageReady(*msg);
-            break;
-        case Message::Channel::Video:
-            emit videoMessageReady(*msg);
-            break;
-        case Message::Channel::Audio:
-            break;
-        }
-    }
-
-    spdlog::info("[MessageHub] 接收分发线程结束 channel={}", static_cast<int>(channel));
+    send_running_.store(false);
+    send_epoch_.fetch_add(1);
+    send_queue_.wake_all();
 }
 
-void MessageHub::startSendWorkers()
+void MessageHub::start_send_worker()
 {
-    /// 已在运行则不重复启动
-    if (m_sendRunning.load())
-        return;
+    /// 先停干净上一轮（含 async stop 留下的 joiner），杜绝双发送线程抢包
+    signal_send_stop();
+    join_send_thread();
 
-    /// 回收上次异步停止残留的线程
-    joinSendThreads();
+    const std::uint64_t epoch = send_epoch_.fetch_add(1) + 1;
+    send_running_.store(true);
 
-    if (m_sendRunning.exchange(true))
-        return;
-
-    std::lock_guard<std::mutex> lock(m_sendThreadMutex);
-    m_sendRequestThread = QThread::create([this]() { sendLoop(Message::Channel::Request); });
-    m_sendTextThread = QThread::create([this]() { sendLoop(Message::Channel::Text); });
-    m_sendVideoThread = QThread::create([this]() { sendLoop(Message::Channel::Video); });
-    m_sendAudioThread = QThread::create([this]() { sendLoop(Message::Channel::Audio); });
-
-    m_sendRequestThread->start();
-    m_sendTextThread->start();
-    m_sendVideoThread->start();
-    m_sendAudioThread->start();
+    std::lock_guard<std::mutex> lock(send_thread_mutex_);
+    send_thread_ = QThread::create([this, epoch]() { send_loop(epoch); });
+    send_thread_->start();
 }
 
-void MessageHub::joinSendThreads()
+void MessageHub::join_send_thread()
 {
-    std::lock_guard<std::mutex> lock(m_sendThreadMutex);
-
-    auto join = [](QThread *&thread) {
-        if (!thread)
-            return;
-        thread->wait(3000);
-        delete thread;
-        thread = nullptr;
-    };
-
-    join(m_sendRequestThread);
-    join(m_sendTextThread);
-    join(m_sendVideoThread);
-    join(m_sendAudioThread);
-}
-
-void MessageHub::stopSendWorkers()
-{
-    if (!m_sendRunning.exchange(false)) {
-        joinSendThreads();
-        return;
-    }
-
-    m_sendRequest.wakeAll();
-    m_sendText.wakeAll();
-    m_sendVideo.wakeAll();
-    m_sendAudio.wakeAll();
-    joinSendThreads();
-}
-
-void MessageHub::stopSendWorkersAsync()
-{
-    if (!m_sendRunning.exchange(false))
-        return;
-
-    m_sendRequest.wakeAll();
-    m_sendText.wakeAll();
-    m_sendVideo.wakeAll();
-    m_sendAudio.wakeAll();
-
-    /// 先摘走线程指针，后台 join；避免与随后的 startSendWorkers 竞态删掉新线程
-    QThread *requestThread = nullptr;
-    QThread *textThread = nullptr;
-    QThread *videoThread = nullptr;
-    QThread *audioThread = nullptr;
+    QThread *joiner = nullptr;
+    QThread *worker = nullptr;
     {
-        std::lock_guard<std::mutex> lock(m_sendThreadMutex);
-        requestThread = m_sendRequestThread;
-        textThread = m_sendTextThread;
-        videoThread = m_sendVideoThread;
-        audioThread = m_sendAudioThread;
-        m_sendRequestThread = nullptr;
-        m_sendTextThread = nullptr;
-        m_sendVideoThread = nullptr;
-        m_sendAudioThread = nullptr;
+        std::lock_guard<std::mutex> lock(send_thread_mutex_);
+        joiner = pending_joiner_;
+        pending_joiner_ = nullptr;
+        worker = send_thread_;
+        send_thread_ = nullptr;
     }
 
-    QThread *joiner = QThread::create([requestThread, textThread, videoThread, audioThread]() {
-        auto join = [](QThread *thread) {
-            if (!thread)
-                return;
-            thread->wait(3000);
-            delete thread;
-        };
-        join(requestThread);
-        join(textThread);
-        join(videoThread);
-        join(audioThread);
-    });
-    QObject::connect(joiner, &QThread::finished, joiner, &QObject::deleteLater);
-    joiner->start();
+    if (joiner) {
+        joiner->wait(3000);
+        delete joiner;
+    }
+    if (worker) {
+        worker->wait(3000);
+        delete worker;
+    }
 }
 
-void MessageHub::startRecvWorkers()
+void MessageHub::stop_send_worker()
 {
-    if (m_recvRunning.load())
-        return;
-
-    m_recvRunning.store(true);
-    m_recvRequestThread = QThread::create([this]() { recvLoop(Message::Channel::Request); });
-    m_recvUserInfoThread = QThread::create([this]() { recvLoop(Message::Channel::UserInfo); });
-    m_recvTextThread = QThread::create([this]() { recvLoop(Message::Channel::Text); });
-    m_recvVideoThread = QThread::create([this]() { recvLoop(Message::Channel::Video); });
-
-    m_recvRequestThread->start();
-    m_recvUserInfoThread->start();
-    m_recvTextThread->start();
-    m_recvVideoThread->start();
+    signal_send_stop();
+    join_send_thread();
 }
 
-void MessageHub::stopRecvWorkers()
+void MessageHub::stop_send_worker_async()
 {
-    if (!m_recvRunning.exchange(false))
-        return;
+    signal_send_stop();
 
-    m_recvRequest.wakeAll();
-    m_recvUserInfo.wakeAll();
-    m_recvText.wakeAll();
-    m_recvVideo.wakeAll();
-    m_recvAudio.wakeAll();
-
-    auto join = [](QThread *&thread) {
-        if (!thread)
+    QThread *old_thread = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(send_thread_mutex_);
+        old_thread = send_thread_;
+        send_thread_ = nullptr;
+        if (!old_thread)
             return;
-        thread->wait(3000);
-        delete thread;
-        thread = nullptr;
-    };
 
-    join(m_recvRequestThread);
-    join(m_recvUserInfoThread);
-    join(m_recvTextThread);
-    join(m_recvVideoThread);
+        /// 若已有 joiner，先串到其后，保证 start_send_worker 能等到全部退出
+        QThread *prev_joiner = pending_joiner_;
+        pending_joiner_ = QThread::create([prev_joiner, old_thread]() {
+            if (prev_joiner) {
+                prev_joiner->wait(3000);
+                delete prev_joiner;
+            }
+            if (old_thread) {
+                old_thread->wait(3000);
+                delete old_thread;
+            }
+        });
+        pending_joiner_->start();
+    }
 }
 
 void MessageHub::start(Connection *connection)
 {
-    m_connection = connection;
-    startRecvWorkers();
+    connection_ = connection;
 }
 
 void MessageHub::stop()
 {
-    stopSendWorkers();
-    stopRecvWorkers();
-    m_connection = nullptr;
+    stop_send_worker();
+    connection_ = nullptr;
 }
-

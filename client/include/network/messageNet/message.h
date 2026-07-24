@@ -7,6 +7,8 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <deque>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <queue>
@@ -21,94 +23,301 @@
 #define WAITSECONDS 2
 #endif
 
-/**
- * @brief 应用层统一消息（替代原 OutgoingItem / MESG）
- */
-struct Message {
-    enum class Kind {
-        CreateMeeting,
-        JoinMeeting,
-        ExitMeeting,
-        CloseCamera,
-        SendText,
-        SendImage,
-        SendAudio,
+#ifndef VIDEO_QUEUE_MAXSIZE
+#define VIDEO_QUEUE_MAXSIZE 3
+#endif
 
-        CreateMeetingResponse,
-        JoinMeetingResponse,
-        RecvText,
-        RecvImage,
-        RecvAudio,
-        PartnerJoin,
-        PartnerExit,
-        PartnerJoin2,
-        CloseCameraNotify,
-        RemoteHostClosedError,
-        OtherNetError,
-    };
+#ifndef AUDIO_QUEUE_MAXSIZE
+#define AUDIO_QUEUE_MAXSIZE 64
+#endif
 
-    enum class Channel { Request, UserInfo, Text, Video, Audio };
+/** @brief 消息类型（取代原 Message::Kind） */
+enum class MessageKind {
+    CreateMeeting,
+    JoinMeeting,
+    ExitMeeting,
+    CloseCamera,
+    SendText,
+    SendImage,
+    SendAudio,
 
-    Kind kind = Kind::CreateMeeting;
-    std::uint32_t ip = 0;
-
-    std::string text;
-    QImage image;
-    QByteArray audio;
-
-    std::uint32_t roomNo = 0;
-    std::int32_t responseCode = 0;
-    std::vector<std::uint32_t> partnerIps;
-
-    /**
-     * @brief 根据消息类型获取通道
-     * @param kind 消息类型
-     * @return 通道
-     */
-    static Channel channelFor(Kind kind);
-    /**
-     * @brief 根据消息类型获取发送通道
-     * @param kind 消息类型
-     * @return 发送通道
-     */
-    static Channel sendChannelFor(Kind kind);
-    /**
-     * @brief 根据消息类型获取接收通道
-     * @param kind 消息类型
-     * @return 接收通道
-     */
-    static Channel recvChannelFor(Kind kind);
+    CreateMeetingResponse,
+    JoinMeetingResponse,
+    RecvText,
+    RecvImage,
+    RecvAudio,
+    PartnerJoin,
+    PartnerExit,
+    PartnerJoin2,
+    CloseCameraNotify,
+    RemoteHostClosedError,
+    OtherNetError,
 };
 
-Q_DECLARE_METATYPE(Message)
+/**
+ * @brief 发送优先级：数值越小越优先
+ * Control > Audio > Text > Video
+ */
+enum class MessagePriority {
+    Control = 0,
+    Audio = 1,
+    Text = 2,
+    Video = 3,
+};
 
 /**
- * @brief 线程安全 Message 队列（值语义）
+ * @brief 应用层消息基类（多态，跨线程用 MessagePtr 传递）
+ */
+class Message {
+public:
+    virtual ~Message() = default;
+
+    virtual MessageKind kind() const = 0;
+    /** @brief 发送侧优先级；接收侧消息可返回 Control */
+    virtual MessagePriority send_priority() const { return MessagePriority::Control; }
+
+    std::uint32_t ip() const { return ip_; }
+    void set_ip(std::uint32_t ip) { ip_ = ip; }
+
+protected:
+    std::uint32_t ip_ = 0;
+};
+
+using MessagePtr = std::shared_ptr<Message>;
+
+// ---------- 发送侧 ----------
+
+class CreateMeetingMessage : public Message {
+public:
+    MessageKind kind() const override { return MessageKind::CreateMeeting; }
+    MessagePriority send_priority() const override { return MessagePriority::Control; }
+};
+
+class JoinMeetingMessage : public Message {
+public:
+    explicit JoinMeetingMessage(std::string room_no = {})
+        : room_no_(std::move(room_no))
+    {
+    }
+
+    MessageKind kind() const override { return MessageKind::JoinMeeting; }
+    MessagePriority send_priority() const override { return MessagePriority::Control; }
+
+    const std::string &room_no() const { return room_no_; }
+    void set_room_no(std::string room_no) { room_no_ = std::move(room_no); }
+
+    std::uint32_t room_no_u32() const
+    {
+        if (room_no_.empty())
+            return 0;
+        try {
+            return static_cast<std::uint32_t>(std::stoul(room_no_));
+        } catch (...) {
+            return 0;
+        }
+    }
+
+private:
+    std::string room_no_;
+};
+
+class ExitMeetingMessage : public Message {
+public:
+    MessageKind kind() const override { return MessageKind::ExitMeeting; }
+    MessagePriority send_priority() const override { return MessagePriority::Control; }
+};
+
+class CloseCameraMessage : public Message {
+public:
+    MessageKind kind() const override { return MessageKind::CloseCamera; }
+    MessagePriority send_priority() const override { return MessagePriority::Control; }
+};
+
+class SendTextMessage : public Message {
+public:
+    explicit SendTextMessage(std::string text = {})
+        : text_(std::move(text))
+    {
+    }
+
+    MessageKind kind() const override { return MessageKind::SendText; }
+    MessagePriority send_priority() const override { return MessagePriority::Text; }
+
+    const std::string &text() const { return text_; }
+    void set_text(std::string text) { text_ = std::move(text); }
+
+private:
+    std::string text_;
+};
+
+class SendImageMessage : public Message {
+public:
+    explicit SendImageMessage(QImage image = {})
+        : image_(std::move(image))
+    {
+    }
+
+    MessageKind kind() const override { return MessageKind::SendImage; }
+    MessagePriority send_priority() const override { return MessagePriority::Video; }
+
+    const QImage &image() const { return image_; }
+    void set_image(QImage image) { image_ = std::move(image); }
+
+private:
+    QImage image_;
+};
+
+class SendAudioMessage : public Message {
+public:
+    explicit SendAudioMessage(QByteArray pcm = {})
+        : audio_(std::move(pcm))
+    {
+    }
+
+    MessageKind kind() const override { return MessageKind::SendAudio; }
+    MessagePriority send_priority() const override { return MessagePriority::Audio; }
+
+    const QByteArray &audio() const { return audio_; }
+    void set_audio(QByteArray pcm) { audio_ = std::move(pcm); }
+
+private:
+    QByteArray audio_;
+};
+
+// ---------- 接收 / 事件侧 ----------
+
+class CreateMeetingResponseMessage : public Message {
+public:
+    MessageKind kind() const override { return MessageKind::CreateMeetingResponse; }
+
+    std::uint32_t room_no() const { return room_no_; }
+    void set_room_no(std::uint32_t room_no) { room_no_ = room_no; }
+
+private:
+    std::uint32_t room_no_ = 0;
+};
+
+class JoinMeetingResponseMessage : public Message {
+public:
+    MessageKind kind() const override { return MessageKind::JoinMeetingResponse; }
+
+    std::int32_t response_code() const { return response_code_; }
+    void set_response_code(std::int32_t code) { response_code_ = code; }
+
+private:
+    std::int32_t response_code_ = 0;
+};
+
+class RecvTextMessage : public Message {
+public:
+    MessageKind kind() const override { return MessageKind::RecvText; }
+
+    const std::string &text() const { return text_; }
+    void set_text(std::string text) { text_ = std::move(text); }
+
+private:
+    std::string text_;
+};
+
+class RecvImageMessage : public Message {
+public:
+    MessageKind kind() const override { return MessageKind::RecvImage; }
+
+    const QImage &image() const { return image_; }
+    void set_image(QImage image) { image_ = std::move(image); }
+
+private:
+    QImage image_;
+};
+
+class RecvAudioMessage : public Message {
+public:
+    MessageKind kind() const override { return MessageKind::RecvAudio; }
+
+    const QByteArray &audio() const { return audio_; }
+    void set_audio(QByteArray pcm) { audio_ = std::move(pcm); }
+
+private:
+    QByteArray audio_;
+};
+
+class PartnerJoinMessage : public Message {
+public:
+    MessageKind kind() const override { return MessageKind::PartnerJoin; }
+};
+
+class PartnerExitMessage : public Message {
+public:
+    MessageKind kind() const override { return MessageKind::PartnerExit; }
+};
+
+class PartnerJoin2Message : public Message {
+public:
+    MessageKind kind() const override { return MessageKind::PartnerJoin2; }
+
+    const std::vector<std::uint32_t> &partner_ips() const { return partner_ips_; }
+    void set_partner_ips(std::vector<std::uint32_t> ips) { partner_ips_ = std::move(ips); }
+    void add_partner_ip(std::uint32_t ip) { partner_ips_.push_back(ip); }
+
+private:
+    std::vector<std::uint32_t> partner_ips_;
+};
+
+class CloseCameraNotifyMessage : public Message {
+public:
+    MessageKind kind() const override { return MessageKind::CloseCameraNotify; }
+};
+
+class RemoteHostClosedErrorMessage : public Message {
+public:
+    MessageKind kind() const override { return MessageKind::RemoteHostClosedError; }
+};
+
+class OtherNetErrorMessage : public Message {
+public:
+    MessageKind kind() const override { return MessageKind::OtherNetError; }
+};
+
+Q_DECLARE_METATYPE(MessagePtr)
+
+/**
+ * @brief 按优先级分桶的线程安全发送队列（单消费者）
+ *
+ * 出队顺序：Control → Audio → Text → Video。
+ * Video/Audio 有界，满则丢最旧，避免积压拖死实时路径。
+ */
+class PriorityMessageQueue {
+public:
+    void push(MessagePtr msg);
+    std::optional<MessagePtr> pop(int wait_ms = WAITSECONDS * 1000);
+    void clear();
+    void wake_all();
+    /** @brief 仅清空视频桶 */
+    void clear_video();
+
+private:
+    std::deque<MessagePtr> &bucket_for(MessagePriority priority);
+    static constexpr int k_priority_count = 4;
+
+    std::mutex mutex_;
+    std::condition_variable cond_;
+    std::deque<MessagePtr> buckets_[k_priority_count];
+};
+
+/**
+ * @brief 普通 FIFO 消息队列（音频接收等单类型场景）
  */
 class MessageQueue {
 public:
-    /**
-     * @brief 入队一条消息
-     * @param msg 消息
-     */
-    void push(Message msg);
-    /**
-     * @brief 出队一条消息
-     * @param waitMs 最长等待毫秒
-     * @return 有消息则返回，超时返回 nullopt
-     */
-    std::optional<Message> pop(int waitMs = WAITSECONDS * 1000);
-    /** @brief 清空队列 */
+    void push(MessagePtr msg);
+    std::optional<MessagePtr> pop(int wait_ms = WAITSECONDS * 1000);
     void clear();
-    /** @brief 唤醒所有等待出队的线程 */
-    void wakeAll();
-    /** @brief 清空队列中的视频类消息 */
-    void clearVideo();
+    void wake_all();
 
 private:
-    std::mutex m_mutex;
-    std::condition_variable m_cond;
-    std::queue<Message> m_queue;
+    std::mutex mutex_;
+    std::condition_variable cond_;
+    std::queue<MessagePtr> queue_;
 };
 
 #endif // MESSAGE_H

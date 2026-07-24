@@ -1,5 +1,6 @@
 #include "AudioOutput.h"
 #include "audiocommon.h"
+#include "message.h"
 #include "messagehub.h"
 #include <mutex>
 #include <spdlog/spdlog.h>
@@ -115,15 +116,18 @@ void AudioOutput::run()
 		if (!m_hub)
 			continue;
 
-		auto msgOpt = m_hub->popRecvAudio();
-		if (!msgOpt)
+		auto msg_opt = m_hub->pop_recv_audio();
+		if (!msg_opt || !*msg_opt)
 			continue;
 
-		Message msg = std::move(*msgOpt);
+		MessagePtr msg = std::move(*msg_opt);
+		auto *audio_msg = dynamic_cast<RecvAudioMessage *>(msg.get());
+		if (!audio_msg)
+			continue;
 		{
 			std::lock_guard<std::mutex> lock(device_lock);
 			if (outputdevice != nullptr) {
-				QByteArray pcm = msg.audio;
+				QByteArray pcm = audio_msg->audio();
 				const AudioFormatStd::Spec wireSpec = standard();
 				const bool sameLayout = wireSpec.sampleFormat == m_format.sampleFormat()
 					&& AudioFormatStd::bytesPerSampleForFormat(wireSpec.sampleFormat) == m_format.bytesPerSample();
@@ -149,7 +153,7 @@ void AudioOutput::run()
 						spdlog::error("[AudioOutput] write failed: {}", outputdevice->errorString().toStdString());
 						return;
 					}
-					emit speaker(QHostAddress(msg.ip).toString());
+					emit speaker(QHostAddress(msg->ip()).toString());
 					m_pcmDataBuffer = m_pcmDataBuffer.right(m_pcmDataBuffer.size() - static_cast<int>(ret));
 				}
 			} else {
@@ -166,7 +170,7 @@ void AudioOutput::stopImmediately()
 		is_canRun = false;
 	}
 	if (m_hub)
-		m_hub->wakeRecvAudio();
+		m_hub->wake_recv_audio();
 }
 
 void AudioOutput::setVolumn(int val)

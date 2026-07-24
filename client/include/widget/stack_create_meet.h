@@ -23,8 +23,6 @@ public:
 signals:
     /** @brief 点击按钮发送信号，通知主窗口创建会议 */
     void createMeetingClicked();
-    /** @brief 点击离线调试，不连服务器直接打开会议窗 */
-    void offlineDebugClicked();
 
 private:
     Ui::stack_create_meet *ui; ///< UI

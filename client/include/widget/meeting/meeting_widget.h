@@ -48,8 +48,12 @@ private:
     bool _openCamera = false; ///< 是否打开摄像头
     bool _sessionActive = false; ///< 是否已连接服务器（会议会话）
     bool _sessionEnding = false; ///< 是否正在异步结束会议
-    bool _offlineMode = false; ///< 离线调试模式（不连服务器）
     bool _connecting = false; ///< 是否正在异步连接服务器
+    bool _hasPendingConnect = false; ///< 断线未完成时是否有延后连接请求
+    QString _pendingConnectIp;
+    QString _pendingConnectPort;
+    ConnectAction _pendingConnectAction = ConnectAction::None;
+    QString _pendingConnectRoomNo;
     std::shared_ptr<NetworkManager> _network; ///< 统一网络收发（与 controller 共享）
     std::unique_ptr<MeetingController> _controller; ///< 业务控制器（独立线程）
     std::unique_ptr<QThread> _controller_thread; ///< 业务工作线程
@@ -123,21 +127,21 @@ private:
     /** @brief 按列表宽度重新排版全部聊天气泡 */
     void relayout_chat_messages();
     /** @brief 处理创建会议响应 */
-    void handle_create_meeting_response(const Message &msg);
+    void handle_create_meeting_response(const MessagePtr &msg);
     /** @brief 处理加入会议响应 */
-    void handle_join_meeting_response(const Message &msg);
+    void handle_join_meeting_response(const MessagePtr &msg);
     /** @brief 处理收到的视频帧 */
-    void handle_img_recv(const Message &msg);
+    void handle_img_recv(const MessagePtr &msg);
     /** @brief 处理收到的文本 */
-    void handle_text_recv(const Message &msg);
+    void handle_text_recv(const MessagePtr &msg);
     /** @brief 处理成员加入 */
-    void handle_partner_join(const Message &msg);
+    void handle_partner_join(const MessagePtr &msg);
     /** @brief 处理成员退出 */
-    void handle_partner_exit(const Message &msg);
+    void handle_partner_exit(const MessagePtr &msg);
     /** @brief 处理对方关闭摄像头通知 */
-    void handle_close_camera(const Message &msg);
+    void handle_close_camera(const MessagePtr &msg);
     /** @brief 处理一次性成员列表（PartnerJoin2） */
-    void handle_partner_join2(const Message &msg);
+    void handle_partner_join2(const MessagePtr &msg);
     /** @brief 处理远端主机关闭连接 */
     void handle_remote_host_closed_error();
     /** @brief 处理其它网络错误 */
@@ -165,10 +169,6 @@ protected:
 public slots:
     /** @brief 点击创建会议 */
     void on_create_meet_btn_clicked_slot();
-    /**
-     * @brief 进入离线调试模式：不连服务器，预置假成员，便于测 UI / 摄像头
-     */
-    void enter_offline_mode();
     /** @brief 点击开关摄像头 */
     void on_open_vedio_clicked_slot();
     /** @brief 点击开关麦克风 */
@@ -209,10 +209,10 @@ private slots:
      * @param err 错误信息
      */
     void audio_error_slot(QString err);
-    void on_request_message_slot(Message msg);
-    void on_user_info_message_slot(Message msg);
-    void on_text_message_slot(Message msg);
-    void on_video_message_slot(Message msg);
+    void on_request_message_slot(MessagePtr msg);
+    void on_user_info_message_slot(MessagePtr msg);
+    void on_text_message_slot(MessagePtr msg);
+    void on_video_message_slot(MessagePtr msg);
     /**
      * @brief 将指定成员切换到主屏幕
      * @param ip 成员 IP
@@ -234,6 +234,8 @@ private slots:
     void on_text_send_slot();
     /** @brief 异步断线完成 */
     void on_network_disconnected_slot();
+    /** @brief 若有延后连接请求则立刻发起 */
+    void flush_pending_connect();
 signals:
     void stop_audio_signal(); ///< 通知停止麦克风采集
     void start_audio_signal(); ///< 通知开始麦克风采集

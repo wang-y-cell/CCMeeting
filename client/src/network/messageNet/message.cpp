@@ -2,53 +2,130 @@
 
 #include <thread>
 
-Message::Channel Message::channelFor(Kind kind)
+namespace {
+
+void push_bounded(std::deque<MessagePtr> &bucket, MessagePtr msg, std::size_t max_size)
 {
-    switch (kind) {
-    case Kind::CreateMeetingResponse:
-    case Kind::JoinMeetingResponse:
-    case Kind::RemoteHostClosedError:
-    case Kind::OtherNetError:
-        return Channel::Request;
-    case Kind::PartnerJoin:
-    case Kind::PartnerExit:
-    case Kind::PartnerJoin2:
-    case Kind::CloseCameraNotify:
-        return Channel::UserInfo;
-    case Kind::RecvText:
-        return Channel::Text;
-    case Kind::RecvImage:
-        return Channel::Video;
-    case Kind::RecvAudio:
-        return Channel::Audio;
-    default:
-        return Channel::Request;
+    if (max_size == 0)
+        return;
+    while (bucket.size() >= max_size)
+        bucket.pop_front();
+    bucket.push_back(std::move(msg));
+}
+
+} // namespace
+
+std::deque<MessagePtr> &PriorityMessageQueue::bucket_for(MessagePriority priority)
+{
+    const int index = static_cast<int>(priority);
+    if (index < 0 || index >= k_priority_count)
+        return buckets_[static_cast<int>(MessagePriority::Control)];
+    return buckets_[index];
+}
+
+void PriorityMessageQueue::push(MessagePtr msg)
+{
+    if (!msg)
+        return;
+
+    const MessagePriority priority = msg->send_priority();
+    {
+        std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
+        const auto deadline =
+            std::chrono::steady_clock::now() + std::chrono::milliseconds(WAITSECONDS * 1000);
+        while (!lock.try_lock()) {
+            if (std::chrono::steady_clock::now() >= deadline)
+                return;
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+
+        auto &bucket = bucket_for(priority);
+        switch (priority) {
+        case MessagePriority::Video:
+            push_bounded(bucket, std::move(msg), VIDEO_QUEUE_MAXSIZE);
+            break;
+        case MessagePriority::Audio:
+            push_bounded(bucket, std::move(msg), AUDIO_QUEUE_MAXSIZE);
+            break;
+        case MessagePriority::Text:
+            push_bounded(bucket, std::move(msg), QUEUE_MAXSIZE);
+            break;
+        case MessagePriority::Control:
+        default:
+            push_bounded(bucket, std::move(msg), QUEUE_MAXSIZE);
+            break;
+        }
+    }
+    cond_.notify_one();
+}
+
+std::optional<MessagePtr> PriorityMessageQueue::pop(int wait_ms)
+{
+    std::unique_lock<std::mutex> lock(mutex_);
+    const auto has_any = [this]() {
+        for (int i = 0; i < k_priority_count; ++i) {
+            if (!buckets_[i].empty())
+                return true;
+        }
+        return false;
+    };
+
+    if (!cond_.wait_for(lock, std::chrono::milliseconds(wait_ms), has_any))
+        return std::nullopt;
+
+    for (int i = 0; i < k_priority_count; ++i) {
+        if (buckets_[i].empty())
+            continue;
+        MessagePtr msg = std::move(buckets_[i].front());
+        buckets_[i].pop_front();
+        lock.unlock();
+        cond_.notify_one();
+        return msg;
+    }
+    return std::nullopt;
+}
+
+void PriorityMessageQueue::clear()
+{
+    std::deque<MessagePtr> discarded[k_priority_count];
+    for (int attempt = 0; attempt < 8; ++attempt) {
+        std::unique_lock<std::mutex> lock(mutex_, std::try_to_lock);
+        if (lock.owns_lock()) {
+            for (int i = 0; i < k_priority_count; ++i)
+                discarded[i].swap(buckets_[i]);
+            lock.unlock();
+            cond_.notify_all();
+            return;
+        }
+        cond_.notify_all();
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 }
 
-Message::Channel Message::sendChannelFor(Kind kind)
+void PriorityMessageQueue::wake_all()
 {
-    switch (kind) {
-    case Kind::CreateMeeting:
-    case Kind::JoinMeeting:
-    case Kind::ExitMeeting:
-    case Kind::CloseCamera:
-        return Channel::Request;
-    case Kind::SendText:
-        return Channel::Text;
-    case Kind::SendImage:
-        return Channel::Video;
-    case Kind::SendAudio:
-        return Channel::Audio;
-    default:
-        return Channel::Request;
-    }
+    std::unique_lock<std::mutex> lock(mutex_, std::try_to_lock);
+    cond_.notify_all();
 }
 
-void MessageQueue::push(Message msg)
+void PriorityMessageQueue::clear_video()
 {
-    std::unique_lock<std::mutex> lock(m_mutex, std::defer_lock);
-    /// UI/音频线程也会 push：不能在发送线程持锁时无限等，否则关摄像头等路径卡死主界面
+    std::deque<MessagePtr> discarded;
+    {
+        std::unique_lock<std::mutex> lock(mutex_, std::try_to_lock);
+        if (!lock.owns_lock())
+            return;
+        discarded.swap(buckets_[static_cast<int>(MessagePriority::Video)]);
+    }
+    cond_.notify_all();
+}
+
+void MessageQueue::push(MessagePtr msg)
+{
+    if (!msg)
+        return;
+
+    std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
     const auto deadline =
         std::chrono::steady_clock::now() + std::chrono::milliseconds(WAITSECONDS * 1000);
     while (!lock.try_lock()) {
@@ -56,62 +133,49 @@ void MessageQueue::push(Message msg)
             return;
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-    /// 限长等待，避免 IO 线程在满队列上永久阻塞（进而卡死 disconnect/clear）
-    if (!m_cond.wait_for(lock, std::chrono::milliseconds(WAITSECONDS * 1000), [this]() {
-            return m_queue.size() < QUEUE_MAXSIZE;
+    if (!cond_.wait_for(lock, std::chrono::milliseconds(WAITSECONDS * 1000), [this]() {
+            return queue_.size() < QUEUE_MAXSIZE;
         })) {
         return;
     }
-    m_queue.push(std::move(msg));
+    queue_.push(std::move(msg));
     lock.unlock();
-    m_cond.notify_one();
+    cond_.notify_one();
 }
 
-std::optional<Message> MessageQueue::pop(int waitMs)
+std::optional<MessagePtr> MessageQueue::pop(int wait_ms)
 {
-    std::unique_lock<std::mutex> lock(m_mutex);
-    /// 谓词等待：超时后仍复查队列，避免丢唤醒导致消息滞留
-    if (!m_cond.wait_for(lock, std::chrono::milliseconds(waitMs), [this]() {
-            return !m_queue.empty();
+    std::unique_lock<std::mutex> lock(mutex_);
+    if (!cond_.wait_for(lock, std::chrono::milliseconds(wait_ms), [this]() {
+            return !queue_.empty();
         })) {
         return std::nullopt;
     }
-    Message msg = std::move(m_queue.front());
-    m_queue.pop();
+    MessagePtr msg = std::move(queue_.front());
+    queue_.pop();
     lock.unlock();
-    m_cond.notify_one();
+    cond_.notify_one();
     return msg;
 }
 
-void MessageQueue::clear() {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    while (!m_queue.empty())
-        m_queue.pop();
-}
-
-void MessageQueue::wakeAll() {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    m_cond.notify_all();
-}
-
-void MessageQueue::clearVideo() {
-    std::queue<Message> discarded;
-    {
-        /// UI 线程也会调用：不能在发送线程持锁时无限等待，否则主界面卡死
-        std::unique_lock<std::mutex> lock(m_mutex, std::try_to_lock); //尝试加锁
-        if (!lock.owns_lock()) //如果锁没有被持有，则返回
+void MessageQueue::clear()
+{
+    std::queue<MessagePtr> discarded;
+    for (int attempt = 0; attempt < 8; ++attempt) {
+        std::unique_lock<std::mutex> lock(mutex_, std::try_to_lock);
+        if (lock.owns_lock()) {
+            discarded.swap(queue_);
+            lock.unlock();
+            cond_.notify_all();
             return;
-
-        std::queue<Message> kept;
-        while (!m_queue.empty()) {
-            Message item = std::move(m_queue.front());
-            m_queue.pop();
-            if (item.kind != Message::Kind::SendImage)
-                kept.push(std::move(item));
-            else
-                discarded.push(std::move(item));
         }
-        m_queue.swap(kept);
+        cond_.notify_all();
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-    m_cond.notify_all();
+}
+
+void MessageQueue::wake_all()
+{
+    std::unique_lock<std::mutex> lock(mutex_, std::try_to_lock);
+    cond_.notify_all();
 }

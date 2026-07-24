@@ -5,6 +5,7 @@
 #include <spdlog/spdlog.h>
 #include <QAudioFormat>
 #include <QThread>
+#include <memory>
 
 #ifndef MB
 #define MB (1024 * 1024)
@@ -93,10 +94,7 @@ void AudioInput::onreadyRead()
 		}
 	}
 
-	Message msg;
-	msg.kind = Message::Kind::SendAudio;
-	msg.audio = rr;
-	m_hub->enqueueSend(std::move(msg));
+	m_hub->enqueue_send(std::make_shared<SendAudioMessage>(rr));
 
 	totallen = 0;
 	num = 0;

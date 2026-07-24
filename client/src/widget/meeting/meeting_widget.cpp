@@ -35,7 +35,7 @@ QRect  MeetingWidget::pos = QRect(-1, -1, -1, -1);
 MeetingWidget::MeetingWidget(QWidget *parent)
     : FramelessWindow<QWidget>(parent)
     , ui(new Ui::Widget) {
-    qRegisterMetaType<Message>("Message");
+    qRegisterMetaType<MessagePtr>("MessagePtr");
     qRegisterMetaType<ConnectAction>("ConnectAction");
     spdlog::info("[MeetingWidget] -------------------------Application Start---------------------------");
     spdlog::info("[MeetingWidget] main UI thread id: {}", reinterpret_cast<quintptr>(QThread::currentThreadId()));
@@ -58,11 +58,11 @@ void MeetingWidget::init_connect() {
     spdlog::debug("[MeetingWidget] 初始化信号与槽");
     connect(_cameraVideo, &CameraVideo::frameCaptured, this, &MeetingWidget::on_local_frame_captured_slot);
 
-    connect(_network.get(), &NetworkManager::requestMessageReady, this, &MeetingWidget::on_request_message_slot, Qt::QueuedConnection);
-    connect(_network.get(), &NetworkManager::userInfoMessageReady, this, &MeetingWidget::on_user_info_message_slot, Qt::QueuedConnection);
-    connect(_network.get(), &NetworkManager::textMessageReady, this, &MeetingWidget::on_text_message_slot, Qt::QueuedConnection);
-    connect(_network.get(), &NetworkManager::videoMessageReady, this, &MeetingWidget::on_video_message_slot, Qt::QueuedConnection);
-    connect(_network.get(), &NetworkManager::sendTextFinished, this, &MeetingWidget::on_text_send_slot);
+    connect(_network.get(), &NetworkManager::request_message_ready, this, &MeetingWidget::on_request_message_slot, Qt::QueuedConnection);
+    connect(_network.get(), &NetworkManager::user_info_message_ready, this, &MeetingWidget::on_user_info_message_slot, Qt::QueuedConnection);
+    connect(_network.get(), &NetworkManager::text_message_ready, this, &MeetingWidget::on_text_message_slot, Qt::QueuedConnection);
+    connect(_network.get(), &NetworkManager::video_message_ready, this, &MeetingWidget::on_video_message_slot, Qt::QueuedConnection);
+    connect(_network.get(), &NetworkManager::send_text_finished, this, &MeetingWidget::on_text_send_slot);
     connect(_network.get(), &NetworkManager::disconnected, this, &MeetingWidget::on_network_disconnected_slot, Qt::QueuedConnection);
 
     connect(this, &MeetingWidget::request_connect_signal, _controller.get(), &MeetingController::connect_to_server_slot, Qt::QueuedConnection);
@@ -174,6 +174,9 @@ void MeetingWidget::closeEvent(QCloseEvent *event) {
     hide(); //隐藏窗口
     event->ignore(); //忽略关闭事件
 
+    /// 关闭窗口时作废尚未发起的延后连接，避免藏起来的窗口又被自动拉起
+    _hasPendingConnect = false;
+
     if (_sessionEnding) return; //如果会议正在结束，则返回
     _sessionEnding = true;
 
@@ -183,8 +186,26 @@ void MeetingWidget::closeEvent(QCloseEvent *event) {
 void MeetingWidget::on_network_disconnected_slot() {
     _sessionActive = false;
     _sessionEnding = false;
+    _connecting = false;
     spdlog::info("[MeetingWidget] 网络已异步断开");
     update_meeting_info();
+    flush_pending_connect();
+}
+
+void MeetingWidget::flush_pending_connect() {
+    if (!_hasPendingConnect)
+        return;
+    const QString ip = _pendingConnectIp;
+    const QString port = _pendingConnectPort;
+    const ConnectAction action = _pendingConnectAction;
+    const QString roomNo = _pendingConnectRoomNo;
+    _hasPendingConnect = false;
+    _pendingConnectIp.clear();
+    _pendingConnectPort.clear();
+    _pendingConnectRoomNo.clear();
+    _pendingConnectAction = ConnectAction::None;
+    spdlog::info("[MeetingWidget] 执行延后连接 {}:{}", ip.toStdString(), port.toStdString());
+    request_connect_to_server_slot(ip, port, action, roomNo);
 }
 
 void MeetingWidget::reset_meeting_ui() {
@@ -216,23 +237,16 @@ void MeetingWidget::update_meeting_info() {
         ui->labelLocalIp->setText(QStringLiteral("-"));
         ui->labelSpeaker->setText(QStringLiteral("-"));
     } else {
-        if (_offlineMode)
-            ui->labelMeetStatus->setText(tr("离线调试中"));
-        else
-            ui->labelMeetStatus->setText(_createmeet ? tr("已创建会议") : tr("已加入会议"));
+        ui->labelMeetStatus->setText(_createmeet ? tr("已创建会议") : tr("已加入会议"));
         ui->labelRoomNo->setText(_roomNo > 0 ? QString::number(_roomNo) : QStringLiteral("-"));
         ui->labelMemberCount->setText(QString::number(static_cast<int>(partner.size())));
-        if (_offlineMode)
-            ui->labelLocalIp->setText(QStringLiteral("127.0.0.1"));
-        else if (_network && _network->localIp() != 0)
+        if (_network && _network->localIp() != 0)
             ui->labelLocalIp->setText(QHostAddress(_network->localIp()).toString());
         else
             ui->labelLocalIp->setText(QStringLiteral("-"));
     }
 
-    if (_offlineMode)
-        ui->labelServer->setText(tr("离线模式"));
-    else if (_sessionActive && !_serverAddr.isEmpty())
+    if (_sessionActive && !_serverAddr.isEmpty())
         ui->labelServer->setText(_serverAddr);
     else if (_sessionActive)
         ui->labelServer->setText(tr("已连接"));
@@ -250,14 +264,16 @@ void MeetingWidget::end_meeting_session() {
 
     _createmeet = false;
     _joinmeet = false;
-    _offlineMode = false;
+    /// 关闭窗口时必须清掉，否则二次连接会一直 already connecting
+    const bool wasConnecting = _connecting;
+    _connecting = false;
 
     /// 先清 UI，再异步断线；断线路径不得阻塞 UI 事件循环
     clear_partner();
     reset_meeting_ui();
     spdlog::info("[MeetingWidget] 会议 UI 已重置");
 
-    if (_network && _sessionActive) {
+    if (_network && (_sessionActive || wasConnecting)) {
         _sessionEnding = true;
         spdlog::info("[MeetingWidget] 异步断开网络");
         if (_controller) {
@@ -267,9 +283,22 @@ void MeetingWidget::end_meeting_session() {
             _network->disconnectFromHost();
         }
         _sessionActive = false;
-    } else {
-        _sessionEnding = false;
+        /// 防止 disconnected 丢失导致永远无法二次连接
+        QTimer::singleShot(800, this, [this]() {
+            if (!_sessionEnding)
+                return;
+            spdlog::warn("[MeetingWidget] 断线回调超时，强制复位 _sessionEnding");
+            _sessionEnding = false;
+            _sessionActive = false;
+            _connecting = false;
+            update_meeting_info();
+            flush_pending_connect();
+        });
+    } else if (!_sessionEnding) {
         spdlog::info("[MeetingWidget] 会议会话结束（无活跃连接）");
+    } else {
+        /// 已在断线中（例如 socket abort 触发的二次 end）：保持 _sessionEnding，等 disconnected
+        spdlog::info("[MeetingWidget] 会议会话结束（断线仍在进行）");
     }
 }
 
@@ -312,81 +341,16 @@ void MeetingWidget::on_create_meet_btn_clicked_slot() {
     }
 }
 
-void MeetingWidget::enter_offline_mode() {
-    spdlog::info("[MeetingWidget] 进入离线调试模式");
-    if (_sessionActive || _createmeet || _joinmeet) {
-        QMessageBox::warning(this, tr("提示"), tr("当前已有会议会话，请先关闭后再进入离线模式"));
-        return;
-    }
-
-    _offlineMode = true;
-    _createmeet = true;
-    _joinmeet = false;
-    _sessionActive = false;
-    _sessionEnding = false;
-    _roomNo = 9001;
-    _serverAddr = QStringLiteral("offline");
-
-    // 本机 + 两个假远端成员，方便测左侧小窗 / 主画面切换
-    const std::uint32_t localIp = QHostAddress(QStringLiteral("127.0.0.1")).toIPv4Address();
-    const std::uint32_t fakeA = QHostAddress(QStringLiteral("10.0.0.2")).toIPv4Address();
-    const std::uint32_t fakeB = QHostAddress(QStringLiteral("10.0.0.3")).toIPv4Address();
-
-    show(); ///< 显示窗口
-    raise(); ///< 将窗口置于顶层
-    activateWindow(); ///< 激活窗口,使其可以接收键盘事件
-
-    ///< 设置本地摄像头IP
-    if (_cameraVideo) {
-        _cameraVideo->setLocalIp(localIp);
-        _cameraVideo->setMainIp(localIp);
-    }
-    mainip = localIp;
-
-    add_partner(localIp); ///< 添加本地成员
-    add_partner(fakeA); ///< 添加假远端成员A
-    add_partner(fakeB); ///< 添加假远端成员B
-    _cameraVideo->showAvatarForIp(localIp);
-    _cameraVideo->showAvatarForIp(fakeA);
-    _cameraVideo->showAvatarForIp(fakeB);
-    _cameraVideo->showMainAvatar();
-
-    iplist.clear();
-    iplist.push_back(QStringLiteral("@127.0.0.1"));
-    iplist.push_back(QStringLiteral("@10.0.0.2"));
-    iplist.push_back(QStringLiteral("@10.0.0.3"));
-    ui->plainTextEdit->setCompleter(iplist);
-
-    ui->openVedio->setDisabled(false);
-    ui->openAudio->setDisabled(false);
-    ui->sendmsg->setDisabled(false);
-    ui->groupBox_2->setTitle(tr("主屏幕(离线调试)"));
-    update_meeting_info();
-
-    QMessageBox::information(
-        this,
-        tr("离线调试"),
-        tr("已进入离线模式：未连接服务器。\n"
-           "可测试摄像头、成员小窗点击切换主画面等 UI。\n"
-           "关闭会议窗口即可退出。"));
-}
-
-
-
-
 void MeetingWidget::on_open_vedio_clicked_slot() {
     spdlog::debug("[MeetingWidget] 点击打开摄像头按钮");
     if(_cameraVideo->isCameraRunning()) { //关闭摄像头
         _cameraVideo->stopCamera();
         spdlog::info("[MeetingWidget] 摄像头关闭");
-        if (_network && !_offlineMode) //如果网络没有初始化以及不在离线模式下，则清除待发送的图像
+        if (_network)
             _network->clearPendingImages();
         ui->openVedio->setText("摄像头关闭");
-        if (_network && !_offlineMode) //同样
+        if (_network) {
             _network->sendCloseCamera(); //发送关闭摄像头信号
-        if (_offlineMode) { //如果是在离线模式下，则关闭本地摄像头
-            close_img(QHostAddress(QStringLiteral("127.0.0.1")).toIPv4Address());
-        } else if (_network) {
             close_img(_network->localIp());
         }
     } else {
@@ -434,17 +398,14 @@ void MeetingWidget::request_connect_to_server_slot(QString ip, QString port, Con
         emit connect_server_finished_signal(false, ip, port, action);
         return;
     }
-    if (_sessionEnding) { //如果会议正在结束，则返回
-        if (!isVisible()) {
-            spdlog::warn("[MeetingWidget] request_connect_to_server_slot: clear stale _sessionEnding");
-            _sessionEnding = false;
-            _sessionActive = false;
-        } else {
-            spdlog::warn("[MeetingWidget] request_connect_to_server_slot: session is ending, try later");
-            QMessageBox::information(this, tr("提示"), tr("会议正在关闭，请稍后再试"));
-            emit connect_server_finished_signal(false, ip, port, action);
-            return;
-        }
+    if (_sessionEnding) { //上次断线尚未完成：记下请求，断线完成后自动连，避免误报「连接失败」
+        spdlog::warn("[MeetingWidget] request_connect_to_server_slot: session ending, defer connect");
+        _pendingConnectIp = ip;
+        _pendingConnectPort = port;
+        _pendingConnectAction = action;
+        _pendingConnectRoomNo = room_no;
+        _hasPendingConnect = true;
+        return;
     }
 
     _connecting = true;
@@ -454,6 +415,23 @@ void MeetingWidget::request_connect_to_server_slot(QString ip, QString port, Con
 void MeetingWidget::on_connect_finished_slot(bool ok, QString ip, QString port, ConnectAction action, QString room_no)
 {
     _connecting = false;
+    /// 用户已关闭窗口 / 会话正在结束：丢弃迟到的连接成功，并立刻拆掉多余连接
+    if (_sessionEnding || !isVisible()) {
+        spdlog::warn("[MeetingWidget] discard late connect result ok={} (ending={} visible={})",
+                     ok, _sessionEnding, isVisible());
+        if (ok && _network) {
+            _sessionEnding = true;
+            _sessionActive = false;
+            if (_controller) {
+                QMetaObject::invokeMethod(_controller.get(), &MeetingController::disconnect_from_host_slot,
+                                          Qt::QueuedConnection);
+            } else {
+                _network->disconnectFromHost();
+            }
+        }
+        emit connect_server_finished_signal(false, ip, port, action);
+        return;
+    }
     if (ok) {
         _sessionActive = true;
         _sessionEnding = false;
@@ -508,8 +486,11 @@ void MeetingWidget::audio_error_slot(QString err) {
 
 
 
-void MeetingWidget::handle_create_meeting_response(const Message &msg) {
-    const int roomno = static_cast<int>(msg.roomNo);
+void MeetingWidget::handle_create_meeting_response(const MessagePtr &msg) {
+    const auto *resp = dynamic_cast<const CreateMeetingResponseMessage *>(msg.get());
+    if (!resp)
+        return;
+    const int roomno = static_cast<int>(resp->room_no());
     spdlog::info("[MeetingWidget] CREATE_MEETING_RESPONSE roomno: {}", roomno);
 
     if (roomno != 0) {
@@ -540,9 +521,12 @@ void MeetingWidget::handle_create_meeting_response(const Message &msg) {
     }
 }
 
-void MeetingWidget::handle_join_meeting_response(const Message &msg) {
+void MeetingWidget::handle_join_meeting_response(const MessagePtr &msg) {
     spdlog::info("[MeetingWidget] JOIN_MEETING_RESPONSE消息类型");
-    const std::int32_t c = msg.responseCode;
+    const auto *resp = dynamic_cast<const JoinMeetingResponseMessage *>(msg.get());
+    if (!resp)
+        return;
+    const std::int32_t c = resp->response_code();
     if (c == 0) {
         QMessageBox::information(this, "Meeting Error", tr("会议不存在"), QMessageBox::Yes, QMessageBox::Yes);
         spdlog::warn("[MeetingWidget] meeting not exist");
@@ -573,59 +557,75 @@ void MeetingWidget::handle_join_meeting_response(const Message &msg) {
     }
 }
 
-void MeetingWidget::handle_img_recv(const Message &msg) {
-    QHostAddress a(msg.ip);
+void MeetingWidget::handle_img_recv(const MessagePtr &msg) {
+    const auto *image_msg = dynamic_cast<const RecvImageMessage *>(msg.get());
+    if (!image_msg)
+        return;
+    const std::uint32_t ip = image_msg->ip();
+    QHostAddress a(ip);
     spdlog::debug("[MeetingWidget] IMG_RECV from {}", a.toString().toStdString());
-    if (partner.find(msg.ip) == partner.end())
-        add_partner(msg.ip);
+    if (partner.find(ip) == partner.end())
+        add_partner(ip);
 
-    _cameraVideo->showImageForIp(msg.ip, msg.image);
+    _cameraVideo->showImageForIp(ip, image_msg->image());
     repaint();
 }
 
-void MeetingWidget::handle_text_recv(const Message &msg) {
-    const QString str = QString::fromUtf8(msg.text.c_str(), static_cast<int>(msg.text.size()));
+void MeetingWidget::handle_text_recv(const MessagePtr &msg) {
+    const auto *text_msg = dynamic_cast<const RecvTextMessage *>(msg.get());
+    if (!text_msg)
+        return;
+    const QString str = QString::fromUtf8(text_msg->text().c_str(), static_cast<int>(text_msg->text().size()));
     QString time = QString::number(QDateTime::currentDateTimeUtc().toSecsSinceEpoch());
     ChatMessage *message = new ChatMessage(ui->listWidget);
     QListWidgetItem *item = new QListWidgetItem();
     deal_message_time(time);
-    deal_message(message, item, str, time, QHostAddress(msg.ip).toString(), ChatMessage::User_She);
+    deal_message(message, item, str, time, QHostAddress(text_msg->ip()).toString(), ChatMessage::User_She);
     if (str.contains('@' + QHostAddress(_network ? _network->localIp() : 0).toString())) {
         _soundEffect->play();
     }
 }
 
-void MeetingWidget::handle_partner_join(const Message &msg) {
-    Partner *p = add_partner(msg.ip);
+void MeetingWidget::handle_partner_join(const MessagePtr &msg) {
+    if (!msg)
+        return;
+    Partner *p = add_partner(msg->ip());
     if (p) {
-        _cameraVideo->showAvatarForIp(msg.ip);
-        iplist.push_back(QString("@") + QHostAddress(msg.ip).toString());
+        _cameraVideo->showAvatarForIp(msg->ip());
+        iplist.push_back(QString("@") + QHostAddress(msg->ip()).toString());
         ui->plainTextEdit->setCompleter(iplist);
         update_meeting_info();
     }
 }
 
-void MeetingWidget::handle_partner_exit(const Message &msg) {
-    remove_partner(msg.ip);
-    if (mainip == msg.ip)
+void MeetingWidget::handle_partner_exit(const MessagePtr &msg) {
+    if (!msg)
+        return;
+    remove_partner(msg->ip());
+    if (mainip == msg->ip())
         _cameraVideo->showMainAvatar();
-    const QString atTag = QString("@") + QHostAddress(msg.ip).toString();
+    const QString atTag = QString("@") + QHostAddress(msg->ip()).toString();
     const auto it = std::find(iplist.begin(), iplist.end(), atTag);
     if (it != iplist.end()) {
         iplist.erase(it);
         ui->plainTextEdit->setCompleter(iplist);
     } else {
-        spdlog::warn("[MeetingWidget] iplist remove failed, ip={}", QHostAddress(msg.ip).toString().toStdString());
+        spdlog::warn("[MeetingWidget] iplist remove failed, ip={}", QHostAddress(msg->ip()).toString().toStdString());
     }
     update_meeting_info();
 }
 
-void MeetingWidget::handle_close_camera(const Message &msg) {
-    close_img(msg.ip);
+void MeetingWidget::handle_close_camera(const MessagePtr &msg) {
+    if (!msg)
+        return;
+    close_img(msg->ip());
 }
 
-void MeetingWidget::handle_partner_join2(const Message &msg) {
-    for (const std::uint32_t ip : msg.partnerIps) {
+void MeetingWidget::handle_partner_join2(const MessagePtr &msg) {
+    const auto *join2 = dynamic_cast<const PartnerJoin2Message *>(msg.get());
+    if (!join2)
+        return;
+    for (const std::uint32_t ip : join2->partner_ips()) {
         Partner *p = add_partner(ip);
         if (p) {
             _cameraVideo->showAvatarForIp(ip);
@@ -638,6 +638,10 @@ void MeetingWidget::handle_partner_join2(const Message &msg) {
 }
 
 void MeetingWidget::handle_remote_host_closed_error() {
+    if (_sessionEnding) {
+        spdlog::info("[MeetingWidget] 忽略断线过程中的 RemoteHostClosed");
+        return;
+    }
     const bool wasInMeeting = _createmeet || _joinmeet;
     end_meeting_session();
     if (wasInMeeting)
@@ -646,25 +650,31 @@ void MeetingWidget::handle_remote_host_closed_error() {
 
 void MeetingWidget::handle_other_net_error()
 {
+    if (_sessionEnding) {
+        spdlog::info("[MeetingWidget] 忽略断线过程中的 OtherNetError");
+        return;
+    }
     const bool wasInMeeting = _createmeet || _joinmeet;
     end_meeting_session();
     if (wasInMeeting)
         QMessageBox::warning(this, "Network Error", "网络异常", QMessageBox::Yes, QMessageBox::Yes);
 }
 
-void MeetingWidget::on_request_message_slot(Message msg) {
-    spdlog::info("[MeetingWidget] 请求/响应消息 kind={}", static_cast<int>(msg.kind));
-    switch (msg.kind) {
-    case Message::Kind::CreateMeetingResponse:
+void MeetingWidget::on_request_message_slot(MessagePtr msg) {
+    if (!msg)
+        return;
+    spdlog::info("[MeetingWidget] 请求/响应消息 kind={}", static_cast<int>(msg->kind()));
+    switch (msg->kind()) {
+    case MessageKind::CreateMeetingResponse:
         handle_create_meeting_response(msg);
         break;
-    case Message::Kind::JoinMeetingResponse:
+    case MessageKind::JoinMeetingResponse:
         handle_join_meeting_response(msg);
         break;
-    case Message::Kind::RemoteHostClosedError:
+    case MessageKind::RemoteHostClosedError:
         handle_remote_host_closed_error();
         break;
-    case Message::Kind::OtherNetError:
+    case MessageKind::OtherNetError:
         handle_other_net_error();
         break;
     default:
@@ -672,19 +682,21 @@ void MeetingWidget::on_request_message_slot(Message msg) {
     }
 }
 
-void MeetingWidget::on_user_info_message_slot(Message msg) {
-    spdlog::info("[MeetingWidget] 用户信息消息 kind={}", static_cast<int>(msg.kind));
-    switch (msg.kind) {
-    case Message::Kind::PartnerJoin:
+void MeetingWidget::on_user_info_message_slot(MessagePtr msg) {
+    if (!msg)
+        return;
+    spdlog::info("[MeetingWidget] 用户信息消息 kind={}", static_cast<int>(msg->kind()));
+    switch (msg->kind()) {
+    case MessageKind::PartnerJoin:
         handle_partner_join(msg);
         break;
-    case Message::Kind::PartnerExit:
+    case MessageKind::PartnerExit:
         handle_partner_exit(msg);
         break;
-    case Message::Kind::CloseCameraNotify:
+    case MessageKind::CloseCameraNotify:
         handle_close_camera(msg);
         break;
-    case Message::Kind::PartnerJoin2:
+    case MessageKind::PartnerJoin2:
         handle_partner_join2(msg);
         break;
     default:
@@ -692,11 +704,11 @@ void MeetingWidget::on_user_info_message_slot(Message msg) {
     }
 }
 
-void MeetingWidget::on_text_message_slot(Message msg) {
+void MeetingWidget::on_text_message_slot(MessagePtr msg) {
     handle_text_recv(msg);
 }
 
-void MeetingWidget::on_video_message_slot(Message msg) {
+void MeetingWidget::on_video_message_slot(MessagePtr msg) {
     handle_img_recv(msg);
 }
 
@@ -805,14 +817,6 @@ void MeetingWidget::on_local_frame_captured_slot(const QImage &image)
     if (!_cameraVideo || !_cameraVideo->isCameraRunning())
         return;
 
-    if (_offlineMode) {
-        const std::uint32_t localIp = QHostAddress(QStringLiteral("127.0.0.1")).toIPv4Address();
-        _cameraVideo->showImageForIp(localIp, image);
-        if (mainip == localIp)
-            _cameraVideo->showMainImage(image);
-        return;
-    }
-
     if (!_network)
         return;
     if (partner.size() <= 1)
@@ -884,11 +888,9 @@ void MeetingWidget::on_send_msg_clicked_slot()
     ChatMessage *message = new ChatMessage(ui->listWidget);
     QListWidgetItem *item = new QListWidgetItem();
     deal_message_time(time);
-    const QString myIp = _offlineMode
-        ? QStringLiteral("127.0.0.1")
-        : QHostAddress(_network ? _network->localIp() : 0).toString();
+    const QString myIp = QHostAddress(_network ? _network->localIp() : 0).toString();
     deal_message(message, item, msg, time, myIp, ChatMessage::User_Me);
-    if (_offlineMode || !_network) {
+    if (!_network) {
         ui->sendmsg->setDisabled(false);
         return;
     }

@@ -6,6 +6,7 @@
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
 #include <climits>
+#include <memory>
 #include <spdlog/spdlog.h>
 
 Connection::Connection(QObject *parent)
@@ -57,6 +58,9 @@ bool Connection::connectOnIoThread(const QString &ip, const QString &port)
 
     destroySocket();
     m_parser.reset();
+    /// 二次连接前清队列，避免上次未发完的包污染新会话
+    if (m_hub)
+        m_hub->clear_all();
 
     m_socket = new QTcpSocket();
     connect(m_socket, &QTcpSocket::readyRead, this, &Connection::onReadyRead);
@@ -122,8 +126,8 @@ void Connection::onReadyRead()
     spdlog::info("[Connection] 收到服务端数据 bytes={}", chunk.size());
     const auto packets = m_parser.feed(reinterpret_cast<const std::uint8_t *>(chunk.constData()),
                                        static_cast<std::size_t>(chunk.size()));
-    for (const auto &packet : packets)
-        m_hub->routeIncoming(packet);
+    for (auto &packet : packets)
+        m_hub->route_incoming(std::move(packet));
 }
 
 void Connection::onSocketError(QAbstractSocket::SocketError error)
@@ -135,11 +139,12 @@ void Connection::onSocketError(QAbstractSocket::SocketError error)
                   static_cast<int>(error),
                   reinterpret_cast<quintptr>(QThread::currentThreadId()));
 
-    Message msg;
-    msg.kind = (error == QAbstractSocket::RemoteHostClosedError)
-        ? Message::Kind::RemoteHostClosedError
-        : Message::Kind::OtherNetError;
-    m_hub->routeIncoming(std::move(msg));
+    MessagePtr msg;
+    if (error == QAbstractSocket::RemoteHostClosedError)
+        msg = std::make_shared<RemoteHostClosedErrorMessage>();
+    else
+        msg = std::make_shared<OtherNetErrorMessage>();
+    m_hub->route_incoming(std::move(msg));
 }
 
 void Connection::destroySocket()
@@ -164,25 +169,33 @@ void Connection::disconnectFromHost()
     m_hasLocalIp = false;
     m_localIp = 0;
 
-    /// 不在 UI 线程 clearAll：队列锁可能被发送/音频线程持有，叠加断线易卡死主窗口
+    /// 只唤醒队列，不在调用线程 clearAll（避免与 IO/发送线程抢锁卡死 controller）
     if (m_hub)
-        m_hub->wakeAllQueues();
+        m_hub->wake_all_queues();
 
     if (m_ioThread.isRunning()) {
-        /// 异步投递到 IO 线程，不阻塞调用方（通常是 UI 线程）
-        QMetaObject::invokeMethod(this, "disconnectOnIoThread", Qt::QueuedConnection);
+        /// 异步投递到 IO 线程，不阻塞调用方（controller / UI）
+        const bool ok = QMetaObject::invokeMethod(this, "disconnectOnIoThread", Qt::QueuedConnection);
+        if (!ok) {
+            spdlog::error("[Connection] disconnectOnIoThread 投递失败，直接通知断开");
+            emit disconnected();
+        }
     } else {
         if (m_hub)
-            m_hub->clearAll();
+            m_hub->clear_all();
         emit disconnected();
     }
 }
 
 void Connection::disconnectOnIoThread()
 {
+    spdlog::info("[Connection] IO 线程断开 tid={}",
+                 reinterpret_cast<quintptr>(QThread::currentThreadId()));
     destroySocket();
     if (m_hub)
-        m_hub->clearAll();
+        m_hub->clear_all();
+    /// 无论此前是否已断连，都通知上层，避免 _sessionEnding 永久卡住
+    spdlog::info("[Connection] 发出 disconnected");
     emit disconnected();
 }
 
