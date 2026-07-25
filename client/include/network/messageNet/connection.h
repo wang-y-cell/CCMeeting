@@ -96,7 +96,7 @@ private slots:
 
 private:
     MessageHub *m_hub = nullptr; ///< 消息中心
-    QThread m_ioThread; ///< IO 工作线程
+    QThread m_ioThread; ///< IO 工作线程, 用于处理网络IO操作
     QTcpSocket *m_socket = nullptr; ///< TCP socket
     MessageCodec::WireStreamParser m_parser; ///< 流式解帧器
 

@@ -12,17 +12,16 @@
 Connection::Connection(QObject *parent)
     : QObject(parent)
 {
-    qRegisterMetaType<QAbstractSocket::SocketError>();
-
-    moveToThread(&m_ioThread);
-    m_ioThread.start();
+    qRegisterMetaType<QAbstractSocket::SocketError>(); // 注册SocketError类型
+    moveToThread(&m_ioThread); // 将对象移动到IO线程
+    m_ioThread.start(); // 启动IO线程
 }
 
 Connection::~Connection()
 {
-    stopImmediately();
+    stopImmediately(); // 立即停止连接
     m_ioThread.quit();
-    m_ioThread.wait(3000);
+    m_ioThread.wait(3000); // 等待IO线程退出
 }
 
 void Connection::setMessageHub(MessageHub *hub)
@@ -119,8 +118,8 @@ void Connection::onReadyRead()
     if (m_socket == nullptr || m_hub == nullptr)
         return;
 
-    const QByteArray chunk = m_socket->readAll();
-    if (chunk.isEmpty())
+    const QByteArray chunk = m_socket->readAll(); // 读取所有数据
+    if (chunk.isEmpty()) // 如果数据为空，则返回
         return;
 
     spdlog::info("[Connection] 收到服务端数据 bytes={}", chunk.size());
