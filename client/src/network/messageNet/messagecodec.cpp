@@ -1,23 +1,20 @@
 #include "messagecodec.h"
 #include <QBuffer>
 #include <QtEndian>
-#include <spdlog/spdlog.h>
 #include <cstring>
+#include <spdlog/spdlog.h>
 
 namespace {
 
-QByteArray compress_text_payload(const std::string &text)
-{
+QByteArray compress_text_payload(const std::string &text) {
     return qCompress(QByteArray::fromStdString(text));
 }
 
-QByteArray compress_audio_payload(const QByteArray &pcm)
-{
+QByteArray compress_audio_payload(const QByteArray &pcm) {
     return qCompress(pcm).toBase64();
 }
 
-QByteArray compress_image_payload(const QImage &image)
-{
+QByteArray compress_image_payload(const QImage &image) {
     QByteArray raw;
     QBuffer buf(&raw);
     buf.open(QIODevice::WriteOnly);
@@ -26,37 +23,35 @@ QByteArray compress_image_payload(const QImage &image)
     return qCompress(raw).toBase64();
 }
 
-QByteArray decode_image_wire_payload(const QByteArray &wire_body)
-{
+QByteArray decode_image_wire_payload(const QByteArray &wire_body) {
     return qUncompress(QByteArray::fromBase64(wire_body));
 }
 
-QByteArray decode_text_wire_payload(const QByteArray &wire_body)
-{
+QByteArray decode_text_wire_payload(const QByteArray &wire_body) {
     return qUncompress(wire_body);
 }
 
-QByteArray decode_audio_wire_payload(const QByteArray &wire_body)
-{
+QByteArray decode_audio_wire_payload(const QByteArray &wire_body) {
     return qUncompress(QByteArray::fromBase64(wire_body));
 }
 
-bool wire_frame_needs_length_field(MSG_TYPE type)
-{
-    return type == CREATE_MEETING || type == AUDIO_SEND || type == CLOSE_CAMERA
-        || type == IMG_SEND || type == TEXT_SEND || type == JOIN_MEETING;
+bool wire_frame_needs_length_field(MSG_TYPE type) {
+    return type == CREATE_MEETING || type == AUDIO_SEND ||
+           type == CLOSE_CAMERA || type == IMG_SEND || type == TEXT_SEND ||
+           type == JOIN_MEETING;
 }
 
-MessagePtr decode_create_meeting_response(const std::uint8_t *body, std::uint32_t n_body)
-{
+MessagePtr decode_create_meeting_response(const std::uint8_t *body,
+                                          std::uint32_t n_body) {
     auto msg = std::make_shared<CreateMeetingResponseMessage>();
     if (n_body >= 4u)
-        msg->set_room_no(static_cast<std::uint32_t>(qFromBigEndian<std::int32_t>(body)));
+        msg->set_room_no(
+            static_cast<std::uint32_t>(qFromBigEndian<std::int32_t>(body)));
     return msg;
 }
 
-MessagePtr decode_join_meeting_response(const std::uint8_t *body, std::uint32_t n_body)
-{
+MessagePtr decode_join_meeting_response(const std::uint8_t *body,
+                                        std::uint32_t n_body) {
     auto msg = std::make_shared<JoinMeetingResponseMessage>();
     if (n_body >= sizeof(std::int32_t)) {
         std::int32_t code = 0;
@@ -66,19 +61,21 @@ MessagePtr decode_join_meeting_response(const std::uint8_t *body, std::uint32_t 
     return msg;
 }
 
-MessagePtr decode_partner_join2(const std::uint8_t *body, std::uint32_t n_body)
-{
+MessagePtr decode_partner_join2(const std::uint8_t *body,
+                                std::uint32_t n_body) {
     auto msg = std::make_shared<PartnerJoin2Message>();
     for (std::uint32_t i = 0; i < n_body / sizeof(std::uint32_t); ++i) {
-        const std::uint32_t ip = qFromBigEndian<std::uint32_t>(body + i * sizeof(std::uint32_t));
+        const std::uint32_t ip =
+            qFromBigEndian<std::uint32_t>(body + i * sizeof(std::uint32_t));
         msg->add_partner_ip(ip);
     }
     return msg;
 }
 
-MessagePtr decode_image_recv(const std::uint8_t *body, std::uint32_t n_body, std::uint32_t ip)
-{
-    const QByteArray wire_body(reinterpret_cast<const char *>(body), static_cast<int>(n_body));
+MessagePtr decode_image_recv(const std::uint8_t *body, std::uint32_t n_body,
+                             std::uint32_t ip) {
+    const QByteArray wire_body(reinterpret_cast<const char *>(body),
+                               static_cast<int>(n_body));
     const QByteArray decoded = decode_image_wire_payload(wire_body);
     if (decoded.isEmpty())
         return nullptr;
@@ -92,9 +89,10 @@ MessagePtr decode_image_recv(const std::uint8_t *body, std::uint32_t n_body, std
     return msg;
 }
 
-MessagePtr decode_text_recv(const std::uint8_t *body, std::uint32_t n_body, std::uint32_t ip)
-{
-    const QByteArray wire_body(reinterpret_cast<const char *>(body), static_cast<int>(n_body));
+MessagePtr decode_text_recv(const std::uint8_t *body, std::uint32_t n_body,
+                            std::uint32_t ip) {
+    const QByteArray wire_body(reinterpret_cast<const char *>(body),
+                               static_cast<int>(n_body));
     const QByteArray decoded = decode_text_wire_payload(wire_body);
     if (decoded.isEmpty())
         return nullptr;
@@ -105,9 +103,10 @@ MessagePtr decode_text_recv(const std::uint8_t *body, std::uint32_t n_body, std:
     return msg;
 }
 
-MessagePtr decode_audio_recv(const std::uint8_t *body, std::uint32_t n_body, std::uint32_t ip)
-{
-    const QByteArray wire_body(reinterpret_cast<const char *>(body), static_cast<int>(n_body));
+MessagePtr decode_audio_recv(const std::uint8_t *body, std::uint32_t n_body,
+                             std::uint32_t ip) {
+    const QByteArray wire_body(reinterpret_cast<const char *>(body),
+                               static_cast<int>(n_body));
     const QByteArray decoded = decode_audio_wire_payload(wire_body);
     if (decoded.isEmpty())
         return nullptr;
@@ -118,8 +117,7 @@ MessagePtr decode_audio_recv(const std::uint8_t *body, std::uint32_t n_body, std
     return msg;
 }
 
-MessagePtr decode_simple_ip_event(MessageKind kind, std::uint32_t ip)
-{
+MessagePtr decode_simple_ip_event(MessageKind kind, std::uint32_t ip) {
     MessagePtr msg;
     switch (kind) {
     case MessageKind::PartnerJoin:
@@ -139,8 +137,7 @@ MessagePtr decode_simple_ip_event(MessageKind kind, std::uint32_t ip)
     return msg;
 }
 
-MessageKind partner_kind_from_wire(MSG_TYPE type)
-{
+MessageKind partner_kind_from_wire(MSG_TYPE type) {
     switch (type) {
     case PARTNER_JOIN:
         return MessageKind::PartnerJoin;
@@ -155,8 +152,7 @@ MessageKind partner_kind_from_wire(MSG_TYPE type)
 
 } // namespace
 
-MSG_TYPE MessageCodec::to_wire_type(MessageKind kind)
-{
+MSG_TYPE MessageCodec::to_wire_type(MessageKind kind) {
     switch (kind) {
     case MessageKind::CreateMeeting:
         return CREATE_MEETING;
@@ -198,8 +194,7 @@ MSG_TYPE MessageCodec::to_wire_type(MessageKind kind)
     return CREATE_MEETING;
 }
 
-MessageKind MessageCodec::from_wire_type(MSG_TYPE type)
-{
+MessageKind MessageCodec::from_wire_type(MSG_TYPE type) {
     switch (type) {
     case IMG_SEND:
         return MessageKind::SendImage;
@@ -239,8 +234,8 @@ MessageKind MessageCodec::from_wire_type(MSG_TYPE type)
     return MessageKind::OtherNetError;
 }
 
-QByteArray MessageCodec::encode_wire_frame(const Message &msg, std::uint32_t local_ip)
-{
+QByteArray MessageCodec::encode_wire_frame(const Message &msg,
+                                           std::uint32_t local_ip) {
     const MSG_TYPE wire_type = to_wire_type(msg.kind());
     QByteArray body;
 
@@ -300,10 +295,10 @@ QByteArray MessageCodec::encode_wire_frame(const Message &msg, std::uint32_t loc
 
 MessagePtr MessageCodec::decode_wire_packet(const std::uint8_t *frame,
                                             std::uint32_t n_body,
-                                            MSG_TYPE msgtype)
-{
+                                            MSG_TYPE msgtype) {
     const std::uint8_t *body = frame + MSG_HEADER;
-    spdlog::debug("[MessageCodec] decode type={} n_body={}", static_cast<int>(msgtype), n_body);
+    spdlog::debug("[MessageCodec] decode type={} n_body={}",
+                  static_cast<int>(msgtype), n_body);
 
     switch (msgtype) {
     case CREATE_MEETING_RESPONSE:
@@ -331,41 +326,44 @@ MessagePtr MessageCodec::decode_wire_packet(const std::uint8_t *frame,
         return decode_simple_ip_event(partner_kind_from_wire(msgtype), ip);
     }
     default:
-        spdlog::warn("[MessageCodec] unsupported message type: {}", static_cast<int>(msgtype));
+        spdlog::warn("[MessageCodec] unsupported message type: {}",
+                     static_cast<int>(msgtype));
         return nullptr;
     }
 }
 
-void MessageCodec::WireStreamParser::reset()
-{
-    buffer_.clear();
-}
+void MessageCodec::WireStreamParser::reset() { buffer_.clear(); }
 
-std::vector<MessagePtr> MessageCodec::WireStreamParser::feed(const std::uint8_t *data, std::size_t len)
-{
+std::vector<MessagePtr>
+MessageCodec::WireStreamParser::feed(const std::uint8_t *data,
+                                     std::size_t len) {
     if (len == 0)
         return {};
 
-    if (buffer_.size() + static_cast<int>(len) > static_cast<int>(k_max_buffer)) { // 如果缓冲区大小超过最大缓冲区大小,则清空缓冲区
+    if (buffer_.size() + static_cast<int>(len) >
+        static_cast<int>(
+            k_max_buffer)) { // 如果缓冲区大小超过最大缓冲区大小,则清空缓冲区
         spdlog::warn("[MessageCodec] receive buffer overflow, resetting");
         buffer_.clear();
     }
 
-    buffer_.append(reinterpret_cast<const char *>(data), static_cast<int>(len)); // 将数据添加到缓冲区
-    return extract_all(); // 提取所有消息
+    buffer_.append(reinterpret_cast<const char *>(data),
+                   static_cast<int>(len)); // 将数据添加到缓冲区
+    return extract_all();                  // 提取所有消息
 }
 
-std::vector<MessagePtr> MessageCodec::WireStreamParser::extract_all()
-{
+std::vector<MessagePtr> MessageCodec::WireStreamParser::extract_all() {
     std::vector<MessagePtr> packets;
 
     for (;;) {
         if (static_cast<std::size_t>(buffer_.size()) < MSG_HEADER)
             break;
 
-        const auto *raw = reinterpret_cast<const std::uint8_t *>(buffer_.constData());
+        const auto *raw =
+            reinterpret_cast<const std::uint8_t *>(buffer_.constData());
         const std::uint32_t n_body = qFromBigEndian<std::uint32_t>(raw + 7);
-        const std::size_t packet_size = static_cast<std::size_t>(n_body) + 1 + MSG_HEADER;
+        const std::size_t packet_size =
+            static_cast<std::size_t>(n_body) + 1 + MSG_HEADER;
 
         if (static_cast<std::size_t>(buffer_.size()) < packet_size)
             break;

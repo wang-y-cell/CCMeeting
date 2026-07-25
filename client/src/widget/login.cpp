@@ -4,28 +4,27 @@
 #include "configure/auth_config.h"
 #include "configure/user_session.h"
 
+#include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMessageBox>
 #include <QNetworkReply>
 #include <QNetworkRequest>
-#include <QFile>
 #include <QUrl>
 
 #include <spdlog/spdlog.h>
 
 login::login(QWidget *parent)
-    : FramelessWindow<QDialog>(parent)
-    , ui(new Ui::login)
-{
+    : FramelessWindow<QDialog>(parent), ui(new Ui::login) {
     ui->setupUi(this);
     setWindowTitle(tr("登录")); ///< 设置窗口标题为登录
-    setResizable(false);   ///< 禁止拖边缩放
-    setMaximizable(false); ///< 禁止最大化按钮与双击标题栏
+    setResizable(false);        ///< 禁止拖边缩放
+    setMaximizable(false);      ///< 禁止最大化按钮与双击标题栏
     set_style();
 
     connect(ui->login_button, &QPushButton::clicked, this, &login::Login);
-    connect(&m_nam, &QNetworkAccessManager::finished, this, &login::onLoginFinished);
+    connect(&m_nam, &QNetworkAccessManager::finished, this,
+            &login::onLoginFinished);
 }
 
 void login::set_style() {
@@ -40,13 +39,11 @@ void login::set_style() {
     }
 }
 
-login::~login()
-{
-    delete ui;
-}
+login::~login() { delete ui; }
 
 /**
- * @details 读取账号密码，向认证服务 POST /api/login；成功则写入 UserSession 并 accept()
+ * @details 读取账号密码，向认证服务 POST /api/login；成功则写入 UserSession 并
+ * accept()
  */
 void login::Login() {
     if (m_requestInFlight) {
@@ -83,7 +80,7 @@ void login::Login() {
     m_nam.post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
 }
 
-void login::onLoginFinished(QNetworkReply* reply) {
+void login::onLoginFinished(QNetworkReply *reply) {
     m_requestInFlight = false;
     ui->login_button->setEnabled(true);
 
@@ -93,10 +90,11 @@ void login::onLoginFinished(QNetworkReply* reply) {
     reply->deleteLater();
 
     if (reply->error() != QNetworkReply::NoError &&
-        reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 0) {
-        spdlog::error("[login] network error: {}", reply->errorString().toStdString());
-        QMessageBox::warning(this,
-                             tr("Login Error"),
+        reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() ==
+            0) {
+        spdlog::error("[login] network error: {}",
+                      reply->errorString().toStdString());
+        QMessageBox::warning(this, tr("Login Error"),
                              tr("无法连接登录服务器，请确认认证服务已启动"));
         return;
     }
@@ -115,15 +113,17 @@ void login::onLoginFinished(QNetworkReply* reply) {
     const QString message = root.value(QStringLiteral("message")).toString();
 
     if (code != 0 || !root.contains(QStringLiteral("data"))) {
-        spdlog::warn("[login] failed code={} msg={}", code, message.toStdString());
-        QMessageBox::warning(this,
-                             tr("Login Error"),
-                             message.isEmpty() ? tr("账号或密码错误") : message);
+        spdlog::warn("[login] failed code={} msg={}", code,
+                     message.toStdString());
+        QMessageBox::warning(this, tr("Login Error"),
+                             message.isEmpty() ? tr("账号或密码错误")
+                                               : message);
         return;
     }
 
     const QJsonObject data = root.value(QStringLiteral("data")).toObject();
-    const qint64 userId = data.value(QStringLiteral("id")).toVariant().toLongLong();
+    const qint64 userId =
+        data.value(QStringLiteral("id")).toVariant().toLongLong();
     const QString name = data.value(QStringLiteral("name")).toString();
     const QString avatar = data.value(QStringLiteral("avatar")).toString();
     const QString info = data.value(QStringLiteral("info")).toString();

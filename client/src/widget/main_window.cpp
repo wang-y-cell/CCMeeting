@@ -1,39 +1,36 @@
 #include "main_window.h"
+#include "connection.h"
 #include "stack_conn_server.h"
 #include "stack_join_meet.h"
-#include "connection.h"
+#include <QFile>
+#include <QHBoxLayout>
+#include <QListWidget>
+#include <QMessageBox>
+#include <QStackedWidget>
+#include <QStringList>
 #include <qnamespace.h>
 #include <spdlog/spdlog.h>
-#include <QMessageBox>
-#include <QListWidget>
-#include <QStackedWidget>
-#include <QHBoxLayout>
-#include <QFile>
-#include <QStringList>
 
-
-main_window::main_window(QWidget *parent)
-: FramelessWindow<QWidget>(parent) {
+main_window::main_window(QWidget *parent) : FramelessWindow<QWidget>(parent) {
     init_ui();
     setWindowTitle(tr("CloudMeeting"));
     set_style();
     widget = new MeetingWidget(nullptr);
 
-    //widget->setWindowFlags(Qt::Window);
+    // widget->setWindowFlags(Qt::Window);
     widget->hide();
 
     connect(create_meeting_widget, &stack_create_meet::createMeetingClicked,
             this, &main_window::CreateMeeting_button_clicked);
 
-    connect(join_meeting_widget, &stack_join_meet::joinMeetingClicked,
-            this, &main_window::JoinMeeting_button_clicked);
+    connect(join_meeting_widget, &stack_join_meet::joinMeetingClicked, this,
+            &main_window::JoinMeeting_button_clicked);
 
     connect(connect_to_server_widget, &stack_conn_server::ConnServerClicked,
             this, &main_window::ConnectToServer_button_clicked);
 
-    connect(widget, &MeetingWidget::connect_server_finished_signal,
-            this, &main_window::onConnectServerFinished);
-
+    connect(widget, &MeetingWidget::connect_server_finished_signal, this,
+            &main_window::onConnectServerFinished);
 }
 
 void main_window::set_style() {
@@ -53,7 +50,7 @@ main_window::~main_window() {
         delete widget;
         widget = nullptr;
     }
-    //delete ui;
+    // delete ui;
 }
 
 void main_window::init_ui() {
@@ -109,7 +106,8 @@ void main_window::init_ui() {
     stackedWidget->addWidget(connect_to_server_widget);
 
     left_bar->setCurrentRow(0);
-    connect(left_bar, &QListWidget::currentRowChanged, stackedWidget, &QStackedWidget::setCurrentIndex);
+    connect(left_bar, &QListWidget::currentRowChanged, stackedWidget,
+            &QStackedWidget::setCurrentIndex);
 }
 
 void main_window::CreateMeeting_button_clicked() {
@@ -124,11 +122,13 @@ void main_window::CreateMeeting_button_clicked() {
     }
 
     widget->show();
-    widget->request_connect_to_server_slot(this->ip, this->port, ConnectAction::CreateMeeting);
+    widget->request_connect_to_server_slot(this->ip, this->port,
+                                           ConnectAction::CreateMeeting);
 }
 
 void main_window::JoinMeeting_button_clicked(const QString &roomNo) {
-    spdlog::info("[main_window] 点击加入会议按钮, roomNo: {}", roomNo.toStdString());
+    spdlog::info("[main_window] 点击加入会议按钮, roomNo: {}",
+                 roomNo.toStdString());
     if (widget == nullptr) {
         QMessageBox::warning(this, "warning", "会议窗口未初始化");
         return;
@@ -143,11 +143,13 @@ void main_window::JoinMeeting_button_clicked(const QString &roomNo) {
     }
 
     widget->show();
-    widget->request_connect_to_server_slot(this->ip, this->port, ConnectAction::JoinMeeting, roomNo);
+    widget->request_connect_to_server_slot(this->ip, this->port,
+                                           ConnectAction::JoinMeeting, roomNo);
 }
 
 void main_window::ConnectToServer_button_clicked(QString ip, QString port) {
-    spdlog::info("[main_window] 点击连接服务器 ip: {} port: {}", ip.toStdString(), port.toStdString());
+    spdlog::info("[main_window] 点击连接服务器 ip: {} port: {}",
+                 ip.toStdString(), port.toStdString());
     if (widget == nullptr) {
         QMessageBox::warning(this, "warning", "会议窗口未初始化");
         return;
@@ -170,23 +172,28 @@ void main_window::ConnectToServer_button_clicked(QString ip, QString port) {
     widget->request_connect_to_server_slot(ip, port, ConnectAction::None);
 }
 
-void main_window::onConnectServerFinished(bool ok, QString ip, QString port, ConnectAction action)
-{
+void main_window::onConnectServerFinished(bool ok, QString ip, QString port,
+                                          ConnectAction action) {
     if (action == ConnectAction::None) {
         if (ok) {
             this->ip = ip;
             this->port = port;
             if (widget)
                 widget->on_disconnect_server_slot();
-            spdlog::info("[main_window] 连接服务器成功并已断开: ip: {} port: {}", ip.toStdString(), port.toStdString());
-            QMessageBox::information(this, "Connection", QString("成功连接到 %1:%2").arg(ip, port));
+            spdlog::info(
+                "[main_window] 连接服务器成功并已断开: ip: {} port: {}",
+                ip.toStdString(), port.toStdString());
+            QMessageBox::information(this, "Connection",
+                                     QString("成功连接到 %1:%2").arg(ip, port));
         } else {
-            QMessageBox::warning(this, "Connection error", "连接服务器失败", QMessageBox::Yes, QMessageBox::Yes);
+            QMessageBox::warning(this, "Connection error", "连接服务器失败",
+                                 QMessageBox::Yes, QMessageBox::Yes);
         }
         return;
     }
 
     if (!ok) {
-        QMessageBox::warning(this, "Connection error", "连接服务器失败", QMessageBox::Yes, QMessageBox::Yes);
+        QMessageBox::warning(this, "Connection error", "连接服务器失败",
+                             QMessageBox::Yes, QMessageBox::Yes);
     }
 }

@@ -3,9 +3,7 @@
 #include <QPushButton>
 
 stack_conn_server::stack_conn_server(QWidget *parent)
-    : QWidget(parent)
-    , ui(new Ui::stack_conn_server)
-{
+    : QWidget(parent), ui(new Ui::stack_conn_server) {
     ui->setupUi(this);
     ui->ip_line_edit->setText("127.0.0.1");
     ui->port_line_edit->setText("8888");
@@ -16,7 +14,4 @@ stack_conn_server::stack_conn_server(QWidget *parent)
     });
 }
 
-stack_conn_server::~stack_conn_server()
-{
-    delete ui;
-}
+stack_conn_server::~stack_conn_server() { delete ui; }

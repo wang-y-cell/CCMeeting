@@ -6,9 +6,7 @@
 #include <QResizeEvent>
 
 PartnerTile::PartnerTile(Partner *partner, QWidget *parent)
-    : QWidget(parent)
-    , m_partner(partner)
-{
+    : QWidget(parent), m_partner(partner) {
     Q_ASSERT(m_partner);
 
     m_displayLabel = new QLabel(this);
@@ -25,33 +23,23 @@ PartnerTile::PartnerTile(Partner *partner, QWidget *parent)
     m_partner->setTile(this);
 }
 
-void PartnerTile::setSelected(bool selected)
-{
-    applyBorder(selected);
-}
+void PartnerTile::setSelected(bool selected) { applyBorder(selected); }
 
-void PartnerTile::resetBorder()
-{
-    applyBorder(false);
-}
+void PartnerTile::resetBorder() { applyBorder(false); }
 
-void PartnerTile::applyBorder(bool selected)
-{
+void PartnerTile::applyBorder(bool selected) {
     if (selected) {
-        setStyleSheet(
-            "border-width: 1px; "
-            "border-style: solid; "
-            "border-color:rgba(255, 0, 0, 0.7)");
+        setStyleSheet("border-width: 1px; "
+                      "border-style: solid; "
+                      "border-color:rgba(255, 0, 0, 0.7)");
     } else {
-        setStyleSheet(
-            "border-width: 1px; "
-            "border-style: solid; "
-            "border-color:rgba(0, 0, 255, 0.7)");
+        setStyleSheet("border-width: 1px; "
+                      "border-style: solid; "
+                      "border-color:rgba(0, 0, 255, 0.7)");
     }
 }
 
-void PartnerTile::resizeEvent(QResizeEvent *event)
-{
+void PartnerTile::resizeEvent(QResizeEvent *event) {
     QWidget::resizeEvent(event);
     const int newW = event->size().width();
     if (newW <= 10 || newW == m_side)
@@ -61,18 +49,13 @@ void PartnerTile::resizeEvent(QResizeEvent *event)
     updateLabelGeometry();
 }
 
-void PartnerTile::updateLabelGeometry()
-{
+void PartnerTile::updateLabelGeometry() {
     const int margin = 5;
-    m_displayLabel->setGeometry(
-        margin,
-        margin,
-        qMax(m_side - margin * 2, 1),
-        qMax(m_side - margin * 2, 1));
+    m_displayLabel->setGeometry(margin, margin, qMax(m_side - margin * 2, 1),
+                                qMax(m_side - margin * 2, 1));
 }
 
-void PartnerTile::mousePressEvent(QMouseEvent *)
-{
+void PartnerTile::mousePressEvent(QMouseEvent *) {
     if (m_partner)
         emit clicked(m_partner->ip());
 }

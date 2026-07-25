@@ -4,18 +4,11 @@
 #include <QLabel>
 
 Partner::Partner(std::uint32_t ip, QObject *parent)
-    : QObject(parent)
-    , m_ip(ip)
-{
-}
+    : QObject(parent), m_ip(ip) {}
 
-QString Partner::ipString() const
-{
-    return QHostAddress(m_ip).toString();
-}
+QString Partner::ipString() const { return QHostAddress(m_ip).toString(); }
 
-void Partner::setTile(PartnerTile *tile)
-{
+void Partner::setTile(PartnerTile *tile) {
     if (m_tile == tile)
         return;
 
@@ -30,19 +23,16 @@ void Partner::setTile(PartnerTile *tile)
     }
 }
 
-QLabel *Partner::displayLabel() const
-{
+QLabel *Partner::displayLabel() const {
     return m_tile ? m_tile->displayLabel() : nullptr;
 }
 
-void Partner::setSelected(bool selected)
-{
+void Partner::setSelected(bool selected) {
     if (m_tile)
         m_tile->setSelected(selected);
 }
 
-void Partner::resetBorder()
-{
+void Partner::resetBorder() {
     if (m_tile)
         m_tile->resetBorder();
 }
