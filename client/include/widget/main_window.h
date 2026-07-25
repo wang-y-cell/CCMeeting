@@ -31,8 +31,13 @@ public:
     void set_style();
 
 private slots:
-    /** @brief 创建会议槽函数 */
-    void CreateMeeting_button_clicked();
+    /**
+     * @brief 创建会议槽函数
+     * @param max_participants 人数上限
+     * @param duration_minutes 时长（分钟）
+     */
+    void CreateMeeting_button_clicked(quint32 max_participants,
+                                      quint32 duration_minutes);
     /**
      * @brief 加入会议槽函数
      * @param roomNo 房间号

@@ -43,8 +43,11 @@ public:
 
     /**
      * @brief 发送创建会议请求
+     * @param max_participants 人数上限
+     * @param duration_minutes 时长（分钟）
      */
-    void send_create_meeting();
+    void send_create_meeting(std::uint32_t max_participants = 8,
+                             std::uint32_t duration_minutes = 60);
     /**
      * @brief 发送加入会议请求
      * @param room_no 会议室号
@@ -100,8 +103,14 @@ public:
     std::uint32_t localIp() const { return local_ip(); }
     /**
      * @brief 发送创建会议请求
+     * @param max_participants 人数上限
+     * @param duration_minutes 时长（分钟）
      */
-    void sendCreateMeeting() { send_create_meeting(); }
+    void sendCreateMeeting(std::uint32_t max_participants = 8,
+                           std::uint32_t duration_minutes = 60)
+    {
+        send_create_meeting(max_participants, duration_minutes);
+    }
     /**
      * @brief 发送加入会议请求
      * @param room_no 会议室号

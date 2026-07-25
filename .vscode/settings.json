@@ -1,6 +1,6 @@
 {
     // git_bash 设置成默认
-    "terminal.integrated.defaultProfile.windows": "Git Bash",
+    //"terminal.integrated.defaultProfile.windows": "Git Bash",
 
 
     

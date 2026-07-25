@@ -19,7 +19,7 @@ int main() {
         , config.max_rooms, config.max_participants_per_room, config.listen_port);
 
     boost::asio::io_context io_context; /*IO上下文*/
-    auto service = std::make_shared<service::MeetingService>(config);
+    auto service = std::make_shared<service::MeetingService>(config, io_context);
     network::Server server(io_context, config.listen_port);
 
     service->bind_server(server);

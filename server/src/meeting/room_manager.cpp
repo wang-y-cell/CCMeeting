@@ -4,10 +4,12 @@
 
 namespace meeting {
 
-RoomManager::RoomManager(config::ServerConfig config) : _config(std::move(config)) {}
+RoomManager::RoomManager(config::ServerConfig config,
+                         boost::asio::io_context& io_ctx)
+    : _config(std::move(config)), _io_ctx(io_ctx) {}
 
 std::optional<uint32_t> RoomManager::create_room(
-    std::shared_ptr<network::Connection> owner) {
+    std::shared_ptr<network::Connection> owner, RoomOptions options) {
     if (!owner || !owner->is_open()) {
         spdlog::warn("cannot create room: owner is not open");
         return std::nullopt;
@@ -18,9 +20,11 @@ std::optional<uint32_t> RoomManager::create_room(
     }
 
     const uint32_t room_id = _next_room_id++;
-    auto room = std::make_shared<Room>(room_id, owner, _config);
+    auto room = std::make_shared<Room>(room_id, owner, _config, _io_ctx, options);
+    room->start_expire_timer();
     _rooms.emplace(room_id, room);
-    spdlog::info("room {} created", room_id);
+    spdlog::info("room {} created, max_participants={}, duration_minutes={}",
+                 room_id, room->max_participants(), room->duration_minutes());
     return room_id;
 }
 
@@ -35,7 +39,7 @@ RoomManager::JoinResult RoomManager::join_room(
         spdlog::warn("room {} is closed", room_id);
         return JoinResult::Closed;
     }
-    if (room->participant_count() >= _config.max_participants_per_room) {
+    if (room->participant_count() >= room->max_participants()) {
         spdlog::warn("room {} is full", room_id);
         return JoinResult::Full;
     }

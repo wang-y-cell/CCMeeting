@@ -13,6 +13,7 @@
 #include "network/server.h"
 #include "protocol/packet.h"
 
+#include <boost/asio.hpp>
 #include <cstdint>
 #include <memory>
 #include <unordered_map>
@@ -21,7 +22,7 @@ namespace service {
 
 class MeetingService {
 public:
-    explicit MeetingService(config::ServerConfig config);
+    MeetingService(config::ServerConfig config, boost::asio::io_context& io_ctx);
 
     /**
      * @brief 绑定服务器
