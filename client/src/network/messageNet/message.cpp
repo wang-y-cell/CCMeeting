@@ -4,8 +4,8 @@
 
 namespace {
 
-void push_bounded(std::deque<MessagePtr> &bucket, MessagePtr msg, std::size_t max_size)
-{
+void push_bounded(std::deque<MessagePtr> &bucket, MessagePtr msg,
+                  std::size_t max_size) {
     if (max_size == 0)
         return;
     while (bucket.size() >= max_size)
@@ -15,24 +15,23 @@ void push_bounded(std::deque<MessagePtr> &bucket, MessagePtr msg, std::size_t ma
 
 } // namespace
 
-std::deque<MessagePtr> &PriorityMessageQueue::bucket_for(MessagePriority priority)
-{
+std::deque<MessagePtr> &
+PriorityMessageQueue::bucket_for(MessagePriority priority) {
     const int index = static_cast<int>(priority);
     if (index < 0 || index >= k_priority_count)
         return buckets_[static_cast<int>(MessagePriority::Control)];
     return buckets_[index];
 }
 
-void PriorityMessageQueue::push(MessagePtr msg)
-{
+void PriorityMessageQueue::push(MessagePtr msg) {
     if (!msg)
         return;
 
     const MessagePriority priority = msg->send_priority();
     {
         std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
-        const auto deadline =
-            std::chrono::steady_clock::now() + std::chrono::milliseconds(WAITSECONDS * 1000);
+        const auto deadline = std::chrono::steady_clock::now() +
+                              std::chrono::milliseconds(WAITSECONDS * 1000);
         while (!lock.try_lock()) {
             if (std::chrono::steady_clock::now() >= deadline)
                 return;
@@ -59,8 +58,7 @@ void PriorityMessageQueue::push(MessagePtr msg)
     cond_.notify_one();
 }
 
-std::optional<MessagePtr> PriorityMessageQueue::pop(int wait_ms)
-{
+std::optional<MessagePtr> PriorityMessageQueue::pop(int wait_ms) {
     std::unique_lock<std::mutex> lock(mutex_);
     const auto has_any = [this]() {
         for (int i = 0; i < k_priority_count; ++i) {
@@ -85,8 +83,7 @@ std::optional<MessagePtr> PriorityMessageQueue::pop(int wait_ms)
     return std::nullopt;
 }
 
-void PriorityMessageQueue::clear()
-{
+void PriorityMessageQueue::clear() {
     std::deque<MessagePtr> discarded[k_priority_count];
     for (int attempt = 0; attempt < 8; ++attempt) {
         std::unique_lock<std::mutex> lock(mutex_, std::try_to_lock);
@@ -102,14 +99,12 @@ void PriorityMessageQueue::clear()
     }
 }
 
-void PriorityMessageQueue::wake_all()
-{
+void PriorityMessageQueue::wake_all() {
     std::unique_lock<std::mutex> lock(mutex_, std::try_to_lock);
     cond_.notify_all();
 }
 
-void PriorityMessageQueue::clear_video()
-{
+void PriorityMessageQueue::clear_video() {
     std::deque<MessagePtr> discarded;
     {
         std::unique_lock<std::mutex> lock(mutex_, std::try_to_lock);
@@ -120,22 +115,20 @@ void PriorityMessageQueue::clear_video()
     cond_.notify_all();
 }
 
-void MessageQueue::push(MessagePtr msg)
-{
+void MessageQueue::push(MessagePtr msg) {
     if (!msg)
         return;
 
     std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
-    const auto deadline =
-        std::chrono::steady_clock::now() + std::chrono::milliseconds(WAITSECONDS * 1000);
+    const auto deadline = std::chrono::steady_clock::now() +
+                          std::chrono::milliseconds(WAITSECONDS * 1000);
     while (!lock.try_lock()) {
         if (std::chrono::steady_clock::now() >= deadline)
             return;
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-    if (!cond_.wait_for(lock, std::chrono::milliseconds(WAITSECONDS * 1000), [this]() {
-            return queue_.size() < QUEUE_MAXSIZE;
-        })) {
+    if (!cond_.wait_for(lock, std::chrono::milliseconds(WAITSECONDS * 1000),
+                        [this]() { return queue_.size() < QUEUE_MAXSIZE; })) {
         return;
     }
     queue_.push(std::move(msg));
@@ -143,12 +136,10 @@ void MessageQueue::push(MessagePtr msg)
     cond_.notify_one();
 }
 
-std::optional<MessagePtr> MessageQueue::pop(int wait_ms)
-{
+std::optional<MessagePtr> MessageQueue::pop(int wait_ms) {
     std::unique_lock<std::mutex> lock(mutex_);
-    if (!cond_.wait_for(lock, std::chrono::milliseconds(wait_ms), [this]() {
-            return !queue_.empty();
-        })) {
+    if (!cond_.wait_for(lock, std::chrono::milliseconds(wait_ms),
+                        [this]() { return !queue_.empty(); })) {
         return std::nullopt;
     }
     MessagePtr msg = std::move(queue_.front());
@@ -158,8 +149,7 @@ std::optional<MessagePtr> MessageQueue::pop(int wait_ms)
     return msg;
 }
 
-void MessageQueue::clear()
-{
+void MessageQueue::clear() {
     std::queue<MessagePtr> discarded;
     for (int attempt = 0; attempt < 8; ++attempt) {
         std::unique_lock<std::mutex> lock(mutex_, std::try_to_lock);
@@ -174,8 +164,7 @@ void MessageQueue::clear()
     }
 }
 
-void MessageQueue::wake_all()
-{
+void MessageQueue::wake_all() {
     std::unique_lock<std::mutex> lock(mutex_, std::try_to_lock);
     cond_.notify_all();
 }

@@ -13,9 +13,7 @@ CameraVideo::CameraVideo(QWidget *parent) : MyVideoSurface(parent) {
     initConnection();
 }
 
-CameraVideo::~CameraVideo() {
-    endVideo();
-}
+CameraVideo::~CameraVideo() { endVideo(); }
 
 QImage CameraVideo::defaultAvatar() {
     return QImage(QString::fromUtf8(Source::default_avatar));
@@ -29,21 +27,19 @@ void CameraVideo::setMainTarget(QWidget *label) {
 
     _mainAvatarImg = new ImgDisplay(this);
     _mainAvatarImg->setTarget(label);
-    _mainAvatarImg->setDrawMode(ImgDisplay::DrawMode::ScaleToHeightFractionCentered);
+    _mainAvatarImg->setDrawMode(
+        ImgDisplay::DrawMode::ScaleToHeightFractionCentered);
     _mainAvatarImg->setHeightFraction(0.1);
     _mainAvatarImg->setAlignment(Qt::AlignCenter);
 }
 
-void CameraVideo::setLocalIp(std::uint32_t ip) {
-    _localIp = ip;
-}
+void CameraVideo::setLocalIp(std::uint32_t ip) { _localIp = ip; }
 
-void CameraVideo::setMainIp(std::uint32_t ip) {
-    _mainIp = ip;
-}
+void CameraVideo::setMainIp(std::uint32_t ip) { _mainIp = ip; }
 
 void CameraVideo::addPartnerDisplay(std::uint32_t ip, QWidget *label) {
-    if (_partnerDisplays.find(ip) != _partnerDisplays.end()) ///< 如果已经有这个人了
+    if (_partnerDisplays.find(ip) !=
+        _partnerDisplays.end()) ///< 如果已经有这个人了
         return;
 
     ImgDisplay *display = new ImgDisplay(this); ///< 创建视频显示区域
@@ -55,7 +51,8 @@ void CameraVideo::addPartnerDisplay(std::uint32_t ip, QWidget *label) {
 }
 
 void CameraVideo::clearAllPartnerDisplays() {
-    for (auto it = _partnerDisplays.begin(); it != _partnerDisplays.end(); ++it) {
+    for (auto it = _partnerDisplays.begin(); it != _partnerDisplays.end();
+         ++it) {
         ImgDisplay *display = it->second;
         if (!display)
             continue;
@@ -97,7 +94,7 @@ void CameraVideo::showMainImage(const QImage &image) {
 }
 
 void CameraVideo::showAvatarForIp(std::uint32_t ip) {
-    _lastImages.erase(ip); ///< 删除ip对应的图像
+    _lastImages.erase(ip);                 ///< 删除ip对应的图像
     const QImage avatar = defaultAvatar(); ///< 获取默认头像
     auto it = _partnerDisplays.find(ip);
     if (it != _partnerDisplays.end() && it->second)
@@ -146,25 +143,29 @@ void CameraVideo::endVideo() {
         _mainVideoImg->clear();
     if (_mainAvatarImg)
         _mainAvatarImg->clear();
-    for (auto it = _partnerDisplays.begin(); it != _partnerDisplays.end(); ++it) {
+    for (auto it = _partnerDisplays.begin(); it != _partnerDisplays.end();
+         ++it) {
         if (ImgDisplay *display = it->second)
             display->clear();
     }
 }
 
 void CameraVideo::cameraError(QCamera::Error, const QString &errorString) {
-    QMessageBox::warning(_parent, "Camera error", errorString, QMessageBox::Yes, QMessageBox::Yes);
+    QMessageBox::warning(_parent, "Camera error", errorString, QMessageBox::Yes,
+                         QMessageBox::Yes);
 }
 
 void CameraVideo::initConnection() {
     connect(_camera, &QCamera::errorOccurred, this, &CameraVideo::cameraError);
-    connect(this, &MyVideoSurface::frameAvailable, this, &CameraVideo::cameraImageCapture);
+    connect(this, &MyVideoSurface::frameAvailable, this,
+            &CameraVideo::cameraImageCapture);
 }
 
 void CameraVideo::reconnectFrameSink() {
     if (QVideoSink *sink = getVideoSink()) {
         disconnect(sink, nullptr, this, nullptr);
-        connect(sink, &QVideoSink::videoFrameChanged, this, &MyVideoSurface::handleVideoFrame);
+        connect(sink, &QVideoSink::videoFrameChanged, this,
+                &MyVideoSurface::handleVideoFrame);
     }
 }
 

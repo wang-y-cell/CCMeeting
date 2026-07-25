@@ -23,7 +23,6 @@
     "program_name": "app.exe",
 
 
-
     // 让cmake插件 别吵~
     "cmake.configureOnOpen": false,
     "cmake.configureOnEdit": false,
@@ -31,4 +30,7 @@
 
     // 忽略 插件建议 提醒
     "extensions.ignoreRecommendations": true,
+    "[cpp]": {
+        "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd"
+    },
 }

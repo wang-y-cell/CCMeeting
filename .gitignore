@@ -9,3 +9,4 @@ log.txt
 docs/
 Doxyfile
 need.md
+.clang-format
