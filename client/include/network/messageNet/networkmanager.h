@@ -20,6 +20,7 @@ public:
     explicit NetworkManager(QObject *parent = nullptr);
     ~NetworkManager() override;
 
+    /** @brief 获取消息中心 */
     MessageHub *message_hub() const;
 
     bool connect_to_server(const QString &ip, const QString &port, QWidget *validate_parent = nullptr);
@@ -61,8 +62,8 @@ signals:
     void disconnected();
 
 private:
-    MessageHub *hub_ = nullptr;
-    Connection *connection_ = nullptr;
+    MessageHub *hub_ = nullptr; ///< 消息中心
+    Connection *connection_ = nullptr; ///< tcp连接对象
 };
 
 #endif // NETWORKMANAGER_H

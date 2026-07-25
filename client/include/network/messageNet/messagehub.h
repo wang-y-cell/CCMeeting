@@ -27,7 +27,7 @@ public:
     void start(Connection *connection);
     /** @brief 启动发送线程 */
     void start_send_worker();
-    /** @brief 停止发送线程 */
+    /** @brief 同步停止发送线程 */
     void stop_send_worker();
     /** @brief 异步停止发送线程 */
     void stop_send_worker_async();
@@ -60,7 +60,9 @@ signals:
 
 private:
     void send_loop(std::uint64_t epoch);
+    /** @brief 发送线程停止信号 */
     void signal_send_stop();
+    /** @brief 将需要销毁的线程等待消除，原始指针置空*/
     void join_send_thread();
     /** @brief 将消息分发到相应的处理函数(除了音频消息) */
     void emit_incoming(MessagePtr msg);
