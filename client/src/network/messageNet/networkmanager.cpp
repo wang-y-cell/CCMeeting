@@ -42,16 +42,16 @@ MessageHub *NetworkManager::message_hub() const { return hub_; }
 
 bool NetworkManager::connect_to_server(const QString &ip, const QString &port,
                                        QWidget *validate_parent) {
-    if (!connection_)
+    if (!connection_) //如果没有连接对象，则返回false
         return false;
-    if (validate_parent &&
+    if (validate_parent && //如果验证父窗口不为空，则验证ip和端口
         !Connection::validateIpPort(validate_parent, ip, port))
         return false;
     /// 新连接前确保旧发送线程已退出，再启动新世代发送线程
-    if (hub_)
+    if (hub_) //如果消息中心不为空，则停止发送线程
         hub_->stop_send_worker();
-    const bool ok = connection_->connectToServer(ip, port);
-    if (ok && hub_)
+    const bool ok = connection_->connectToServer(ip, port); //连接到服务器
+    if (ok && hub_) //如果连接成功，则启动发送线程
         hub_->start_send_worker();
     return ok;
 }
