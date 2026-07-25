@@ -346,13 +346,13 @@ std::vector<MessagePtr> MessageCodec::WireStreamParser::feed(const std::uint8_t 
     if (len == 0)
         return {};
 
-    if (buffer_.size() + static_cast<int>(len) > static_cast<int>(k_max_buffer)) {
+    if (buffer_.size() + static_cast<int>(len) > static_cast<int>(k_max_buffer)) { // 如果缓冲区大小超过最大缓冲区大小,则清空缓冲区
         spdlog::warn("[MessageCodec] receive buffer overflow, resetting");
         buffer_.clear();
     }
 
-    buffer_.append(reinterpret_cast<const char *>(data), static_cast<int>(len));
-    return extract_all();
+    buffer_.append(reinterpret_cast<const char *>(data), static_cast<int>(len)); // 将数据添加到缓冲区
+    return extract_all(); // 提取所有消息
 }
 
 std::vector<MessagePtr> MessageCodec::WireStreamParser::extract_all()
