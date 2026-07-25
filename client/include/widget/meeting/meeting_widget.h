@@ -54,6 +54,10 @@ private:
     QString _pendingConnectPort;
     ConnectAction _pendingConnectAction = ConnectAction::None;
     QString _pendingConnectRoomNo;
+    quint32 _pendingMaxParticipants = 8; ///< 延后连接时的人数上限
+    quint32 _pendingDurationMinutes = 60; ///< 延后连接时的时长（分钟）
+    quint32 _createMaxParticipants = 8; ///< 本次创建会议的人数上限
+    quint32 _createDurationMinutes = 60; ///< 本次创建会议的时长（分钟）
     std::shared_ptr<NetworkManager> _network; ///< 统一网络收发（与 controller 共享）
     std::unique_ptr<MeetingController> _controller; ///< 业务控制器（独立线程）
     std::unique_ptr<QThread> _controller_thread; ///< 业务工作线程
@@ -179,8 +183,14 @@ public slots:
      * @param port 端口
      * @param action 连接成功后的后续动作
      * @param room_no 加入会议时的房间号（仅 JoinMeeting 使用）
+     * @param max_participants 创建会议时的人数上限
+     * @param duration_minutes 创建会议时的时长（分钟）
      */
-    void request_connect_to_server_slot(QString ip, QString port, ConnectAction action, QString room_no = QString());
+    void request_connect_to_server_slot(QString ip, QString port,
+                                        ConnectAction action,
+                                        QString room_no = QString(),
+                                        quint32 max_participants = 8,
+                                        quint32 duration_minutes = 60);
     /** @brief 断开服务器连接（异步） */
     void on_disconnect_server_slot();
     /**
@@ -248,8 +258,13 @@ signals:
      * @param room_no 房间号
      */
     void request_connect_signal(QString ip, QString port, ConnectAction action, QString room_no);
-    /** @brief 请求工作线程创建会议 */
-    void create_meeting_requested_signal();
+    /**
+     * @brief 请求工作线程创建会议
+     * @param max_participants 人数上限
+     * @param duration_minutes 时长（分钟）
+     */
+    void create_meeting_requested_signal(quint32 max_participants,
+                                         quint32 duration_minutes);
     /**
      * @brief 请求工作线程加入会议
      * @param room_no 房间号

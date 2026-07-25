@@ -69,8 +69,10 @@ std::uint32_t NetworkManager::local_ip() const {
     return connection_ ? connection_->localIp() : UINT32_MAX;
 }
 
-void NetworkManager::send_create_meeting() {
-    hub_->enqueue_send(std::make_shared<CreateMeetingMessage>());
+void NetworkManager::send_create_meeting(std::uint32_t max_participants,
+                                         std::uint32_t duration_minutes) {
+    hub_->enqueue_send(std::make_shared<CreateMeetingMessage>(
+        max_participants, duration_minutes));
 }
 
 void NetworkManager::send_join_meeting(const std::string &room_no) {

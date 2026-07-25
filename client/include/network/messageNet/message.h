@@ -95,8 +95,28 @@ using MessagePtr = std::shared_ptr<Message>;
 /** @brief 创建房间消息 */
 class CreateMeetingMessage : public Message {
 public:
+    CreateMeetingMessage(std::uint32_t max_participants = 8,
+                         std::uint32_t duration_minutes = 60)
+        : max_participants_(max_participants),
+          duration_minutes_(duration_minutes)
+    {
+    }
+
     MessageKind kind() const override { return MessageKind::CreateMeeting; }
     MessagePriority send_priority() const override { return MessagePriority::Control; }
+
+    /** @brief 人数上限 */
+    std::uint32_t max_participants() const { return max_participants_; }
+    /** @brief 设置人数上限 */
+    void set_max_participants(std::uint32_t value) { max_participants_ = value; }
+    /** @brief 时长（分钟） */
+    std::uint32_t duration_minutes() const { return duration_minutes_; }
+    /** @brief 设置时长（分钟） */
+    void set_duration_minutes(std::uint32_t value) { duration_minutes_ = value; }
+
+private:
+    std::uint32_t max_participants_ = 8;
+    std::uint32_t duration_minutes_ = 60;
 };
 
 /** @brief 加入房间消息 */

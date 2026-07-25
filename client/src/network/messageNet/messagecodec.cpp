@@ -240,6 +240,14 @@ QByteArray MessageCodec::encode_wire_frame(const Message &msg,
     QByteArray body;
 
     switch (msg.kind()) {
+    case MessageKind::CreateMeeting: {
+        const auto *create = dynamic_cast<const CreateMeetingMessage *>(&msg);
+        char buf[8];
+        qToBigEndian(create ? create->max_participants() : 8u, buf);
+        qToBigEndian(create ? create->duration_minutes() : 60u, buf + 4);
+        body.append(buf, 8);
+        break;
+    }
     case MessageKind::JoinMeeting: {
         const auto *join = dynamic_cast<const JoinMeetingMessage *>(&msg);
         std::uint32_t room = join ? join->room_no_u32() : 0;
