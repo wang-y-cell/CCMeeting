@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parent
 
 DEFAULT_QT_PATH = Path("F:/Qt/6.8.3/mingw_64")
 DEFAULT_QT_CXX_COMPILER = Path("F:/Qt/Tools/mingw1310_64")
+#环境变量可以设置 QT6_DIR 来指定Qt的安装路径
 
 # 目标名 -> (构建目录, CMake 开关)
 TARGETS = {
@@ -125,7 +126,7 @@ def cmake_configure(
     if qt_path:
         cmd.append(f"-DQT_INSTALL_PATH={qt_path}")
     elif not os.environ.get("Qt6_DIR") and DEFAULT_QT_PATH.is_dir():
-        cmd.append(f"-DQT_INSTALL_PATH={DEFAULT_QT_PATH.as_posix()}")
+        cmd.append(f"-DQT_INSTALL_PATH={DEFAULT_QT_PATH.as_posix()}") # 无论是windows还是linux,路径都是/
 
     if mingw_root is not None:
         gcc, gxx = mingw_compilers(mingw_root)
@@ -206,7 +207,7 @@ def build_data_server(**kwargs) -> None:
 
 
 # 解析命令行参数
-def parse_args() -> argparse.Namespace:
+def parse_args() -> argparse.Namespace: #返回解析之后得到的结果
     # 创建解析器
     parser = argparse.ArgumentParser(
         description="构建 CCMeeting(客户端 / 消息服务器 / 数据服务器)",
