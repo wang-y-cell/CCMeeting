@@ -1,10 +1,9 @@
 #ifndef STACK_CREATE_MEET_H
 #define STACK_CREATE_MEET_H
 
-
 #include "ui_stack_create_meet.h"
 #include <QWidget>
-
+#include <cstdint>
 
 /**
  * @brief 创建会议入口页
@@ -13,6 +12,13 @@ class stack_create_meet : public QWidget {
     Q_OBJECT
 
 public:
+    static constexpr std::uint32_t kDefaultMaxParticipants = 8;
+    static constexpr std::uint32_t kDefaultDurationMinutes = 60;
+    static constexpr std::uint32_t kMinParticipants = 2;
+    static constexpr std::uint32_t kMaxParticipants = 1024;
+    static constexpr std::uint32_t kMinDurationMinutes = 1;
+    static constexpr std::uint32_t kMaxDurationMinutes = 24 * 60;
+
     /**
      * @brief 构造创建会议页
      * @param parent 父控件
@@ -21,8 +27,16 @@ public:
     ~stack_create_meet();
 
 signals:
-    /** @brief 点击按钮发送信号，通知主窗口创建会议 */
-    void createMeetingClicked();
+    /**
+     * @brief 点击创建会议（人数与时长已校验）
+     * @param max_participants 会议人数上限
+     * @param duration_minutes 会议时长（分钟）
+     */
+    void createMeetingClicked(quint32 max_participants, quint32 duration_minutes);
+
+private slots:
+    /** @brief 校验输入并发送创建信号 */
+    void on_create_clicked();
 
 private:
     Ui::stack_create_meet *ui; ///< UI

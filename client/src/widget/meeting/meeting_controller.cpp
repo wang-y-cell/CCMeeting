@@ -18,10 +18,14 @@ void MeetingController::connect_to_server_slot(QString ip, QString port,
     emit connect_finished_signal(ok, ip, port, action, room_no);
 }
 
-void MeetingController::create_meeting_slot() {
-    spdlog::debug("[MeetingController] create_meeting_slot");
+void MeetingController::create_meeting_slot(quint32 max_participants,
+                                            quint32 duration_minutes) {
+    spdlog::debug(
+        "[MeetingController] create_meeting_slot max_participants={} "
+        "duration_minutes={}",
+        max_participants, duration_minutes);
     if (_network)
-        _network->sendCreateMeeting();
+        _network->sendCreateMeeting(max_participants, duration_minutes);
 }
 
 void MeetingController::join_meeting_slot(QString room_no) {
