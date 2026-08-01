@@ -73,18 +73,19 @@ public:
         m_titleBarHeight = height > 0 ? height : 0;
     }
 
-    /** @brief 当前标题栏高度 */
+    /** @brief 获得当前标题栏高度 */
     int titleBarHeight() const { return m_titleBarHeight; }
 
     /**
-     * @brief 是否允许拖窗口边缘改变大小
+     * @brief 设置是否允许拖窗口边缘改变大小
      * @note 与最大化无关；登录等固定尺寸窗口应设为 false
      */
     void setResizable(bool enabled) { m_resizable = enabled; }
+    /** @brief 获得是否允许拖窗口边缘改变大小的bool值,true表示允许,false表示不允许 */
     bool isResizable() const { return m_resizable; }
 
     /**
-     * @brief 是否允许最大化
+     * @brief 设置是否允许最大化
      * @details 为 false 时会隐藏最大化按钮，并禁用双击标题栏最大化。
      *          登录窗口通常调用 setMaximizable(false)。
      */
@@ -95,11 +96,14 @@ public:
             updateTitleButtonsGeometry();
         }
     }
+    /** @brief 获得是否允许最大化的bool值,true表示允许,false表示不允许 */
     bool isMaximizable() const { return m_maximizable; }
 
 protected:
     /**
-     * @brief 鼠标按下
+     * @brief 鼠标按下,如果是左键，我们要判断是点击了边缘还是标题栏，还是其他区域，
+     * 如果是点击了边缘，我们要进入缩放模式，如果是点击了标题栏，我们要进入拖动模式，
+     * 如果是点击了其他区域，我们要交给基类/子控件处理。
      *
      * 处理优先级：
      * 1. 非左键 -> 交给基类
@@ -180,7 +184,7 @@ protected:
     }
 
     /**
-     * @brief 鼠标释放：结束拖动/缩放，并释放 grabMouse
+     * @brief 鼠标释放：结束拖动/缩放，并释放 grabMouse，用来恢复状态
      */
     void mouseReleaseEvent(QMouseEvent *event) override {
         if (event->button() == Qt::LeftButton) {
@@ -278,24 +282,26 @@ private:
 
     /**
      * @brief 创建最大化、关闭按钮并绑定点击
+     * @details 设置按钮的基础属性，包括高度和宽度、鼠标光标、焦点策略、悬浮提示信息、点击事件等
+     * 没有设置按钮位置
      * @note objectName 供 QSS 选择：#framelessMaxBtn / #framelessCloseBtn
      */
     void setupTitleButtons() {
         /// ----- 最大化按钮 -----
         m_maxBtn = new QPushButton(this);
         m_maxBtn->setObjectName(QStringLiteral("framelessMaxBtn"));
-        m_maxBtn->setFixedSize(32, 28);
-        m_maxBtn->setCursor(Qt::PointingHandCursor);
+        m_maxBtn->setFixedSize(32, 32); //设置按钮的高度和宽度为固定值
+        m_maxBtn->setCursor(Qt::PointingHandCursor); //设置鼠标光标为手形
         m_maxBtn->setFocusPolicy(Qt::NoFocus); ///< 避免抢输入框焦点
-        m_maxBtn->setToolTip(QStringLiteral("最大化"));
+        m_maxBtn->setToolTip(QStringLiteral("最大化")); //设置按钮悬浮的提示信息
         QObject::connect(m_maxBtn, &QPushButton::clicked, this, [this]() {
-            toggleMaximize();
+            toggleMaximize(); //点击按钮时切换窗口的最大化和普通状态
         });
 
         /// ----- 关闭按钮 -----
         m_closeBtn = new QPushButton(QStringLiteral("×"), this);
         m_closeBtn->setObjectName(QStringLiteral("framelessCloseBtn"));
-        m_closeBtn->setFixedSize(32, 28);
+        m_closeBtn->setFixedSize(32, 32);
         m_closeBtn->setCursor(Qt::PointingHandCursor);
         m_closeBtn->setFocusPolicy(Qt::NoFocus);
         m_closeBtn->setToolTip(QStringLiteral("关闭"));
