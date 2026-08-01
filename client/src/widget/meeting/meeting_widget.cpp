@@ -224,6 +224,8 @@ void MeetingWidget::flush_pending_connect() {
     const QString port = _pendingConnectPort;
     const ConnectAction action = _pendingConnectAction;
     const QString roomNo = _pendingConnectRoomNo;
+    const quint32 max_participants = _pendingMaxParticipants;
+    const quint32 duration_minutes = _pendingDurationMinutes;
     _hasPendingConnect = false;
     _pendingConnectIp.clear();
     _pendingConnectPort.clear();
@@ -231,7 +233,8 @@ void MeetingWidget::flush_pending_connect() {
     _pendingConnectAction = ConnectAction::None;
     spdlog::info("[MeetingWidget] 执行延后连接 {}:{}", ip.toStdString(),
                  port.toStdString());
-    request_connect_to_server_slot(ip, port, action, roomNo);
+    request_connect_to_server_slot(ip, port, action, roomNo, max_participants,
+                                   duration_minutes);
 }
 
 void MeetingWidget::reset_meeting_ui() {
@@ -371,7 +374,8 @@ void MeetingWidget::on_create_meet_btn_clicked_slot() {
     if (!_createmeet) { // 如果未创建会议，则发送创建会议信号
         ui->openAudio->setDisabled(true);
         ui->openVedio->setDisabled(true);
-        emit create_meeting_requested_signal();
+        emit create_meeting_requested_signal(_createMaxParticipants,
+                                             _createDurationMinutes);
     }
 }
 
@@ -420,10 +424,14 @@ void MeetingWidget::close_img(std::uint32_t ip) {
 
 void MeetingWidget::request_connect_to_server_slot(QString ip, QString port,
                                                    ConnectAction action,
-                                                   QString room_no) {
+                                                   QString room_no,
+                                                   quint32 max_participants,
+                                                   quint32 duration_minutes) {
     spdlog::debug(
-        "[MeetingWidget] request_connect_to_server_slot ip = {}, port = {}",
-        ip.toStdString(), port.toStdString());
+        "[MeetingWidget] request_connect_to_server_slot ip = {}, port = {}, "
+        "max_participants = {}, duration_minutes = {}",
+        ip.toStdString(), port.toStdString(), max_participants,
+        duration_minutes);
     if (!_network || !_controller) { // 如果网络和业务线程都没有初始化，则返回
         spdlog::warn("[MeetingWidget] request_connect_to_server_slot: "
                      "network/controller not initialized");
@@ -443,8 +451,15 @@ void MeetingWidget::request_connect_to_server_slot(QString ip, QString port,
         _pendingConnectPort = port;
         _pendingConnectAction = action;
         _pendingConnectRoomNo = room_no;
+        _pendingMaxParticipants = max_participants;
+        _pendingDurationMinutes = duration_minutes;
         _hasPendingConnect = true;
         return;
+    }
+
+    if (action == ConnectAction::CreateMeeting) {
+        _createMaxParticipants = max_participants;
+        _createDurationMinutes = duration_minutes;
     }
 
     _connecting = true;
@@ -487,7 +502,8 @@ void MeetingWidget::on_connect_finished_slot(bool ok, QString ip, QString port,
         spdlog::info("[MeetingWidget] succeed connecting to {}:{}",
                      ip.toStdString(), port.toStdString());
         if (action == ConnectAction::CreateMeeting) {
-            emit create_meeting_requested_signal();
+            emit create_meeting_requested_signal(_createMaxParticipants,
+                                                 _createDurationMinutes);
         } else if (action == ConnectAction::JoinMeeting) {
             _roomNo = room_no.toInt();
             update_meeting_info();

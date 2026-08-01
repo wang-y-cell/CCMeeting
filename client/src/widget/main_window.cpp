@@ -110,8 +110,11 @@ void main_window::init_ui() {
             &QStackedWidget::setCurrentIndex);
 }
 
-void main_window::CreateMeeting_button_clicked() {
-    spdlog::info("[main_window] 点击创建会议按钮");
+void main_window::CreateMeeting_button_clicked(quint32 max_participants,
+                                               quint32 duration_minutes) {
+    spdlog::info(
+        "[main_window] 点击创建会议按钮, max_participants={}, duration_minutes={}",
+        max_participants, duration_minutes);
     if (widget == nullptr) {
         QMessageBox::warning(this, "warning", "会议窗口未初始化");
         return;
@@ -123,7 +126,9 @@ void main_window::CreateMeeting_button_clicked() {
 
     widget->show();
     widget->request_connect_to_server_slot(this->ip, this->port,
-                                           ConnectAction::CreateMeeting);
+                                           ConnectAction::CreateMeeting,
+                                           QString(), max_participants,
+                                           duration_minutes);
 }
 
 void main_window::JoinMeeting_button_clicked(const QString &roomNo) {

@@ -6,15 +6,46 @@
 
 #include <algorithm>
 #include <arpa/inet.h>
+#include <chrono>
 #include <cstring>
 
 namespace meeting {
 
 Room::Room(uint32_t room_id,
            std::shared_ptr<network::Connection> owner,
-           const config::ServerConfig& config)
-    : _room_id(room_id), _config(config) {
+           const config::ServerConfig& config,
+           boost::asio::io_context& io_ctx,
+           RoomOptions options)
+    : _room_id(room_id),
+      _config(config),
+      _options(std::move(options)),
+      _io_ctx(io_ctx) {
+    if (_options.max_participants == 0) {
+        _options.max_participants = _config.max_participants_per_room;
+    }
+    _options.max_participants =
+        std::min(_options.max_participants, _config.max_participants_per_room);
     add_participant(std::move(owner), true);
+}
+
+void Room::start_expire_timer() {
+    if (_options.duration_minutes == 0 || _closed) {
+        return;
+    }
+    _expire_timer = std::make_unique<boost::asio::steady_timer>(_io_ctx);
+    _expire_timer->expires_after(std::chrono::minutes(_options.duration_minutes));
+    auto self = shared_from_this();
+    _expire_timer->async_wait(
+        [self](const boost::system::error_code& ec) {
+            if (ec) {
+                return;
+            }
+            spdlog::info("room {} duration expired ({} minutes)", self->_room_id,
+                         self->_options.duration_minutes);
+            self->close_room();
+        });
+    spdlog::info("room {} expire timer started, duration={} minutes", _room_id,
+                 _options.duration_minutes);
 }
 
 void Room::set_close_callback(CloseCallback callback) {
@@ -26,8 +57,8 @@ bool Room::add_participant(std::shared_ptr<network::Connection> conn, bool is_ow
         spdlog::warn("room {} add participant failed", _room_id);
         return false;
     }
-    if (_participants.size() >= _config.max_participants_per_room) {
-        spdlog::warn("room {} is full", _room_id);
+    if (_participants.size() >= _options.max_participants) {
+        spdlog::warn("room {} is full (max={})", _room_id, _options.max_participants);
         return false;
     }
 
@@ -69,6 +100,12 @@ void Room::close_room() {
         return;
     }
     _closed = true;
+
+    if (_expire_timer) {
+        boost::system::error_code ec;
+        _expire_timer->cancel(ec);
+        _expire_timer.reset();
+    }
 
     auto participants = _participants;
     _participants.clear();
