@@ -10,3 +10,4 @@ docs/
 Doxyfile
 need.md
 .clang-format
+.vscode/
