@@ -1,0 +1,27 @@
+{
+  "auth": {
+    "host": "127.0.0.1",
+    "port": 9000,
+    "login_path": "/api/login"
+  },
+  "meeting_server": {
+    "host": "127.0.0.1",
+    "port": 8888
+  },
+  "webrtc": {
+    "janus_ws_url": "ws://8.153.155.18:8188/",
+    "admin_key": "",
+    "video": {
+      "width": 640,
+      "height": 480,
+      "fps": 30
+    },
+    "ice_servers": [
+      {
+        "uri": "stun:8.153.155.18:3478",
+        "username": "",
+        "password": ""
+      }
+    ]
+  }
+}

@@ -7,7 +7,7 @@
 namespace {
 
 QByteArray compress_text_payload(const std::string &text) {
-    return qCompress(QByteArray::fromStdString(text));
+    return qCompress(QByteArray(text.data(), static_cast<int>(text.size())));
 }
 
 QByteArray compress_audio_payload(const QByteArray &pcm) {
@@ -38,7 +38,7 @@ QByteArray decode_audio_wire_payload(const QByteArray &wire_body) {
 bool wire_frame_needs_length_field(MSG_TYPE type) {
     return type == CREATE_MEETING || type == AUDIO_SEND ||
            type == CLOSE_CAMERA || type == IMG_SEND || type == TEXT_SEND ||
-           type == JOIN_MEETING;
+           type == JOIN_MEETING || type == USER_PROFILE;
 }
 
 MessagePtr decode_create_meeting_response(const std::uint8_t *body,
@@ -99,7 +99,8 @@ MessagePtr decode_text_recv(const std::uint8_t *body, std::uint32_t n_body,
 
     auto msg = std::make_shared<RecvTextMessage>();
     msg->set_ip(ip);
-    msg->set_text(decoded.toStdString());
+    msg->set_text(std::string(decoded.constData(),
+                              static_cast<std::size_t>(decoded.size())));
     return msg;
 }
 
@@ -115,6 +116,56 @@ MessagePtr decode_audio_recv(const std::uint8_t *body, std::uint32_t n_body,
     msg->set_ip(ip);
     msg->set_audio(decoded);
     return msg;
+}
+
+MessagePtr decode_user_profile(const std::uint8_t *body, std::uint32_t n_body,
+                               std::uint32_t ip) {
+    if (n_body < 12)
+        return nullptr;
+    std::size_t offset = 0;
+    const quint64 user_id =
+        qFromBigEndian<quint64>(reinterpret_cast<const char *>(body + offset));
+    offset += 8;
+    const quint16 name_len =
+        qFromBigEndian<quint16>(reinterpret_cast<const char *>(body + offset));
+    offset += 2;
+    if (offset + name_len + 2 > n_body)
+        return nullptr;
+    const QString name = QString::fromUtf8(
+        reinterpret_cast<const char *>(body + offset), name_len);
+    offset += name_len;
+    const quint16 avatar_len =
+        qFromBigEndian<quint16>(reinterpret_cast<const char *>(body + offset));
+    offset += 2;
+    if (offset + avatar_len > n_body)
+        return nullptr;
+    const QString avatar = QString::fromUtf8(
+        reinterpret_cast<const char *>(body + offset), avatar_len);
+
+    auto msg = std::make_shared<UserProfileNotifyMessage>();
+    msg->set_ip(ip);
+    msg->set_user_id(static_cast<qint64>(user_id));
+    msg->set_display_name(name.toUtf8().constData());
+    msg->set_avatar_url(avatar.toUtf8().constData());
+    return msg;
+}
+
+QByteArray encode_user_profile_payload(qint64 user_id, const std::string &name,
+                                       const std::string &avatar) {
+    QByteArray body;
+    body.reserve(12 + static_cast<int>(name.size() + avatar.size()));
+    char buf[8];
+    qToBigEndian(static_cast<quint64>(user_id), buf);
+    body.append(buf, 8);
+    const quint16 name_len = static_cast<quint16>(name.size());
+    qToBigEndian(name_len, buf);
+    body.append(buf, 2);
+    body.append(name.data(), static_cast<int>(name.size()));
+    const quint16 avatar_len = static_cast<quint16>(avatar.size());
+    qToBigEndian(avatar_len, buf);
+    body.append(buf, 2);
+    body.append(avatar.data(), static_cast<int>(avatar.size()));
+    return body;
 }
 
 MessagePtr decode_simple_ip_event(MessageKind kind, std::uint32_t ip) {
@@ -184,6 +235,10 @@ MSG_TYPE MessageCodec::to_wire_type(MessageKind kind) {
         return PARTNER_EXIT;
     case MessageKind::PartnerJoin2:
         return PARTNER_JOIN2;
+    case MessageKind::SendUserProfile:
+        return USER_PROFILE;
+    case MessageKind::UserProfileNotify:
+        return USER_PROFILE;
     case MessageKind::CloseCameraNotify:
         return CLOSE_CAMERA;
     case MessageKind::RemoteHostClosedError:
@@ -226,6 +281,8 @@ MessageKind MessageCodec::from_wire_type(MSG_TYPE type) {
         return MessageKind::JoinMeetingResponse;
     case PARTNER_JOIN2:
         return MessageKind::PartnerJoin2;
+    case USER_PROFILE:
+        return MessageKind::UserProfileNotify;
     case RemoteHostClosedError:
         return MessageKind::RemoteHostClosedError;
     case OtherNetError:
@@ -268,10 +325,13 @@ QByteArray MessageCodec::encode_wire_frame(const Message &msg,
             body = compress_image_payload(image_msg->image());
         break;
     }
-    case MessageKind::SendAudio: {
-        const auto *audio_msg = dynamic_cast<const SendAudioMessage *>(&msg);
-        if (audio_msg)
-            body = compress_audio_payload(audio_msg->audio());
+    case MessageKind::SendUserProfile: {
+        const auto *profile = dynamic_cast<const SendUserProfileMessage *>(&msg);
+        if (profile) {
+            body = encode_user_profile_payload(
+                profile->user_id(), profile->display_name(),
+                profile->avatar_url());
+        }
         break;
     }
     default:
@@ -326,6 +386,10 @@ MessagePtr MessageCodec::decode_wire_packet(const std::uint8_t *frame,
     case AUDIO_RECV: {
         const std::uint32_t ip = qFromBigEndian<std::uint32_t>(frame + 3);
         return decode_audio_recv(body, n_body, ip);
+    }
+    case USER_PROFILE: {
+        const std::uint32_t ip = qFromBigEndian<std::uint32_t>(frame + 3);
+        return decode_user_profile(body, n_body, ip);
     }
     case PARTNER_JOIN:
     case PARTNER_EXIT:

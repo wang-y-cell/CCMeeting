@@ -14,9 +14,12 @@
 namespace meeting {
 
 struct Participant {
-    std::shared_ptr<network::Connection> connection;/*连接*/
-    uint32_t ip_network = 0;  /*成员 IPv4，网络字节序*/
-    bool is_owner = false;    /*是否为房间创建者（房主断开则解散房间）*/
+    std::shared_ptr<network::Connection> connection;
+    uint32_t ip_network = 0;
+    bool is_owner = false;
+    uint64_t user_id = 0;
+    std::string display_name;
+    std::string avatar_url;
 };
 
 }  // namespace meeting

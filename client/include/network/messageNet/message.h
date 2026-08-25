@@ -4,6 +4,7 @@
 #include <QByteArray>
 #include <QImage>
 #include <QMetaType>
+#include <QtGlobal>
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
@@ -38,6 +39,7 @@ enum class MessageKind {
     ExitMeeting,
     CloseCamera,
     SendText,
+    SendUserProfile,
     SendImage,
     SendAudio,
 
@@ -50,6 +52,7 @@ enum class MessageKind {
     PartnerExit,
     PartnerJoin2,
     CloseCameraNotify,
+    UserProfileNotify,
     RemoteHostClosedError,
     OtherNetError,
 };
@@ -170,6 +173,28 @@ public:
     MessagePriority send_priority() const override { return MessagePriority::Control; }
 };
 
+
+/** @brief 发送用户资料（显示名/头像） */
+class SendUserProfileMessage : public Message {
+public:
+    SendUserProfileMessage(qint64 user_id = 0, std::string display_name = {},
+                           std::string avatar_url = {})
+        : user_id_(user_id),
+          display_name_(std::move(display_name)),
+          avatar_url_(std::move(avatar_url)) {}
+
+    MessageKind kind() const override { return MessageKind::SendUserProfile; }
+    MessagePriority send_priority() const override { return MessagePriority::Control; }
+
+    qint64 user_id() const { return user_id_; }
+    const std::string &display_name() const { return display_name_; }
+    const std::string &avatar_url() const { return avatar_url_; }
+
+private:
+    qint64 user_id_ = 0;
+    std::string display_name_;
+    std::string avatar_url_;
+};
 
 /** @brief 发送文本消息 */
 class SendTextMessage : public Message {
@@ -341,6 +366,24 @@ class CloseCameraNotifyMessage : public Message {
 public:
     /** @brief 获取消息类型 */
     MessageKind kind() const override { return MessageKind::CloseCameraNotify; }
+};
+
+/** @brief 用户资料通知 */
+class UserProfileNotifyMessage : public Message {
+public:
+    MessageKind kind() const override { return MessageKind::UserProfileNotify; }
+
+    qint64 user_id() const { return user_id_; }
+    void set_user_id(qint64 id) { user_id_ = id; }
+    const std::string &display_name() const { return display_name_; }
+    void set_display_name(std::string name) { display_name_ = std::move(name); }
+    const std::string &avatar_url() const { return avatar_url_; }
+    void set_avatar_url(std::string url) { avatar_url_ = std::move(url); }
+
+private:
+    qint64 user_id_ = 0;
+    std::string display_name_;
+    std::string avatar_url_;
 };
 
 /** @brief 远程主机关闭错误消息 */

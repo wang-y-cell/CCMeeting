@@ -1,21 +1,49 @@
 #include "main_window.h"
+#include "configure/client_config.h"
+#include "configure/user_session.h"
 #include "connection.h"
 #include "stack_conn_server.h"
 #include "stack_join_meet.h"
 #include <QFile>
 #include <QHBoxLayout>
+#include <QLabel>
 #include <QListWidget>
 #include <QMessageBox>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QPixmap>
+#include <QUrl>
 #include <QStackedWidget>
+#include <QVBoxLayout>
 #include <QStringList>
 #include <qnamespace.h>
 #include <spdlog/spdlog.h>
 
 main_window::main_window(QWidget *parent) : FramelessWindow<QWidget>(parent) {
+    spdlog::info("[main_window] ctor begin");
+    spdlog::default_logger()->flush();
+
+    const auto &meeting = ClientConfig::instance().meeting_server();
+    ip = meeting.host;
+    port = QString::number(meeting.port);
+    spdlog::info("[main_window] default meeting server {}:{}",
+                 ip.toUtf8().constData(), port.toUtf8().constData());
+    spdlog::default_logger()->flush();
+
+    spdlog::info("[main_window] init_ui begin");
+    spdlog::default_logger()->flush();
     init_ui();
+    spdlog::info("[main_window] init_ui done");
+    spdlog::default_logger()->flush();
+
     setWindowTitle(tr("CloudMeeting"));
     set_style();
+
+    spdlog::info("[main_window] creating MeetingWidget ...");
+    spdlog::default_logger()->flush();
     widget = new MeetingWidget(nullptr);
+    spdlog::info("[main_window] MeetingWidget created");
+    spdlog::default_logger()->flush();
 
     // widget->setWindowFlags(Qt::Window);
     widget->hide();
@@ -31,6 +59,8 @@ main_window::main_window(QWidget *parent) : FramelessWindow<QWidget>(parent) {
 
     connect(widget, &MeetingWidget::connect_server_finished_signal, this,
             &main_window::onConnectServerFinished);
+    spdlog::info("[main_window] ctor done");
+    spdlog::default_logger()->flush();
 }
 
 void main_window::set_style() {
@@ -65,12 +95,59 @@ void main_window::init_ui() {
     mainLayout->setContentsMargins(18, 42, 18, 18);
     mainLayout->setSpacing(16);
 
+    auto *leftColumn = new QVBoxLayout();
+    leftColumn->setSpacing(12);
+
+    auto *userCard = new QWidget(this);
+    userCard->setObjectName(QStringLiteral("userProfile"));
+    auto *userLayout = new QVBoxLayout(userCard);
+    userLayout->setContentsMargins(12, 12, 12, 12);
+    userLayout->setSpacing(8);
+
+    auto *avatarLabel = new QLabel(userCard);
+    avatarLabel->setObjectName(QStringLiteral("userAvatar"));
+    avatarLabel->setFixedSize(72, 72);
+    avatarLabel->setAlignment(Qt::AlignCenter);
+    avatarLabel->setScaledContents(true);
+
+    auto *nameLabel = new QLabel(userCard);
+    nameLabel->setObjectName(QStringLiteral("userName"));
+    nameLabel->setAlignment(Qt::AlignCenter);
+    nameLabel->setWordWrap(true);
+
+    const auto &session = UserSession::instance();
+    nameLabel->setText(session.isLoggedIn() ? session.name() : tr("未登录"));
+    avatarLabel->setPixmap(
+        QPixmap(QString::fromUtf8(":/myImage/source/EmptyHead.png"))
+            .scaled(72, 72, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+
+    if (session.isLoggedIn() && !session.avatar().isEmpty()) {
+        auto *nam = new QNetworkAccessManager(userCard);
+        QNetworkRequest req{QUrl(session.avatar())};
+        auto *reply = nam->get(req);
+        connect(reply, &QNetworkReply::finished, userCard,
+                [avatarLabel, reply]() {
+                    if (reply->error() == QNetworkReply::NoError) {
+                        QPixmap pix;
+                        if (pix.loadFromData(reply->readAll())) {
+                            avatarLabel->setPixmap(
+                                pix.scaled(72, 72, Qt::KeepAspectRatio,
+                                           Qt::SmoothTransformation));
+                        }
+                    }
+                    reply->deleteLater();
+                });
+    }
+
+    userLayout->addWidget(avatarLabel, 0, Qt::AlignHCenter);
+    userLayout->addWidget(nameLabel);
+    leftColumn->addWidget(userCard);
+
     auto *left_bar = new QListWidget(this);
     left_bar->setObjectName(QStringLiteral("sideNav"));
     left_bar->setSpacing(4);
     left_bar->setFrameShape(QListWidget::NoFrame);
     left_bar->setFocusPolicy(Qt::NoFocus);
-    left_bar->setFixedWidth(196);
     left_bar->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     left_bar->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
@@ -93,7 +170,17 @@ void main_window::init_ui() {
 
     auto *stackedWidget = new QStackedWidget(this);
     stackedWidget->setObjectName(QStringLiteral("contentStack"));
-    mainLayout->addWidget(left_bar);
+
+    leftColumn->addWidget(left_bar, 1);
+
+    auto *leftWrap = new QWidget(this);
+    leftWrap->setFixedWidth(196);
+    auto *leftWrapLayout = new QVBoxLayout(leftWrap);
+    leftWrapLayout->setContentsMargins(0, 0, 0, 0);
+    leftWrapLayout->setSpacing(0);
+    leftWrapLayout->addLayout(leftColumn);
+
+    mainLayout->addWidget(leftWrap);
     mainLayout->addWidget(stackedWidget, 1);
 
     create_meeting_widget = new stack_create_meet(this);
@@ -113,7 +200,7 @@ void main_window::init_ui() {
 void main_window::CreateMeeting_button_clicked(quint32 max_participants,
                                                quint32 duration_minutes) {
     spdlog::info(
-        "[main_window] 点击创建会议按钮, max_participants={}, duration_minutes={}",
+        "[main_window] CreateMeeting max_participants={} duration_minutes={}",
         max_participants, duration_minutes);
     if (widget == nullptr) {
         QMessageBox::warning(this, "warning", "会议窗口未初始化");
@@ -132,8 +219,8 @@ void main_window::CreateMeeting_button_clicked(quint32 max_participants,
 }
 
 void main_window::JoinMeeting_button_clicked(const QString &roomNo) {
-    spdlog::info("[main_window] 点击加入会议按钮, roomNo: {}",
-                 roomNo.toStdString());
+    spdlog::info("[main_window] JoinMeeting roomNo={}",
+                 roomNo.toUtf8().constData());
     if (widget == nullptr) {
         QMessageBox::warning(this, "warning", "会议窗口未初始化");
         return;
@@ -153,8 +240,8 @@ void main_window::JoinMeeting_button_clicked(const QString &roomNo) {
 }
 
 void main_window::ConnectToServer_button_clicked(QString ip, QString port) {
-    spdlog::info("[main_window] 点击连接服务器 ip: {} port: {}",
-                 ip.toStdString(), port.toStdString());
+    spdlog::info("[main_window] ConnectToServer ip={} port={}",
+                 ip.toUtf8().constData(), port.toUtf8().constData());
     if (widget == nullptr) {
         QMessageBox::warning(this, "warning", "会议窗口未初始化");
         return;
@@ -186,8 +273,8 @@ void main_window::onConnectServerFinished(bool ok, QString ip, QString port,
             if (widget)
                 widget->on_disconnect_server_slot();
             spdlog::info(
-                "[main_window] 连接服务器成功并已断开: ip: {} port: {}",
-                ip.toStdString(), port.toStdString());
+                "[main_window] probe connect ok then disconnect: {}:{}",
+                ip.toUtf8().constData(), port.toUtf8().constData());
             QMessageBox::information(this, "Connection",
                                      QString("成功连接到 %1:%2").arg(ip, port));
         } else {

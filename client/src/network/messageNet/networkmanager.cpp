@@ -87,19 +87,12 @@ void NetworkManager::send_close_camera() {
     hub_->enqueue_send(std::make_shared<CloseCameraMessage>());
 }
 
-void NetworkManager::send_image(const QImage &image) {
-    if (image.isNull())
-        return;
-    hub_->enqueue_send(std::make_shared<SendImageMessage>(image));
+void NetworkManager::send_user_profile(qint64 user_id,
+                                       const std::string &display_name,
+                                       const std::string &avatar_url) {
+    hub_->enqueue_send(std::make_shared<SendUserProfileMessage>(
+        user_id, display_name, avatar_url));
 }
-
-void NetworkManager::send_audio(const QByteArray &pcm) {
-    if (pcm.isEmpty())
-        return;
-    hub_->enqueue_send(std::make_shared<SendAudioMessage>(pcm));
-}
-
-void NetworkManager::clear_pending_images() { hub_->clear_pending_video(); }
 
 void NetworkManager::stop() {
     if (hub_)

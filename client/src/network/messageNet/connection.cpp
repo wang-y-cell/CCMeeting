@@ -24,8 +24,8 @@ Connection::~Connection() {
 void Connection::setMessageHub(MessageHub *hub) { m_hub = hub; }
 
 bool Connection::connectToServer(const QString &ip, const QString &port) {
-    spdlog::info("[Connection] 连接服务器: {}:{}", ip.toStdString(),
-                 port.toStdString());
+    spdlog::info("[Connection] connectToServer {}:{}", ip.toUtf8().constData(),
+                 port.toUtf8().constData());
 
     bool ok = false;
     const bool invoked = QMetaObject::invokeMethod(
@@ -35,7 +35,7 @@ bool Connection::connectToServer(const QString &ip, const QString &port) {
     if (!invoked) {
         m_lastError =
             QStringLiteral("internal error: connectOnIoThread not invoked");
-        spdlog::error("[Connection] {}", m_lastError.toStdString());
+        spdlog::error("[Connection] invoke failed");
         return false;
     }
 
@@ -45,8 +45,8 @@ bool Connection::connectToServer(const QString &ip, const QString &port) {
 }
 
 bool Connection::connectOnIoThread(const QString &ip, const QString &port) {
-    spdlog::info("[Connection] IO 线程连接 {}:{} tid={}", ip.toStdString(),
-                 port.toStdString(),
+    spdlog::info("[Connection] IO connect {}:{} tid={}", ip.toUtf8().constData(),
+                 port.toUtf8().constData(),
                  reinterpret_cast<quintptr>(QThread::currentThreadId()));
 
     destroySocket();
@@ -63,7 +63,8 @@ bool Connection::connectOnIoThread(const QString &ip, const QString &port) {
     m_socket->connectToHost(ip, port.toUShort());
     if (!m_socket->waitForConnected(5000)) {
         m_lastError = m_socket->errorString();
-        spdlog::error("[Connection] 连接失败: {}", m_lastError.toStdString());
+        spdlog::error("[Connection] connect failed err={}",
+                      m_lastError.toUtf8().constData());
         destroySocket();
         return false;
     }
@@ -71,7 +72,7 @@ bool Connection::connectOnIoThread(const QString &ip, const QString &port) {
     m_localIp = m_socket->localAddress().toIPv4Address();
     m_hasLocalIp = true;
     m_lastError.clear();
-    spdlog::info("[Connection] 连接成功, 本机 ip: {}", m_localIp);
+    spdlog::info("[Connection] connected localIp={}", m_localIp);
     return true;
 }
 

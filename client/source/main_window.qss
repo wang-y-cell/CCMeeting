@@ -142,3 +142,20 @@ QPushButton#framelessMaxBtn:hover {
     background-color: #2a3040;
     color: #ffffff;
 }
+
+QWidget#userProfile {
+    background-color: #1c1f28;
+    border: 1px solid #2a2e38;
+    border-radius: 14px;
+}
+
+QLabel#userAvatar {
+    border-radius: 36px;
+    background-color: #232733;
+}
+
+QLabel#userName {
+    color: #f3f5f8;
+    font-size: 13px;
+    font-weight: 600;
+}

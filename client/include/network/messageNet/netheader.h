@@ -44,6 +44,8 @@ enum MSG_TYPE : std::uint8_t {
     JOIN_MEETING_RESPONSE,
     PARTNER_JOIN2,
 
+    USER_PROFILE = 25,
+
     RemoteHostClosedError = 40,
     OtherNetError
 };

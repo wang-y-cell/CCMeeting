@@ -10,3 +10,6 @@ docs/
 Doxyfile
 need.md
 .clang-format
+build_client/
+build_message_server/
+build_data_server/

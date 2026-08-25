@@ -1,7 +1,7 @@
 #include "login.h"
 #include "ui_login.h"
 
-#include "configure/auth_config.h"
+#include "configure/client_config.h"
 #include "configure/user_session.h"
 
 #include <QFile>
@@ -14,12 +14,27 @@
 
 #include <spdlog/spdlog.h>
 
+namespace {
+
+std::string qutf8(const QString &s) {
+    const QByteArray bytes = s.toUtf8();
+    return std::string(bytes.constData(), static_cast<std::size_t>(bytes.size()));
+}
+
+void flush_log() {
+    if (spdlog::default_logger()) {
+        spdlog::default_logger()->flush();
+    }
+}
+
+}  // namespace
+
 login::login(QWidget *parent)
     : FramelessWindow<QDialog>(parent), ui(new Ui::login) {
     ui->setupUi(this);
-    setWindowTitle(tr("登录")); ///< 设置窗口标题为登录
-    setResizable(false);        ///< 禁止拖边缩放
-    setMaximizable(false);      ///< 禁止最大化按钮与双击标题栏
+    setWindowTitle(tr("登录"));
+    setResizable(false);
+    setMaximizable(false);
     set_style();
 
     connect(ui->login_button, &QPushButton::clicked, this, &login::Login);
@@ -41,10 +56,6 @@ void login::set_style() {
 
 login::~login() { delete ui; }
 
-/**
- * @details 读取账号密码，向认证服务 POST /api/login；成功则写入 UserSession 并
- * accept()
- */
 void login::Login() {
     if (m_requestInFlight) {
         return;
@@ -57,26 +68,28 @@ void login::Login() {
         QMessageBox::warning(this, tr("Login Error"), tr("请输入账号和密码"));
         return;
     }
-    ///< 获得登录 URL
+
     QUrl url;
     url.setScheme(QStringLiteral("http"));
-    url.setHost(QString::fromUtf8(AuthConfig::host));
-    url.setPort(AuthConfig::port);
-    url.setPath(QString::fromUtf8(AuthConfig::login_path));
+    const auto &auth = ClientConfig::instance().auth();
+    url.setHost(auth.host);
+    url.setPort(auth.port);
+    url.setPath(auth.login_path);
 
-    QNetworkRequest request(url); ///< 创建网络请求
+    QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader,
                       QStringLiteral("application/json; charset=utf-8"));
     request.setHeader(QNetworkRequest::UserAgentHeader,
                       QStringLiteral("CloudMeetingClient/1.0"));
 
-    QJsonObject body; ///< 创建请求体: json 格式
+    QJsonObject body;
     body.insert(QStringLiteral("username"), username);
     body.insert(QStringLiteral("password"), password);
 
     m_requestInFlight = true;
     ui->login_button->setEnabled(false);
-    spdlog::info("[login] POST {}", url.toString().toStdString());
+    spdlog::info("[login] POST {}", qutf8(url.toString()));
+    flush_log();
     m_nam.post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
 }
 
@@ -84,26 +97,43 @@ void login::onLoginFinished(QNetworkReply *reply) {
     m_requestInFlight = false;
     ui->login_button->setEnabled(true);
 
+    spdlog::info("[login] onLoginFinished enter");
+    flush_log();
+
     if (!reply) {
+        spdlog::error("[login] reply is null");
+        flush_log();
         return;
     }
-    reply->deleteLater();
 
-    if (reply->error() != QNetworkReply::NoError &&
-        reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() ==
-            0) {
-        spdlog::error("[login] network error: {}",
-                      reply->errorString().toStdString());
+    const int httpStatus =
+        reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    const auto netErr = reply->error();
+    spdlog::info("[login] httpStatus={} qNetworkError={}", httpStatus,
+                 static_cast<int>(netErr));
+    flush_log();
+
+    if (netErr != QNetworkReply::NoError && httpStatus == 0) {
+        spdlog::error("[login] network error");
+        flush_log();
+        reply->deleteLater();
         QMessageBox::warning(this, tr("Login Error"),
                              tr("无法连接登录服务器，请确认认证服务已启动"));
         return;
     }
 
     const QByteArray payload = reply->readAll();
+    reply->deleteLater();
+    // 不把整段 JSON（含中文）直接打到可能非 UTF-8 的 sink，避免 0xC0000005
+    spdlog::info("[login] response bytes={}", payload.size());
+    flush_log();
+
     QJsonParseError parseError;
     const QJsonDocument doc = QJsonDocument::fromJson(payload, &parseError);
     if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
-        spdlog::error("[login] invalid response: {}", payload.toStdString());
+        spdlog::error("[login] invalid response parseError={}",
+                      static_cast<int>(parseError.error));
+        flush_log();
         QMessageBox::warning(this, tr("Login Error"), tr("登录响应格式错误"));
         return;
     }
@@ -113,8 +143,8 @@ void login::onLoginFinished(QNetworkReply *reply) {
     const QString message = root.value(QStringLiteral("message")).toString();
 
     if (code != 0 || !root.contains(QStringLiteral("data"))) {
-        spdlog::warn("[login] failed code={} msg={}", code,
-                     message.toStdString());
+        spdlog::warn("[login] failed code={}", code);
+        flush_log();
         QMessageBox::warning(this, tr("Login Error"),
                              message.isEmpty() ? tr("账号或密码错误")
                                                : message);
@@ -129,6 +159,11 @@ void login::onLoginFinished(QNetworkReply *reply) {
     const QString info = data.value(QStringLiteral("info")).toString();
 
     UserSession::instance().setUser(userId, name, avatar, info);
-    spdlog::info("[login] success id={} name={}", userId, name.toStdString());
+    spdlog::info("[login] success id={} name_bytes={}", userId,
+                 name.toUtf8().size());
+    spdlog::info("[login] calling accept()");
+    flush_log();
     accept();
+    spdlog::info("[login] accept() returned");
+    flush_log();
 }
