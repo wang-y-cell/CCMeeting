@@ -13,3 +13,4 @@ need.md
 build_client/
 build_message_server/
 build_data_server/
+.vscode/
