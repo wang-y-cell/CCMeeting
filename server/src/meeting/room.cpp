@@ -9,6 +9,18 @@
 #include <chrono>
 #include <cstring>
 
+namespace {
+
+uint64_t read_be64(const uint8_t* data) {
+    uint64_t value = 0;
+    for (int i = 0; i < 8; ++i) {
+        value = (value << 8) | data[i];
+    }
+    return value;
+}
+
+}  // namespace
+
 namespace meeting {
 
 Room::Room(uint32_t room_id,
@@ -157,17 +169,9 @@ void Room::handle_packet(std::shared_ptr<network::Connection> from,
     spdlog::debug("room {} handle packet from connection {}, type: {}", _room_id, from->id(), protocol::get_type_name(packet.type));
 
     switch (packet.type) {
-        case protocol::MessageType::ImgSend:
-        case protocol::MessageType::AudioSend:
         case protocol::MessageType::TextSend: {
             protocol::Packet outbound = packet;
-            if (packet.type == protocol::MessageType::ImgSend) {
-                outbound.type = protocol::MessageType::ImgRecv;
-            } else if (packet.type == protocol::MessageType::AudioSend) {
-                outbound.type = protocol::MessageType::AudioRecv;
-            } else {
-                outbound.type = protocol::MessageType::TextRecv;
-            }
+            outbound.type = protocol::MessageType::TextRecv;
             outbound.ip = sender_ip;
             broadcast(outbound, from->id());
             break;
@@ -179,6 +183,42 @@ void Room::handle_packet(std::shared_ptr<network::Connection> from,
             broadcast(outbound, from->id());
             break;
         }
+        case protocol::MessageType::UserProfile: {
+            if (packet.payload.size() >= 12) {
+                std::size_t offset = 0;
+                const uint64_t user_id = read_be64(packet.payload.data());
+                offset += 8;
+                uint16_t name_len = 0;
+                std::memcpy(&name_len, packet.payload.data() + offset, sizeof(name_len));
+                name_len = ntohs(name_len);
+                offset += 2;
+                if (offset + name_len + 2 <= packet.payload.size()) {
+                    participant_it->second.user_id = user_id;
+                    participant_it->second.display_name.assign(
+                        packet.payload.begin() + static_cast<std::ptrdiff_t>(offset),
+                        packet.payload.begin() + static_cast<std::ptrdiff_t>(offset + name_len));
+                    offset += name_len;
+                    uint16_t avatar_len = 0;
+                    std::memcpy(&avatar_len, packet.payload.data() + offset,
+                                sizeof(avatar_len));
+                    avatar_len = ntohs(avatar_len);
+                    offset += 2;
+                    if (offset + avatar_len <= packet.payload.size()) {
+                        participant_it->second.avatar_url.assign(
+                            packet.payload.begin() + static_cast<std::ptrdiff_t>(offset),
+                            packet.payload.begin() + static_cast<std::ptrdiff_t>(offset + avatar_len));
+                    }
+                }
+            }
+            protocol::Packet outbound = packet;
+            outbound.ip = sender_ip;
+            broadcast(outbound, from->id());
+            break;
+        }
+        case protocol::MessageType::ImgSend:
+        case protocol::MessageType::AudioSend:
+            spdlog::debug("room {} ignored legacy media packet", _room_id);
+            break;
         default:
             spdlog::warn("room {} ignored message type {}", _room_id,
                          static_cast<int>(packet.type));

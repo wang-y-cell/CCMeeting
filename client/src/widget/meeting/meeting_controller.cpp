@@ -20,19 +20,23 @@ void MeetingController::connect_to_server_slot(QString ip, QString port,
 
 void MeetingController::create_meeting_slot(quint32 max_participants,
                                             quint32 duration_minutes) {
-    spdlog::debug(
+    spdlog::info(
         "[MeetingController] create_meeting_slot max_participants={} "
         "duration_minutes={}",
         max_participants, duration_minutes);
+    if (spdlog::default_logger())
+        spdlog::default_logger()->flush();
     if (_network)
         _network->sendCreateMeeting(max_participants, duration_minutes);
 }
 
 void MeetingController::join_meeting_slot(QString room_no) {
-    spdlog::debug("[MeetingController] join_meeting_slot room_no={}",
-                  room_no.toStdString());
+    const QByteArray room = room_no.toUtf8();
+    spdlog::info("[MeetingController] join_meeting_slot room_no={}",
+                 room.constData());
     if (_network)
-        _network->sendJoinMeeting(room_no.toStdString());
+        _network->sendJoinMeeting(
+            std::string(room.constData(), static_cast<std::size_t>(room.size())));
 }
 
 void MeetingController::disconnect_from_host_slot() {

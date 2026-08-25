@@ -31,6 +31,7 @@ enum class MessageType : uint16_t {
     PartnerJoin = 22,
     JoinMeetingResponse = 23,
     PartnerJoin2 = 24,
+    UserProfile = 25,
 };
 
 std::string get_type_name(MessageType type);

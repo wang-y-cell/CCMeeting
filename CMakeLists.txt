@@ -4,7 +4,9 @@ project(CCMeeting VERSION 1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_BUILD_TYPE Debug)
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
+endif()
 
 option(BUILD_CLIENT "Build CloudMeeting Qt client" ON)
 option(BUILD_SERVER "Build CloudMeeting server" OFF)
@@ -38,10 +40,15 @@ else()
 endif()
 unset(_SPDLOG_SOURCE_DIR)
 
-# 设置编译选项
+if(TARGET spdlog AND MSVC)
+    target_compile_definitions(spdlog PRIVATE
+        $<$<CONFIG:Debug>:_ITERATOR_DEBUG_LEVEL=0>
+        $<$<CONFIG:Debug>:_HAS_ITERATOR_DEBUGGING=0>)
+endif()
+
+# 设置编译选项（Ninja 下勿给 /wd 加引号，否则会变成 /wd\"4819\"）
 if(MSVC)
-    add_compile_options(/wd"4819") #关闭MSVC警告
-    add_compile_options(/utf-8) #设置编码
+    add_compile_options(/wd4819 /utf-8)
 endif()
 
 if(BUILD_CLIENT)

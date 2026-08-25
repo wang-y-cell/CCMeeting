@@ -8,6 +8,15 @@ Partner::Partner(std::uint32_t ip, QObject *parent)
 
 QString Partner::ipString() const { return QHostAddress(m_ip).toString(); }
 
+void Partner::setProfile(qint64 userId, const QString &displayName,
+                         const QString &avatarUrl) {
+    m_userId = userId;
+    m_displayName = displayName;
+    m_avatarUrl = avatarUrl;
+    if (m_tile)
+        m_tile->updateProfile(displayName, avatarUrl);
+}
+
 void Partner::setTile(PartnerTile *tile) {
     if (m_tile == tile)
         return;
@@ -20,6 +29,9 @@ void Partner::setTile(PartnerTile *tile) {
 
     if (m_tile) {
         connect(m_tile, &PartnerTile::clicked, this, &Partner::clicked);
+        if (!m_displayName.isEmpty() || !m_avatarUrl.isEmpty()) {
+            m_tile->updateProfile(m_displayName, m_avatarUrl);
+        }
     }
 }
 

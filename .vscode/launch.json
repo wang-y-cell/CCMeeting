@@ -1,9 +1,21 @@
 {
-    // 使用 IntelliSense 了解相关属性。 
-    // 悬停以查看现有属性的描述。
-    // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        {
+            "name": "CloudMeeting (MSVC)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build_client/client/CloudMeeting.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}/build_client/client",
+            "environment": [
+                {
+                    "name": "PATH",
+                    "value": "F:/Qt/6.8.3/msvc2022_64/bin;${env:PATH}"
+                }
+            ],
+            "console": "integratedTerminal"
+        },
         {
             "name": "(gdb) Launch",
             "type": "cppdbg",
@@ -15,20 +27,7 @@
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
-            "miDebuggerPath": "F:/mingw/mingw64/bin/gdb.exe",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Set Disassembly Flavor to Intel",
-                    "text": "-gdb-set disassembly-flavor intel",
-                    "ignoreFailures": true
-                }
-            ]
+            "miDebuggerPath": "F:/mingw/mingw64/bin/gdb.exe"
         }
-        
     ]
 }

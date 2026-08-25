@@ -62,20 +62,8 @@ public:
      * @brief 发送关闭摄像头请求
      */
     void send_close_camera();
-    /**
-     * @brief 发送图片消息
-     * @param image 图片
-     */
-    void send_image(const QImage &image);
-    /**
-     * @brief 发送音频消息
-     * @param pcm 音频数据
-     */
-    void send_audio(const QByteArray &pcm);
-    /**
-     * @brief 清除待发送图片
-     */
-    void clear_pending_images();
+    void send_user_profile(qint64 user_id, const std::string &display_name,
+                           const std::string &avatar_url);
 
     void stop();
 
@@ -125,20 +113,10 @@ public:
      * @brief 发送关闭摄像头请求
      */
     void sendCloseCamera() { send_close_camera(); }
-    /**
-     * @brief 发送图片消息
-     * @param image 图片
-     */
-    void sendImage(const QImage &image) { send_image(image); }
-    /**
-     * @brief 发送音频消息
-     * @param pcm 音频数据
-     */
-    void sendAudio(const QByteArray &pcm) { send_audio(pcm); }
-    /**
-     * @brief 清除待发送图片
-     */
-    void clearPendingImages() { clear_pending_images(); }
+    void sendUserProfile(qint64 user_id, const std::string &display_name,
+                         const std::string &avatar_url) {
+        send_user_profile(user_id, display_name, avatar_url);
+    }
 
 signals:
     void request_message_ready(MessagePtr msg);

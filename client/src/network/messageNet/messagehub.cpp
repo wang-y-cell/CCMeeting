@@ -16,8 +16,8 @@ void MessageHub::enqueue_send(MessagePtr msg) {
     const MessageKind kind = msg->kind();
     if (kind == MessageKind::CreateMeeting ||
         kind == MessageKind::JoinMeeting || kind == MessageKind::CloseCamera ||
-        kind == MessageKind::SendText) {
-        spdlog::info("[MessageHub] 入队发送 kind={}", static_cast<int>(kind));
+        kind == MessageKind::SendText || kind == MessageKind::SendUserProfile) {
+        spdlog::info("[MessageHub] enqueue_send kind={}", static_cast<int>(kind));
     }
     send_queue_.push(std::move(msg));
 }
@@ -39,6 +39,7 @@ void MessageHub::emit_incoming(MessagePtr msg) {
     case MessageKind::PartnerExit:
     case MessageKind::PartnerJoin2:
     case MessageKind::CloseCameraNotify:
+    case MessageKind::UserProfileNotify:
         emit user_info_message_ready(msg);
         break;
     case MessageKind::RecvText:

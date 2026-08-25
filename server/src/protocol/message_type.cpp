@@ -34,6 +34,8 @@ std::string get_type_name(MessageType type) {
             return "JoinMeetingResponse";
         case MessageType::PartnerJoin2:
             return "PartnerJoin2";
+        case MessageType::UserProfile:
+            return "UserProfile";
         default:
             return "Unknown";
     }
