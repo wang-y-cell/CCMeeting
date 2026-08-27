@@ -13,7 +13,6 @@
 #include <QDateTime>
 #include <QEvent>
 #include <QFile>
-#include <QHostAddress>
 #include <QLabel>
 #include <QMessageBox>
 #include <QPainter>
@@ -57,7 +56,7 @@ MeetingWidget::MeetingWidget(QWidget *parent)
     spdlog::info("[MeetingWidget] init_ui done");
     spdlog::default_logger()->flush();
 
-    mainip = 0;
+    main_user_id_ = 0;
     _cameraVideo = new CameraVideo(this);
     _cameraVideo->setMainTarget(ui->mainshow_label);
     spdlog::info("[MeetingWidget] CameraVideo ready");
@@ -118,7 +117,7 @@ void MeetingWidget::init_connect() {
 }
 
 void MeetingWidget::init_partner_connect(Partner *p) {
-    connect(p, &Partner::clicked, this, &MeetingWidget::on_recv_ip_slot);
+    connect(p, &Partner::clicked, this, &MeetingWidget::on_recv_user_slot);
 }
 
 void MeetingWidget::init_ui() {
@@ -195,7 +194,7 @@ void MeetingWidget::flush_pending_connect() {
     _pendingConnectIp.clear();
     _pendingConnectPort.clear();
     _pendingConnectRoomNo.clear();
-    _pendingConnectAction = ConnectAction::None;
+    _pendingConnectAction = ConnectAction::CreateMeeting;
     request_connect_to_server_slot(ip, port, action, roomNo, max_participants,
                                    duration_minutes);
 }
@@ -230,14 +229,10 @@ void MeetingWidget::update_meeting_info() {
     ui->labelRoomNo->setText(_roomNo > 0 ? QString::number(_roomNo) : QStringLiteral("-"));
     ui->labelMemberCount->setText(QString::number(static_cast<int>(partner.size())));
 
-    if (_network && _network->localIp() != UINT32_MAX) {
-        const QString display = UserSession::instance().name();
-        ui->labelLocalIp->setText(display.isEmpty()
-                                      ? QHostAddress(_network->localIp()).toString()
-                                      : display);
-    } else {
-        ui->labelLocalIp->setText(QStringLiteral("-"));
-    }
+    const QString display = UserSession::instance().name();
+    ui->labelLocalIp->setText(display.isEmpty()
+                                  ? QString::number(local_user_id())
+                                  : display);
 
     if (_sessionActive && !_serverAddr.isEmpty())
         ui->labelServer->setText(_serverAddr);
@@ -257,8 +252,8 @@ void MeetingWidget::update_speaker_label() {
     // 尚无远端音量回调时：本端麦克风开启则显示本端为当前说话人
     if (!_audioMuted) {
         QString name = UserSession::instance().name();
-        if (name.isEmpty() && _network && _network->localIp() != UINT32_MAX)
-            name = partner_display_name(_network->localIp());
+        if (name.isEmpty())
+            name = partner_display_name(local_user_id());
         ui->labelSpeaker->setText(name.isEmpty() ? QStringLiteral("-") : name);
     } else {
         ui->labelSpeaker->setText(QStringLiteral("-"));
@@ -384,7 +379,7 @@ void MeetingWidget::stop_meeting_media() {
         xrtc::destroy_xrtc_engine(_rtc);
         _rtc = nullptr;
     }
-    _feed_to_ip.clear();
+    _feed_to_user.clear();
     if (_cameraVideo)
         _cameraVideo->endVideo();
 }
@@ -402,18 +397,18 @@ void MeetingWidget::send_local_user_profile() {
                     static_cast<std::size_t>(avatar.size())));
 }
 
-void MeetingWidget::apply_partner_profile(std::uint32_t ip, qint64 userId,
+void MeetingWidget::apply_partner_profile(qint64 userId,
                                           const QString &displayName,
                                           const QString &avatarUrl) {
     Partner *p = nullptr;
-    if (partner.find(ip) == partner.end()) {
-        p = add_partner(ip);
+    if (partner.find(userId) == partner.end()) {
+        p = add_partner(userId);
     } else {
-        p = partner[ip];
+        p = partner[userId];
     }
     if (!p)
         return;
-    p->setProfile(userId, displayName, avatarUrl);
+    p->setProfile(displayName, avatarUrl);
 
     const QString atTag = QStringLiteral("@") + displayName;
     if (std::find(iplist.begin(), iplist.end(), atTag) == iplist.end()) {
@@ -422,16 +417,20 @@ void MeetingWidget::apply_partner_profile(std::uint32_t ip, qint64 userId,
     }
 }
 
-QString MeetingWidget::partner_display_name(std::uint32_t ip) const {
-    const auto it = partner.find(ip);
+QString MeetingWidget::partner_display_name(qint64 userId) const {
+    const auto it = partner.find(userId);
     if (it == partner.end())
-        return QHostAddress(ip).toString();
+        return QString::number(userId);
     const QString name = it->second->displayName();
-    return name.isEmpty() ? QHostAddress(ip).toString() : name;
+    return name.isEmpty() ? QString::number(userId) : name;
 }
 
-void MeetingWidget::update_main_screen_title(std::uint32_t ip) {
-    ui->groupBox_2->setTitle(partner_display_name(ip));
+void MeetingWidget::update_main_screen_title(qint64 userId) {
+    ui->groupBox_2->setTitle(partner_display_name(userId));
+}
+
+qint64 MeetingWidget::local_user_id() const {
+    return UserSession::instance().userId();
 }
 
 void MeetingWidget::on_create_meet_btn_clicked_slot() {
@@ -455,7 +454,7 @@ void MeetingWidget::on_open_vedio_clicked_slot() {
         }
         if (_network) {
             _network->sendCloseCamera();
-            close_img(_network->localIp());
+            close_video_for_user(local_user_id());
         }
         ui->openVedio->setText(QString(OPENVIDEO).toUtf8());
     } else {
@@ -489,18 +488,15 @@ void MeetingWidget::handle_create_meeting_response(const MessagePtr &msg) {
         _createmeet = true;
         ui->sendmsg->setDisabled(false);
 
-        if (_network) {
-            const std::uint32_t localIp = _network->localIp();
-            apply_partner_profile(localIp, UserSession::instance().userId(),
-                                  UserSession::instance().name(),
-                                  UserSession::instance().avatar());
-            add_partner(localIp);
-            mainip = localIp;
-            _cameraVideo->setLocalIp(localIp);
-            _cameraVideo->setMainIp(mainip);
-            update_main_screen_title(mainip);
-            _cameraVideo->showMainAvatar();
-        }
+        const qint64 selfId = local_user_id();
+        apply_partner_profile(selfId, UserSession::instance().name(),
+                              UserSession::instance().avatar());
+        add_partner(selfId);
+        main_user_id_ = selfId;
+        _cameraVideo->setLocalUserId(selfId);
+        _cameraVideo->setMainUserId(main_user_id_);
+        update_main_screen_title(main_user_id_);
+        _cameraVideo->showMainAvatar();
         spdlog::info("[MeetingWidget] start_meeting_media begin");
         if (spdlog::default_logger())
             spdlog::default_logger()->flush();
@@ -532,18 +528,15 @@ void MeetingWidget::handle_join_meeting_response(const MessagePtr &msg) {
         QMessageBox::warning(this, tr("Meeting information"), tr("成员已满，无法加入"));
         update_meeting_info();
     } else if (c > 0) {
-        if (_network) {
-            const std::uint32_t localIp = _network->localIp();
-            apply_partner_profile(localIp, UserSession::instance().userId(),
-                                  UserSession::instance().name(),
-                                  UserSession::instance().avatar());
-            add_partner(localIp);
-            mainip = localIp;
-            _cameraVideo->setLocalIp(localIp);
-            _cameraVideo->setMainIp(mainip);
-            update_main_screen_title(mainip);
-            _cameraVideo->showMainAvatar();
-        }
+        const qint64 selfId = local_user_id();
+        apply_partner_profile(selfId, UserSession::instance().name(),
+                              UserSession::instance().avatar());
+        add_partner(selfId);
+        main_user_id_ = selfId;
+        _cameraVideo->setLocalUserId(selfId);
+        _cameraVideo->setMainUserId(main_user_id_);
+        update_main_screen_title(main_user_id_);
+        _cameraVideo->showMainAvatar();
         ui->sendmsg->setDisabled(false);
         _joinmeet = true;
         start_meeting_media();
@@ -563,7 +556,7 @@ void MeetingWidget::handle_text_recv(const MessagePtr &msg) {
     ChatMessage *message = new ChatMessage(ui->listWidget);
     QListWidgetItem *item = new QListWidgetItem();
     deal_message_time(time);
-    deal_message(message, item, str, time, partner_display_name(text_msg->ip()),
+    deal_message(message, item, str, time, partner_display_name(text_msg->user_id()),
                    ChatMessage::User_She);
     const QString myName = UserSession::instance().name();
     if (!myName.isEmpty() && str.contains(QStringLiteral("@") + myName)) {
@@ -574,9 +567,9 @@ void MeetingWidget::handle_text_recv(const MessagePtr &msg) {
 void MeetingWidget::handle_partner_join(const MessagePtr &msg) {
     if (!msg)
         return;
-    Partner *p = add_partner(msg->ip());
+    Partner *p = add_partner(msg->user_id());
     if (p) {
-        _cameraVideo->showAvatarForIp(msg->ip());
+        _cameraVideo->showAvatarForUser(msg->user_id());
         update_meeting_info();
     }
 }
@@ -584,9 +577,9 @@ void MeetingWidget::handle_partner_join(const MessagePtr &msg) {
 void MeetingWidget::handle_partner_exit(const MessagePtr &msg) {
     if (!msg)
         return;
-    const QString name = partner_display_name(msg->ip());
-    remove_partner(msg->ip());
-    if (mainip == msg->ip())
+    const QString name = partner_display_name(msg->user_id());
+    remove_partner(msg->user_id());
+    if (main_user_id_ == msg->user_id())
         _cameraVideo->showMainAvatar();
     const QString atTag = QStringLiteral("@") + name;
     const auto it = std::find(iplist.begin(), iplist.end(), atTag);
@@ -599,16 +592,16 @@ void MeetingWidget::handle_partner_exit(const MessagePtr &msg) {
 
 void MeetingWidget::handle_close_camera(const MessagePtr &msg) {
     if (msg)
-        close_img(msg->ip());
+        close_video_for_user(msg->user_id());
 }
 
 void MeetingWidget::handle_partner_join2(const MessagePtr &msg) {
     const auto *join2 = dynamic_cast<const PartnerJoin2Message *>(msg.get());
     if (!join2)
         return;
-    for (const std::uint32_t ip : join2->partner_ips()) {
-        if (add_partner(ip))
-            _cameraVideo->showAvatarForIp(ip);
+    for (const qint64 userId : join2->partner_user_ids()) {
+        if (add_partner(userId))
+            _cameraVideo->showAvatarForUser(userId);
     }
     ui->openVedio->setDisabled(false);
     update_meeting_info();
@@ -619,10 +612,10 @@ void MeetingWidget::handle_user_profile(const MessagePtr &msg) {
     if (!profile)
         return;
     apply_partner_profile(
-        profile->ip(), profile->user_id(),
+        profile->user_id(),
         QString::fromUtf8(profile->display_name().c_str()),
         QString::fromUtf8(profile->avatar_url().c_str()));
-    update_main_screen_title(mainip);
+    update_main_screen_title(main_user_id_);
 }
 
 void MeetingWidget::handle_remote_host_closed_error() {
@@ -692,18 +685,18 @@ void MeetingWidget::on_text_message_slot(MessagePtr msg) {
     handle_text_recv(msg);
 }
 
-Partner *MeetingWidget::add_partner(std::uint32_t ip) {
-    if (partner.find(ip) != partner.end())
-        return partner[ip];
+Partner *MeetingWidget::add_partner(qint64 userId) {
+    if (partner.find(userId) != partner.end())
+        return partner[userId];
 
-    Partner *p = new Partner(ip, this);
+    Partner *p = new Partner(userId, this);
     auto *tile = new PartnerTile(p, ui->scrollAreaWidgetContents);
     init_partner_connect(p);
-    partner.emplace(ip, p);
+    partner.emplace(userId, p);
     ui->verticalLayout_3->addWidget(tile, 1);
 
     if (QLabel *label = p->displayLabel())
-        _cameraVideo->addPartnerDisplay(ip, label);
+        _cameraVideo->addPartnerDisplay(userId, label);
 
     if (_createmeet || _joinmeet) {
         ui->openAudio->setDisabled(false);
@@ -712,13 +705,13 @@ Partner *MeetingWidget::add_partner(std::uint32_t ip) {
     return p;
 }
 
-void MeetingWidget::remove_partner(std::uint32_t ip) {
-    auto it = partner.find(ip);
+void MeetingWidget::remove_partner(qint64 userId) {
+    auto it = partner.find(userId);
     if (it == partner.end())
         return;
     Partner *p = it->second;
-    disconnect(p, &Partner::clicked, this, &MeetingWidget::on_recv_ip_slot);
-    _cameraVideo->removePartnerDisplay(ip);
+    disconnect(p, &Partner::clicked, this, &MeetingWidget::on_recv_user_slot);
+    _cameraVideo->removePartnerDisplay(userId);
     if (PartnerTile *tile = p->tile()) {
         ui->verticalLayout_3->removeWidget(tile);
         p->setTile(nullptr);
@@ -737,7 +730,7 @@ void MeetingWidget::clear_partner() {
         _cameraVideo->clearAllPartnerDisplays();
     for (auto it = partner.begin(); it != partner.end();) {
         Partner *p = it->second;
-        disconnect(p, &Partner::clicked, this, &MeetingWidget::on_recv_ip_slot);
+        disconnect(p, &Partner::clicked, this, &MeetingWidget::on_recv_user_slot);
         if (PartnerTile *tile = p->tile()) {
             ui->verticalLayout_3->removeWidget(tile);
             p->setTile(nullptr);
@@ -752,20 +745,20 @@ void MeetingWidget::clear_partner() {
     ui->openVedio->setDisabled(true);
 }
 
-void MeetingWidget::close_img(std::uint32_t ip) {
-    if (partner.find(ip) == partner.end())
+void MeetingWidget::close_video_for_user(qint64 userId) {
+    if (partner.find(userId) == partner.end())
         return;
-    _cameraVideo->showAvatarForIp(ip);
+    _cameraVideo->showAvatarForUser(userId);
 }
 
-void MeetingWidget::on_recv_ip_slot(std::uint32_t ip) {
-    if (partner.find(mainip) != partner.end())
-        partner[mainip]->resetBorder();
-    if (partner.find(ip) != partner.end())
-        partner[ip]->setSelected(true);
-    mainip = ip;
-    _cameraVideo->refreshMainForIp(mainip);
-    update_main_screen_title(mainip);
+void MeetingWidget::on_recv_user_slot(qint64 userId) {
+    if (partner.find(main_user_id_) != partner.end())
+        partner[main_user_id_]->resetBorder();
+    if (partner.find(userId) != partner.end())
+        partner[userId]->setSelected(true);
+    main_user_id_ = userId;
+    _cameraVideo->refreshMainForUser(main_user_id_);
+    update_main_screen_title(main_user_id_);
 }
 
 void MeetingWidget::on_join_meet_btn_slot(QString room_no) {
@@ -831,11 +824,6 @@ void MeetingWidget::on_connect_finished_slot(bool ok, QString ip, QString port,
                      room_no.toUtf8().constData());
         on_join_meet_btn_slot(room_no);
     }
-}
-
-void MeetingWidget::on_disconnect_server_slot() {
-    if (_network)
-        _network->disconnectFromHost();
 }
 
 void MeetingWidget::on_send_msg_clicked_slot() {
@@ -952,8 +940,8 @@ void MeetingWidget::schedule_preview_render() {
                               Qt::QueuedConnection);
 }
 
-void MeetingWidget::schedule_remote_render(std::uint32_t ip) {
-    pending_remote_ip_ = ip;
+void MeetingWidget::schedule_remote_render(qint64 userId) {
+    pending_remote_user_id_ = userId;
     if (remote_scheduled_)
         return;
     remote_scheduled_ = true;
@@ -970,25 +958,24 @@ void MeetingWidget::render_preview_frame() {
         preview_scheduled_ = false;
     }
     // mute_video 只停推流，采集仍会回调；关闭摄像头时丢弃本地预览
-    if (_videoMuted || image.isNull() || !_network)
+    if (_videoMuted || image.isNull())
         return;
-    const std::uint32_t localIp = _network->localIp();
-    _cameraVideo->showImageForIp(localIp, image);
+    _cameraVideo->showImageForUser(local_user_id(), image);
 }
 
 void MeetingWidget::render_remote_frame() {
     QImage image;
-    std::uint32_t ip = 0;
+    qint64 userId = 0;
     {
         std::lock_guard<std::mutex> lock(remote_mutex_);
         image = pending_remote_;
-        ip = pending_remote_ip_;
+        userId = pending_remote_user_id_;
         pending_remote_ = QImage();
         remote_scheduled_ = false;
     }
-    if (image.isNull() || ip == 0)
+    if (image.isNull() || userId == 0)
         return;
-    _cameraVideo->showImageForIp(ip, image);
+    _cameraVideo->showImageForUser(userId, image);
 }
 
 void MeetingWidget::video_source_start_event(xrtc::IXRtcMediaSource *,
@@ -1052,12 +1039,7 @@ void MeetingWidget::on_remote_user_joined(const xrtc::XRTCRemoteUser &user) {
     QMetaObject::invokeMethod(
         this,
         [this, feed_id = user.feed_id, userId]() {
-            for (const auto &[ip, p] : partner) {
-                if (p && p->userId() == static_cast<qint64>(userId)) {
-                    _feed_to_ip[feed_id] = ip;
-                    break;
-                }
-            }
+            _feed_to_user[feed_id] = static_cast<qint64>(userId);
         },
         Qt::QueuedConnection);
 }
@@ -1066,10 +1048,10 @@ void MeetingWidget::on_remote_user_left(const xrtc::XRTCRemoteUser &user) {
     QMetaObject::invokeMethod(
         this,
         [this, feed_id = user.feed_id]() {
-            const auto it = _feed_to_ip.find(feed_id);
-            if (it != _feed_to_ip.end()) {
-                close_img(it->second);
-                _feed_to_ip.erase(it);
+            const auto it = _feed_to_user.find(feed_id);
+            if (it != _feed_to_user.end()) {
+                close_video_for_user(it->second);
+                _feed_to_user.erase(it);
             }
         },
         Qt::QueuedConnection);
@@ -1080,18 +1062,18 @@ void MeetingWidget::on_remote_video_frame(uint64_t feed_id,
     QImage image = frameToImage(frame);
     if (image.isNull())
         return;
-    std::uint32_t ip = 0;
+    qint64 userId = 0;
     {
-        const auto it = _feed_to_ip.find(feed_id);
-        if (it != _feed_to_ip.end())
-            ip = it->second;
+        const auto it = _feed_to_user.find(feed_id);
+        if (it != _feed_to_user.end())
+            userId = it->second;
     }
-    if (ip == 0)
+    if (userId == 0)
         return;
     {
         std::lock_guard<std::mutex> lock(remote_mutex_);
         pending_remote_ = std::move(image);
-        pending_remote_ip_ = ip;
+        pending_remote_user_id_ = userId;
     }
-    schedule_remote_render(ip);
+    schedule_remote_render(userId);
 }

@@ -36,13 +36,15 @@ public:
      * @return 房间ID
      */
     std::optional<uint32_t> create_room(std::shared_ptr<network::Connection> owner,
-                                        RoomOptions options = {});
+                                        RoomOptions options,
+                                        uint64_t owner_user_id);
     /**
      * @brief 加入房间
      * @param room_id 房间ID
      * @param conn 连接
      */
-    JoinResult join_room(uint32_t room_id, std::shared_ptr<network::Connection> conn);
+    JoinResult join_room(uint32_t room_id, std::shared_ptr<network::Connection> conn,
+                         uint64_t user_id);
 
     /**
      * @brief 获取房间

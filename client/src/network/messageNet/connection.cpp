@@ -69,10 +69,8 @@ bool Connection::connectOnIoThread(const QString &ip, const QString &port) {
         return false;
     }
 
-    m_localIp = m_socket->localAddress().toIPv4Address();
-    m_hasLocalIp = true;
     m_lastError.clear();
-    spdlog::info("[Connection] connected localIp={}", m_localIp);
+    spdlog::info("[Connection] connected");
     return true;
 }
 
@@ -160,9 +158,6 @@ void Connection::stopImmediately() {
 }
 
 void Connection::disconnectFromHost() {
-    m_hasLocalIp = false;
-    m_localIp = 0;
-
     /// 只唤醒队列，不在调用线程 clearAll（避免与 IO/发送线程抢锁卡死
     /// controller）
     if (m_hub)
@@ -196,10 +191,6 @@ void Connection::disconnectOnIoThread() {
 }
 
 QString Connection::errorString() const { return m_lastError; }
-
-std::uint32_t Connection::localIp() const {
-    return m_hasLocalIp ? m_localIp : UINT32_MAX;
-}
 
 bool Connection::validateIpPort(QWidget *parent, const QString &ip,
                                 const QString &port) {

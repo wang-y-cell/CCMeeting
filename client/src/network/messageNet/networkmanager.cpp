@@ -24,8 +24,6 @@ NetworkManager::NetworkManager(QObject *parent) : QObject(parent) {
             &NetworkManager::user_info_message_ready);
     connect(hub_, &MessageHub::text_message_ready, this,
             &NetworkManager::text_message_ready);
-    connect(hub_, &MessageHub::video_message_ready, this,
-            &NetworkManager::video_message_ready);
     connect(hub_, &MessageHub::text_send_finished, this,
             &NetworkManager::send_text_finished);
 
@@ -63,10 +61,6 @@ void NetworkManager::disconnect_from_host() {
         connection_->disconnectFromHost();
     /// 不再提前 emit disconnected：等 Connection::disconnectOnIoThread
     /// 完成后再通知， 否则 UI 会过早允许重连，旧发送线程仍可能抢走创建会议包。
-}
-
-std::uint32_t NetworkManager::local_ip() const {
-    return connection_ ? connection_->localIp() : UINT32_MAX;
 }
 
 void NetworkManager::send_create_meeting(std::uint32_t max_participants,

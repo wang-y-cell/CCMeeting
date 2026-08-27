@@ -98,4 +98,48 @@ void UserRepository::insert_login_log(std::uint64_t user_id,
     }
 }
 
+std::optional<std::uint64_t> UserRepository::create_user(
+    const std::string& username,
+    const std::string& password_hash) const {
+    if (find_credential_by_username(username).has_value()) {
+        return std::nullopt;
+    }
+
+    auto conn = mysql_.create_connection();
+    conn->setAutoCommit(false);
+
+    try {
+        std::unique_ptr<sql::PreparedStatement> user_stmt(conn->prepareStatement(
+            "INSERT INTO sys_users (username, password_hash, status) "
+            "VALUES (?, ?, 1)"));
+        user_stmt->setString(1, username);
+        user_stmt->setString(2, password_hash);
+        user_stmt->executeUpdate();
+
+        std::unique_ptr<sql::Statement> id_stmt(conn->createStatement());
+        std::unique_ptr<sql::ResultSet> id_rs(
+            id_stmt->executeQuery("SELECT LAST_INSERT_ID() AS user_id"));
+        if (!id_rs->next()) {
+            conn->rollback();
+            return std::nullopt;
+        }
+
+        const std::uint64_t user_id =
+            static_cast<std::uint64_t>(id_rs->getUInt64("user_id"));
+
+        std::unique_ptr<sql::PreparedStatement> profile_stmt(conn->prepareStatement(
+            "INSERT INTO sys_user_profiles (user_id, nickname) VALUES (?, ?)"));
+        profile_stmt->setUInt64(1, user_id);
+        profile_stmt->setString(2, username);
+        profile_stmt->executeUpdate();
+
+        conn->commit();
+        return user_id;
+    } catch (const std::exception& ex) {
+        conn->rollback();
+        spdlog::warn("[UserRepository] create_user failed: {}", ex.what());
+        return std::nullopt;
+    }
+}
+
 }  // namespace repository

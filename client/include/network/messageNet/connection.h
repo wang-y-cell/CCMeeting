@@ -47,11 +47,6 @@ public:
      * @return 错误字符串
      */
     QString errorString() const;
-    /**
-     * @brief 本机在连接上的 IP（主机序）
-     * @return 本机 IP
-     */
-    std::uint32_t localIp() const;
 
     /**
      * @brief 校验 IP/端口格式，失败时弹窗提示
@@ -101,8 +96,6 @@ private:
     MessageCodec::WireStreamParser m_parser; ///< 流式解帧器
 
     QString m_lastError; ///< 最近错误信息
-    std::uint32_t m_localIp = 0; ///< 本机 IP
-    bool m_hasLocalIp = false; ///< 是否已解析到本机 IP
 };
 
 #endif // CONNECTION_H

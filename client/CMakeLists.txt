@@ -38,8 +38,6 @@ file(GLOB_RECURSE CLIENT_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.ui"
 )
 
-# 排除xrtc SDK中的音频相关文件
-list(FILTER CLIENT_SOURCES EXCLUDE REGEX ".*/(AudioInput|AudioOutput|AudioFormatStd|audiocommon|myvideosurface)\\.(cpp|h)$")
 list(SORT CLIENT_SOURCES)
 
 qt_add_executable(CloudMeetingClient
@@ -67,6 +65,8 @@ target_include_directories(CloudMeetingClient PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include/network/messageNet"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/widget"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/widget/meeting"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/widget/login"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/widget/main_window"
 )
 
 target_compile_definitions(CloudMeetingClient PRIVATE

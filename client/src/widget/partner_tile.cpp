@@ -42,10 +42,10 @@ PartnerTile::PartnerTile(Partner *partner, QWidget *parent)
 void PartnerTile::updateProfile(const QString &displayName,
                                 const QString &avatarUrl) {
     if (m_nameLabel) {
-        m_nameLabel->setText(displayName.isEmpty() ? m_partner->ipString()
+        m_nameLabel->setText(displayName.isEmpty() ? m_partner->fallbackLabel()
                                                    : displayName);
     }
-    setToolTip(displayName.isEmpty() ? m_partner->ipString() : displayName);
+    setToolTip(displayName.isEmpty() ? m_partner->fallbackLabel() : displayName);
     loadAvatar(avatarUrl);
 }
 
@@ -109,5 +109,5 @@ void PartnerTile::updateLabelGeometry() {
 
 void PartnerTile::mousePressEvent(QMouseEvent *) {
     if (m_partner)
-        emit clicked(m_partner->ip());
+        emit clicked(m_partner->userId());
 }

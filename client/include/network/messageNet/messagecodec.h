@@ -16,10 +16,10 @@ public:
     /**
      * @brief 将业务 Message 编码为网络帧
      * @param msg 业务 Message
-     * @param local_ip 本地 IP 地址
+     * @param local_user_id 本地用户 ID
      * @return 网络帧
     */
-    static QByteArray encode_wire_frame(const Message &msg, std::uint32_t local_ip);
+    static QByteArray encode_wire_frame(const Message &msg, qint64 local_user_id);
 
     /**
      * @brief 解析网络帧,封装成业务 Message

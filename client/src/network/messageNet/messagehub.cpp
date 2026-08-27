@@ -1,6 +1,7 @@
 #include "messagehub.h"
 #include "connection.h"
 #include "messagecodec.h"
+#include "configure/user_session.h"
 #include <QMetaObject>
 #include <spdlog/spdlog.h>
 
@@ -17,7 +18,8 @@ void MessageHub::enqueue_send(MessagePtr msg) {
     if (kind == MessageKind::CreateMeeting ||
         kind == MessageKind::JoinMeeting || kind == MessageKind::CloseCamera ||
         kind == MessageKind::SendText || kind == MessageKind::SendUserProfile) {
-        spdlog::info("[MessageHub] enqueue_send kind={}", static_cast<int>(kind));
+        spdlog::info("[MessageHub] enqueue_send kind={}",
+                     static_cast<int>(kind));
     }
     send_queue_.push(std::move(msg));
 }
@@ -45,12 +47,6 @@ void MessageHub::emit_incoming(MessagePtr msg) {
     case MessageKind::RecvText:
         emit text_message_ready(msg);
         break;
-    case MessageKind::RecvImage:
-        emit video_message_ready(msg);
-        break;
-    case MessageKind::RecvAudio:
-        recv_audio_queue_.push(std::move(msg));
-        break;
     default:
         spdlog::warn("[MessageHub] 未处理的入站 kind={}",
                      static_cast<int>(msg->kind()));
@@ -62,13 +58,7 @@ void MessageHub::route_incoming(MessagePtr msg) {
     if (!msg)
         return;
 
-    /// 控制面与 UI 消息：投递到 MessageHub 所在线程发信号，不另开接收线程
     const MessageKind k = msg->kind();
-    if (k ==
-        MessageKind::RecvAudio) { // 如果是音频消息,则直接添加到接收音频队列
-        recv_audio_queue_.push(std::move(msg));
-        return;
-    }
 
     // 如果是控制面消息,则直接投递到 MessageHub 所在线程发信号
     if (k == MessageKind::CreateMeetingResponse ||
@@ -87,37 +77,25 @@ void MessageHub::route_incoming(MessagePtr msg) {
         Qt::QueuedConnection);
 }
 
-void MessageHub::clear_pending_video() { send_queue_.clear_video(); }
-
 void MessageHub::clear_all() {
     send_queue_.clear();
-    recv_audio_queue_.clear();
     send_queue_.wake_all();
-    recv_audio_queue_.wake_all();
 }
 
-void MessageHub::wake_all_queues() {
-    send_queue_.wake_all();
-    recv_audio_queue_.wake_all();
-}
-
-std::optional<MessagePtr> MessageHub::pop_recv_audio(int wait_ms) {
-    return recv_audio_queue_.pop(wait_ms);
-}
-
-void MessageHub::wake_recv_audio() { recv_audio_queue_.wake_all(); }
+void MessageHub::wake_all_queues() { send_queue_.wake_all(); }
 
 void MessageHub::send_loop(std::uint64_t epoch) {
     spdlog::info("[MessageHub] 发送线程启动 tid={} epoch={}",
                  reinterpret_cast<quintptr>(QThread::currentThreadId()), epoch);
 
-    //如果当前旧的线程(上次创建的线程)发现send_epoch_和自己不相等了，说明被新线程取代了，则退出循环
+    // 如果当前旧的线程(上次创建的线程)发现send_epoch_和自己不相等了，说明被新线程取代了，则退出循环
     while (send_running_.load() && send_epoch_.load() == epoch) {
         /// 短超时，便于 epoch/stop 后尽快退出，避免与新会话发送线程重叠
-        auto msg = send_queue_.pop(100); //从发送队列中取出消息
-        if (send_epoch_.load() != epoch) { //如果发送线程世代号不相等，则说明被新线程取代了，则退出循环
+        auto msg = send_queue_.pop(100); // 从发送队列中取出消息
+        if (send_epoch_.load() !=
+            epoch) { // 如果发送线程世代号不相等，则说明被新线程取代了，则退出循环
             /// 已被新世代取代：若已取出控制包则放回，避免创建/加入会议请求丢失
-            if (msg && *msg) { //如果消息不为空，则取出消息的类型
+            if (msg && *msg) { // 如果消息不为空，则取出消息的类型
                 const MessageKind kind = (*msg)->kind();
                 if (kind == MessageKind::CreateMeeting ||
                     kind == MessageKind::JoinMeeting ||
@@ -125,12 +103,12 @@ void MessageHub::send_loop(std::uint64_t epoch) {
                     kind == MessageKind::SendText) {
                     spdlog::warn("[MessageHub] 旧发送线程归还控制包 kind={}",
                                  static_cast<int>(kind));
-                    send_queue_.push(std::move(*msg)); //将消息放回发送队列
+                    send_queue_.push(std::move(*msg)); // 将消息放回发送队列
                 }
             }
             break;
         }
-        if (!msg || !*msg) //如果消息为空，则继续循环
+        if (!msg || !*msg) // 如果消息为空，则继续循环
             continue;
 
         if (!connection_) {
@@ -138,10 +116,10 @@ void MessageHub::send_loop(std::uint64_t epoch) {
             continue;
         }
 
-        const MessageKind kind = (*msg)->kind(); //获取消息的类型
-        const std::uint32_t local_ip = connection_->localIp(); //获取本地ip
+        const MessageKind kind = (*msg)->kind();           // 获取消息的类型
+        const qint64 local_user_id = UserSession::instance().userId();
         const QByteArray frame =
-            MessageCodec::encode_wire_frame(**msg, local_ip); //编码消息
+            MessageCodec::encode_wire_frame(**msg, local_user_id);
         if (frame.isEmpty()) {
             spdlog::error("[MessageHub] 编码失败 kind={}",
                           static_cast<int>(kind));
@@ -149,17 +127,18 @@ void MessageHub::send_loop(std::uint64_t epoch) {
         }
 
         if (kind == MessageKind::CreateMeeting ||
-            kind == MessageKind::JoinMeeting) { //如果消息类型为创建会议或加入会议，则打印日志
+            kind == MessageKind::JoinMeeting) { // 如果消息类型为创建会议或加入会议，则打印日志
             spdlog::info("[MessageHub] 发出控制包 kind={} bytes={}",
                          static_cast<int>(kind), frame.size());
         }
 
-        const bool text_kind = kind == MessageKind::SendText; //如果消息类型为发送文本，则设置为true
-        QMetaObject::invokeMethod(connection_, "sendWireData", //调用连接对象的sendWireData方法发送消息
-                                  Qt::QueuedConnection,
-                                  Q_ARG(QByteArray, frame));
-        if (text_kind) //如果消息类型为发送文本，则发送完成信号
-            emit text_send_finished(); //发送完成信号,通知UI线程发送文本完成,结束等待动画
+        const bool text_kind =
+            kind == MessageKind::SendText; // 如果消息类型为发送文本，则设置为true
+        QMetaObject::invokeMethod(
+            connection_, "sendWireData", // 调用连接对象的sendWireData方法发送消息
+            Qt::QueuedConnection, Q_ARG(QByteArray, frame));
+        if (text_kind) // 如果消息类型为发送文本，则发送完成信号
+            emit text_send_finished(); // 发送完成信号,通知UI线程发送文本完成,结束等待动画
     }
 
     spdlog::info("[MessageHub] 发送线程结束 tid={} epoch={}",
@@ -167,9 +146,9 @@ void MessageHub::send_loop(std::uint64_t epoch) {
 }
 
 void MessageHub::signal_send_stop() {
-    send_running_.store(false); //设置发送线程为停止状态
-    send_epoch_.fetch_add(1); //增加发送线程世代号
-    send_queue_.wake_all(); //唤醒发送队列
+    send_running_.store(false); // 设置发送线程为停止状态
+    send_epoch_.fetch_add(1);   // 增加发送线程世代号
+    send_queue_.wake_all();     // 唤醒发送队列
 }
 
 void MessageHub::start_send_worker() {

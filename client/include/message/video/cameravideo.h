@@ -4,7 +4,7 @@
 #include "ImgDisplay.h"
 #include <QImage>
 #include <QObject>
-#include <cstdint>
+#include <QtGlobal>
 #include <unordered_map>
 
 /**
@@ -17,19 +17,19 @@ public:
     ~CameraVideo();
 
     void setMainTarget(QWidget *label);
-    void setLocalIp(std::uint32_t ip);
-    void setMainIp(std::uint32_t ip);
+    void setLocalUserId(qint64 userId);
+    void setMainUserId(qint64 userId);
 
-    void addPartnerDisplay(std::uint32_t ip, QWidget *label);
-    void removePartnerDisplay(std::uint32_t ip);
+    void addPartnerDisplay(qint64 userId, QWidget *label);
+    void removePartnerDisplay(qint64 userId);
     void clearAllPartnerDisplays();
 
-    void showImageForIp(std::uint32_t ip, const QImage &image);
+    void showImageForUser(qint64 userId, const QImage &image);
     void showMainImage(const QImage &image);
-    void showAvatarForIp(std::uint32_t ip);
-    void showAvatarForIp(std::uint32_t ip, const QImage &avatar);
+    void showAvatarForUser(qint64 userId);
+    void showAvatarForUser(qint64 userId, const QImage &avatar);
     void showMainAvatar();
-    void refreshMainForIp(std::uint32_t ip);
+    void refreshMainForUser(qint64 userId);
 
     void endVideo();
 
@@ -39,10 +39,10 @@ private:
     QWidget *_parent = nullptr;
     ImgDisplay *_mainVideoImg = nullptr;
     ImgDisplay *_mainAvatarImg = nullptr;
-    std::unordered_map<std::uint32_t, ImgDisplay *> _partnerDisplays;
-    std::unordered_map<std::uint32_t, QImage> _lastImages;
-    std::uint32_t _localIp = 0;
-    std::uint32_t _mainIp = 0;
+    std::unordered_map<qint64, ImgDisplay *> _partnerDisplays;
+    std::unordered_map<qint64, QImage> _lastImages;
+    qint64 _localUserId = 0;
+    qint64 _mainUserId = 0;
 };
 
 #endif // CAMERAVIDEO_H

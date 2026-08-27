@@ -10,14 +10,14 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 
 namespace meeting {
 
 struct Participant {
     std::shared_ptr<network::Connection> connection;
-    uint32_t ip_network = 0;
-    bool is_owner = false;
     uint64_t user_id = 0;
+    bool is_owner = false;
     std::string display_name;
     std::string avatar_url;
 };

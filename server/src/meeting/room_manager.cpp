@@ -9,7 +9,8 @@ RoomManager::RoomManager(config::ServerConfig config,
     : _config(std::move(config)), _io_ctx(io_ctx) {}
 
 std::optional<uint32_t> RoomManager::create_room(
-    std::shared_ptr<network::Connection> owner, RoomOptions options) {
+    std::shared_ptr<network::Connection> owner, RoomOptions options,
+    uint64_t owner_user_id) {
     if (!owner || !owner->is_open()) {
         spdlog::warn("cannot create room: owner is not open");
         return std::nullopt;
@@ -20,7 +21,8 @@ std::optional<uint32_t> RoomManager::create_room(
     }
 
     const uint32_t room_id = _next_room_id++;
-    auto room = std::make_shared<Room>(room_id, owner, _config, _io_ctx, options);
+    auto room = std::make_shared<Room>(room_id, owner, _config, _io_ctx, options,
+                                       owner_user_id);
     room->start_expire_timer();
     _rooms.emplace(room_id, room);
     spdlog::info("room {} created, max_participants={}, duration_minutes={}",
@@ -29,7 +31,8 @@ std::optional<uint32_t> RoomManager::create_room(
 }
 
 RoomManager::JoinResult RoomManager::join_room(
-    uint32_t room_id, std::shared_ptr<network::Connection> conn) {
+    uint32_t room_id, std::shared_ptr<network::Connection> conn,
+    uint64_t user_id) {
     auto room = get_room(room_id);
     if (!room) {
         spdlog::warn("room {} not found", room_id);
@@ -43,7 +46,7 @@ RoomManager::JoinResult RoomManager::join_room(
         spdlog::warn("room {} is full", room_id);
         return JoinResult::Full;
     }
-    if (!room->add_participant(conn, false)) {
+    if (!room->add_participant(conn, false, user_id)) {
         spdlog::warn("room {} add participant failed", room_id);
         return JoinResult::Full;
     }

@@ -1,16 +1,15 @@
 #include "partner.h"
 #include "partner_tile.h"
-#include <QHostAddress>
 #include <QLabel>
 
-Partner::Partner(std::uint32_t ip, QObject *parent)
-    : QObject(parent), m_ip(ip) {}
+Partner::Partner(qint64 userId, QObject *parent)
+    : QObject(parent), m_userId(userId) {}
 
-QString Partner::ipString() const { return QHostAddress(m_ip).toString(); }
+QString Partner::fallbackLabel() const {
+    return m_displayName.isEmpty() ? QString::number(m_userId) : m_displayName;
+}
 
-void Partner::setProfile(qint64 userId, const QString &displayName,
-                         const QString &avatarUrl) {
-    m_userId = userId;
+void Partner::setProfile(const QString &displayName, const QString &avatarUrl) {
     m_displayName = displayName;
     m_avatarUrl = avatarUrl;
     if (m_tile)

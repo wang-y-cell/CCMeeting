@@ -1,5 +1,4 @@
 #include "messagecodec.h"
-#include <QBuffer>
 #include <QtEndian>
 #include <cstring>
 #include <spdlog/spdlog.h>
@@ -10,35 +9,18 @@ QByteArray compress_text_payload(const std::string &text) {
     return qCompress(QByteArray(text.data(), static_cast<int>(text.size())));
 }
 
-QByteArray compress_audio_payload(const QByteArray &pcm) {
-    return qCompress(pcm).toBase64();
-}
-
-QByteArray compress_image_payload(const QImage &image) {
-    QByteArray raw;
-    QBuffer buf(&raw);
-    buf.open(QIODevice::WriteOnly);
-    if (!image.save(&buf, "JPEG"))
-        return {};
-    return qCompress(raw).toBase64();
-}
-
-QByteArray decode_image_wire_payload(const QByteArray &wire_body) {
-    return qUncompress(QByteArray::fromBase64(wire_body));
-}
-
 QByteArray decode_text_wire_payload(const QByteArray &wire_body) {
     return qUncompress(wire_body);
 }
 
-QByteArray decode_audio_wire_payload(const QByteArray &wire_body) {
-    return qUncompress(QByteArray::fromBase64(wire_body));
+bool wire_frame_needs_length_field(MSG_TYPE type) {
+    return type == CREATE_MEETING || type == CLOSE_CAMERA ||
+           type == TEXT_SEND || type == JOIN_MEETING || type == USER_PROFILE;
 }
 
-bool wire_frame_needs_length_field(MSG_TYPE type) {
-    return type == CREATE_MEETING || type == AUDIO_SEND ||
-           type == CLOSE_CAMERA || type == IMG_SEND || type == TEXT_SEND ||
-           type == JOIN_MEETING || type == USER_PROFILE;
+qint64 read_wire_user_id(const std::uint8_t *frame) {
+    return static_cast<qint64>(
+        qFromBigEndian<quint64>(reinterpret_cast<const char *>(frame + 3)));
 }
 
 MessagePtr decode_create_meeting_response(const std::uint8_t *body,
@@ -64,33 +46,16 @@ MessagePtr decode_join_meeting_response(const std::uint8_t *body,
 MessagePtr decode_partner_join2(const std::uint8_t *body,
                                 std::uint32_t n_body) {
     auto msg = std::make_shared<PartnerJoin2Message>();
-    for (std::uint32_t i = 0; i < n_body / sizeof(std::uint32_t); ++i) {
-        const std::uint32_t ip =
-            qFromBigEndian<std::uint32_t>(body + i * sizeof(std::uint32_t));
-        msg->add_partner_ip(ip);
+    for (std::uint32_t i = 0; i < n_body / sizeof(quint64); ++i) {
+        const qint64 user_id = static_cast<qint64>(qFromBigEndian<quint64>(
+            body + i * sizeof(quint64)));
+        msg->add_partner_user_id(user_id);
     }
     return msg;
 }
 
-MessagePtr decode_image_recv(const std::uint8_t *body, std::uint32_t n_body,
-                             std::uint32_t ip) {
-    const QByteArray wire_body(reinterpret_cast<const char *>(body),
-                               static_cast<int>(n_body));
-    const QByteArray decoded = decode_image_wire_payload(wire_body);
-    if (decoded.isEmpty())
-        return nullptr;
-
-    auto msg = std::make_shared<RecvImageMessage>();
-    msg->set_ip(ip);
-    QImage image;
-    if (!image.loadFromData(decoded) || image.isNull())
-        return nullptr;
-    msg->set_image(std::move(image));
-    return msg;
-}
-
 MessagePtr decode_text_recv(const std::uint8_t *body, std::uint32_t n_body,
-                            std::uint32_t ip) {
+                            qint64 user_id) {
     const QByteArray wire_body(reinterpret_cast<const char *>(body),
                                static_cast<int>(n_body));
     const QByteArray decoded = decode_text_wire_payload(wire_body);
@@ -98,28 +63,14 @@ MessagePtr decode_text_recv(const std::uint8_t *body, std::uint32_t n_body,
         return nullptr;
 
     auto msg = std::make_shared<RecvTextMessage>();
-    msg->set_ip(ip);
+    msg->set_user_id(user_id);
     msg->set_text(std::string(decoded.constData(),
                               static_cast<std::size_t>(decoded.size())));
     return msg;
 }
 
-MessagePtr decode_audio_recv(const std::uint8_t *body, std::uint32_t n_body,
-                             std::uint32_t ip) {
-    const QByteArray wire_body(reinterpret_cast<const char *>(body),
-                               static_cast<int>(n_body));
-    const QByteArray decoded = decode_audio_wire_payload(wire_body);
-    if (decoded.isEmpty())
-        return nullptr;
-
-    auto msg = std::make_shared<RecvAudioMessage>();
-    msg->set_ip(ip);
-    msg->set_audio(decoded);
-    return msg;
-}
-
 MessagePtr decode_user_profile(const std::uint8_t *body, std::uint32_t n_body,
-                               std::uint32_t ip) {
+                               qint64 sender_user_id) {
     if (n_body < 12)
         return nullptr;
     std::size_t offset = 0;
@@ -143,8 +94,8 @@ MessagePtr decode_user_profile(const std::uint8_t *body, std::uint32_t n_body,
         reinterpret_cast<const char *>(body + offset), avatar_len);
 
     auto msg = std::make_shared<UserProfileNotifyMessage>();
-    msg->set_ip(ip);
-    msg->set_user_id(static_cast<qint64>(user_id));
+    msg->set_user_id(sender_user_id != 0 ? sender_user_id
+                                         : static_cast<qint64>(user_id));
     msg->set_display_name(name.toUtf8().constData());
     msg->set_avatar_url(avatar.toUtf8().constData());
     return msg;
@@ -168,7 +119,7 @@ QByteArray encode_user_profile_payload(qint64 user_id, const std::string &name,
     return body;
 }
 
-MessagePtr decode_simple_ip_event(MessageKind kind, std::uint32_t ip) {
+MessagePtr decode_simple_user_event(MessageKind kind, qint64 user_id) {
     MessagePtr msg;
     switch (kind) {
     case MessageKind::PartnerJoin:
@@ -184,7 +135,7 @@ MessagePtr decode_simple_ip_event(MessageKind kind, std::uint32_t ip) {
         msg = std::make_shared<PartnerJoinMessage>();
         break;
     }
-    msg->set_ip(ip);
+    msg->set_user_id(user_id);
     return msg;
 }
 
@@ -215,20 +166,12 @@ MSG_TYPE MessageCodec::to_wire_type(MessageKind kind) {
         return CLOSE_CAMERA;
     case MessageKind::SendText:
         return TEXT_SEND;
-    case MessageKind::SendImage:
-        return IMG_SEND;
-    case MessageKind::SendAudio:
-        return AUDIO_SEND;
     case MessageKind::CreateMeetingResponse:
         return CREATE_MEETING_RESPONSE;
     case MessageKind::JoinMeetingResponse:
         return JOIN_MEETING_RESPONSE;
     case MessageKind::RecvText:
         return TEXT_RECV;
-    case MessageKind::RecvImage:
-        return IMG_RECV;
-    case MessageKind::RecvAudio:
-        return AUDIO_RECV;
     case MessageKind::PartnerJoin:
         return PARTNER_JOIN;
     case MessageKind::PartnerExit:
@@ -252,13 +195,10 @@ MSG_TYPE MessageCodec::to_wire_type(MessageKind kind) {
 MessageKind MessageCodec::from_wire_type(MSG_TYPE type) {
     switch (type) {
     case IMG_SEND:
-        return MessageKind::SendImage;
     case IMG_RECV:
-        return MessageKind::RecvImage;
     case AUDIO_SEND:
-        return MessageKind::SendAudio;
     case AUDIO_RECV:
-        return MessageKind::RecvAudio;
+        return MessageKind::OtherNetError; // reserved legacy media
     case TEXT_SEND:
         return MessageKind::SendText;
     case TEXT_RECV:
@@ -292,7 +232,7 @@ MessageKind MessageCodec::from_wire_type(MSG_TYPE type) {
 }
 
 QByteArray MessageCodec::encode_wire_frame(const Message &msg,
-                                           std::uint32_t local_ip) {
+                                           qint64 local_user_id) {
     const MSG_TYPE wire_type = to_wire_type(msg.kind());
     QByteArray body;
 
@@ -319,18 +259,13 @@ QByteArray MessageCodec::encode_wire_frame(const Message &msg,
             body = compress_text_payload(text_msg->text());
         break;
     }
-    case MessageKind::SendImage: {
-        const auto *image_msg = dynamic_cast<const SendImageMessage *>(&msg);
-        if (image_msg)
-            body = compress_image_payload(image_msg->image());
-        break;
-    }
     case MessageKind::SendUserProfile: {
-        const auto *profile = dynamic_cast<const SendUserProfileMessage *>(&msg);
+        const auto *profile =
+            dynamic_cast<const SendUserProfileMessage *>(&msg);
         if (profile) {
-            body = encode_user_profile_payload(
-                profile->user_id(), profile->display_name(),
-                profile->avatar_url());
+            body = encode_user_profile_payload(profile->user_id(),
+                                               profile->display_name(),
+                                               profile->avatar_url());
         }
         break;
     }
@@ -339,15 +274,15 @@ QByteArray MessageCodec::encode_wire_frame(const Message &msg,
     }
 
     QByteArray frame;
-    frame.reserve(static_cast<int>(1 + 2 + 4 + 4 + body.size() + 1));
+    frame.reserve(static_cast<int>(1 + 2 + 8 + 4 + body.size() + 1));
     frame.append('$');
 
-    char num_buf[4] = {};
+    char num_buf[8] = {};
     qToBigEndian(static_cast<std::uint16_t>(wire_type), num_buf);
     frame.append(num_buf, 2);
 
-    qToBigEndian(local_ip, num_buf);
-    frame.append(num_buf, 4);
+    qToBigEndian(static_cast<quint64>(local_user_id), num_buf);
+    frame.append(num_buf, 8);
 
     if (wire_frame_needs_length_field(wire_type)) {
         qToBigEndian(static_cast<std::uint32_t>(body.size()), num_buf);
@@ -375,27 +310,27 @@ MessagePtr MessageCodec::decode_wire_packet(const std::uint8_t *frame,
         return decode_join_meeting_response(body, n_body);
     case PARTNER_JOIN2:
         return decode_partner_join2(body, n_body);
-    case IMG_RECV: {
-        const std::uint32_t ip = qFromBigEndian<std::uint32_t>(frame + 3);
-        return decode_image_recv(body, n_body, ip);
-    }
+    case IMG_SEND:
+    case IMG_RECV:
+    case AUDIO_SEND:
+    case AUDIO_RECV:
+        spdlog::debug("[MessageCodec] ignore legacy media type={}",
+                      static_cast<int>(msgtype));
+        return nullptr;
     case TEXT_RECV: {
-        const std::uint32_t ip = qFromBigEndian<std::uint32_t>(frame + 3);
-        return decode_text_recv(body, n_body, ip);
-    }
-    case AUDIO_RECV: {
-        const std::uint32_t ip = qFromBigEndian<std::uint32_t>(frame + 3);
-        return decode_audio_recv(body, n_body, ip);
+        const qint64 user_id = read_wire_user_id(frame);
+        return decode_text_recv(body, n_body, user_id);
     }
     case USER_PROFILE: {
-        const std::uint32_t ip = qFromBigEndian<std::uint32_t>(frame + 3);
-        return decode_user_profile(body, n_body, ip);
+        const qint64 user_id = read_wire_user_id(frame);
+        return decode_user_profile(body, n_body, user_id);
     }
     case PARTNER_JOIN:
     case PARTNER_EXIT:
     case CLOSE_CAMERA: {
-        const std::uint32_t ip = qFromBigEndian<std::uint32_t>(frame + 3);
-        return decode_simple_ip_event(partner_kind_from_wire(msgtype), ip);
+        const qint64 user_id = read_wire_user_id(frame);
+        return decode_simple_user_event(partner_kind_from_wire(msgtype),
+                                        user_id);
     }
     default:
         spdlog::warn("[MessageCodec] unsupported message type: {}",
@@ -433,7 +368,7 @@ std::vector<MessagePtr> MessageCodec::WireStreamParser::extract_all() {
 
         const auto *raw =
             reinterpret_cast<const std::uint8_t *>(buffer_.constData());
-        const std::uint32_t n_body = qFromBigEndian<std::uint32_t>(raw + 7);
+        const std::uint32_t n_body = qFromBigEndian<std::uint32_t>(raw + 11);
         const std::size_t packet_size =
             static_cast<std::size_t>(n_body) + 1 + MSG_HEADER;
 

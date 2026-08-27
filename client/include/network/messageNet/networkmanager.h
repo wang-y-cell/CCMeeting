@@ -2,7 +2,6 @@
 #define NETWORKMANAGER_H
 
 #include "message.h"
-#include <QImage>
 #include <QObject>
 #include <cstdint>
 #include <string>
@@ -35,11 +34,6 @@ public:
      * @brief 断开与服务器的连接
     */
     void disconnect_from_host();
-    /**
-     * @brief 获取本地IP地址
-     * @return 本地IP地址
-     */
-    std::uint32_t local_ip() const;
 
     /**
      * @brief 发送创建会议请求
@@ -85,11 +79,6 @@ public:
      */
     void disconnectFromHost() { disconnect_from_host(); }
     /**
-     * @brief 获取本地IP地址
-     * @return 本地IP地址
-     */
-    std::uint32_t localIp() const { return local_ip(); }
-    /**
      * @brief 发送创建会议请求
      * @param max_participants 人数上限
      * @param duration_minutes 时长（分钟）
@@ -122,7 +111,6 @@ signals:
     void request_message_ready(MessagePtr msg);
     void user_info_message_ready(MessagePtr msg);
     void text_message_ready(MessagePtr msg);
-    void video_message_ready(MessagePtr msg);
     void send_text_finished();
     void disconnected();
 

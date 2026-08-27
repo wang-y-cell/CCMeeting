@@ -17,7 +17,7 @@
 #include <QEvent>
 #include <QImage>
 #include <QSoundEffect>
-#include <cstdint>
+#include <QtGlobal>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -34,7 +34,7 @@ class MeetingWidget : public FramelessWindow<QWidget>,
     Q_OBJECT
 private:
     static QRect pos;
-    std::uint32_t mainip = 0;
+    qint64 main_user_id_ = 0;
     bool _createmeet = false;
     bool _joinmeet = false;
     bool _videoMuted = false;
@@ -45,7 +45,7 @@ private:
     bool _hasPendingConnect = false;
     QString _pendingConnectIp;
     QString _pendingConnectPort;
-    ConnectAction _pendingConnectAction = ConnectAction::None;
+    ConnectAction _pendingConnectAction = ConnectAction::CreateMeeting;
     QString _pendingConnectRoomNo;
     quint32 _pendingMaxParticipants = 8;
     quint32 _pendingDurationMinutes = 60;
@@ -54,8 +54,8 @@ private:
     std::shared_ptr<NetworkManager> _network;
     std::unique_ptr<MeetingController> _controller;
     std::unique_ptr<QThread> _controller_thread;
-    std::unordered_map<std::uint32_t, Partner *> partner;
-    std::unordered_map<std::uint64_t, std::uint32_t> _feed_to_ip;
+    std::unordered_map<qint64, Partner *> partner;
+    std::unordered_map<std::uint64_t, qint64> _feed_to_user;
     std::vector<QString> iplist;
     QSoundEffect *_soundEffect = nullptr;
     int m_lastChatListWidth = -1;
@@ -70,7 +70,7 @@ private:
     bool preview_scheduled_ = false;
     std::mutex remote_mutex_;
     QImage pending_remote_;
-    std::uint32_t pending_remote_ip_ = 0;
+    qint64 pending_remote_user_id_ = 0;
     bool remote_scheduled_ = false;
 
 private:
@@ -84,13 +84,14 @@ private:
     void update_speaker_label();
     void shutdown_all_workers();
 
-    Partner *add_partner(std::uint32_t ip);
-    void remove_partner(std::uint32_t ip);
+    Partner *add_partner(qint64 userId);
+    void remove_partner(qint64 userId);
     void clear_partner();
-    void close_img(std::uint32_t ip);
+    void close_video_for_user(qint64 userId);
 
     void deal_message(ChatMessage *messageW, QListWidgetItem *item, QString text,
-                      QString time, QString ip, ChatMessage::User_Type type);
+                      QString time, QString senderName,
+                      ChatMessage::User_Type type);
     void deal_message_time(QString curMsgTime);
     void relayout_chat_messages();
 
@@ -108,16 +109,16 @@ private:
     void start_meeting_media();
     void stop_meeting_media();
     void send_local_user_profile();
-    void apply_partner_profile(std::uint32_t ip, qint64 userId,
-                               const QString &displayName,
+    void apply_partner_profile(qint64 userId, const QString &displayName,
                                const QString &avatarUrl);
-    QString partner_display_name(std::uint32_t ip) const;
-    void update_main_screen_title(std::uint32_t ip);
+    QString partner_display_name(qint64 userId) const;
+    void update_main_screen_title(qint64 userId);
     xrtc::XRTCJoinConfig build_join_config() const;
     void schedule_preview_render();
-    void schedule_remote_render(std::uint32_t ip);
+    void schedule_remote_render(qint64 userId);
     void render_preview_frame();
     void render_remote_frame();
+    qint64 local_user_id() const;
 
     void video_source_start_event(xrtc::IXRtcMediaSource *video_source,
                                   xrtc::XRtcError error) override;
@@ -151,7 +152,6 @@ public slots:
                                         QString room_no = QString(),
                                         quint32 max_participants = 8,
                                         quint32 duration_minutes = 60);
-    void on_disconnect_server_slot();
     void on_join_meet_btn_slot(QString room_no);
 
 private slots:
@@ -160,7 +160,7 @@ private slots:
     void on_request_message_slot(MessagePtr msg);
     void on_user_info_message_slot(MessagePtr msg);
     void on_text_message_slot(MessagePtr msg);
-    void on_recv_ip_slot(std::uint32_t ip);
+    void on_recv_user_slot(qint64 userId);
     void on_send_msg_clicked_slot();
     void on_text_send_slot();
     void on_network_disconnected_slot();

@@ -120,6 +120,38 @@ void HttpSession::handle_request(http::request<http::string_body>&& req) {
         return;
     }
 
+    if (req.method() == http::verb::post && target == "/api/register") {
+        std::string username;
+        std::string password;
+        if (!util::parse_login_request(req.body(), username, password)) {
+            model::LoginResult bad;
+            bad.code = 400;
+            bad.message = "invalid json body";
+            send_response(make_json_response(
+                http::status::bad_request,
+                util::to_login_response_json(bad),
+                version,
+                keep_alive));
+            return;
+        }
+
+        const model::LoginResult result =
+            auth_service_->register_user(username, password);
+
+        http::status status = http::status::bad_request;
+        if (result.success) {
+            status = http::status::ok;
+        } else if (result.code == 409) {
+            status = http::status::conflict;
+        } else if (result.code == 500) {
+            status = http::status::internal_server_error;
+        }
+
+        send_response(make_json_response(
+            status, util::to_login_response_json(result), version, keep_alive));
+        return;
+    }
+
     model::LoginResult not_found;
     not_found.code = 404;
     not_found.message = "not found";

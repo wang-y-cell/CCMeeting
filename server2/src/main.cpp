@@ -75,7 +75,7 @@ int main() {
         spdlog::info("CloudMeeting auth server listening on {}:{}",
                      config.listen_address,
                      config.listen_port);
-        spdlog::info("POST /api/login  GET /health");
+        spdlog::info("POST /api/login  POST /api/register  GET /health");
 
         ioc.run();
     } catch (const std::exception& ex) {

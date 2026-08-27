@@ -27,6 +27,7 @@ struct AuthConfigData {
     QString host = QStringLiteral("127.0.0.1");
     int port = 9000;
     QString login_path = QStringLiteral("/api/login");
+    QString register_path = QStringLiteral("/api/register");
 };
 
 struct MeetingServerConfig {

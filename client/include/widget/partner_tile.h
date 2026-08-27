@@ -2,6 +2,7 @@
 #define PARTNER_TILE_H
 
 #include <QWidget>
+#include <QtGlobal>
 
 class QLabel;
 class Partner;
@@ -21,7 +22,7 @@ public:
     void resetBorder();
 
 signals:
-    void clicked(std::uint32_t ip);
+    void clicked(qint64 userId);
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;
