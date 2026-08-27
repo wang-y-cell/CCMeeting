@@ -110,6 +110,26 @@ bool AuthServerConfigLoader::loadFromJsonObject(const json::object& root) {
         }
     }
 
+    if (const auto it = root.find("assets"); it != root.end() && it->value().is_object()) {
+        const json::object& assets = it->value().as_object();
+        if (const auto v = assets.if_contains("public_base_url"); v && v->is_string()) {
+            config_.assets.public_base_url = std::string(v->as_string());
+        }
+        if (const auto v = assets.if_contains("static_root"); v && v->is_string()) {
+            config_.assets.static_root = std::string(v->as_string());
+        }
+        if (const auto v = assets.if_contains("upload_root"); v && v->is_string()) {
+            config_.assets.upload_root = std::string(v->as_string());
+        }
+        if (const auto v = assets.if_contains("default_avatar_path"); v && v->is_string()) {
+            config_.assets.default_avatar_path = std::string(v->as_string());
+        }
+        if (const auto v = assets.if_contains("max_avatar_bytes"); v && v->is_int64()) {
+            config_.assets.max_avatar_bytes =
+                static_cast<std::size_t>(v->as_int64());
+        }
+    }
+
     return true;
 }
 

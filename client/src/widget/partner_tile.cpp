@@ -1,12 +1,9 @@
 #include "partner_tile.h"
+#include "avatar_image_loader.h"
 #include "partner.h"
 #include "videoglwidget.h"
 #include <QLabel>
 #include <QMouseEvent>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
-#include <QNetworkRequest>
-#include <QPixmap>
 #include <QResizeEvent>
 #include <QVBoxLayout>
 
@@ -66,19 +63,16 @@ void PartnerTile::loadAvatar(const QString &avatarUrl) {
         showAvatarImage(QImage(avatarUrl));
         return;
     }
-    if (!m_nam) {
-        m_nam = new QNetworkAccessManager(this);
-    }
-    QNetworkRequest req{QUrl(avatarUrl)};
-    auto *reply = m_nam->get(req);
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        if (reply->error() == QNetworkReply::NoError) {
-            QImage image;
-            if (image.loadFromData(reply->readAll()))
-                showAvatarImage(image);
-        }
-        reply->deleteLater();
-    });
+
+    const QSize targetSize = m_displayWidget
+                                 ? QSize(qMax(m_side - 20, 20), qMax(m_side - 20, 20))
+                                 : QSize(64, 64);
+    AvatarImageLoader::instance().load(
+        avatarUrl, targetSize, [this](const QPixmap &pixmap) {
+            if (!pixmap.isNull()) {
+                showAvatarImage(pixmap.toImage());
+            }
+        });
 }
 
 void PartnerTile::setSelected(bool selected) { applyBorder(selected); }

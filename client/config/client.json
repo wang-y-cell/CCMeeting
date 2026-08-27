@@ -3,7 +3,8 @@
     "host": "127.0.0.1",
     "port": 9000,
     "login_path": "/api/login",
-    "register_path": "/api/register"
+    "register_path": "/api/register",
+    "upload_avatar_path": "/api/upload-avatar"
   },
   "meeting_server": {
     "host": "127.0.0.1",

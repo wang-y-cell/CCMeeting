@@ -7,6 +7,7 @@ log.txt
 # 可选本地 spdlog 源码目录（也可用 FetchContent，不必提交）
 # third_party/
 docs/
+server2/uploads/
 Doxyfile
 need.md
 .clang-format

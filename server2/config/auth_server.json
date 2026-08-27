@@ -9,5 +9,12 @@
     "user": "root",
     "password": "123456",
     "database": "CCMeeting"
+  },
+  "assets": {
+    "public_base_url": "http://127.0.0.1:9000",
+    "static_root": "./static",
+    "upload_root": "./uploads",
+    "default_avatar_path": "/static/avatar/default.png",
+    "max_avatar_bytes": 2097152
   }
 }

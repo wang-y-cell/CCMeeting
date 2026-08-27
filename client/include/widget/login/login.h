@@ -51,7 +51,7 @@ private:
 
     Ui::login *ui; ///< UI
     QNetworkAccessManager m_nam; ///< HTTP 客户端
-    bool m_requestInFlight = false; ///< 防止重复提交
+    bool m_requestInFlight = false; ///< 防止重复提交,当前处于请求状态的时候为true,调用结束时为false
     PendingRequest m_pendingRequest = PendingRequest::None;
 };
 

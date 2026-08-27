@@ -63,7 +63,12 @@ add_custom_command(TARGET CloudMeetingAuthServer POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CMAKE_CURRENT_SOURCE_DIR}/config/auth_server.json"
             "$<TARGET_FILE_DIR:CloudMeetingAuthServer>/config/auth_server.json"
-    COMMENT "Copy auth_server.json to output directory"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/static"
+            "$<TARGET_FILE_DIR:CloudMeetingAuthServer>/static"
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+            "$<TARGET_FILE_DIR:CloudMeetingAuthServer>/uploads"
+    COMMENT "Copy auth config, static assets, and uploads dir"
 )
 
 include(GNUInstallDirs)

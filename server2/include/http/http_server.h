@@ -40,6 +40,7 @@ private:
 
     net::io_context& ioc_; ///< IO 上下文,负责处理网络事件
     tcp::acceptor acceptor_; ///< 接受连接的套接字,主要负责tcp连接的建立
+    config::AuthServerConfig config_;
     std::shared_ptr<service::AuthService> auth_service_; ///< 认证服务,负责处理认证逻辑
 };
 

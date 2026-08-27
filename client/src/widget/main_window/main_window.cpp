@@ -1,17 +1,18 @@
 #include "main_window.h"
+#include "avatar_image_loader.h"
 #include "configure/client_config.h"
 #include "configure/user_session.h"
 #include "stack_join_meet.h"
+
+#include <QEvent>
 #include <QFile>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
 #include <QMessageBox>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
-#include <QPixmap>
-#include <QUrl>
+#include <QMouseEvent>
 #include <QStackedWidget>
+#include <QUrl>
 #include <QVBoxLayout>
 #include <QStringList>
 #include <qnamespace.h>
@@ -19,12 +20,10 @@
 
 namespace {
 
-///获取会议服务器主机
 QString meeting_server_host() {
     return ClientConfig::instance().meeting_server().host;
 }
 
-///获取会议服务器端口
 QString meeting_server_port() {
     return QString::number(ClientConfig::instance().meeting_server().port);
 }
@@ -43,6 +42,7 @@ main_window::main_window(QWidget *parent) : FramelessWindow<QWidget>(parent) {
     init_ui();
     setWindowTitle(tr("CloudMeeting"));
     set_style();
+    refreshUserCard();
 
     widget = new MeetingWidget(nullptr);
     widget->hide();
@@ -53,6 +53,10 @@ main_window::main_window(QWidget *parent) : FramelessWindow<QWidget>(parent) {
             &main_window::JoinMeeting_button_clicked);
     connect(widget, &MeetingWidget::connect_server_finished_signal, this,
             &main_window::onConnectServerFinished);
+    connect(user_profile_widget, &stack_user_profile::backHomeRequested, this,
+            &main_window::onProfileBackHome);
+    connect(user_profile_widget, &stack_user_profile::avatarUpdated, this,
+            &main_window::onProfileAvatarUpdated);
 
     spdlog::info("[main_window] ctor done");
     spdlog::default_logger()->flush();
@@ -75,6 +79,55 @@ main_window::~main_window() {
     widget = nullptr;
 }
 
+void main_window::refreshUserCard() {
+    if (!name_label_ || !avatar_label_) {
+        return;
+    }
+
+    const auto &session = UserSession::instance();
+    name_label_->setText(session.isLoggedIn() ? session.name() : tr("未登录"));
+
+    AvatarImageLoader::instance().load(
+        session.avatar(), avatar_label_->size(), [this](const QPixmap &pixmap) {
+            if (avatar_label_) {
+                avatar_label_->setPixmap(pixmap);
+            }
+        });
+}
+
+bool main_window::eventFilter(QObject *watched, QEvent *event) {
+    if (watched == user_card_ && event->type() == QEvent::MouseButtonRelease) {
+        auto *mouseEvent = static_cast<QMouseEvent *>(event);
+        if (mouseEvent->button() == Qt::LeftButton) {
+            onUserCardClicked();
+            return true;
+        }
+    }
+    return FramelessWindow<QWidget>::eventFilter(watched, event);
+}
+
+void main_window::onUserCardClicked() {
+    if (!UserSession::instance().isLoggedIn()) {
+        return;
+    }
+    if (user_profile_widget) {
+        user_profile_widget->refreshFromSession();
+    }
+    if (content_stack_) {
+        content_stack_->setCurrentWidget(user_profile_widget);
+    }
+}
+
+void main_window::onProfileBackHome() {
+    if (content_stack_ && create_meeting_widget) {
+        content_stack_->setCurrentWidget(create_meeting_widget);
+    }
+}
+
+void main_window::onProfileAvatarUpdated() {
+    refreshUserCard();
+}
+
 void main_window::init_ui() {
     setObjectName(QStringLiteral("main_window"));
     resize(960, 640);
@@ -89,50 +142,28 @@ void main_window::init_ui() {
     auto *leftColumn = new QVBoxLayout();
     leftColumn->setSpacing(12);
 
-    auto *userCard = new QWidget(this);
-    userCard->setObjectName(QStringLiteral("userProfile"));
-    auto *userLayout = new QVBoxLayout(userCard);
+    user_card_ = new QWidget(this);
+    user_card_->setObjectName(QStringLiteral("userProfile"));
+    user_card_->setCursor(Qt::PointingHandCursor);
+    user_card_->installEventFilter(this);
+    auto *userLayout = new QVBoxLayout(user_card_);
     userLayout->setContentsMargins(12, 12, 12, 12);
     userLayout->setSpacing(8);
 
-    auto *avatarLabel = new QLabel(userCard);
-    avatarLabel->setObjectName(QStringLiteral("userAvatar"));
-    avatarLabel->setFixedSize(72, 72);
-    avatarLabel->setAlignment(Qt::AlignCenter);
-    avatarLabel->setScaledContents(true);
+    avatar_label_ = new QLabel(user_card_);
+    avatar_label_->setObjectName(QStringLiteral("userAvatar"));
+    avatar_label_->setFixedSize(72, 72);
+    avatar_label_->setAlignment(Qt::AlignCenter);
+    avatar_label_->setScaledContents(true);
 
-    auto *nameLabel = new QLabel(userCard);
-    nameLabel->setObjectName(QStringLiteral("userName"));
-    nameLabel->setAlignment(Qt::AlignCenter);
-    nameLabel->setWordWrap(true);
+    name_label_ = new QLabel(user_card_);
+    name_label_->setObjectName(QStringLiteral("userName"));
+    name_label_->setAlignment(Qt::AlignCenter);
+    name_label_->setWordWrap(true);
 
-    const auto &session = UserSession::instance();
-    nameLabel->setText(session.isLoggedIn() ? session.name() : tr("未登录"));
-    avatarLabel->setPixmap(
-        QPixmap(QString::fromUtf8(":/myImage/source/EmptyHead.png"))
-            .scaled(72, 72, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-
-    if (session.isLoggedIn() && !session.avatar().isEmpty()) {
-        auto *nam = new QNetworkAccessManager(userCard);
-        QNetworkRequest req{QUrl(session.avatar())};
-        auto *reply = nam->get(req);
-        connect(reply, &QNetworkReply::finished, userCard,
-                [avatarLabel, reply]() {
-                    if (reply->error() == QNetworkReply::NoError) {
-                        QPixmap pix;
-                        if (pix.loadFromData(reply->readAll())) {
-                            avatarLabel->setPixmap(
-                                pix.scaled(72, 72, Qt::KeepAspectRatio,
-                                           Qt::SmoothTransformation));
-                        }
-                    }
-                    reply->deleteLater();
-                });
-    }
-
-    userLayout->addWidget(avatarLabel, 0, Qt::AlignHCenter);
-    userLayout->addWidget(nameLabel);
-    leftColumn->addWidget(userCard);
+    userLayout->addWidget(avatar_label_, 0, Qt::AlignHCenter);
+    userLayout->addWidget(name_label_);
+    leftColumn->addWidget(user_card_);
 
     auto *left_bar = new QListWidget(this);
     left_bar->setObjectName(QStringLiteral("sideNav"));
@@ -158,8 +189,8 @@ void main_window::init_ui() {
         left_bar->addItem(listWidgetItem);
     }
 
-    auto *stackedWidget = new QStackedWidget(this);
-    stackedWidget->setObjectName(QStringLiteral("contentStack"));
+    content_stack_ = new QStackedWidget(this);
+    content_stack_->setObjectName(QStringLiteral("contentStack"));
 
     leftColumn->addWidget(left_bar, 1);
 
@@ -171,17 +202,29 @@ void main_window::init_ui() {
     leftWrapLayout->addLayout(leftColumn);
 
     mainLayout->addWidget(leftWrap);
-    mainLayout->addWidget(stackedWidget, 1);
+    mainLayout->addWidget(content_stack_, 1);
 
     create_meeting_widget = new stack_create_meet(this);
-    stackedWidget->addWidget(create_meeting_widget);
+    content_stack_->addWidget(create_meeting_widget);
 
     join_meeting_widget = new stack_join_meet(this);
-    stackedWidget->addWidget(join_meeting_widget);
+    content_stack_->addWidget(join_meeting_widget);
+
+    user_profile_widget = new stack_user_profile(this);
+    content_stack_->addWidget(user_profile_widget);
 
     left_bar->setCurrentRow(0);
-    connect(left_bar, &QListWidget::currentRowChanged, stackedWidget,
-            &QStackedWidget::setCurrentIndex);
+    connect(left_bar, &QListWidget::currentRowChanged, this,
+            [this](int row) {
+                if (!content_stack_) {
+                    return;
+                }
+                if (row == 0 && create_meeting_widget) {
+                    content_stack_->setCurrentWidget(create_meeting_widget);
+                } else if (row == 1 && join_meeting_widget) {
+                    content_stack_->setCurrentWidget(join_meeting_widget);
+                }
+            });
 }
 
 void main_window::CreateMeeting_button_clicked(quint32 max_participants,

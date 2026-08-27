@@ -159,3 +159,51 @@ QLabel#userName {
     font-size: 13px;
     font-weight: 600;
 }
+
+QWidget#userProfile:hover {
+    border-color: #3b82f6;
+    background-color: #232733;
+}
+
+QLabel#profileAvatarLarge {
+    border-radius: 64px;
+    background-color: #232733;
+    border: 2px solid #343a48;
+}
+
+QFrame#profileFrame {
+    background-color: #1c1f28;
+    border: 1px solid #2a2e38;
+    border-radius: 16px;
+}
+
+QLabel#fieldLabelNickname,
+QLabel#fieldLabelUsername,
+QLabel#fieldLabelUserId,
+QLabel#fieldLabelInfo {
+    color: #aeb6c7;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+QLabel#valueNickname,
+QLabel#valueUsername,
+QLabel#valueUserId,
+QLabel#valueInfo {
+    color: #eef1f6;
+    font-size: 14px;
+}
+
+QPushButton#changeAvatarBtn {
+    min-height: 36px;
+    font-size: 13px;
+}
+
+QPushButton#backHomeBtn {
+    background-color: #343a48;
+    max-width: 160px;
+}
+
+QPushButton#backHomeBtn:hover {
+    background-color: #455066;
+}
