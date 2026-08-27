@@ -56,19 +56,11 @@ void PartnerTile::showAvatarImage(const QImage &image) {
 }
 
 void PartnerTile::loadAvatar(const QString &avatarUrl) {
-    if (avatarUrl.isEmpty()) {
-        return;
-    }
-    if (avatarUrl.startsWith(QStringLiteral(":/"))) {
-        showAvatarImage(QImage(avatarUrl));
-        return;
-    }
-
-    const QSize targetSize = m_displayWidget
-                                 ? QSize(qMax(m_side - 20, 20), qMax(m_side - 20, 20))
-                                 : QSize(64, 64);
+    const QSize targetSize =
+        m_displayWidget ? m_displayWidget->size()
+                        : QSize(qMax(m_side - 20, 20), qMax(m_side - 20, 20));
     AvatarImageLoader::instance().load(
-        avatarUrl, targetSize, [this](const QPixmap &pixmap) {
+        avatarUrl, targetSize, this, [this](const QPixmap &pixmap) {
             if (!pixmap.isNull()) {
                 showAvatarImage(pixmap.toImage());
             }

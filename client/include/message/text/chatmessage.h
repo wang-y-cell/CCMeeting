@@ -38,7 +38,9 @@ public:
      * @param ip 可选 IP
      * @param userType 消息角色
      */
-    void setText(QString text, QString time, QSize allSize, QString ip = "",  User_Type userType = User_Time);
+    void setText(QString text, QString time, QSize allSize, QString ip = "",
+                 User_Type userType = User_Time,
+                 const QString &avatarUrl = QString());
 
     /**
      * @brief 按当前字体与折行宽度计算文本排版后的逻辑宽高（供 fontRect 使用）
@@ -109,6 +111,9 @@ private:
     QLabel* m_loading = Q_NULLPTR;   ///< 「发送中」GIF 容器
     QMovie* m_loadingMovie = Q_NULLPTR; ///< 「发送中」动画
     bool m_isSending = false; ///< 本人消息是否已标记发送成功（与 setTextSuccess 配合）
+    quint64 m_avatarLoadGen = 0;
+
+    void loadAvatar(const QString &avatarUrl, User_Type userType);
 };
 
 #endif // CHATMESSAGE_H

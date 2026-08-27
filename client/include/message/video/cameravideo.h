@@ -2,10 +2,11 @@
 #define CAMERAVIDEO_H
 
 #include "ImgDisplay.h"
+#include <QHash>
 #include <QImage>
 #include <QObject>
+#include <QString>
 #include <QtGlobal>
-#include <unordered_map>
 
 class VideoGLWidget;
 
@@ -26,23 +27,33 @@ public:
     void removePartnerDisplay(qint64 userId);
     void clearAllPartnerDisplays();
 
+    void setAvatarUrlForUser(qint64 userId, const QString &avatarUrl);
+    bool hasActiveVideo(qint64 userId) const;
+
     void showImageForUser(qint64 userId, const QImage &image);
     void showMainImage(const QImage &image);
     void showAvatarForUser(qint64 userId);
-    void showAvatarForUser(qint64 userId, const QImage &avatar);
     void showMainAvatar();
     void refreshMainForUser(qint64 userId);
 
     void endVideo();
+    /** 在销毁 VideoGLWidget 之前调用，避免悬空 target 指针 */
+    void detachFromWidgets();
 
 private:
-    static QImage defaultAvatar();
+    void clearVideoForUser(qint64 userId);
+    void clearMainDisplay();
+    void showMainAvatarImage(const QImage &avatar);
+    void displayAvatarImage(qint64 userId, const QImage &avatar);
+    void loadAndShowAvatar(qint64 userId, bool forMain);
+    QSize avatarTargetSizeForUser(qint64 userId, bool forMain) const;
 
     QWidget *_parent = nullptr;
-    ImgDisplay *_mainVideoImg = nullptr;
-    ImgDisplay *_mainAvatarImg = nullptr;
-    std::unordered_map<qint64, ImgDisplay *> _partnerDisplays;
-    std::unordered_map<qint64, QImage> _lastImages;
+    ImgDisplay *_mainDisplay = nullptr;
+    QHash<qint64, ImgDisplay *> _partnerDisplays;
+    QHash<qint64, QImage> _lastImages;
+    QHash<qint64, QString> _avatarUrls;
+    QHash<qint64, quint64> _avatarLoadGen;
     qint64 _localUserId = 0;
     qint64 _mainUserId = 0;
 };

@@ -126,3 +126,43 @@ QMessageBox {
 QMessageBox QLabel {
     color: #e8ebf2;
 }
+
+QLabel#cropHint {
+    color: #aeb6c7;
+    font-size: 13px;
+}
+
+QPushButton#cropToolBtn {
+    background-color: #343a48;
+    min-height: 36px;
+    min-width: 36px;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+QPushButton#cropToolBtn:hover {
+    background-color: #455066;
+}
+
+QPushButton#cropResetBtn {
+    background-color: #343a48;
+    min-height: 36px;
+    padding: 0 16px;
+}
+
+QPushButton#cropResetBtn:hover {
+    background-color: #455066;
+}
+
+QPushButton#cropCancelBtn {
+    background-color: #343a48;
+    min-height: 44px;
+}
+
+QPushButton#cropCancelBtn:hover {
+    background-color: #455066;
+}
+
+QPushButton#cropOkBtn {
+    min-height: 44px;
+}

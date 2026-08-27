@@ -165,6 +165,9 @@ int main(int argc, char *argv[]) {
     flush_log();
     ClientConfig::instance().load();
     AvatarImageLoader::instance().initialize();
+    QObject::connect(&app, &QCoreApplication::aboutToQuit, []() {
+        AvatarImageLoader::instance().shutdown();
+    });
     const auto &auth = ClientConfig::instance().auth();
     const auto &meeting = ClientConfig::instance().meeting_server();
     spdlog::info("[main] auth={}:{}{} meeting={}:{}", qutf8(auth.host),
@@ -232,6 +235,8 @@ int main(int argc, char *argv[]) {
 
     const int ret = app.exec();
     spdlog::info("[main] app.exec returned {}", ret);
+    flush_log();
+    main_windowDialog.reset();
     flush_log();
     spdlog::shutdown();
     return ret;

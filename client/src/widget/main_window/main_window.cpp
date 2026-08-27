@@ -74,9 +74,22 @@ void main_window::set_style() {
     }
 }
 
-main_window::~main_window() {
+void main_window::destroyMeetingWidget() {
+    if (!widget) {
+        return;
+    }
+    widget->hide();
     delete widget;
     widget = nullptr;
+}
+
+main_window::~main_window() {
+    destroyMeetingWidget();
+}
+
+void main_window::closeEvent(QCloseEvent *event) {
+    destroyMeetingWidget();
+    FramelessWindow<QWidget>::closeEvent(event);
 }
 
 void main_window::refreshUserCard() {
@@ -88,7 +101,8 @@ void main_window::refreshUserCard() {
     name_label_->setText(session.isLoggedIn() ? session.name() : tr("未登录"));
 
     AvatarImageLoader::instance().load(
-        session.avatar(), avatar_label_->size(), [this](const QPixmap &pixmap) {
+        session.avatar(), avatar_label_->size(), this,
+        [this](const QPixmap &pixmap) {
             if (avatar_label_) {
                 avatar_label_->setPixmap(pixmap);
             }

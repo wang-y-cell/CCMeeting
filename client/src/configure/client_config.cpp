@@ -8,6 +8,30 @@
 
 #include <spdlog/spdlog.h>
 
+namespace {
+
+QString joinBaseUrlPath(const QString &base, const QString &path) {
+    if (base.isEmpty()) {
+        return path;
+    }
+    if (base.endsWith(QLatin1Char('/')) && path.startsWith(QLatin1Char('/'))) {
+        return base.chopped(1) + path;
+    }
+    if (!base.endsWith(QLatin1Char('/')) && !path.startsWith(QLatin1Char('/'))) {
+        return base + QLatin1Char('/') + path;
+    }
+    return base + path;
+}
+
+}  // namespace
+
+QString AuthConfigData::defaultAvatarUrl() const {
+    const QString base = public_base_url.isEmpty()
+                             ? QStringLiteral("http://%1:%2").arg(host).arg(port)
+                             : public_base_url;
+    return joinBaseUrlPath(base, default_avatar_path);
+}
+
 ClientConfig& ClientConfig::instance() {
     static ClientConfig cfg;
     return cfg;
@@ -52,6 +76,11 @@ bool ClientConfig::loadFromJsonObject(const QJsonObject& root) {
         auth_.upload_avatar_path =
             auth.value(QStringLiteral("upload_avatar_path"))
                 .toString(auth_.upload_avatar_path);
+        auth_.public_base_url =
+            auth.value(QStringLiteral("public_base_url")).toString();
+        auth_.default_avatar_path =
+            auth.value(QStringLiteral("default_avatar_path"))
+                .toString(auth_.default_avatar_path);
     }
 
     if (const QJsonObject meeting =
