@@ -2,7 +2,8 @@
   "auth": {
     "host": "127.0.0.1",
     "port": 9000,
-    "login_path": "/api/login"
+    "login_path": "/api/login",
+    "register_path": "/api/register"
   },
   "meeting_server": {
     "host": "127.0.0.1",

@@ -8,9 +8,8 @@
 
 /** @brief 连接成功后在 UI 线程继续的动作 */
 enum class ConnectAction : int {
-    None = 0,           ///< 仅测试连接
-    CreateMeeting = 1,  ///< 连接后创建会议
-    JoinMeeting = 2     ///< 连接后加入会议
+    CreateMeeting = 0,  ///< 连接后创建会议
+    JoinMeeting = 1     ///< 连接后加入会议
 };
 Q_DECLARE_METATYPE(ConnectAction)
 

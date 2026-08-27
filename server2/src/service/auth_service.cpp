@@ -70,4 +70,50 @@ model::LoginResult AuthService::login(const std::string& username,
     }
 }
 
+model::LoginResult AuthService::register_user(const std::string& username,
+                                              const std::string& password) const {
+    model::LoginResult result;
+
+    if (username.empty() || password.empty()) {
+        result.code = 400;
+        result.message = "username and password are required";
+        return result;
+    }
+
+    if (username.size() > 50) {
+        result.code = 400;
+        result.message = "username too long";
+        return result;
+    }
+
+    try {
+        if (repository_.find_credential_by_username(username).has_value()) {
+            result.code = 409;
+            result.message = "username already exists";
+            return result;
+        }
+
+        const auto user_id = repository_.create_user(
+            username, util::sha256_hex(password));
+        if (!user_id.has_value()) {
+            result.code = 500;
+            result.message = "failed to create user";
+            return result;
+        }
+
+        result.success = true;
+        result.code = 0;
+        result.message = "ok";
+        result.user = repository_.load_user_info(*user_id, username);
+        spdlog::info("[AuthService] register ok user_id={} name={}",
+                     result.user.id, result.user.name);
+        return result;
+    } catch (const std::exception& ex) {
+        spdlog::error("[AuthService] register exception: {}", ex.what());
+        result.code = 500;
+        result.message = "internal server error";
+        return result;
+    }
+}
+
 }  // namespace service

@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #ifndef MSG_HEADER
-#define MSG_HEADER 11
+#define MSG_HEADER 15
 #endif
 
 #ifndef OPENVIDEO
@@ -25,12 +25,13 @@
 
 /**
  * @brief 线上协议消息类型（与对端约定的 MSG_TYPE）
+ * @note 0–3 为旧 TCP JPEG/PCM 媒体槽位，数值保留勿改；媒体面已改走 WebRTC。
  */
 enum MSG_TYPE : std::uint8_t {
-    IMG_SEND = 0,
-    IMG_RECV,
-    AUDIO_SEND,
-    AUDIO_RECV,
+    IMG_SEND = 0,  // reserved legacy
+    IMG_RECV,      // reserved legacy
+    AUDIO_SEND,    // reserved legacy
+    AUDIO_RECV,    // reserved legacy
     TEXT_SEND,
     TEXT_RECV,
     CREATE_MEETING,

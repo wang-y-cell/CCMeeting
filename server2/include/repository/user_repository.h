@@ -66,6 +66,13 @@ public:
                           const std::string& device_info,
                           bool success) const;
 
+    /**
+     * @brief 创建新用户
+     * @return 新用户 ID；用户名已存在返回 nullopt
+     */
+    std::optional<std::uint64_t> create_user(const std::string& username,
+                                             const std::string& password_hash) const;
+
 private:
     db::MysqlClient mysql_;
 };

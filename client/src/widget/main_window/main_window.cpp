@@ -1,8 +1,6 @@
 #include "main_window.h"
 #include "configure/client_config.h"
 #include "configure/user_session.h"
-#include "connection.h"
-#include "stack_conn_server.h"
 #include "stack_join_meet.h"
 #include <QFile>
 #include <QHBoxLayout>
@@ -19,46 +17,43 @@
 #include <qnamespace.h>
 #include <spdlog/spdlog.h>
 
+namespace {
+
+///获取会议服务器主机
+QString meeting_server_host() {
+    return ClientConfig::instance().meeting_server().host;
+}
+
+///获取会议服务器端口
+QString meeting_server_port() {
+    return QString::number(ClientConfig::instance().meeting_server().port);
+}
+
+}  // namespace
+
 main_window::main_window(QWidget *parent) : FramelessWindow<QWidget>(parent) {
     spdlog::info("[main_window] ctor begin");
     spdlog::default_logger()->flush();
 
     const auto &meeting = ClientConfig::instance().meeting_server();
-    ip = meeting.host;
-    port = QString::number(meeting.port);
-    spdlog::info("[main_window] default meeting server {}:{}",
-                 ip.toUtf8().constData(), port.toUtf8().constData());
+    spdlog::info("[main_window] meeting server {}:{}",
+                 meeting.host.toUtf8().constData(), meeting.port);
     spdlog::default_logger()->flush();
 
-    spdlog::info("[main_window] init_ui begin");
-    spdlog::default_logger()->flush();
     init_ui();
-    spdlog::info("[main_window] init_ui done");
-    spdlog::default_logger()->flush();
-
     setWindowTitle(tr("CloudMeeting"));
     set_style();
 
-    spdlog::info("[main_window] creating MeetingWidget ...");
-    spdlog::default_logger()->flush();
     widget = new MeetingWidget(nullptr);
-    spdlog::info("[main_window] MeetingWidget created");
-    spdlog::default_logger()->flush();
-
-    // widget->setWindowFlags(Qt::Window);
     widget->hide();
 
     connect(create_meeting_widget, &stack_create_meet::createMeetingClicked,
             this, &main_window::CreateMeeting_button_clicked);
-
     connect(join_meeting_widget, &stack_join_meet::joinMeetingClicked, this,
             &main_window::JoinMeeting_button_clicked);
-
-    connect(connect_to_server_widget, &stack_conn_server::ConnServerClicked,
-            this, &main_window::ConnectToServer_button_clicked);
-
     connect(widget, &MeetingWidget::connect_server_finished_signal, this,
             &main_window::onConnectServerFinished);
+
     spdlog::info("[main_window] ctor done");
     spdlog::default_logger()->flush();
 }
@@ -76,11 +71,8 @@ void main_window::set_style() {
 }
 
 main_window::~main_window() {
-    if (widget != nullptr) {
-        delete widget;
-        widget = nullptr;
-    }
-    // delete ui;
+    delete widget;
+    widget = nullptr;
 }
 
 void main_window::init_ui() {
@@ -88,7 +80,6 @@ void main_window::init_ui() {
     resize(960, 640);
     setMinimumSize(760, 480);
     setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
-
     setAttribute(Qt::WA_StyledBackground, true);
 
     auto *mainLayout = new QHBoxLayout(this);
@@ -154,7 +145,6 @@ void main_window::init_ui() {
     const QStringList left_bar_items = {
         QStringLiteral("创建会议"),
         QStringLiteral("加入会议"),
-        QStringLiteral("连接服务器"),
     };
 
     for (const auto &item : left_bar_items) {
@@ -189,9 +179,6 @@ void main_window::init_ui() {
     join_meeting_widget = new stack_join_meet(this);
     stackedWidget->addWidget(join_meeting_widget);
 
-    connect_to_server_widget = new stack_conn_server(this);
-    stackedWidget->addWidget(connect_to_server_widget);
-
     left_bar->setCurrentRow(0);
     connect(left_bar, &QListWidget::currentRowChanged, stackedWidget,
             &QStackedWidget::setCurrentIndex);
@@ -212,10 +199,10 @@ void main_window::CreateMeeting_button_clicked(quint32 max_participants,
     }
 
     widget->show();
-    widget->request_connect_to_server_slot(this->ip, this->port,
-                                           ConnectAction::CreateMeeting,
-                                           QString(), max_participants,
-                                           duration_minutes);
+    widget->request_connect_to_server_slot(
+        meeting_server_host(), meeting_server_port(),
+        ConnectAction::CreateMeeting, QString(), max_participants,
+        duration_minutes);
 }
 
 void main_window::JoinMeeting_button_clicked(const QString &roomNo) {
@@ -235,55 +222,16 @@ void main_window::JoinMeeting_button_clicked(const QString &roomNo) {
     }
 
     widget->show();
-    widget->request_connect_to_server_slot(this->ip, this->port,
+    widget->request_connect_to_server_slot(meeting_server_host(),
+                                           meeting_server_port(),
                                            ConnectAction::JoinMeeting, roomNo);
-}
-
-void main_window::ConnectToServer_button_clicked(QString ip, QString port) {
-    spdlog::info("[main_window] ConnectToServer ip={} port={}",
-                 ip.toUtf8().constData(), port.toUtf8().constData());
-    if (widget == nullptr) {
-        QMessageBox::warning(this, "warning", "会议窗口未初始化");
-        return;
-    }
-    if (widget->isVisible()) {
-        QMessageBox::warning(this, "warning", "目前有一打开的会议");
-        return;
-    }
-
-    ip = ip.trimmed();
-    port = port.trimmed();
-    if (ip.isEmpty() || port.isEmpty()) {
-        QMessageBox::warning(this, "Input Error", "请输入 IP 和端口");
-        return;
-    }
-    if (!Connection::validateIpPort(this, ip, port)) {
-        return;
-    }
-
-    widget->request_connect_to_server_slot(ip, port, ConnectAction::None);
 }
 
 void main_window::onConnectServerFinished(bool ok, QString ip, QString port,
                                           ConnectAction action) {
-    if (action == ConnectAction::None) {
-        if (ok) {
-            this->ip = ip;
-            this->port = port;
-            if (widget)
-                widget->on_disconnect_server_slot();
-            spdlog::info(
-                "[main_window] probe connect ok then disconnect: {}:{}",
-                ip.toUtf8().constData(), port.toUtf8().constData());
-            QMessageBox::information(this, "Connection",
-                                     QString("成功连接到 %1:%2").arg(ip, port));
-        } else {
-            QMessageBox::warning(this, "Connection error", "连接服务器失败",
-                                 QMessageBox::Yes, QMessageBox::Yes);
-        }
-        return;
-    }
-
+    Q_UNUSED(ip);
+    Q_UNUSED(port);
+    Q_UNUSED(action);
     if (!ok) {
         QMessageBox::warning(this, "Connection error", "连接服务器失败",
                              QMessageBox::Yes, QMessageBox::Yes);

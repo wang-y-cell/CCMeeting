@@ -27,6 +27,25 @@ void flush_log() {
     }
 }
 
+QUrl authUrl(const QString &path) {
+    QUrl url;
+    url.setScheme(QStringLiteral("http"));
+    const auto &auth = ClientConfig::instance().auth();
+    url.setHost(auth.host);
+    url.setPort(auth.port);
+    url.setPath(path);
+    return url;
+}
+
+QNetworkRequest makeJsonRequest(const QUrl &url) {
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader,
+                      QStringLiteral("application/json; charset=utf-8"));
+    request.setHeader(QNetworkRequest::UserAgentHeader,
+                      QStringLiteral("CloudMeetingClient/1.0"));
+    return request;
+}
+
 }  // namespace
 
 login::login(QWidget *parent)
@@ -38,8 +57,19 @@ login::login(QWidget *parent)
     set_style();
 
     connect(ui->login_button, &QPushButton::clicked, this, &login::Login);
+    connect(ui->register_button, &QPushButton::clicked, this, &login::Register);
+    connect(ui->createUserLink, &QLabel::linkActivated, this,
+            [this](const QString &) { showRegisterPage(); });
+    connect(ui->backToLoginLink, &QLabel::linkActivated, this,
+            [this](const QString &) { showLoginPage(); });
     connect(&m_nam, &QNetworkAccessManager::finished, this,
-            &login::onLoginFinished);
+            [this](QNetworkReply *reply) {
+                if (m_pendingRequest == PendingRequest::Register) {
+                    onRegisterFinished(reply);
+                } else {
+                    onLoginFinished(reply);
+                }
+            });
 }
 
 void login::set_style() {
@@ -56,6 +86,16 @@ void login::set_style() {
 
 login::~login() { delete ui; }
 
+void login::showRegisterPage() {
+    ui->stackedWidget->setCurrentWidget(ui->registerPage);
+    setWindowTitle(tr("创建账号"));
+}
+
+void login::showLoginPage() {
+    ui->stackedWidget->setCurrentWidget(ui->loginPage);
+    setWindowTitle(tr("登录"));
+}
+
 void login::Login() {
     if (m_requestInFlight) {
         return;
@@ -69,32 +109,56 @@ void login::Login() {
         return;
     }
 
-    QUrl url;
-    url.setScheme(QStringLiteral("http"));
-    const auto &auth = ClientConfig::instance().auth();
-    url.setHost(auth.host);
-    url.setPort(auth.port);
-    url.setPath(auth.login_path);
-
-    QNetworkRequest request(url);
-    request.setHeader(QNetworkRequest::ContentTypeHeader,
-                      QStringLiteral("application/json; charset=utf-8"));
-    request.setHeader(QNetworkRequest::UserAgentHeader,
-                      QStringLiteral("CloudMeetingClient/1.0"));
+    const QUrl url = authUrl(ClientConfig::instance().auth().login_path);
 
     QJsonObject body;
     body.insert(QStringLiteral("username"), username);
     body.insert(QStringLiteral("password"), password);
 
+    m_pendingRequest = PendingRequest::Login;
     m_requestInFlight = true;
     ui->login_button->setEnabled(false);
     spdlog::info("[login] POST {}", qutf8(url.toString()));
     flush_log();
-    m_nam.post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
+    m_nam.post(makeJsonRequest(url),
+               QJsonDocument(body).toJson(QJsonDocument::Compact));
+}
+
+void login::Register() {
+    if (m_requestInFlight) {
+        return;
+    }
+
+    const QString username = ui->register_username_line->text().trimmed();
+    const QString password = ui->register_password_line->text();
+
+    if (username.isEmpty() || password.isEmpty()) {
+        QMessageBox::warning(this, tr("Register Error"), tr("请输入用户名和密码"));
+        return;
+    }
+
+    const QUrl url = authUrl(ClientConfig::instance().auth().register_path);
+
+    QJsonObject body;
+    body.insert(QStringLiteral("username"), username);
+    body.insert(QStringLiteral("password"), password);
+
+    m_pendingRequest = PendingRequest::Register;
+    m_requestInFlight = true;
+    ui->register_button->setEnabled(false);
+    spdlog::info("[register] POST {}", qutf8(url.toString()));
+    flush_log();
+    m_nam.post(makeJsonRequest(url),
+               QJsonDocument(body).toJson(QJsonDocument::Compact));
 }
 
 void login::onLoginFinished(QNetworkReply *reply) {
+    if (m_pendingRequest == PendingRequest::Register) {
+        return;
+    }
+
     m_requestInFlight = false;
+    m_pendingRequest = PendingRequest::None;
     ui->login_button->setEnabled(true);
 
     spdlog::info("[login] onLoginFinished enter");
@@ -124,7 +188,6 @@ void login::onLoginFinished(QNetworkReply *reply) {
 
     const QByteArray payload = reply->readAll();
     reply->deleteLater();
-    // 不把整段 JSON（含中文）直接打到可能非 UTF-8 的 sink，避免 0xC0000005
     spdlog::info("[login] response bytes={}", payload.size());
     flush_log();
 
@@ -166,4 +229,59 @@ void login::onLoginFinished(QNetworkReply *reply) {
     accept();
     spdlog::info("[login] accept() returned");
     flush_log();
+}
+
+void login::onRegisterFinished(QNetworkReply *reply) {
+    if (m_pendingRequest != PendingRequest::Register) {
+        return;
+    }
+
+    m_requestInFlight = false;
+    m_pendingRequest = PendingRequest::None;
+    ui->register_button->setEnabled(true);
+
+    const QString username = ui->register_username_line->text().trimmed();
+
+    if (!reply) {
+        QMessageBox::warning(this, tr("Register Error"), tr("注册请求失败"));
+        return;
+    }
+
+    const int httpStatus =
+        reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    const auto netErr = reply->error();
+
+    if (netErr != QNetworkReply::NoError && httpStatus == 0) {
+        reply->deleteLater();
+        QMessageBox::warning(this, tr("Register Error"),
+                             tr("无法连接登录服务器，请确认认证服务已启动"));
+        return;
+    }
+
+    const QByteArray payload = reply->readAll();
+    reply->deleteLater();
+
+    QJsonParseError parseError;
+    const QJsonDocument doc = QJsonDocument::fromJson(payload, &parseError);
+    if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+        QMessageBox::warning(this, tr("Register Error"), tr("注册响应格式错误"));
+        return;
+    }
+
+    const QJsonObject root = doc.object();
+    const int code = root.value(QStringLiteral("code")).toInt(-1);
+    const QString message = root.value(QStringLiteral("message")).toString();
+
+    if (code != 0) {
+        QMessageBox::warning(this, tr("Register Error"),
+                             message.isEmpty() ? tr("注册失败") : message);
+        return;
+    }
+
+    ui->register_password_line->clear();
+    ui->account_line->setText(username);
+    ui->password_line->clear();
+    showLoginPage();
+    QMessageBox::information(this, tr("Register Success"),
+                             tr("注册成功，请使用新账号登录"));
 }

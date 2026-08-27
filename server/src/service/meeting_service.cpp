@@ -122,7 +122,14 @@ void MeetingService::handle_lobby_packet(std::shared_ptr<network::Connection> co
 void MeetingService::handle_create_meeting(std::shared_ptr<network::Connection> conn,
                                            const protocol::Packet& packet) {
     const auto options = parse_create_meeting_options(packet, _config);
-    const auto room_id = _room_manager.create_room(conn, options);
+    const uint64_t owner_user_id = packet.user_id;
+    if (owner_user_id == 0) {
+        spdlog::warn("create meeting rejected: user_id=0 from connection {}",
+                     conn->id());
+        conn->close();
+        return;
+    }
+    const auto room_id = _room_manager.create_room(conn, options, owner_user_id);
 
     protocol::Packet response;
     response.type = protocol::MessageType::CreateMeetingResponse;
@@ -160,8 +167,16 @@ void MeetingService::handle_join_meeting(std::shared_ptr<network::Connection> co
     std::memcpy(&room_no_net, packet.payload.data(), sizeof(room_no_net));
     /*将网络字节序转换为主机字节序*/
     const uint32_t room_id = ntohl(room_no_net);
-    spdlog::info("connection {} join meeting, room_id: {}", conn->id(), room_id);
-    const auto result = _room_manager.join_room(room_id, conn);
+    const uint64_t user_id = packet.user_id;
+    if (user_id == 0) {
+        spdlog::warn("join meeting rejected: user_id=0 from connection {}",
+                     conn->id());
+        conn->close();
+        return;
+    }
+    spdlog::info("connection {} join meeting, room_id: {} user_id: {}",
+                 conn->id(), room_id, user_id);
+    const auto result = _room_manager.join_room(room_id, conn, user_id);
 
     protocol::Packet response;
     response.type = protocol::MessageType::JoinMeetingResponse;

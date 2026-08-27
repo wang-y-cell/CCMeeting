@@ -25,20 +25,20 @@ void CameraVideo::setMainTarget(QWidget *label) {
     _mainAvatarImg->setAlignment(Qt::AlignCenter);
 }
 
-void CameraVideo::setLocalIp(std::uint32_t ip) { _localIp = ip; }
+void CameraVideo::setLocalUserId(qint64 userId) { _localUserId = userId; }
 
-void CameraVideo::setMainIp(std::uint32_t ip) { _mainIp = ip; }
+void CameraVideo::setMainUserId(qint64 userId) { _mainUserId = userId; }
 
-void CameraVideo::addPartnerDisplay(std::uint32_t ip, QWidget *label) {
-    if (_partnerDisplays.find(ip) != _partnerDisplays.end())
+void CameraVideo::addPartnerDisplay(qint64 userId, QWidget *label) {
+    if (_partnerDisplays.find(userId) != _partnerDisplays.end())
         return;
 
     ImgDisplay *display = new ImgDisplay(this);
     display->setTarget(label);
     display->setDrawMode(ImgDisplay::DrawMode::FitWidgetSmooth);
     display->setAlignment(Qt::AlignCenter);
-    _partnerDisplays[ip] = display;
-    showAvatarForIp(ip);
+    _partnerDisplays[userId] = display;
+    showAvatarForUser(userId);
 }
 
 void CameraVideo::clearAllPartnerDisplays() {
@@ -52,8 +52,8 @@ void CameraVideo::clearAllPartnerDisplays() {
     _lastImages.clear();
 }
 
-void CameraVideo::removePartnerDisplay(std::uint32_t ip) {
-    auto it = _partnerDisplays.find(ip);
+void CameraVideo::removePartnerDisplay(qint64 userId) {
+    auto it = _partnerDisplays.find(userId);
     if (it != _partnerDisplays.end()) {
         if (ImgDisplay *display = it->second) {
             display->setTarget(nullptr);
@@ -61,18 +61,18 @@ void CameraVideo::removePartnerDisplay(std::uint32_t ip) {
         }
         _partnerDisplays.erase(it);
     }
-    _lastImages.erase(ip);
+    _lastImages.erase(userId);
 }
 
-void CameraVideo::showImageForIp(std::uint32_t ip, const QImage &image) {
+void CameraVideo::showImageForUser(qint64 userId, const QImage &image) {
     if (image.isNull())
         return;
 
-    _lastImages[ip] = image;
-    auto it = _partnerDisplays.find(ip);
+    _lastImages[userId] = image;
+    auto it = _partnerDisplays.find(userId);
     if (it != _partnerDisplays.end() && it->second)
         it->second->showImage(image);
-    if (ip == _mainIp)
+    if (userId == _mainUserId)
         showMainImage(image);
 }
 
@@ -82,16 +82,16 @@ void CameraVideo::showMainImage(const QImage &image) {
     _mainVideoImg->showImage(image);
 }
 
-void CameraVideo::showAvatarForIp(std::uint32_t ip) {
-    showAvatarForIp(ip, defaultAvatar());
+void CameraVideo::showAvatarForUser(qint64 userId) {
+    showAvatarForUser(userId, defaultAvatar());
 }
 
-void CameraVideo::showAvatarForIp(std::uint32_t ip, const QImage &avatar) {
-    _lastImages.erase(ip);
-    auto it = _partnerDisplays.find(ip);
+void CameraVideo::showAvatarForUser(qint64 userId, const QImage &avatar) {
+    _lastImages.erase(userId);
+    auto it = _partnerDisplays.find(userId);
     if (it != _partnerDisplays.end() && it->second)
         it->second->showImage(avatar);
-    if (ip == _mainIp)
+    if (userId == _mainUserId)
         showMainAvatar();
 }
 
@@ -101,10 +101,10 @@ void CameraVideo::showMainAvatar() {
     _mainAvatarImg->showImage(defaultAvatar());
 }
 
-void CameraVideo::refreshMainForIp(std::uint32_t ip) {
-    _mainIp = ip;
-    if (_lastImages.find(ip) != _lastImages.end())
-        showMainImage(_lastImages[ip]);
+void CameraVideo::refreshMainForUser(qint64 userId) {
+    _mainUserId = userId;
+    if (_lastImages.find(userId) != _lastImages.end())
+        showMainImage(_lastImages[userId]);
     else
         showMainAvatar();
 }

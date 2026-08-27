@@ -33,7 +33,8 @@ public:
          std::shared_ptr<network::Connection> owner,
          const config::ServerConfig& config,
          boost::asio::io_context& io_ctx,
-         RoomOptions options);
+         RoomOptions options,
+         uint64_t owner_user_id);
 
     /**
      * @brief 获取房间ID
@@ -70,7 +71,8 @@ public:
      * @param is_owner 是否为房主
      * @return 是否成功
      */
-    bool add_participant(std::shared_ptr<network::Connection> conn, bool is_owner);
+    bool add_participant(std::shared_ptr<network::Connection> conn, bool is_owner,
+                         uint64_t user_id);
     /**
      * @brief 删除参与者
      * @param conn_id 连接ID
@@ -78,15 +80,15 @@ public:
     void remove_participant(network::Connection::Id conn_id);
 
     /**
-     * @brief 处理房间内媒体消息（IMG/AUDIO/TEXT/CLOSE_CAMERA），转发给其它成员
+     * @brief 处理房间内控制/文本消息（TEXT/CLOSE_CAMERA/USER_PROFILE 等），转发给其它成员
      * @param from 发送者
-     * @param packet 媒体消息
+     * @param packet 消息
      */
     void handle_packet(std::shared_ptr<network::Connection> from,
                        const protocol::Packet& packet);
 
     /**
-     * @brief 新人加入后：广播 PARTNER_JOIN，并向新人发送 PARTNER_JOIN2（在场 IP 列表）
+     * @brief 新人加入后：广播 PARTNER_JOIN，并向新人发送 PARTNER_JOIN2（在场用户 ID 列表）
      * @param newcomer 新人
      */
     void notify_user_joined(std::shared_ptr<network::Connection> newcomer);
