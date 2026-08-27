@@ -233,6 +233,8 @@ void main_window::onConnectServerFinished(bool ok, QString ip, QString port,
     Q_UNUSED(port);
     Q_UNUSED(action);
     if (!ok) {
+        if (widget && widget->isVisible())
+            widget->hide();
         QMessageBox::warning(this, "Connection error", "连接服务器失败",
                              QMessageBox::Yes, QMessageBox::Yes);
     }
