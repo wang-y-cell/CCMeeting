@@ -1,0 +1,3 @@
+[submodule "client/webrtcSDK"]
+	path = client/webrtcSDK
+	url = git@github.com:wang-y-cell/xrtc.git

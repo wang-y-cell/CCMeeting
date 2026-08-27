@@ -13,4 +13,7 @@
         <file>source/main_window.qss</file>
         <file>source/widget.qss</file>
     </qresource>
+    <qresource prefix="/config">
+        <file>config/client.json</file>
+    </qresource>
 </RCC>

@@ -6,32 +6,26 @@
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
 #include <climits>
+#include <memory>
 #include <spdlog/spdlog.h>
 
-Connection::Connection(QObject *parent)
-    : QObject(parent)
-{
-    qRegisterMetaType<QAbstractSocket::SocketError>();
-
-    moveToThread(&m_ioThread);
-    m_ioThread.start();
+Connection::Connection(QObject *parent) : QObject(parent) {
+    qRegisterMetaType<QAbstractSocket::SocketError>(); // 注册SocketError类型
+    moveToThread(&m_ioThread); // 将当前构建的对象移动到IO线程
+    m_ioThread.start();        // 启动IO线程
 }
 
-Connection::~Connection()
-{
-    stopImmediately();
+Connection::~Connection() {
+    stopImmediately(); // 立即停止连接
     m_ioThread.quit();
-    m_ioThread.wait(3000);
+    m_ioThread.wait(3000); // 等待IO线程退出
 }
 
-void Connection::setMessageHub(MessageHub *hub)
-{
-    m_hub = hub;
-}
+void Connection::setMessageHub(MessageHub *hub) { m_hub = hub; }
 
-bool Connection::connectToServer(const QString &ip, const QString &port)
-{
-    spdlog::info("[Connection] 连接服务器: {}:{}", ip.toStdString(), port.toStdString());
+bool Connection::connectToServer(const QString &ip, const QString &port) {
+    spdlog::info("[Connection] connectToServer {}:{}", ip.toUtf8().constData(),
+                 port.toUtf8().constData());
 
     bool ok = false;
     const bool invoked = QMetaObject::invokeMethod(
@@ -39,8 +33,9 @@ bool Connection::connectToServer(const QString &ip, const QString &port)
         Q_RETURN_ARG(bool, ok), Q_ARG(QString, ip), Q_ARG(QString, port));
 
     if (!invoked) {
-        m_lastError = QStringLiteral("internal error: connectOnIoThread not invoked");
-        spdlog::error("[Connection] {}", m_lastError.toStdString());
+        m_lastError =
+            QStringLiteral("internal error: connectOnIoThread not invoked");
+        spdlog::error("[Connection] invoke failed");
         return false;
     }
 
@@ -49,43 +44,46 @@ bool Connection::connectToServer(const QString &ip, const QString &port)
     return ok;
 }
 
-bool Connection::connectOnIoThread(const QString &ip, const QString &port)
-{
-    spdlog::info("[Connection] IO 线程连接 {}:{} tid={}",
-                 ip.toStdString(), port.toStdString(),
+bool Connection::connectOnIoThread(const QString &ip, const QString &port) {
+    spdlog::info("[Connection] IO connect {}:{} tid={}", ip.toUtf8().constData(),
+                 port.toUtf8().constData(),
                  reinterpret_cast<quintptr>(QThread::currentThreadId()));
 
     destroySocket();
     m_parser.reset();
+    /// 二次连接前清队列，避免上次未发完的包污染新会话
+    if (m_hub)
+        m_hub->clear_all();
 
     m_socket = new QTcpSocket();
     connect(m_socket, &QTcpSocket::readyRead, this, &Connection::onReadyRead);
-    connect(m_socket, &QTcpSocket::errorOccurred, this, &Connection::onSocketError);
+    connect(m_socket, &QTcpSocket::errorOccurred, this,
+            &Connection::onSocketError);
 
     m_socket->connectToHost(ip, port.toUShort());
     if (!m_socket->waitForConnected(5000)) {
         m_lastError = m_socket->errorString();
-        spdlog::error("[Connection] 连接失败: {}", m_lastError.toStdString());
+        spdlog::error("[Connection] connect failed err={}",
+                      m_lastError.toUtf8().constData());
         destroySocket();
         return false;
     }
 
-    m_localIp = m_socket->localAddress().toIPv4Address();
-    m_hasLocalIp = true;
     m_lastError.clear();
-    spdlog::info("[Connection] 连接成功, 本机 ip: {}", m_localIp);
+    spdlog::info("[Connection] connected");
     return true;
 }
 
-bool Connection::sendWireData(const QByteArray &frame)
-{
+bool Connection::sendWireData(const QByteArray &frame) {
     if (QThread::currentThread() != thread()) {
         /// 只投递、不阻塞调用方（发送工作线程 / UI 断线路径都可能走到这里）
-        return QMetaObject::invokeMethod(
-            this, "sendWireData", Qt::QueuedConnection, Q_ARG(QByteArray, frame));
+        return QMetaObject::invokeMethod(this, "sendWireData",
+                                         Qt::QueuedConnection,
+                                         Q_ARG(QByteArray, frame));
     }
 
-    if (m_socket == nullptr || m_socket->state() == QAbstractSocket::UnconnectedState) {
+    if (m_socket == nullptr ||
+        m_socket->state() == QAbstractSocket::UnconnectedState) {
         spdlog::info("[Connection] socket 未连接, 发送失败");
         return false;
     }
@@ -94,7 +92,8 @@ bool Connection::sendWireData(const QByteArray &frame)
     std::int64_t written = 0;
 
     while (written < remaining) {
-        const std::int64_t ret = m_socket->write(frame.constData() + written, remaining - written);
+        const std::int64_t ret =
+            m_socket->write(frame.constData() + written, remaining - written);
         if (ret < 0) {
             if (m_socket->error() == QAbstractSocket::TemporaryError)
                 continue;
@@ -110,24 +109,23 @@ bool Connection::sendWireData(const QByteArray &frame)
     return true;
 }
 
-void Connection::onReadyRead()
-{
+void Connection::onReadyRead() {
     if (m_socket == nullptr || m_hub == nullptr)
         return;
 
-    const QByteArray chunk = m_socket->readAll();
-    if (chunk.isEmpty())
+    const QByteArray chunk = m_socket->readAll(); // 读取所有数据
+    if (chunk.isEmpty())                          // 如果数据为空，则返回
         return;
 
     spdlog::info("[Connection] 收到服务端数据 bytes={}", chunk.size());
-    const auto packets = m_parser.feed(reinterpret_cast<const std::uint8_t *>(chunk.constData()),
-                                       static_cast<std::size_t>(chunk.size()));
-    for (const auto &packet : packets)
-        m_hub->routeIncoming(packet);
+    const auto packets =
+        m_parser.feed(reinterpret_cast<const std::uint8_t *>(chunk.constData()),
+                      static_cast<std::size_t>(chunk.size()));
+    for (auto &packet : packets)
+        m_hub->route_incoming(std::move(packet));
 }
 
-void Connection::onSocketError(QAbstractSocket::SocketError error)
-{
+void Connection::onSocketError(QAbstractSocket::SocketError error) {
     if (!m_hub)
         return;
 
@@ -135,15 +133,15 @@ void Connection::onSocketError(QAbstractSocket::SocketError error)
                   static_cast<int>(error),
                   reinterpret_cast<quintptr>(QThread::currentThreadId()));
 
-    Message msg;
-    msg.kind = (error == QAbstractSocket::RemoteHostClosedError)
-        ? Message::Kind::RemoteHostClosedError
-        : Message::Kind::OtherNetError;
-    m_hub->routeIncoming(std::move(msg));
+    MessagePtr msg;
+    if (error == QAbstractSocket::RemoteHostClosedError)
+        msg = std::make_shared<RemoteHostClosedErrorMessage>();
+    else
+        msg = std::make_shared<OtherNetErrorMessage>();
+    m_hub->route_incoming(std::move(msg));
 }
 
-void Connection::destroySocket()
-{
+void Connection::destroySocket() {
     m_parser.reset();
     if (m_socket == nullptr)
         return;
@@ -153,55 +151,54 @@ void Connection::destroySocket()
     m_socket = nullptr;
 }
 
-void Connection::stopImmediately()
-{
+void Connection::stopImmediately() {
     if (m_ioThread.isRunning())
-        QMetaObject::invokeMethod(this, "destroySocket", Qt::BlockingQueuedConnection);
+        QMetaObject::invokeMethod(this, "destroySocket",
+                                  Qt::BlockingQueuedConnection);
 }
 
-void Connection::disconnectFromHost()
-{
-    m_hasLocalIp = false;
-    m_localIp = 0;
-
-    /// 不在 UI 线程 clearAll：队列锁可能被发送/音频线程持有，叠加断线易卡死主窗口
+void Connection::disconnectFromHost() {
+    /// 只唤醒队列，不在调用线程 clearAll（避免与 IO/发送线程抢锁卡死
+    /// controller）
     if (m_hub)
-        m_hub->wakeAllQueues();
+        m_hub->wake_all_queues();
 
     if (m_ioThread.isRunning()) {
-        /// 异步投递到 IO 线程，不阻塞调用方（通常是 UI 线程）
-        QMetaObject::invokeMethod(this, "disconnectOnIoThread", Qt::QueuedConnection);
+        /// 异步投递到 IO 线程，不阻塞调用方（controller / UI）
+        const bool ok = QMetaObject::invokeMethod(this, "disconnectOnIoThread",
+                                                  Qt::QueuedConnection);
+        if (!ok) {
+            spdlog::error(
+                "[Connection] disconnectOnIoThread 投递失败，直接通知断开");
+            emit disconnected();
+        }
     } else {
         if (m_hub)
-            m_hub->clearAll();
+            m_hub->clear_all();
         emit disconnected();
     }
 }
 
-void Connection::disconnectOnIoThread()
-{
+void Connection::disconnectOnIoThread() {
+    spdlog::info("[Connection] IO 线程断开 tid={}",
+                 reinterpret_cast<quintptr>(QThread::currentThreadId()));
     destroySocket();
     if (m_hub)
-        m_hub->clearAll();
+        m_hub->clear_all();
+    /// 无论此前是否已断连，都通知上层，避免 _sessionEnding 永久卡住
+    spdlog::info("[Connection] 发出 disconnected");
     emit disconnected();
 }
 
-QString Connection::errorString() const
-{
-    return m_lastError;
-}
+QString Connection::errorString() const { return m_lastError; }
 
-std::uint32_t Connection::localIp() const
-{
-    return m_hasLocalIp ? m_localIp : UINT32_MAX;
-}
-
-bool Connection::validateIpPort(QWidget *parent, const QString &ip, const QString &port)
-{
+bool Connection::validateIpPort(QWidget *parent, const QString &ip,
+                                const QString &port) {
     const QRegularExpression ipPattern(
         R"(^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$)");
-    const QRegularExpression portPattern(
-        "^([0-9]|[1-9]\\d|[1-9]\\d{2}|[1-9]\\d{3}|[1-5]\\d{4}|6[0-4]\\d{3}|65[0-4]\\d{2}|655[0-2]\\d|6553[0-5])$");
+    const QRegularExpression portPattern("^([0-9]|[1-9]\\d|[1-9]\\d{2}|[1-9]"
+                                         "\\d{3}|[1-5]\\d{4}|6[0-4]\\d{3}|65[0-"
+                                         "4]\\d{2}|655[0-2]\\d|6553[0-5])$");
 
     QRegularExpressionValidator ipValidator(ipPattern);
     QRegularExpressionValidator portValidator(portPattern);
@@ -210,7 +207,8 @@ bool Connection::validateIpPort(QWidget *parent, const QString &ip, const QStrin
     int pos = 0;
     if (ipValidator.validate(ipInput, pos) != QValidator::Acceptable) {
         spdlog::warn("[Connection] IP 格式错误");
-        QMessageBox::warning(parent, "Input Error", "Ip Error", QMessageBox::Yes, QMessageBox::Yes);
+        QMessageBox::warning(parent, "Input Error", "Ip Error",
+                             QMessageBox::Yes, QMessageBox::Yes);
         return false;
     }
 
@@ -218,7 +216,8 @@ bool Connection::validateIpPort(QWidget *parent, const QString &ip, const QStrin
     pos = 0;
     if (portValidator.validate(portInput, pos) != QValidator::Acceptable) {
         spdlog::warn("[Connection] 端口格式错误");
-        QMessageBox::warning(parent, "Input Error", "Port Error", QMessageBox::Yes, QMessageBox::Yes);
+        QMessageBox::warning(parent, "Input Error", "Port Error",
+                             QMessageBox::Yes, QMessageBox::Yes);
         return false;
     }
 

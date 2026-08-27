@@ -4,13 +4,53 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <arpa/inet.h>
 #include <cstring>
 
 namespace service {
 
-MeetingService::MeetingService(config::ServerConfig config)
-    : _config(std::move(config)), _room_manager(_config) {}
+namespace {
+
+constexpr uint32_t kMinParticipants = 2;
+constexpr uint32_t kMinDurationMinutes = 1;
+constexpr uint32_t kMaxDurationMinutes = 24 * 60;
+constexpr uint32_t kDefaultDurationMinutes = 60;
+
+meeting::RoomOptions parse_create_meeting_options(
+    const protocol::Packet& packet, const config::ServerConfig& config) {
+    meeting::RoomOptions options;
+    options.max_participants = config.max_participants_per_room;
+    options.duration_minutes = kDefaultDurationMinutes;
+
+    if (packet.payload.size() >= sizeof(uint32_t) * 2) {
+        uint32_t max_participants_net = 0;
+        uint32_t duration_minutes_net = 0;
+        std::memcpy(&max_participants_net, packet.payload.data(),
+                    sizeof(max_participants_net));
+        std::memcpy(&duration_minutes_net,
+                    packet.payload.data() + sizeof(max_participants_net),
+                    sizeof(duration_minutes_net));
+        options.max_participants = ntohl(max_participants_net);
+        options.duration_minutes = ntohl(duration_minutes_net);
+    }
+
+    const uint32_t hard_max =
+        static_cast<uint32_t>(config.max_participants_per_room);
+    options.max_participants =
+        std::clamp(static_cast<uint32_t>(options.max_participants),
+                   kMinParticipants, hard_max);
+    options.duration_minutes =
+        std::clamp(options.duration_minutes, kMinDurationMinutes,
+                   kMaxDurationMinutes);
+    return options;
+}
+
+}  // namespace
+
+MeetingService::MeetingService(config::ServerConfig config,
+                               boost::asio::io_context& io_ctx)
+    : _config(std::move(config)), _room_manager(_config, io_ctx) {}
 
 void MeetingService::bind_server(network::Server& server) {
     server.set_connection_handler(
@@ -80,8 +120,16 @@ void MeetingService::handle_lobby_packet(std::shared_ptr<network::Connection> co
 }
 
 void MeetingService::handle_create_meeting(std::shared_ptr<network::Connection> conn,
-                                           const protocol::Packet& /*packet*/) {
-    const auto room_id = _room_manager.create_room(conn);
+                                           const protocol::Packet& packet) {
+    const auto options = parse_create_meeting_options(packet, _config);
+    const uint64_t owner_user_id = packet.user_id;
+    if (owner_user_id == 0) {
+        spdlog::warn("create meeting rejected: user_id=0 from connection {}",
+                     conn->id());
+        conn->close();
+        return;
+    }
+    const auto room_id = _room_manager.create_room(conn, options, owner_user_id);
 
     protocol::Packet response;
     response.type = protocol::MessageType::CreateMeetingResponse;
@@ -92,8 +140,11 @@ void MeetingService::handle_create_meeting(std::shared_ptr<network::Connection> 
         room->set_close_callback([this](uint32_t id) { cleanup_room(id); });
         _connection_room.emplace(conn->id(), room);
         room_no = htonl(*room_id);
-        spdlog::info("meeting created: room id = {} owner connection id = {}", *room_id,
-                     conn->id());
+        spdlog::info(
+            "meeting created: room id = {} owner connection id = {} "
+            "max_participants = {} duration_minutes = {}",
+            *room_id, conn->id(), options.max_participants,
+            options.duration_minutes);
     } else {
         spdlog::warn("create meeting failed for connection {}", conn->id());
     }
@@ -116,8 +167,16 @@ void MeetingService::handle_join_meeting(std::shared_ptr<network::Connection> co
     std::memcpy(&room_no_net, packet.payload.data(), sizeof(room_no_net));
     /*将网络字节序转换为主机字节序*/
     const uint32_t room_id = ntohl(room_no_net);
-    spdlog::info("connection {} join meeting, room_id: {}", conn->id(), room_id);
-    const auto result = _room_manager.join_room(room_id, conn);
+    const uint64_t user_id = packet.user_id;
+    if (user_id == 0) {
+        spdlog::warn("join meeting rejected: user_id=0 from connection {}",
+                     conn->id());
+        conn->close();
+        return;
+    }
+    spdlog::info("connection {} join meeting, room_id: {} user_id: {}",
+                 conn->id(), room_id, user_id);
+    const auto result = _room_manager.join_room(room_id, conn, user_id);
 
     protocol::Packet response;
     response.type = protocol::MessageType::JoinMeetingResponse;

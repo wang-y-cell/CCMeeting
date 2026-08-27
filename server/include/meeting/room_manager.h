@@ -10,6 +10,7 @@
 #include "config/server_config.h"
 #include "meeting/room.h"
 
+#include <boost/asio.hpp>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -26,20 +27,24 @@ public:
         Closed,    // 房间已关闭
     };
 
-    explicit RoomManager(config::ServerConfig config);
+    RoomManager(config::ServerConfig config, boost::asio::io_context& io_ctx);
 
     /**
      * @brief 创建房间
      * @param owner 房主连接
+     * @param options 人数上限与时长
      * @return 房间ID
      */
-    std::optional<uint32_t> create_room(std::shared_ptr<network::Connection> owner);
+    std::optional<uint32_t> create_room(std::shared_ptr<network::Connection> owner,
+                                        RoomOptions options,
+                                        uint64_t owner_user_id);
     /**
      * @brief 加入房间
      * @param room_id 房间ID
      * @param conn 连接
      */
-    JoinResult join_room(uint32_t room_id, std::shared_ptr<network::Connection> conn);
+    JoinResult join_room(uint32_t room_id, std::shared_ptr<network::Connection> conn,
+                         uint64_t user_id);
 
     /**
      * @brief 获取房间
@@ -74,6 +79,7 @@ public:
 
 private:
     config::ServerConfig _config;/*服务器配置*/
+    boost::asio::io_context& _io_ctx;/*IO上下文*/
     std::unordered_map<uint32_t, std::shared_ptr<Room>> _rooms; /*房间号和房间的指针的映射*/
     uint32_t _next_room_id = 1;  /*自增房间号，替代 cloudMeet 的 pid*/
 };

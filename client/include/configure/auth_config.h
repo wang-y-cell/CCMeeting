@@ -13,5 +13,7 @@ constexpr char host[] = "127.0.0.1";
 constexpr int port = 9000;
 /** @brief 登录 API 路径 */
 constexpr char login_path[] = "/api/login";
+/** @brief 注册 API 路径 */
+constexpr char register_path[] = "/api/register";
 
 }  // namespace AuthConfig

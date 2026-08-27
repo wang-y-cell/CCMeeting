@@ -2,14 +2,15 @@
 #define MESSAGE_H
 
 #include <QByteArray>
-#include <QImage>
 #include <QMetaType>
+#include <QtGlobal>
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <deque>
+#include <memory>
 #include <mutex>
 #include <optional>
-#include <queue>
 #include <string>
 #include <vector>
 
@@ -21,94 +22,340 @@
 #define WAITSECONDS 2
 #endif
 
-/**
- * @brief 应用层统一消息（替代原 OutgoingItem / MESG）
- */
-struct Message {
-    enum class Kind {
-        CreateMeeting,
-        JoinMeeting,
-        ExitMeeting,
-        CloseCamera,
-        SendText,
-        SendImage,
-        SendAudio,
+/** @brief 消息类型（取代原 Message::Kind） */
+enum class MessageKind {
+    CreateMeeting,
+    JoinMeeting,
+    ExitMeeting,
+    CloseCamera,
+    SendText,
+    SendUserProfile,
 
-        CreateMeetingResponse,
-        JoinMeetingResponse,
-        RecvText,
-        RecvImage,
-        RecvAudio,
-        PartnerJoin,
-        PartnerExit,
-        PartnerJoin2,
-        CloseCameraNotify,
-        RemoteHostClosedError,
-        OtherNetError,
-    };
-
-    enum class Channel { Request, UserInfo, Text, Video, Audio };
-
-    Kind kind = Kind::CreateMeeting;
-    std::uint32_t ip = 0;
-
-    std::string text;
-    QImage image;
-    QByteArray audio;
-
-    std::uint32_t roomNo = 0;
-    std::int32_t responseCode = 0;
-    std::vector<std::uint32_t> partnerIps;
-
-    /**
-     * @brief 根据消息类型获取通道
-     * @param kind 消息类型
-     * @return 通道
-     */
-    static Channel channelFor(Kind kind);
-    /**
-     * @brief 根据消息类型获取发送通道
-     * @param kind 消息类型
-     * @return 发送通道
-     */
-    static Channel sendChannelFor(Kind kind);
-    /**
-     * @brief 根据消息类型获取接收通道
-     * @param kind 消息类型
-     * @return 接收通道
-     */
-    static Channel recvChannelFor(Kind kind);
+    CreateMeetingResponse,
+    JoinMeetingResponse,
+    RecvText,
+    PartnerJoin,
+    PartnerExit,
+    PartnerJoin2,
+    CloseCameraNotify,
+    UserProfileNotify,
+    RemoteHostClosedError,
+    OtherNetError,
 };
 
-Q_DECLARE_METATYPE(Message)
+/**
+ * @brief 发送优先级：数值越小越优先
+ * Control > Text
+ */
+enum class MessagePriority {
+    Control = 0, // 控制信息，如添加/移除房间成员，创建房间
+    Text = 1,    // 文本信息
+};
 
 /**
- * @brief 线程安全 Message 队列（值语义）
+ * @brief 业务 Message 基类
+ * @details 多态，跨线程用 MessagePtr 传递
  */
-class MessageQueue {
+class Message {
 public:
-    /**
-     * @brief 入队一条消息
-     * @param msg 消息
-     */
-    void push(Message msg);
-    /**
-     * @brief 出队一条消息
-     * @param waitMs 最长等待毫秒
-     * @return 有消息则返回，超时返回 nullopt
-     */
-    std::optional<Message> pop(int waitMs = WAITSECONDS * 1000);
-    /** @brief 清空队列 */
-    void clear();
-    /** @brief 唤醒所有等待出队的线程 */
-    void wakeAll();
-    /** @brief 清空队列中的视频类消息 */
-    void clearVideo();
+    virtual ~Message() = default;
+
+    /** @brief 获取消息类型 */
+    virtual MessageKind kind() const = 0;
+    /** @brief 发送侧优先级；接收侧消息可返回 Control */
+    virtual MessagePriority send_priority() const {
+        return MessagePriority::Control;
+    }
+
+    /** @brief 获取消息发送者的用户 ID */
+    qint64 user_id() const { return user_id_; }
+    /** @brief 设置消息发送者的用户 ID */
+    void set_user_id(qint64 user_id) { user_id_ = user_id; }
+
+protected:
+    qint64 user_id_ = 0;
+};
+
+/** @brief 业务 Message 智能指针 */
+using MessagePtr = std::shared_ptr<Message>;
+
+// ---------- 发送侧 ----------
+
+/** @brief 创建房间消息 */
+class CreateMeetingMessage : public Message {
+public:
+    CreateMeetingMessage(std::uint32_t max_participants = 8,
+                         std::uint32_t duration_minutes = 60)
+        : max_participants_(max_participants),
+          duration_minutes_(duration_minutes) {}
+
+    MessageKind kind() const override { return MessageKind::CreateMeeting; }
+    MessagePriority send_priority() const override {
+        return MessagePriority::Control;
+    }
+
+    /** @brief 人数上限 */
+    std::uint32_t max_participants() const { return max_participants_; }
+    /** @brief 设置人数上限 */
+    void set_max_participants(std::uint32_t value) {
+        max_participants_ = value;
+    }
+    /** @brief 时长（分钟） */
+    std::uint32_t duration_minutes() const { return duration_minutes_; }
+    /** @brief 设置时长（分钟） */
+    void set_duration_minutes(std::uint32_t value) {
+        duration_minutes_ = value;
+    }
 
 private:
-    std::mutex m_mutex;
-    std::condition_variable m_cond;
-    std::queue<Message> m_queue;
+    std::uint32_t max_participants_ = 8;
+    std::uint32_t duration_minutes_ = 60;
+};
+
+/** @brief 加入房间消息 */
+class JoinMeetingMessage : public Message {
+public:
+    explicit JoinMeetingMessage(std::string room_no = {})
+        : room_no_(std::move(room_no)) {}
+
+    /** @brief 获取消息类型 */
+    MessageKind kind() const override { return MessageKind::JoinMeeting; }
+    /** @brief 获取消息发送优先级 */
+    MessagePriority send_priority() const override {
+        return MessagePriority::Control;
+    }
+    /** @brief 获取房间号 */
+    const std::string &room_no() const { return room_no_; }
+    /** @brief 设置房间号 */
+    void set_room_no(std::string room_no) { room_no_ = std::move(room_no); }
+    /** @brief 将房间号转换为 32 位整数 */
+    std::uint32_t room_no_u32() const {
+        if (room_no_.empty())
+            return 0;
+        try {
+            return static_cast<std::uint32_t>(std::stoul(room_no_));
+        } catch (...) {
+            return 0;
+        }
+    }
+
+private:
+    std::string room_no_;
+};
+
+/** @brief 退出房间消息 */
+class ExitMeetingMessage : public Message {
+public:
+    /** @brief 获取消息类型 */
+    MessageKind kind() const override { return MessageKind::ExitMeeting; }
+    /** @brief 获取消息发送优先级 */
+    MessagePriority send_priority() const override {
+        return MessagePriority::Control;
+    }
+};
+
+/** @brief 关闭摄像头消息 */
+class CloseCameraMessage : public Message {
+public:
+    /** @brief 获取消息类型 */
+    MessageKind kind() const override { return MessageKind::CloseCamera; }
+    /** @brief 获取消息发送优先级 */
+    MessagePriority send_priority() const override {
+        return MessagePriority::Control;
+    }
+};
+
+/** @brief 发送用户资料（显示名/头像） */
+class SendUserProfileMessage : public Message {
+public:
+    SendUserProfileMessage(qint64 user_id = 0, std::string display_name = {},
+                           std::string avatar_url = {})
+        : display_name_(std::move(display_name)),
+          avatar_url_(std::move(avatar_url)) {
+        set_user_id(user_id);
+    }
+
+    MessageKind kind() const override { return MessageKind::SendUserProfile; }
+    MessagePriority send_priority() const override {
+        return MessagePriority::Control;
+    }
+
+    const std::string &display_name() const { return display_name_; }
+    const std::string &avatar_url() const { return avatar_url_; }
+
+private:
+    std::string display_name_;
+    std::string avatar_url_;
+};
+
+/** @brief 发送文本消息 */
+class SendTextMessage : public Message {
+public:
+    explicit SendTextMessage(std::string text = {}) : text_(std::move(text)) {}
+
+    /** @brief 获取消息类型 */
+    MessageKind kind() const override { return MessageKind::SendText; }
+    /** @brief 获取消息发送优先级 */
+    MessagePriority send_priority() const override {
+        return MessagePriority::Text;
+    }
+
+    /** @brief 获取文本内容 */
+    const std::string &text() const { return text_; }
+    /** @brief 设置文本内容 */
+    void set_text(std::string text) { text_ = std::move(text); }
+
+private:
+    std::string text_;
+};
+
+// ---------- 接收 / 事件侧 ----------
+
+/** @brief 创建房间响应消息 */
+class CreateMeetingResponseMessage : public Message {
+public:
+    MessageKind kind() const override {
+        return MessageKind::CreateMeetingResponse;
+    }
+    /** @brief 获取房间号 */
+    std::uint32_t room_no() const { return room_no_; }
+    /** @brief 设置房间号 */
+    void set_room_no(std::uint32_t room_no) { room_no_ = room_no; }
+
+private:
+    std::uint32_t room_no_ = 0; ///< 房间号
+};
+
+/** @brief 加入房间响应消息 */
+class JoinMeetingResponseMessage : public Message {
+public:
+    MessageKind kind() const override {
+        return MessageKind::JoinMeetingResponse;
+    }
+
+    std::int32_t response_code() const { return response_code_; }
+    void set_response_code(std::int32_t code) { response_code_ = code; }
+
+private:
+    std::int32_t response_code_ = 0;
+};
+
+/** @brief 接收文本消息 */
+class RecvTextMessage : public Message {
+public:
+    /** @brief 获取消息类型 */
+    MessageKind kind() const override { return MessageKind::RecvText; }
+    /** @brief 获取文本内容 */
+    const std::string &text() const { return text_; }
+    /** @brief 设置文本内容 */
+    void set_text(std::string text) { text_ = std::move(text); }
+
+private:
+    std::string text_; ///< 文本内容
+};
+
+/** @brief 房间成员加入消息 */
+class PartnerJoinMessage : public Message {
+public:
+    /** @brief 获取消息类型 */
+    MessageKind kind() const override { return MessageKind::PartnerJoin; }
+};
+
+/** @brief 房间成员退出消息 */
+class PartnerExitMessage : public Message {
+public:
+    /** @brief 获取消息类型 */
+    MessageKind kind() const override { return MessageKind::PartnerExit; }
+};
+
+/** @brief 房间成员加入消息（2） */
+class PartnerJoin2Message : public Message {
+public:
+    /** @brief 获取消息类型 */
+    MessageKind kind() const override { return MessageKind::PartnerJoin2; }
+    /** @brief 获取房间成员用户 ID 列表 */
+    const std::vector<qint64> &partner_user_ids() const {
+        return partner_user_ids_;
+    }
+    /** @brief 设置房间成员用户 ID 列表 */
+    void set_partner_user_ids(std::vector<qint64> ids) {
+        partner_user_ids_ = std::move(ids);
+    }
+    /** @brief 添加房间成员用户 ID */
+    void add_partner_user_id(qint64 user_id) {
+        partner_user_ids_.push_back(user_id);
+    }
+
+private:
+    std::vector<qint64> partner_user_ids_;
+};
+
+/** @brief 关闭摄像头通知消息 */
+class CloseCameraNotifyMessage : public Message {
+public:
+    /** @brief 获取消息类型 */
+    MessageKind kind() const override { return MessageKind::CloseCameraNotify; }
+};
+
+/** @brief 用户资料通知 */
+class UserProfileNotifyMessage : public Message {
+public:
+    MessageKind kind() const override { return MessageKind::UserProfileNotify; }
+
+    const std::string &display_name() const { return display_name_; }
+    void set_display_name(std::string name) {
+        display_name_ = std::move(name);
+    }
+    const std::string &avatar_url() const { return avatar_url_; }
+    void set_avatar_url(std::string url) { avatar_url_ = std::move(url); }
+
+private:
+    std::string display_name_;
+    std::string avatar_url_;
+};
+
+/** @brief 远程主机关闭错误消息 */
+class RemoteHostClosedErrorMessage : public Message {
+public:
+    /** @brief 获取消息类型 */
+    MessageKind kind() const override {
+        return MessageKind::RemoteHostClosedError;
+    }
+};
+
+/** @brief 其他网络错误消息 */
+class OtherNetErrorMessage : public Message {
+public:
+    /** @brief 获取消息类型 */
+    MessageKind kind() const override { return MessageKind::OtherNetError; }
+};
+
+Q_DECLARE_METATYPE(MessagePtr)
+
+/**
+ * @brief 按优先级分桶的线程安全发送队列（单消费者）
+ *
+ * 出队顺序：Control → Text。
+ */
+class PriorityMessageQueue {
+public:
+    /** @brief 将消息添加到队列 */
+    void push(MessagePtr msg);
+    /** @brief 从队列中取出消息 */
+    std::optional<MessagePtr> pop(int wait_ms = WAITSECONDS * 1000);
+    /** @brief 清空队列 */
+    void clear();
+    /** @brief 唤醒所有等待的线程 */
+    void wake_all();
+
+private:
+    std::deque<MessagePtr> &
+    bucket_for(MessagePriority priority);         ///< 获取指定优先级的桶
+    static constexpr int k_priority_count = 2; ///< 优先级数量
+
+    std::mutex mutex_;                                 ///< 互斥锁
+    std::condition_variable cond_;                     ///< 条件变量
+    std::deque<MessagePtr> buckets_[k_priority_count]; ///< 优先级桶
 };
 
 #endif // MESSAGE_H

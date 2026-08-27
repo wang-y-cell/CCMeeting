@@ -27,6 +27,42 @@ QLabel#hintLabel { /* 提示标签 */
     border: none; /* 边框 */
 }
 
+QLabel#createUserLink,
+QLabel#backToLoginLink {
+    color: #6d7588;
+    font-size: 11px;
+    background: transparent;
+    border: none;
+}
+
+QLabel#createUserLink a,
+QLabel#backToLoginLink a {
+    color: #6d7588;
+    text-decoration: none;
+}
+
+QLabel#createUserLink a:hover,
+QLabel#backToLoginLink a:hover {
+    color: #3b82f6;
+    text-decoration: underline;
+}
+
+QLabel#registerBrandLabel {
+    color: #f3f5f8;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    background: transparent;
+    border: none;
+}
+
+QLabel#registerSubtitleLabel {
+    color: #8b93a7;
+    font-size: 13px;
+    background: transparent;
+    border: none;
+}
+
 QLineEdit { /* 输入框 */
     background-color: #232733; /* 背景颜色 */
     color: #eef1f6; /* 文字颜色 */
@@ -65,6 +101,23 @@ QPushButton#login_button:hover { /* 登录按钮悬停时背景颜色 */
 
 QPushButton#login_button:pressed { /* 登录按钮按下时背景颜色 */
     background-color: #255fd4; /* 背景颜色 */
+}
+
+QPushButton#register_button {
+    background-color: #2f6fed;
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+QPushButton#register_button:hover {
+    background-color: #3b7fff;
+}
+
+QPushButton#register_button:pressed {
+    background-color: #255fd4;
 }
 
 QPushButton#framelessCloseBtn { /* 关闭按钮 */
