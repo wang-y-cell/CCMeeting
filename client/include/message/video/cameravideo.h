@@ -7,6 +7,8 @@
 #include <QtGlobal>
 #include <unordered_map>
 
+class VideoGLWidget;
+
 /**
  * @brief 主/成员画面显示管理（纯显示，采集由 WebRTC 负责）
  */
@@ -16,11 +18,11 @@ public:
     explicit CameraVideo(QWidget *parent = nullptr);
     ~CameraVideo();
 
-    void setMainTarget(QWidget *label);
+    void setMainTarget(VideoGLWidget *widget);
     void setLocalUserId(qint64 userId);
     void setMainUserId(qint64 userId);
 
-    void addPartnerDisplay(qint64 userId, QWidget *label);
+    void addPartnerDisplay(qint64 userId, VideoGLWidget *widget);
     void removePartnerDisplay(qint64 userId);
     void clearAllPartnerDisplays();
 

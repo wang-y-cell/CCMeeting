@@ -6,6 +6,7 @@
 
 class QLabel;
 class Partner;
+class VideoGLWidget;
 class QNetworkAccessManager;
 
 class PartnerTile : public QWidget {
@@ -14,7 +15,7 @@ public:
     explicit PartnerTile(Partner *partner, QWidget *parent = nullptr);
 
     Partner *partner() const { return m_partner; }
-    QLabel *displayLabel() const { return m_displayLabel; }
+    VideoGLWidget *displayWidget() const { return m_displayWidget; }
     QLabel *nameLabel() const { return m_nameLabel; }
 
     void updateProfile(const QString &displayName, const QString &avatarUrl);
@@ -32,9 +33,10 @@ private:
     void updateLabelGeometry();
     void applyBorder(bool selected);
     void loadAvatar(const QString &avatarUrl);
+    void showAvatarImage(const QImage &image);
 
     Partner *m_partner = nullptr;
-    QLabel *m_displayLabel = nullptr;
+    VideoGLWidget *m_displayWidget = nullptr;
     QLabel *m_nameLabel = nullptr;
     QNetworkAccessManager *m_nam = nullptr;
     int m_side = 40;

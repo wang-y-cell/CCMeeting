@@ -8,13 +8,13 @@
 #include <QWidget>
 #include <functional>
 
-class QLabel;
+class VideoGLWidget;
 
 /**
  * @brief 将「图片来源 → 缩放/对齐策略 → 显示到控件」从业务逻辑里拆出，
  *        便于在同一处切换绘制方式、绘制区域与刷新方式。
  *
- * 典型用法：绑定 QLabel，设置 DrawMode / 可选矩形区域，再调用 showImage()。
+ * 典型用法：绑定 VideoGLWidget，设置 DrawMode / 可选矩形区域，再调用 showImage()。
  */
 class ImgDisplay : public QObject
 {
@@ -28,7 +28,7 @@ public:
         FitWidgetFast,     ///< 缩放到目标尺寸且保持宽高比，使用快速缩放
         StretchWidget,     ///< 拉伸填满控件矩形（IgnoreAspectRatio）
         FixedSize,         ///< 按 setFixedOutputSize() 输出，不随控件变大而变大
-        ScaleToHeightFractionCentered, ///< 高度为控件高度的 heightFraction（默认 0.5），宽度按原图等比例；配合 QLabel 对齐实现居中
+        ScaleToHeightFractionCentered, ///< 高度为控件高度的 heightFraction（默认 0.5），宽度按原图等比例；配合对齐实现居中
         Custom             ///< 使用 setPixmapTransform() 自定义
     };
 
@@ -85,7 +85,7 @@ public:
     QRect contentRect() const;
 
     /**
-     * @brief QLabel 上 pixmap 的对齐（默认居中），仅在目标为 QLabel 时生效
+     * @brief 画面在控件内的对齐（默认居中）
      * @param alignment 对齐方式，如 Qt::AlignCenter / Left / Right / Top / Bottom
      */
     void setAlignment(Qt::Alignment alignment);
@@ -123,7 +123,7 @@ public:
     QPixmap preparePixmap(const QImage &image) const;
 
     /**
-     * @brief 显示图像（内部 preparePixmap + 刷新 QLabel / update QWidget）
+     * @brief 显示图像（由 VideoGLWidget 在 GPU 上缩放并绘制）
      * @param image 源图像
      */
     void showImage(const QImage &image);
@@ -133,7 +133,7 @@ public:
      */
     void showPixmap(const QPixmap &pixmap);
 
-    /** @brief 清空标签图像或对控件触发 repaint */
+    /** @brief 清空 VideoGLWidget 上的画面 */
     void clear();
 
     /**
@@ -146,11 +146,8 @@ public:
     static QPixmap scaleImage(const QImage &image, const QSize &targetSize, DrawMode mode);
 
 private:
-    /**
-     * @brief 将 pixmap 刷新到目标 QLabel
-     * @param pixmap 待显示图像
-     */
-    void refreshLabel(const QPixmap &pixmap);
+    VideoGLWidget *videoWidget() const;
+    void applyWidgetSettings(VideoGLWidget *widget) const;
     /**
      * @brief 有效目标尺寸
      * @return 尺寸
@@ -166,7 +163,7 @@ private:
     DrawMode m_drawMode = DrawMode::FitWidgetSmooth; ///< 图像相对目标控件的缩放与适配策略
     QSize m_fixedOutputSize; ///< 仅 FixedSize：输出 pixmap 像素尺寸
     QRect m_contentRect; ///< 绘制内容区域；无效表示整个控件 rect()
-    Qt::Alignment m_alignment = Qt::AlignCenter; ///< QLabel pixmap 对齐（默认居中）
+    Qt::Alignment m_alignment = Qt::AlignCenter; ///< 画面对齐（默认居中）
     PixmapTransform m_customTransform; ///< Custom 模式下的自定义变换
     double m_heightFraction = 0.5; ///< ScaleToHeightFractionCentered：高度比例（默认 0.5）
 };

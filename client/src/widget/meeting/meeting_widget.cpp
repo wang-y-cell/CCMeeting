@@ -695,8 +695,8 @@ Partner *MeetingWidget::add_partner(qint64 userId) {
     partner.emplace(userId, p);
     ui->verticalLayout_3->addWidget(tile, 1);
 
-    if (QLabel *label = p->displayLabel())
-        _cameraVideo->addPartnerDisplay(userId, label);
+    if (VideoGLWidget *widget = p->displayWidget())
+        _cameraVideo->addPartnerDisplay(userId, widget);
 
     if (_createmeet || _joinmeet) {
         ui->openAudio->setDisabled(false);

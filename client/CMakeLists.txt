@@ -26,7 +26,7 @@ set(WEBRTC_INCLUDE "F:/wy/webrtc/src" CACHE PATH "libwebrtc headers")
 set(WEBRTC_LIB "F:/wy/webrtc/src/out/Default/obj" CACHE PATH "libwebrtc libs")
 set(Boost_ROOT "F:/wy/boost_install" CACHE PATH "Boost install prefix")
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets Network Multimedia)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Network Multimedia OpenGLWidgets OpenGL)
 find_package(Threads REQUIRED)
 
 set(BUILD_XRTC_DEMO OFF CACHE BOOL "" FORCE)
@@ -51,6 +51,8 @@ target_link_libraries(CloudMeetingClient
     Qt6::Widgets
     Qt6::Network
     Qt6::Multimedia
+    Qt6::OpenGLWidgets
+    Qt6::OpenGL
     Threads::Threads
     spdlog::spdlog
     xrtc

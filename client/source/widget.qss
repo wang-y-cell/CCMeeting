@@ -78,7 +78,7 @@ QListWidget {
     color: #e8ebf2;
 }
 
-QLabel#mainshow_label {
+VideoGLWidget#mainshow_label {
     background-color: #12141a;
     border: 1px solid #2a2e38;
     border-radius: 8px;
