@@ -27,6 +27,8 @@ public:
 
     /** @brief 发起登录请求 */
     void Login();
+    /** @brief 发起注册请求 */
+    void Register();
     /** @brief 应用样式 */
     void set_style();
 
@@ -36,11 +38,21 @@ private slots:
      * @param reply 网络响应
      */
     void onLoginFinished(QNetworkReply* reply);
+    /**
+     * @brief 处理注册 HTTP 响应
+     * @param reply 网络响应
+     */
+    void onRegisterFinished(QNetworkReply* reply);
+    void showRegisterPage();
+    void showLoginPage();
 
 private:
+    enum class PendingRequest { None, Login, Register };
+
     Ui::login *ui; ///< UI
     QNetworkAccessManager m_nam; ///< HTTP 客户端
     bool m_requestInFlight = false; ///< 防止重复提交
+    PendingRequest m_pendingRequest = PendingRequest::None;
 };
 
 #endif // LOGIN_H

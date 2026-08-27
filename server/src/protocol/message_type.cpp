@@ -5,13 +5,13 @@ namespace protocol {
 std::string get_type_name(MessageType type) {
     switch (type) {
         case MessageType::ImgSend:
-            return "ImgSend";
+            return "ImgSend(reserved)";
         case MessageType::ImgRecv:
-            return "ImgRecv";
+            return "ImgRecv(reserved)";
         case MessageType::AudioSend:
-            return "AudioSend";
+            return "AudioSend(reserved)";
         case MessageType::AudioRecv:
-            return "AudioRecv";
+            return "AudioRecv(reserved)";
         case MessageType::TextSend:
             return "TextSend";
         case MessageType::TextRecv:
@@ -34,6 +34,8 @@ std::string get_type_name(MessageType type) {
             return "JoinMeetingResponse";
         case MessageType::PartnerJoin2:
             return "PartnerJoin2";
+        case MessageType::UserProfile:
+            return "UserProfile";
         default:
             return "Unknown";
     }

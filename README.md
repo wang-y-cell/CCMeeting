@@ -7,7 +7,7 @@
 **客户端**
 
 - 连接服务器，创建或加入会议房间
-- 摄像头 / 麦克风开关，实时音视频收发
+- 基于 WebRTC（xrtc + Janus VideoRoom）的摄像头 / 麦克风实时音视频
 - 文字聊天（含 `@` 成员补全）
 - 成员列表、主画面切换、会议信息展示
 - 无边框窗口（拖动、边缘缩放、最大化）
@@ -15,7 +15,7 @@
 **消息服务器（server）**
 
 - 会议室创建与成员进出管理
-- 基于 TCP 的消息转发（请求、文本、音视频等通道）
+- 基于 TCP 的控制面消息转发（请求、文本、成员状态等；音视频走 WebRTC）
 
 **认证服务器（server2）**
 
@@ -26,7 +26,8 @@
 
 | 组件 | 依赖 | 说明 |
 |------|------|------|
-| 客户端 | **Qt 6**（Widgets、Multimedia、MultimediaWidgets、Network） | GUI、音视频采集播放、网络 |
+| 客户端 | **Qt 6**（Widgets、Network、Multimedia） | GUI、网络；Multimedia 仅用于聊天提示音 |
+| 客户端 | **xrtc / libwebrtc**、**Boost**（Beast WebSocket） | WebRTC 音视频与 Janus 信令 |
 | 客户端 / 服务端 | **spdlog** | 日志 |
 | 客户端 / 服务端 | **C++17**、**Threads** | 标准与线程库 |
 | 消息服务器 | **Boost.Asio / Boost.System**（≥ 1.70） | 异步网络 |
@@ -43,9 +44,11 @@
 CCMeeting/
 ├── CMakeLists.txt          # 根工程（可选构建 client / server / server2）
 ├── build.py                # 一键构建脚本
-├── client/                 # Qt 客户端
+├── client/                 # Qt 客户端（含 webrtcSDK/xrtc 子模块）
 │   ├── include/
 │   ├── src/
+│   ├── webrtcSDK/          # xrtc WebRTC 封装
+│   ├── config/
 │   └── CMakeLists.txt
 ├── server/                 # 消息服务器
 │   ├── include/
@@ -63,10 +66,11 @@ CCMeeting/
 ## 环境准备
 
 1. 安装 **CMake**、**C++17** 编译器（MSVC / MinGW / GCC / Clang）、**Python 3**（用于 `build.py`）
-2. 安装 **Qt 6**（建议 6.x，需含 Multimedia、Network 等模块）
+2. 安装 **Qt 6**（建议 6.x，需含 Network、Multimedia 等模块；客户端音视频依赖预编译 libwebrtc 与 Boost）
 3. **spdlog**：无需预装；首次配置需能访问 GitHub（或事先把源码放到 `third_party/spdlog`）
 4. 若构建消息服务器：安装 **Boost**（含 `system`，≥ 1.70）
 5. 若构建认证服务器：额外需要 Boost `json`、**OpenSSL**、**MySQL Connector/C++**（如 `libmysqlcppconn-dev`）
+6. 客户端需 **MSVC** 工具链（与 libwebrtc 一致），并配置 `WEBRTC_INCLUDE` / `WEBRTC_LIB` / Boost 路径（见 `client/CMakeLists.txt`）
 
 ## 编译
 
@@ -138,7 +142,7 @@ cmake --build build-all
 1. （可选）启动 **CloudMeetingAuthServer**，用于注册 / 登录
 2. 启动 **CloudMeetingServer** 消息服务器
 3. 启动 **CloudMeetingClient** 客户端，填写服务器地址与端口并连接
-4. 创建会议或加入已有房间号，即可进行音视频与文字交流
+4. 创建会议或加入已有房间号；音视频经 Janus/WebRTC，文字与房间控制经消息服务器
 
 ## 文档（可选）
 

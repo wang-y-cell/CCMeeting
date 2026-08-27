@@ -8,9 +8,8 @@
 
 /** @brief 连接成功后在 UI 线程继续的动作 */
 enum class ConnectAction : int {
-    None = 0,           ///< 仅测试连接
-    CreateMeeting = 1,  ///< 连接后创建会议
-    JoinMeeting = 2     ///< 连接后加入会议
+    CreateMeeting = 0,  ///< 连接后创建会议
+    JoinMeeting = 1     ///< 连接后加入会议
 };
 Q_DECLARE_METATYPE(ConnectAction)
 
@@ -43,8 +42,12 @@ public slots:
      * @param room_no 加入会议时的房间号
      */
     void connect_to_server_slot(QString ip, QString port, ConnectAction action, QString room_no);
-    /** @brief 发送创建会议请求 */
-    void create_meeting_slot();
+    /**
+     * @brief 发送创建会议请求
+     * @param max_participants 人数上限
+     * @param duration_minutes 时长（分钟）
+     */
+    void create_meeting_slot(quint32 max_participants, quint32 duration_minutes);
     /**
      * @brief 发送加入会议请求
      * @param room_no 房间号

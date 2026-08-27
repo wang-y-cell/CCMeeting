@@ -37,6 +37,12 @@ public:
                              const std::string& client_ip,
                              const std::string& device_info) const;
 
+    /**
+     * @brief 注册新用户
+     */
+    model::LoginResult register_user(const std::string& username,
+                                     const std::string& password) const;
+
 private:
     repository::UserRepository repository_;
 };

@@ -3,7 +3,7 @@
 /*
  * codec.h — 协议编解码器
  *
- * wire 格式: $ | type(2) | ip(4) | size(4) | data | #
+ * wire 格式: $ | type(2) | user_id(8) | size(4) | data | #
  * 所有多字节字段均为网络字节序。仅负责字节流 ↔ Packet 转换，不含业务逻辑。
  */
 
@@ -22,7 +22,7 @@ enum class DecodeStatus {
 
 class Codec {
 public:
-    static constexpr size_t kHeaderSize = 11;
+    static constexpr size_t kHeaderSize = 15;
     static constexpr char kMagic = '$';
     static constexpr char kTail = '#';
 
@@ -30,8 +30,8 @@ public:
     static std::vector<uint8_t> encode(const Packet& packet);
 
 private:
-    // 部分响应类型在 wire 头中省略 ip 字段（填 0）
-    static bool header_includes_ip(MessageType type);
+    // 部分响应类型在 wire 头中省略 user_id 字段（填 0）
+    static bool header_includes_user_id(MessageType type);
 };
 
 }  // namespace protocol

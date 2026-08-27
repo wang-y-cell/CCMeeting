@@ -6,34 +6,89 @@
 
 #include <algorithm>
 #include <arpa/inet.h>
+#include <chrono>
 #include <cstring>
+
+namespace {
+
+uint64_t read_be64(const uint8_t* data) {
+    uint64_t value = 0;
+    for (int i = 0; i < 8; ++i) {
+        value = (value << 8) | data[i];
+    }
+    return value;
+}
+
+void write_be64(uint8_t* out, uint64_t value) {
+    for (int i = 0; i < 8; ++i) {
+        out[i] = static_cast<uint8_t>((value >> (56 - i * 8)) & 0xFF);
+    }
+}
+
+}  // namespace
 
 namespace meeting {
 
 Room::Room(uint32_t room_id,
            std::shared_ptr<network::Connection> owner,
-           const config::ServerConfig& config)
-    : _room_id(room_id), _config(config) {
-    add_participant(std::move(owner), true);
+           const config::ServerConfig& config,
+           boost::asio::io_context& io_ctx,
+           RoomOptions options,
+           uint64_t owner_user_id)
+    : _room_id(room_id),
+      _config(config),
+      _options(std::move(options)),
+      _io_ctx(io_ctx) {
+    if (_options.max_participants == 0) {
+        _options.max_participants = _config.max_participants_per_room;
+    }
+    _options.max_participants =
+        std::min(_options.max_participants, _config.max_participants_per_room);
+    add_participant(std::move(owner), true, owner_user_id);
+}
+
+void Room::start_expire_timer() {
+    if (_options.duration_minutes == 0 || _closed) {
+        return;
+    }
+    _expire_timer = std::make_unique<boost::asio::steady_timer>(_io_ctx);
+    _expire_timer->expires_after(std::chrono::minutes(_options.duration_minutes));
+    auto self = shared_from_this();
+    _expire_timer->async_wait(
+        [self](const boost::system::error_code& ec) {
+            if (ec) {
+                return;
+            }
+            spdlog::info("room {} duration expired ({} minutes)", self->_room_id,
+                         self->_options.duration_minutes);
+            self->close_room();
+        });
+    spdlog::info("room {} expire timer started, duration={} minutes", _room_id,
+                 _options.duration_minutes);
 }
 
 void Room::set_close_callback(CloseCallback callback) {
     _close_callback = std::move(callback);
 }
 
-bool Room::add_participant(std::shared_ptr<network::Connection> conn, bool is_owner) {
+bool Room::add_participant(std::shared_ptr<network::Connection> conn,
+                           bool is_owner, uint64_t user_id) {
     if (_closed || !conn || !conn->is_open()) {
         spdlog::warn("room {} add participant failed", _room_id);
         return false;
     }
-    if (_participants.size() >= _config.max_participants_per_room) {
-        spdlog::warn("room {} is full", _room_id);
+    if (_participants.size() >= _options.max_participants) {
+        spdlog::warn("room {} is full (max={})", _room_id, _options.max_participants);
+        return false;
+    }
+    if (user_id == 0) {
+        spdlog::warn("room {} reject participant with user_id=0", _room_id);
         return false;
     }
 
     Participant participant;
     participant.connection = conn;
-    participant.ip_network = conn->peer_ip_network();
+    participant.user_id = user_id;
     participant.is_owner = is_owner;
     _participants.emplace(conn->id(), std::move(participant));
     return true;
@@ -50,7 +105,7 @@ void Room::remove_participant(network::Connection::Id conn_id) {
     }
 
     const bool was_owner = it->second.is_owner;
-    const uint32_t ip_network = it->second.ip_network;
+    const uint64_t user_id = it->second.user_id;
     _participants.erase(it);
 
     if (was_owner) {
@@ -60,7 +115,7 @@ void Room::remove_participant(network::Connection::Id conn_id) {
 
     protocol::Packet packet;
     packet.type = protocol::MessageType::PartnerExit;
-    packet.ip = ip_network;
+    packet.user_id = user_id;
     broadcast(packet);
 }
 
@@ -69,6 +124,12 @@ void Room::close_room() {
         return;
     }
     _closed = true;
+
+    if (_expire_timer) {
+        boost::system::error_code ec;
+        _expire_timer->cancel(ec);
+        _expire_timer.reset();
+    }
 
     auto participants = _participants;
     _participants.clear();
@@ -116,32 +177,62 @@ void Room::handle_packet(std::shared_ptr<network::Connection> from,
         return;
     }
 
-    const uint32_t sender_ip = participant_it->second.ip_network;
+    const uint64_t sender_user_id = participant_it->second.user_id;
     spdlog::debug("room {} handle packet from connection {}, type: {}", _room_id, from->id(), protocol::get_type_name(packet.type));
 
     switch (packet.type) {
-        case protocol::MessageType::ImgSend:
-        case protocol::MessageType::AudioSend:
         case protocol::MessageType::TextSend: {
             protocol::Packet outbound = packet;
-            if (packet.type == protocol::MessageType::ImgSend) {
-                outbound.type = protocol::MessageType::ImgRecv;
-            } else if (packet.type == protocol::MessageType::AudioSend) {
-                outbound.type = protocol::MessageType::AudioRecv;
-            } else {
-                outbound.type = protocol::MessageType::TextRecv;
-            }
-            outbound.ip = sender_ip;
+            outbound.type = protocol::MessageType::TextRecv;
+            outbound.user_id = sender_user_id;
             broadcast(outbound, from->id());
             break;
         }
         case protocol::MessageType::CloseCamera: {
             protocol::Packet outbound;
             outbound.type = protocol::MessageType::CloseCamera;
-            outbound.ip = sender_ip;
+            outbound.user_id = sender_user_id;
             broadcast(outbound, from->id());
             break;
         }
+        case protocol::MessageType::UserProfile: {
+            if (packet.payload.size() >= 12) {
+                std::size_t offset = 0;
+                const uint64_t user_id = read_be64(packet.payload.data());
+                offset += 8;
+                uint16_t name_len = 0;
+                std::memcpy(&name_len, packet.payload.data() + offset, sizeof(name_len));
+                name_len = ntohs(name_len);
+                offset += 2;
+                if (offset + name_len + 2 <= packet.payload.size()) {
+                    participant_it->second.user_id = user_id;
+                    participant_it->second.display_name.assign(
+                        packet.payload.begin() + static_cast<std::ptrdiff_t>(offset),
+                        packet.payload.begin() + static_cast<std::ptrdiff_t>(offset + name_len));
+                    offset += name_len;
+                    uint16_t avatar_len = 0;
+                    std::memcpy(&avatar_len, packet.payload.data() + offset,
+                                sizeof(avatar_len));
+                    avatar_len = ntohs(avatar_len);
+                    offset += 2;
+                    if (offset + avatar_len <= packet.payload.size()) {
+                        participant_it->second.avatar_url.assign(
+                            packet.payload.begin() + static_cast<std::ptrdiff_t>(offset),
+                            packet.payload.begin() + static_cast<std::ptrdiff_t>(offset + avatar_len));
+                    }
+                }
+            }
+            protocol::Packet outbound = packet;
+            outbound.user_id = participant_it->second.user_id;
+            broadcast(outbound, from->id());
+            break;
+        }
+        case protocol::MessageType::ImgSend:
+        case protocol::MessageType::ImgRecv:
+        case protocol::MessageType::AudioSend:
+        case protocol::MessageType::AudioRecv:
+            // reserved legacy TCP media (0–3); media plane is WebRTC
+            break;
         default:
             spdlog::warn("room {} ignored message type {}", _room_id,
                          static_cast<int>(packet.type));
@@ -154,11 +245,15 @@ void Room::notify_user_joined(std::shared_ptr<network::Connection> newcomer) {
         return;
     }
 
-    const uint32_t newcomer_ip = newcomer->peer_ip_network();
+    auto newcomer_it = _participants.find(newcomer->id());
+    if (newcomer_it == _participants.end()) {
+        return;
+    }
+    const uint64_t newcomer_user_id = newcomer_it->second.user_id;
 
     protocol::Packet join_notice;
     join_notice.type = protocol::MessageType::PartnerJoin;
-    join_notice.ip = newcomer_ip;
+    join_notice.user_id = newcomer_user_id;
     broadcast(join_notice, newcomer->id());
 
     protocol::Packet partner_list;
@@ -167,10 +262,10 @@ void Room::notify_user_joined(std::shared_ptr<network::Connection> newcomer) {
         if (item.first == newcomer->id()) {
             continue;
         }
-        const uint32_t ip_wire = htonl(item.second.ip_network);
-        partner_list.payload.insert(partner_list.payload.end(),
-                                    reinterpret_cast<const uint8_t*>(&ip_wire),
-                                    reinterpret_cast<const uint8_t*>(&ip_wire) + sizeof(ip_wire));
+        uint8_t id_wire[8];
+        write_be64(id_wire, item.second.user_id);
+        partner_list.payload.insert(partner_list.payload.end(), id_wire,
+                                    id_wire + sizeof(id_wire));
     }
     send_to(newcomer, partner_list);
 }
