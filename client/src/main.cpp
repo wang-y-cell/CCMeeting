@@ -13,8 +13,9 @@
 #include <spdlog/spdlog.h>
 #include <string>
 
-#include "configure/user_session.h"
 #include "configure/client_config.h"
+#include "configure/user_session.h"
+#include "avatar_image_loader.h"
 #include "login.h"
 #include "main_window.h"
 #include "screen.h"
@@ -163,6 +164,7 @@ int main(int argc, char *argv[]) {
     spdlog::info("[main] ClientConfig::load begin");
     flush_log();
     ClientConfig::instance().load();
+    AvatarImageLoader::instance().initialize();
     const auto &auth = ClientConfig::instance().auth();
     const auto &meeting = ClientConfig::instance().meeting_server();
     spdlog::info("[main] auth={}:{}{} meeting={}:{}", qutf8(auth.host),

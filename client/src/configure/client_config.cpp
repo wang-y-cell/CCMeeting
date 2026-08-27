@@ -49,6 +49,9 @@ bool ClientConfig::loadFromJsonObject(const QJsonObject& root) {
             auth.value(QStringLiteral("login_path")).toString(auth_.login_path);
         auth_.register_path = auth.value(QStringLiteral("register_path"))
                                   .toString(auth_.register_path);
+        auth_.upload_avatar_path =
+            auth.value(QStringLiteral("upload_avatar_path"))
+                .toString(auth_.upload_avatar_path);
     }
 
     if (const QJsonObject meeting =

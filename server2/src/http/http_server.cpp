@@ -13,6 +13,7 @@ HttpServer::HttpServer(net::io_context& ioc,
                        std::shared_ptr<service::AuthService> auth_service)
     : ioc_(ioc)
     , acceptor_(net::make_strand(ioc))
+    , config_(config)
     , auth_service_(std::move(auth_service)) {
     boost::system::error_code ec;
     const auto address = net::ip::make_address(config.listen_address, ec);//将字符串形式的地址转换为ip地址
@@ -48,7 +49,9 @@ void HttpServer::do_accept() {
             if (ec) {
                 spdlog::warn("[HttpServer] accept error: {}", ec.message());
             } else {
-                std::make_shared<HttpSession>(std::move(socket), auth_service_)->run();
+                std::make_shared<HttpSession>(std::move(socket), auth_service_,
+                                              config_)
+                    ->run();
             }
             do_accept();
         });

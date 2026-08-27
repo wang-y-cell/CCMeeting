@@ -1,31 +1,102 @@
 #include "service/auth_service.h"
 
+#include "util/base64.h"
 #include "util/password_hasher.h"
+
+#include <openssl/rand.h>
 
 #include <spdlog/spdlog.h>
 
+#include <filesystem>
+#include <fstream>
+#include <sstream>
+#include <vector>
+
 namespace service {
+namespace {
 
-AuthService::AuthService(repository::UserRepository repository)
-    : repository_(std::move(repository)) {}
+namespace fs = std::filesystem;
 
-/**
- * @details 登录认证,主要用于登录认证,根据提供的用户名和密码等信息,进行登录认证,并返回登录结果
- * 1. 检查用户名和密码是否为空,为空返回400 Bad Request 请求参数错误
- * 2. 检查用户名是否存在,不存在返回401 Unauthorized 未授权,没有找到用户名
- * 3. 检查用户名是否被禁用或锁定,被禁用或锁定返回403 Forbidden 禁止访问,账户被禁用或锁定
- * 4. 检查用户名和密码是否匹配,不匹配返回401 Unauthorized 未授权,密码错误
- * 5. 检查用户名和密码是否匹配,匹配返回200 OK 登录成功
- * 6. 期间如果发生错误,返回500 Internal Server Error 内部服务器错误
-*/
+fs::path executable_dir() {
+#if defined(_WIN32)
+    return fs::current_path();
+#else
+    std::error_code ec;
+    const auto exe = fs::read_symlink("/proc/self/exe", ec);
+    if (!ec) {
+        return exe.parent_path();
+    }
+    return fs::current_path();
+#endif
+}
+
+fs::path resolve_upload_root(const config::AuthServerConfig& config) {
+    fs::path root = fs::path(config.assets.upload_root);
+    if (root.is_relative()) {
+        root = executable_dir() / root;
+    }
+    return root;
+}
+
+std::string random_hex(std::size_t byte_count) {
+    std::string out(byte_count * 2, '0');
+    std::vector<unsigned char> bytes(byte_count);
+    if (RAND_bytes(bytes.data(), static_cast<int>(bytes.size())) != 1) {
+        return "fallback";
+    }
+    static const char* kHex = "0123456789abcdef";
+    for (std::size_t i = 0; i < byte_count; ++i) {
+        out[i * 2] = kHex[(bytes[i] >> 4) & 0x0F];
+        out[i * 2 + 1] = kHex[bytes[i] & 0x0F];
+    }
+    return out;
+}
+
+std::string extension_for_mime(const std::string& mime) {
+    if (mime == "image/png") {
+        return ".png";
+    }
+    if (mime == "image/jpeg" || mime == "image/jpg") {
+        return ".jpg";
+    }
+    if (mime == "image/webp") {
+        return ".webp";
+    }
+    return {};
+}
+
+std::string join_public_url(const config::AuthServerConfig& config,
+                            const std::string& relative_path) {
+    const std::string& base = config.assets.public_base_url;
+    if (base.empty()) {
+        return relative_path;
+    }
+    if (!relative_path.empty() && relative_path.front() == '/') {
+        if (!base.empty() && base.back() == '/') {
+            return base.substr(0, base.size() - 1) + relative_path;
+        }
+        return base + relative_path;
+    }
+    if (!base.empty() && base.back() != '/') {
+        return base + "/" + relative_path;
+    }
+    return base + relative_path;
+}
+
+}  // namespace
+
+AuthService::AuthService(repository::UserRepository repository,
+                         config::AuthServerConfig config)
+    : repository_(std::move(repository)), config_(std::move(config)) {}
+
 model::LoginResult AuthService::login(const std::string& username,
                                       const std::string& password,
                                       const std::string& client_ip,
                                       const std::string& device_info) const {
-    model::LoginResult result; // 登录结果,主要用于返回登录结果给客户端
+    model::LoginResult result;
 
     if (username.empty() || password.empty()) {
-        result.code = 400; // 400 Bad Request 请求参数错误
+        result.code = 400;
         result.message = "username and password are required";
         return result;
     }
@@ -33,34 +104,37 @@ model::LoginResult AuthService::login(const std::string& username,
     try {
         const auto credential = repository_.find_credential_by_username(username);
         if (!credential.has_value()) {
-            result.code = 401; // 401 Unauthorized 未授权,没有找到用户名
+            result.code = 401;
             result.message = "invalid username or password";
             return result;
         }
 
         if (credential->status != 1U) {
-            result.code = 403; // 403 Forbidden 禁止访问,账户被禁用或锁定
+            result.code = 403;
             result.message = "account disabled or locked";
-            repository_.insert_login_log(credential->user_id, client_ip, device_info, false);
+            repository_.insert_login_log(credential->user_id, client_ip, device_info,
+                                         false);
             return result;
         }
 
         if (!util::verify_password(password, credential->password_hash)) {
             result.code = 401;
             result.message = "invalid username or password";
-            repository_.insert_login_log(credential->user_id, client_ip, device_info, false);
+            repository_.insert_login_log(credential->user_id, client_ip, device_info,
+                                         false);
             return result;
         }
 
         result.success = true;
         result.code = 0;
         result.message = "ok";
-        result.user = repository_.load_user_info(credential->user_id, credential->username);
-        repository_.insert_login_log(credential->user_id, client_ip, device_info, true);
+        result.user = repository_.load_user_info(credential->user_id,
+                                                 credential->username);
+        repository_.insert_login_log(credential->user_id, client_ip, device_info,
+                                     true);
 
         spdlog::info("[AuthService] login ok user_id={} name={}",
-                     result.user.id,
-                     result.user.name);
+                     result.user.id, result.user.name);
         return result;
     } catch (const std::exception& ex) {
         spdlog::error("[AuthService] login exception: {}", ex.what());
@@ -94,7 +168,7 @@ model::LoginResult AuthService::register_user(const std::string& username,
         }
 
         const auto user_id = repository_.create_user(
-            username, util::sha256_hex(password));
+            username, util::sha256_hex(password), config_.default_avatar_url());
         if (!user_id.has_value()) {
             result.code = 500;
             result.message = "failed to create user";
@@ -110,6 +184,88 @@ model::LoginResult AuthService::register_user(const std::string& username,
         return result;
     } catch (const std::exception& ex) {
         spdlog::error("[AuthService] register exception: {}", ex.what());
+        result.code = 500;
+        result.message = "internal server error";
+        return result;
+    }
+}
+
+model::AvatarUploadResult AuthService::upload_avatar(
+    std::uint64_t user_id,
+    const std::string& mime,
+    const std::string& data_base64) const {
+    model::AvatarUploadResult result;
+
+    if (user_id == 0) {
+        result.code = 400;
+        result.message = "user_id is required";
+        return result;
+    }
+
+    const std::string ext = extension_for_mime(mime);
+    if (ext.empty()) {
+        result.code = 400;
+        result.message = "unsupported mime type";
+        return result;
+    }
+
+    if (!repository_.user_exists(user_id)) {
+        result.code = 404;
+        result.message = "user not found";
+        return result;
+    }
+
+    const auto decoded = util::base64_decode(data_base64);
+    if (!decoded.has_value()) {
+        result.code = 400;
+        result.message = "invalid base64 data";
+        return result;
+    }
+
+    if (decoded->size() > config_.assets.max_avatar_bytes) {
+        result.code = 413;
+        result.message = "avatar too large";
+        return result;
+    }
+
+    try {
+        const fs::path upload_root = resolve_upload_root(config_);
+        const fs::path user_dir =
+            upload_root / "avatars" / std::to_string(user_id);
+        fs::create_directories(user_dir);
+
+        const std::string file_name = random_hex(16) + ext;
+        const fs::path file_path = user_dir / file_name;
+
+        std::ofstream out(file_path, std::ios::binary);
+        if (!out) {
+            result.code = 500;
+            result.message = "failed to save avatar";
+            return result;
+        }
+        out.write(reinterpret_cast<const char*>(decoded->data()),
+                  static_cast<std::streamsize>(decoded->size()));
+        out.close();
+
+        const std::string relative =
+            "/uploads/avatars/" + std::to_string(user_id) + "/" + file_name;
+        const std::string avatar_url = join_public_url(config_, relative);
+
+        if (!repository_.update_avatar_url(user_id, avatar_url)) {
+            result.code = 500;
+            result.message = "failed to update profile";
+            return result;
+        }
+
+        result.success = true;
+        result.code = 0;
+        result.message = "ok";
+        result.avatar_url = avatar_url;
+        spdlog::info("[AuthService] upload_avatar ok user_id={} url={}",
+                     user_id, avatar_url);
+        return result;
+    } catch (const std::exception& ex) {
+        spdlog::error("[AuthService] upload_avatar exception: {}", ex.what());
         result.code = 500;
         result.message = "internal server error";
         return result;

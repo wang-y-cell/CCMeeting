@@ -9,13 +9,9 @@ namespace repository {
 UserRepository::UserRepository(db::MysqlClient mysql)
     : mysql_(std::move(mysql)) {}
 
-/**
- * @details 根据用户名连接数据库查询凭证UserCredential,查询成功返回凭证,查询失败返回空
- * 凭证是一个包含用户id,用户名,密码哈希,状态的结构体
-*/
 std::optional<UserCredential> UserRepository::find_credential_by_username(
     const std::string& username) const {
-    auto conn = mysql_.create_connection(); //创建数据库连接
+    auto conn = mysql_.create_connection();
     std::unique_ptr<sql::PreparedStatement> stmt(conn->prepareStatement(
         "SELECT user_id, username, password_hash, status "
         "FROM sys_users WHERE username = ? LIMIT 1"));
@@ -34,21 +30,20 @@ std::optional<UserCredential> UserRepository::find_credential_by_username(
     return credential;
 }
 
-/**
- * @details 根据用户id连接数据库查询用户信息UserInfo,查询成功返回用户信息,查询失败返回空
- * 用户信息是一个包含用户id,用户名,头像,简介的结构体
-*/
 model::UserInfo UserRepository::load_user_info(
     std::uint64_t user_id,
     const std::string& fallback_name) const {
     model::UserInfo info;
     info.id = user_id;
+    info.username = fallback_name;
     info.name = fallback_name;
 
     auto conn = mysql_.create_connection();
     std::unique_ptr<sql::PreparedStatement> stmt(conn->prepareStatement(
-        "SELECT nickname, avatar_url, info "
-        "FROM sys_user_profiles WHERE user_id = ? LIMIT 1"));
+        "SELECT u.username, p.nickname, p.avatar_url, p.info "
+        "FROM sys_users u "
+        "LEFT JOIN sys_user_profiles p ON u.user_id = p.user_id "
+        "WHERE u.user_id = ? LIMIT 1"));
     stmt->setUInt64(1, user_id);
 
     std::unique_ptr<sql::ResultSet> rs(stmt->executeQuery());
@@ -56,6 +51,12 @@ model::UserInfo UserRepository::load_user_info(
         return info;
     }
 
+    if (!rs->isNull("username")) {
+        const std::string username = rs->getString("username");
+        if (!username.empty()) {
+            info.username = username;
+        }
+    }
     if (!rs->isNull("nickname")) {
         const std::string nickname = rs->getString("nickname");
         if (!nickname.empty()) {
@@ -71,10 +72,6 @@ model::UserInfo UserRepository::load_user_info(
     return info;
 }
 
-/**
- * @details 连接数据库之后写入
- * user_id, login_ip, device_info, status登录日志表,记录登录记录
-*/
 void UserRepository::insert_login_log(std::uint64_t user_id,
                                       const std::string& login_ip,
                                       const std::string& device_info,
@@ -100,7 +97,8 @@ void UserRepository::insert_login_log(std::uint64_t user_id,
 
 std::optional<std::uint64_t> UserRepository::create_user(
     const std::string& username,
-    const std::string& password_hash) const {
+    const std::string& password_hash,
+    const std::string& default_avatar_url) const {
     if (find_credential_by_username(username).has_value()) {
         return std::nullopt;
     }
@@ -128,9 +126,11 @@ std::optional<std::uint64_t> UserRepository::create_user(
             static_cast<std::uint64_t>(id_rs->getUInt64("user_id"));
 
         std::unique_ptr<sql::PreparedStatement> profile_stmt(conn->prepareStatement(
-            "INSERT INTO sys_user_profiles (user_id, nickname) VALUES (?, ?)"));
+            "INSERT INTO sys_user_profiles (user_id, nickname, avatar_url) "
+            "VALUES (?, ?, ?)"));
         profile_stmt->setUInt64(1, user_id);
         profile_stmt->setString(2, username);
+        profile_stmt->setString(3, default_avatar_url);
         profile_stmt->executeUpdate();
 
         conn->commit();
@@ -139,6 +139,43 @@ std::optional<std::uint64_t> UserRepository::create_user(
         conn->rollback();
         spdlog::warn("[UserRepository] create_user failed: {}", ex.what());
         return std::nullopt;
+    }
+}
+
+bool UserRepository::update_avatar_url(std::uint64_t user_id,
+                                       const std::string& avatar_url) const {
+    if (user_id == 0) {
+        return false;
+    }
+
+    try {
+        auto conn = mysql_.create_connection();
+        std::unique_ptr<sql::PreparedStatement> stmt(conn->prepareStatement(
+            "UPDATE sys_user_profiles SET avatar_url = ? WHERE user_id = ?"));
+        stmt->setString(1, avatar_url);
+        stmt->setUInt64(2, user_id);
+        return stmt->executeUpdate() > 0;
+    } catch (const std::exception& ex) {
+        spdlog::warn("[UserRepository] update_avatar_url failed: {}", ex.what());
+        return false;
+    }
+}
+
+bool UserRepository::user_exists(std::uint64_t user_id) const {
+    if (user_id == 0) {
+        return false;
+    }
+
+    try {
+        auto conn = mysql_.create_connection();
+        std::unique_ptr<sql::PreparedStatement> stmt(conn->prepareStatement(
+            "SELECT user_id FROM sys_users WHERE user_id = ? LIMIT 1"));
+        stmt->setUInt64(1, user_id);
+        std::unique_ptr<sql::ResultSet> rs(stmt->executeQuery());
+        return rs->next();
+    } catch (const std::exception& ex) {
+        spdlog::warn("[UserRepository] user_exists failed: {}", ex.what());
+        return false;
     }
 }
 

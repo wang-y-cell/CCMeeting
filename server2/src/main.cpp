@@ -39,7 +39,7 @@ int main() {
         spdlog::info("MySQL connection ok");
 
         auto auth_service = std::make_shared<service::AuthService>(
-            repository::UserRepository(std::move(mysql)));
+            repository::UserRepository(std::move(mysql)), config);
 
         boost::asio::io_context ioc{1};
         http_api::HttpServer server(ioc, config, auth_service);
@@ -48,7 +48,9 @@ int main() {
         spdlog::info("CloudMeeting auth server listening on {}:{}",
                      config.listen_address,
                      config.listen_port);
-        spdlog::info("POST /api/login  POST /api/register  GET /health");
+        spdlog::info(
+            "POST /api/login  POST /api/register  POST /api/upload-avatar  "
+            "GET /health  GET /static/*  GET /uploads/*");
 
         ioc.run();
     } catch (const std::exception& ex) {

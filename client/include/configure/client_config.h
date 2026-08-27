@@ -28,6 +28,7 @@ struct AuthConfigData {
     int port = 9000;
     QString login_path = QStringLiteral("/api/login");
     QString register_path = QStringLiteral("/api/register");
+    QString upload_avatar_path = QStringLiteral("/api/upload-avatar");
 };
 
 struct MeetingServerConfig {

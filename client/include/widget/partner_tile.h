@@ -7,7 +7,6 @@
 class QLabel;
 class Partner;
 class VideoGLWidget;
-class QNetworkAccessManager;
 
 class PartnerTile : public QWidget {
     Q_OBJECT
@@ -38,7 +37,6 @@ private:
     Partner *m_partner = nullptr;
     VideoGLWidget *m_displayWidget = nullptr;
     QLabel *m_nameLabel = nullptr;
-    QNetworkAccessManager *m_nam = nullptr;
     int m_side = 40;
 };
 
