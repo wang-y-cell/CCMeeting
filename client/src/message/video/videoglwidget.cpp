@@ -35,13 +35,20 @@ VideoGLWidget::VideoGLWidget(QWidget *parent) : QOpenGLWidget(parent) {
 }
 
 VideoGLWidget::~VideoGLWidget() {
-    makeCurrent();
-    if (m_texture != 0)
-        glDeleteTextures(1, &m_texture);
-    if (m_vbo != 0)
-        glDeleteBuffers(1, &m_vbo);
+    // MeetingWidget 可能从未 show，initializeGL 未执行；此时 makeCurrent() 会触发 0xC0000005
+    if (!m_program) {
+        return;
+    }
+    if (context() && context()->isValid()) {
+        makeCurrent();
+        if (m_texture != 0)
+            glDeleteTextures(1, &m_texture);
+        if (m_vbo != 0)
+            glDeleteBuffers(1, &m_vbo);
+        doneCurrent();
+    }
     delete m_program;
-    doneCurrent();
+    m_program = nullptr;
 }
 
 void VideoGLWidget::setDrawMode(DrawMode mode) { m_drawMode = mode; }

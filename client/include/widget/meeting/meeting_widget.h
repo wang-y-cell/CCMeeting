@@ -93,7 +93,8 @@ private:
 
     void deal_message(ChatMessage *messageW, QListWidgetItem *item, QString text,
                       QString time, QString senderName,
-                      ChatMessage::User_Type type);
+                      ChatMessage::User_Type type,
+                      const QString &avatarUrl = QString());
     void deal_message_time(QString curMsgTime);
     void relayout_chat_messages();
 
@@ -114,6 +115,7 @@ private:
     void apply_partner_profile(qint64 userId, const QString &displayName,
                                const QString &avatarUrl);
     QString partner_display_name(qint64 userId) const;
+    QString partner_avatar_url(qint64 userId) const;
     void update_main_screen_title(qint64 userId);
     xrtc::XRTCJoinConfig build_join_config() const;
     void schedule_preview_render();

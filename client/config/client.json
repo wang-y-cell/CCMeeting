@@ -4,7 +4,9 @@
     "port": 9000,
     "login_path": "/api/login",
     "register_path": "/api/register",
-    "upload_avatar_path": "/api/upload-avatar"
+    "upload_avatar_path": "/api/upload-avatar",
+    "public_base_url": "http://127.0.0.1:9000",
+    "default_avatar_path": "/static/avatar/default.png"
   },
   "meeting_server": {
     "host": "127.0.0.1",

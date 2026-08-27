@@ -1,10 +1,11 @@
 #include "stack_user_profile.h"
 
+#include "avatar_crop_dialog.h"
 #include "avatar_image_loader.h"
 #include "configure/client_config.h"
 #include "configure/user_session.h"
 
-#include <QFile>
+#include <QBuffer>
 #include <QFileDialog>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -63,7 +64,7 @@ void stack_user_profile::refreshFromSession() {
                                                     : session.info());
 
     AvatarImageLoader::instance().load(
-        session.avatar(), ui->profileAvatarLarge->size(),
+        session.avatar(), ui->profileAvatarLarge->size(), this,
         [this](const QPixmap &pixmap) {
             ui->profileAvatarLarge->setPixmap(pixmap);
         });
@@ -85,30 +86,34 @@ void stack_user_profile::on_change_avatar_clicked() {
         return;
     }
 
-    QFile file(filePath);
-    if (!file.open(QIODevice::ReadOnly)) {
-        QMessageBox::warning(this, tr("更换头像"), tr("无法读取图片文件"));
+    const auto cropped = AvatarCropDialog::cropFromFile(this, filePath);
+    if (!cropped.has_value() || cropped->isNull()) {
         return;
     }
 
-    const QByteArray bytes = file.readAll();
-    const QString mime = detectMime(filePath);
-    if (mime.isEmpty()) {
-        QMessageBox::warning(this, tr("更换头像"), tr("不支持的图片格式"));
+    uploadCroppedAvatar(cropped.value());
+}
+
+void stack_user_profile::uploadCroppedAvatar(const QImage &cropped) {
+    QByteArray bytes;
+    QBuffer buffer(&bytes);
+    buffer.open(QIODevice::WriteOnly);
+    if (!cropped.save(&buffer, "PNG")) {
+        QMessageBox::warning(this, tr("更换头像"), tr("无法编码裁剪结果"));
         return;
     }
-
-    QJsonObject body;
-    body.insert(QStringLiteral("user_id"), UserSession::instance().userId());
-    body.insert(QStringLiteral("mime"), mime);
-    body.insert(QStringLiteral("data_base64"),
-                QString::fromLatin1(bytes.toBase64()));
 
     auto *nam = AvatarImageLoader::instance().networkManager();
     if (!nam) {
         QMessageBox::warning(this, tr("更换头像"), tr("网络模块未初始化"));
         return;
     }
+
+    QJsonObject body;
+    body.insert(QStringLiteral("user_id"), UserSession::instance().userId());
+    body.insert(QStringLiteral("mime"), QStringLiteral("image/png"));
+    body.insert(QStringLiteral("data_base64"),
+                QString::fromLatin1(bytes.toBase64()));
 
     m_pendingOldAvatar = UserSession::instance().avatar();
     m_uploadInFlight = true;
@@ -119,29 +124,17 @@ void stack_user_profile::on_change_avatar_clicked() {
     auto *reply =
         nam->post(makeJsonRequest(url),
                   QJsonDocument(body).toJson(QJsonDocument::Compact));
+    m_uploadReply = reply;
     connect(reply, &QNetworkReply::finished, this,
             &stack_user_profile::on_upload_finished);
 }
 
-QString stack_user_profile::detectMime(const QString &filePath) const {
-    const QString lower = filePath.toLower();
-    if (lower.endsWith(QStringLiteral(".png"))) {
-        return QStringLiteral("image/png");
-    }
-    if (lower.endsWith(QStringLiteral(".jpg")) ||
-        lower.endsWith(QStringLiteral(".jpeg"))) {
-        return QStringLiteral("image/jpeg");
-    }
-    if (lower.endsWith(QStringLiteral(".webp"))) {
-        return QStringLiteral("image/webp");
-    }
-    return {};
-}
-
-void stack_user_profile::on_upload_finished(QNetworkReply *reply) {
+void stack_user_profile::on_upload_finished() {
     m_uploadInFlight = false;
     ui->changeAvatarBtn->setEnabled(true);
 
+    QNetworkReply *reply = m_uploadReply;
+    m_uploadReply = nullptr;
     if (!reply) {
         QMessageBox::warning(this, tr("更换头像"), tr("上传失败"));
         return;

@@ -82,7 +82,11 @@ MeetingWidget::MeetingWidget(QWidget *parent)
 MeetingWidget::~MeetingWidget() {
     stop_meeting_media();
     shutdown_all_workers();
+    if (_cameraVideo) {
+        _cameraVideo->detachFromWidgets();
+    }
     delete ui;
+    ui = nullptr;
 }
 
 void MeetingWidget::init_connect() {
@@ -413,6 +417,16 @@ void MeetingWidget::apply_partner_profile(qint64 userId,
         return;
     p->setProfile(displayName, avatarUrl);
 
+    if (_cameraVideo) {
+        _cameraVideo->setAvatarUrlForUser(userId, avatarUrl);
+        if (!_cameraVideo->hasActiveVideo(userId)) {
+            _cameraVideo->showAvatarForUser(userId);
+        }
+        if (userId == main_user_id_ && !_cameraVideo->hasActiveVideo(userId)) {
+            _cameraVideo->showMainAvatar();
+        }
+    }
+
     const QString atTag = QStringLiteral("@") + displayName;
     if (std::find(iplist.begin(), iplist.end(), atTag) == iplist.end()) {
         iplist.push_back(atTag);
@@ -426,6 +440,14 @@ QString MeetingWidget::partner_display_name(qint64 userId) const {
         return QString::number(userId);
     const QString name = it->second->displayName();
     return name.isEmpty() ? QString::number(userId) : name;
+}
+
+QString MeetingWidget::partner_avatar_url(qint64 userId) const {
+    const auto it = partner.find(userId);
+    if (it == partner.end()) {
+        return {};
+    }
+    return it->second->avatarUrl();
 }
 
 void MeetingWidget::update_main_screen_title(qint64 userId) {
@@ -457,8 +479,8 @@ void MeetingWidget::on_open_vedio_clicked_slot() {
         }
         if (_network) {
             _network->sendCloseCamera();
-            close_video_for_user(local_user_id());
         }
+        close_video_for_user(local_user_id());
         ui->openVedio->setText(QString(OPENVIDEO).toUtf8());
     } else {
         ui->openVedio->setText(QString(CLOSEVIDEO).toUtf8());
@@ -492,12 +514,12 @@ void MeetingWidget::handle_create_meeting_response(const MessagePtr &msg) {
         ui->sendmsg->setDisabled(false);
 
         const qint64 selfId = local_user_id();
-        apply_partner_profile(selfId, UserSession::instance().name(),
-                              UserSession::instance().avatar());
-        add_partner(selfId);
         main_user_id_ = selfId;
         _cameraVideo->setLocalUserId(selfId);
         _cameraVideo->setMainUserId(main_user_id_);
+        apply_partner_profile(selfId, UserSession::instance().name(),
+                              UserSession::instance().avatar());
+        add_partner(selfId);
         update_main_screen_title(main_user_id_);
         _cameraVideo->showMainAvatar();
         spdlog::info("[MeetingWidget] start_meeting_media begin");
@@ -532,12 +554,12 @@ void MeetingWidget::handle_join_meeting_response(const MessagePtr &msg) {
                              tr("成员已满，无法加入"));
     } else if (c > 0) {
         const qint64 selfId = local_user_id();
-        apply_partner_profile(selfId, UserSession::instance().name(),
-                              UserSession::instance().avatar());
-        add_partner(selfId);
         main_user_id_ = selfId;
         _cameraVideo->setLocalUserId(selfId);
         _cameraVideo->setMainUserId(main_user_id_);
+        apply_partner_profile(selfId, UserSession::instance().name(),
+                              UserSession::instance().avatar());
+        add_partner(selfId);
         update_main_screen_title(main_user_id_);
         _cameraVideo->showMainAvatar();
         ui->sendmsg->setDisabled(false);
@@ -560,7 +582,7 @@ void MeetingWidget::handle_text_recv(const MessagePtr &msg) {
     QListWidgetItem *item = new QListWidgetItem();
     deal_message_time(time);
     deal_message(message, item, str, time, partner_display_name(text_msg->user_id()),
-                   ChatMessage::User_She);
+                   ChatMessage::User_She, partner_avatar_url(text_msg->user_id()));
     const QString myName = UserSession::instance().name();
     if (!myName.isEmpty() && str.contains(QStringLiteral("@") + myName)) {
         _soundEffect->play();
@@ -843,7 +865,7 @@ void MeetingWidget::on_send_msg_clicked_slot() {
     QListWidgetItem *item = new QListWidgetItem();
     deal_message_time(time);
     deal_message(message, item, msg, time, UserSession::instance().name(),
-                 ChatMessage::User_Me);
+                 ChatMessage::User_Me, UserSession::instance().avatar());
     if (!_network) {
         ui->sendmsg->setDisabled(false);
         return;
@@ -901,13 +923,14 @@ void MeetingWidget::relayout_chat_messages() {
 
 void MeetingWidget::deal_message(ChatMessage *messageW, QListWidgetItem *item,
                                  QString text, QString time, QString ip,
-                                 ChatMessage::User_Type type) {
+                                 ChatMessage::User_Type type,
+                                 const QString &avatarUrl) {
     ui->listWidget->addItem(item);
     const int listWidth = ui->listWidget->viewport()->width();
     messageW->setFixedWidth(listWidth > 0 ? listWidth : ui->listWidget->width());
     const QSize size = messageW->fontRect(text);
     item->setSizeHint(size);
-    messageW->setText(text, time, size, ip, type);
+    messageW->setText(text, time, size, ip, type, avatarUrl);
     ui->listWidget->setItemWidget(item, messageW);
 }
 

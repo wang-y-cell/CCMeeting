@@ -1,4 +1,5 @@
 #include "chatmessage.h"
+#include "avatar_image_loader.h"
 #include "configure/configure.h"
 #include <QDateTime>
 #include <QFontMetrics>
@@ -15,9 +16,6 @@ ChatMessage::ChatMessage(QWidget *parent) : QWidget(parent) {
     te_font.setFamily("MicrosoftYaHei"); ///< 使用微软雅黑
     te_font.setPointSize(12);            ///< 设置字体大小
     this->setFont(te_font);
-    /// 加载头像图片
-    m_leftPixmap = QPixmap(QString::fromUtf8(Source::default_avatar));
-    m_rightPixmap = QPixmap(QString::fromUtf8(Source::default_avatar));
 
     /// 加载加载动画
     m_loadingMovie = new QMovie(this);
@@ -70,7 +68,8 @@ QSize ChatMessage::relayoutForWidth(int width) {
 }
 
 void ChatMessage::setText(QString text, QString time, QSize allSize, QString ip,
-                          ChatMessage::User_Type userType) {
+                          ChatMessage::User_Type userType,
+                          const QString &avatarUrl) {
     m_msg = text;
     m_userType = userType;
     m_time = time;
@@ -78,6 +77,9 @@ void ChatMessage::setText(QString text, QString time, QSize allSize, QString ip,
         QDateTime::fromSecsSinceEpoch(time.toInt()).toString("ddd hh:mm");
     m_allSize = allSize;
     m_ip = ip;
+    if (userType == User_Me || userType == User_She) {
+        loadAvatar(avatarUrl, userType);
+    }
     if (userType == User_Me) {
         /// 如果是用户自己发送就显示发送中的加载动画
         if (!m_isSending) {
@@ -95,6 +97,24 @@ void ChatMessage::setText(QString text, QString time, QSize allSize, QString ip,
     }
 
     this->update(); ///< 更新界面
+}
+
+void ChatMessage::loadAvatar(const QString &avatarUrl, User_Type userType) {
+    const quint64 generation = ++m_avatarLoadGen;
+    constexpr int iconWH = 40;
+    AvatarImageLoader::instance().load(
+        avatarUrl, QSize(iconWH, iconWH), this,
+        [this, userType, generation](const QPixmap &pixmap) {
+            if (generation != m_avatarLoadGen || pixmap.isNull()) {
+                return;
+            }
+            if (userType == User_Me) {
+                m_rightPixmap = pixmap;
+            } else if (userType == User_She) {
+                m_leftPixmap = pixmap;
+            }
+            update();
+        });
 }
 
 QSize ChatMessage::fontRect(QString str) {

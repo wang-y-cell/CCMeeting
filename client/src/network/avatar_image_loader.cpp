@@ -1,12 +1,13 @@
 #include "avatar_image_loader.h"
 
-#include "configure/configure.h"
+#include "configure/client_config.h"
 
 #include <QCoreApplication>
 #include <QNetworkAccessManager>
 #include <QNetworkDiskCache>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QPointer>
 #include <QStandardPaths>
 #include <QUrl>
 
@@ -17,6 +18,13 @@ QPixmap scalePixmap(const QPixmap& source, const QSize& targetSize) {
         return source;
     }
     return source.scaled(targetSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+}
+
+QString resolvedAvatarUrl(const QString& url) {
+    if (!url.isEmpty()) {
+        return url;
+    }
+    return ClientConfig::instance().auth().defaultAvatarUrl();
 }
 
 }  // namespace
@@ -31,6 +39,7 @@ void AvatarImageLoader::initialize() {
         return;
     }
 
+    m_shuttingDown = false;
     m_nam = new QNetworkAccessManager(qApp);
     auto* cache = new QNetworkDiskCache(m_nam);
     cache->setCacheDirectory(
@@ -38,6 +47,13 @@ void AvatarImageLoader::initialize() {
         QStringLiteral("/avatar_http_cache"));
     cache->setMaximumCacheSize(32 * 1024 * 1024);
     m_nam->setCache(cache);
+}
+
+void AvatarImageLoader::shutdown() {
+    m_shuttingDown = true;
+    if (m_nam) {
+        m_nam->disconnect();
+    }
 }
 
 QNetworkAccessManager* AvatarImageLoader::networkManager() const {
@@ -48,44 +64,57 @@ void AvatarImageLoader::invalidate(const QString& url) {
     if (url.isEmpty() || !m_nam || !m_nam->cache()) {
         return;
     }
-    m_nam->cache()->remove(QNetworkCacheMetaData::UrlKey, QUrl(url));
-}
-
-QPixmap AvatarImageLoader::fallbackPixmap(const QSize& targetSize) const {
-    QPixmap pix(QString::fromUtf8(Source::default_avatar));
-    return scalePixmap(pix, targetSize);
+    m_nam->cache()->remove(QUrl(url));
 }
 
 void AvatarImageLoader::load(const QString& url,
                              const QSize& targetSize,
+                             QObject* context,
                              const std::function<void(QPixmap)>& callback) {
-    if (!callback) {
+    loadInternal(url, targetSize, context, callback, false);
+}
+
+void AvatarImageLoader::loadInternal(const QString& url,
+                                     const QSize& targetSize,
+                                     QObject* context,
+                                     const std::function<void(QPixmap)>& callback,
+                                     bool retriedDefault) {
+    if (!callback || m_shuttingDown) {
         return;
     }
 
-    if (url.isEmpty() || url.startsWith(QStringLiteral(":/"))) {
-        callback(fallbackPixmap(targetSize));
-        return;
-    }
-
+    const QPointer<QObject> contextGuard(context);
+    const QString requestUrl = resolvedAvatarUrl(url);
     if (!m_nam) {
-        callback(fallbackPixmap(targetSize));
+        callback(QPixmap());
         return;
     }
 
-    QNetworkRequest request{QUrl(url)};
+    const QString defaultUrl = ClientConfig::instance().auth().defaultAvatarUrl();
+    QNetworkRequest request{QUrl(requestUrl)};
     request.setAttribute(QNetworkRequest::CacheLoadControlAttribute,
                          QNetworkRequest::PreferCache);
     auto* reply = m_nam->get(request);
-    QObject::connect(reply, &QNetworkReply::finished, qApp,
-                     [this, reply, targetSize, callback]() {
-                         QPixmap pix;
-                         if (reply->error() == QNetworkReply::NoError &&
-                             pix.loadFromData(reply->readAll())) {
-                             callback(scalePixmap(pix, targetSize));
-                         } else {
-                             callback(fallbackPixmap(targetSize));
-                         }
-                         reply->deleteLater();
-                     });
+    QObject* receiver = context ? context : qApp;
+    QObject::connect(
+        reply, &QNetworkReply::finished, receiver,
+        [this, reply, targetSize, callback, requestUrl, defaultUrl, retriedDefault,
+         contextGuard]() {
+            if (m_shuttingDown || (contextGuard && !contextGuard.data())) {
+                reply->deleteLater();
+                return;
+            }
+
+            QPixmap pix;
+            if (reply->error() == QNetworkReply::NoError &&
+                pix.loadFromData(reply->readAll())) {
+                callback(scalePixmap(pix, targetSize));
+            } else if (!retriedDefault && requestUrl != defaultUrl) {
+                loadInternal(defaultUrl, targetSize, contextGuard.data(), callback,
+                             true);
+            } else {
+                callback(QPixmap());
+            }
+            reply->deleteLater();
+        });
 }

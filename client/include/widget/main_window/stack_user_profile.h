@@ -2,7 +2,10 @@
 #define STACK_USER_PROFILE_H
 
 #include "ui_stack_user_profile.h"
+#include <QImage>
 #include <QWidget>
+
+class QNetworkReply;
 
 class stack_user_profile : public QWidget {
     Q_OBJECT
@@ -19,14 +22,15 @@ signals:
 
 private slots:
     void on_change_avatar_clicked();
-    void on_upload_finished(class QNetworkReply *reply);
+    void on_upload_finished();
 
 private:
-    QString detectMime(const QString &filePath) const;
+    void uploadCroppedAvatar(const QImage &cropped);
 
     Ui::stack_user_profile *ui = nullptr;
     QString m_pendingOldAvatar;
     bool m_uploadInFlight = false;
+    QNetworkReply *m_uploadReply = nullptr;
 };
 
 #endif // STACK_USER_PROFILE_H

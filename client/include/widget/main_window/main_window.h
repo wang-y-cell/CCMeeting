@@ -7,6 +7,7 @@
 #include "stack_join_meet.h"
 #include "stack_user_profile.h"
 
+#include <QCloseEvent>
 #include <QLabel>
 #include <QStackedWidget>
 #include <QWidget>
@@ -36,9 +37,12 @@ private slots:
     void onProfileAvatarUpdated();
 
 protected:
+    void closeEvent(QCloseEvent *event) override;
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
+    void destroyMeetingWidget();
+
     MeetingWidget *widget = nullptr;
 
     stack_create_meet *create_meeting_widget = nullptr;
