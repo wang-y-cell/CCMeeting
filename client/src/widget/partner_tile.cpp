@@ -1,12 +1,12 @@
 #include "partner_tile.h"
-#include "configure/configure.h"
 #include "partner.h"
+#include "videoglwidget.h"
 #include <QLabel>
 #include <QMouseEvent>
-#include <QPixmap>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QPixmap>
 #include <QResizeEvent>
 #include <QVBoxLayout>
 
@@ -18,16 +18,17 @@ PartnerTile::PartnerTile(Partner *partner, QWidget *parent)
     layout->setContentsMargins(2, 2, 2, 2);
     layout->setSpacing(2);
 
-    m_displayLabel = new QLabel(this);
-    m_displayLabel->setAlignment(Qt::AlignCenter);
-    m_displayLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
+    m_displayWidget = new VideoGLWidget(this);
+    m_displayWidget->setDrawMode(VideoGLWidget::DrawMode::FitWidgetSmooth);
+    m_displayWidget->setAlignment(Qt::AlignCenter);
+    m_displayWidget->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
 
     m_nameLabel = new QLabel(this);
     m_nameLabel->setAlignment(Qt::AlignCenter);
     m_nameLabel->setWordWrap(true);
     m_nameLabel->setStyleSheet(QStringLiteral("color:#c5ccd9;font-size:11px;"));
 
-    layout->addWidget(m_displayLabel, 1);
+    layout->addWidget(m_displayWidget, 1);
     layout->addWidget(m_nameLabel, 0);
 
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
@@ -49,14 +50,20 @@ void PartnerTile::updateProfile(const QString &displayName,
     loadAvatar(avatarUrl);
 }
 
+void PartnerTile::showAvatarImage(const QImage &image) {
+    if (!m_displayWidget || image.isNull())
+        return;
+    m_displayWidget->setDrawMode(VideoGLWidget::DrawMode::FitWidgetSmooth);
+    m_displayWidget->setAlignment(Qt::AlignCenter);
+    m_displayWidget->setFrame(image);
+}
+
 void PartnerTile::loadAvatar(const QString &avatarUrl) {
     if (avatarUrl.isEmpty()) {
         return;
     }
     if (avatarUrl.startsWith(QStringLiteral(":/"))) {
-        m_displayLabel->setPixmap(
-            QPixmap(avatarUrl).scaled(m_displayLabel->size(), Qt::KeepAspectRatio,
-                                      Qt::SmoothTransformation));
+        showAvatarImage(QImage(avatarUrl));
         return;
     }
     if (!m_nam) {
@@ -66,12 +73,9 @@ void PartnerTile::loadAvatar(const QString &avatarUrl) {
     auto *reply = m_nam->get(req);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         if (reply->error() == QNetworkReply::NoError) {
-            QPixmap pix;
-            if (pix.loadFromData(reply->readAll())) {
-                m_displayLabel->setPixmap(
-                    pix.scaled(m_displayLabel->size(), Qt::KeepAspectRatio,
-                               Qt::SmoothTransformation));
-            }
+            QImage image;
+            if (image.loadFromData(reply->readAll()))
+                showAvatarImage(image);
         }
         reply->deleteLater();
     });
@@ -102,8 +106,8 @@ void PartnerTile::resizeEvent(QResizeEvent *event) {
 }
 
 void PartnerTile::updateLabelGeometry() {
-    if (m_displayLabel) {
-        m_displayLabel->setMinimumHeight(qMax(m_side - 20, 20));
+    if (m_displayWidget) {
+        m_displayWidget->setMinimumHeight(qMax(m_side - 20, 20));
     }
 }
 

@@ -5,7 +5,7 @@
 #include <QString>
 #include <QtGlobal>
 
-class QLabel;
+class VideoGLWidget;
 class PartnerTile;
 
 class Partner : public QObject {
@@ -23,7 +23,7 @@ public:
 
     void setTile(PartnerTile *tile);
     PartnerTile *tile() const { return m_tile; }
-    QLabel *displayLabel() const;
+    VideoGLWidget *displayWidget() const;
 
 public slots:
     void setSelected(bool selected);

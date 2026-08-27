@@ -1,6 +1,6 @@
 #include "cameravideo.h"
 #include "configure/configure.h"
-#include <QWidget>
+#include "videoglwidget.h"
 #include <spdlog/spdlog.h>
 
 CameraVideo::CameraVideo(QWidget *parent) : QObject(parent), _parent(parent) {}
@@ -11,14 +11,14 @@ QImage CameraVideo::defaultAvatar() {
     return QImage(QString::fromUtf8(Source::default_avatar));
 }
 
-void CameraVideo::setMainTarget(QWidget *label) {
+void CameraVideo::setMainTarget(VideoGLWidget *widget) {
     _mainVideoImg = new ImgDisplay(this);
-    _mainVideoImg->setTarget(label);
+    _mainVideoImg->setTarget(widget);
     _mainVideoImg->setDrawMode(ImgDisplay::DrawMode::FitWidgetSmooth);
     _mainVideoImg->setAlignment(Qt::AlignCenter);
 
     _mainAvatarImg = new ImgDisplay(this);
-    _mainAvatarImg->setTarget(label);
+    _mainAvatarImg->setTarget(widget);
     _mainAvatarImg->setDrawMode(
         ImgDisplay::DrawMode::ScaleToHeightFractionCentered);
     _mainAvatarImg->setHeightFraction(0.1);
@@ -29,12 +29,12 @@ void CameraVideo::setLocalUserId(qint64 userId) { _localUserId = userId; }
 
 void CameraVideo::setMainUserId(qint64 userId) { _mainUserId = userId; }
 
-void CameraVideo::addPartnerDisplay(qint64 userId, QWidget *label) {
+void CameraVideo::addPartnerDisplay(qint64 userId, VideoGLWidget *widget) {
     if (_partnerDisplays.find(userId) != _partnerDisplays.end())
         return;
 
     ImgDisplay *display = new ImgDisplay(this);
-    display->setTarget(label);
+    display->setTarget(widget);
     display->setDrawMode(ImgDisplay::DrawMode::FitWidgetSmooth);
     display->setAlignment(Qt::AlignCenter);
     _partnerDisplays[userId] = display;
