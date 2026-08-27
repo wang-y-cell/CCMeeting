@@ -21,16 +21,17 @@ HttpServer::HttpServer(net::io_context& ioc,
     }
 
     const tcp::endpoint endpoint{address, config.listen_port}; //将ip和端口打包成一个endpoint
-    acceptor_.open(endpoint.protocol(), ec);
+    boost::system::error_code null_ec; //没有用处
+    null_ec = acceptor_.open(endpoint.protocol(), ec);
     if (ec) {
         throw std::runtime_error("acceptor open failed: " + ec.message());
     }
-    acceptor_.set_option(net::socket_base::reuse_address(true), ec); //设置套接字选项,允许重用地址
-    acceptor_.bind(endpoint, ec);
+    null_ec = acceptor_.set_option(net::socket_base::reuse_address(true), ec); //设置套接字选项,允许重用地址
+    null_ec = acceptor_.bind(endpoint, ec);
     if (ec) {
         throw std::runtime_error("acceptor bind failed: " + ec.message());
     }
-    acceptor_.listen(net::socket_base::max_listen_connections, ec);
+    null_ec = acceptor_.listen(net::socket_base::max_listen_connections, ec);
     if (ec) {
         throw std::runtime_error("acceptor listen failed: " + ec.message());
     }

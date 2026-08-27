@@ -37,7 +37,7 @@ void HttpSession::run() {
 }
 
 void HttpSession::do_read() {
-    request_ = {};
+    request_ = {};//清空上次请求对象,准备接收新的请求
     http::async_read(
         stream_,
         buffer_,
@@ -47,8 +47,9 @@ void HttpSession::do_read() {
 
 void HttpSession::on_read(beast::error_code ec, std::size_t) {
     if (ec == http::error::end_of_stream) {
-        beast::error_code ignored;
-        stream_.socket().shutdown(tcp::socket::shutdown_send, ignored);
+        //对端已经关闭连接了
+        beast::error_code ignored,null_ec;
+        null_ec = stream_.socket().shutdown(tcp::socket::shutdown_send, ignored);
         return;
     }
     if (ec) {
@@ -62,7 +63,7 @@ void HttpSession::on_read(beast::error_code ec, std::size_t) {
 void HttpSession::handle_request(http::request<http::string_body>&& req) {
     const auto version = req.version();
     const bool keep_alive = req.keep_alive();
-    const std::string target(req.target());
+    const std::string target(req.target()); //url 部分
 
     if (req.method() == http::verb::options) {
         send_response(make_json_response(http::status::no_content, "", version, keep_alive));
@@ -174,9 +175,10 @@ void HttpSession::send_response(http::response<http::string_body>&& res) {
                 spdlog::warn("[HttpSession] write error: {}", ec.message());
                 return;
             }
+            //如果不是keep_alive,发送完数据之后则关闭连接
             if (!keep_alive) {
-                beast::error_code ignored;
-                self->stream_.socket().shutdown(tcp::socket::shutdown_send, ignored);
+                beast::error_code ignored,null_ec;
+                null_ec = self->stream_.socket().shutdown(tcp::socket::shutdown_send, ignored);
                 return;
             }
             self->do_read();

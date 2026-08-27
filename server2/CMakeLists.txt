@@ -57,6 +57,15 @@ set_target_properties(CloudMeetingAuthServer PROPERTIES
     OUTPUT_NAME CloudMeetingAuthServer
 )
 
+add_custom_command(TARGET CloudMeetingAuthServer POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+            "$<TARGET_FILE_DIR:CloudMeetingAuthServer>/config"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/config/auth_server.json"
+            "$<TARGET_FILE_DIR:CloudMeetingAuthServer>/config/auth_server.json"
+    COMMENT "Copy auth_server.json to output directory"
+)
+
 include(GNUInstallDirs)
 install(TARGETS CloudMeetingAuthServer
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
