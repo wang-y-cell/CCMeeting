@@ -79,6 +79,8 @@ private:
     void init_partner_connect(Partner *p);
     void init_permanent_workers();
     void end_meeting_session();
+    /** 结束会议会话并隐藏会议窗口（加入失败 / 断线 / 超时等） */
+    void close_meeting_window();
     void reset_meeting_ui();
     void update_meeting_info();
     void update_speaker_label();
