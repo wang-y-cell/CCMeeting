@@ -23,7 +23,7 @@ using tcp = net::ip::tcp;
 class HttpServer {
 public:
     /**
-     * @brief 构造 HTTP 服务器
+     * @brief 构造 HTTP 服务器,建立服务端监听套接字,并绑定到指定地址和端口
      * @param ioc IO 上下文
      * @param config 监听配置
      * @param auth_service 认证服务
