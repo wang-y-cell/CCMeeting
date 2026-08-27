@@ -1,6 +1,6 @@
 #include "partner.h"
 #include "partner_tile.h"
-#include <QLabel>
+#include "videoglwidget.h"
 
 Partner::Partner(qint64 userId, QObject *parent)
     : QObject(parent), m_userId(userId) {}
@@ -34,8 +34,8 @@ void Partner::setTile(PartnerTile *tile) {
     }
 }
 
-QLabel *Partner::displayLabel() const {
-    return m_tile ? m_tile->displayLabel() : nullptr;
+VideoGLWidget *Partner::displayWidget() const {
+    return m_tile ? m_tile->displayWidget() : nullptr;
 }
 
 void Partner::setSelected(bool selected) {

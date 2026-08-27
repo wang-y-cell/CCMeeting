@@ -162,15 +162,18 @@ void MeetingWidget::init_permanent_workers() {
 }
 
 void MeetingWidget::closeEvent(QCloseEvent *event) {
+    event->ignore();
+    close_meeting_window();
+}
+
+void MeetingWidget::close_meeting_window() {
     releaseMouse();
     unsetCursor();
-    hide();
-    event->ignore();
     _hasPendingConnect = false;
-    if (_sessionEnding)
-        return;
-    _sessionEnding = true;
-    end_meeting_session();
+    if (!_sessionEnding)
+        end_meeting_session();
+    if (isVisible())
+        hide();
 }
 
 void MeetingWidget::on_network_disconnected_slot() {
@@ -508,9 +511,9 @@ void MeetingWidget::handle_create_meeting_response(const MessagePtr &msg) {
         QMessageBox::information(this, tr("Room No"),
                                  QStringLiteral("房间号：%1").arg(roomno));
     } else {
-        _createmeet = false;
-        update_meeting_info();
-        QMessageBox::information(this, tr("Room Information"), tr("无可用房间"));
+        close_meeting_window();
+        QMessageBox::information(nullptr, tr("Room Information"),
+                                 tr("无可用房间"));
     }
 }
 
@@ -520,13 +523,13 @@ void MeetingWidget::handle_join_meeting_response(const MessagePtr &msg) {
         return;
     const std::int32_t c = resp->response_code();
     if (c == 0) {
-        QMessageBox::information(this, tr("Meeting Error"), tr("会议不存在"));
-        _joinmeet = false;
-        _roomNo = 0;
-        update_meeting_info();
+        close_meeting_window();
+        QMessageBox::information(nullptr, tr("Meeting Error"),
+                                 tr("会议不存在"));
     } else if (c == -1) {
-        QMessageBox::warning(this, tr("Meeting information"), tr("成员已满，无法加入"));
-        update_meeting_info();
+        close_meeting_window();
+        QMessageBox::warning(nullptr, tr("Meeting information"),
+                             tr("成员已满，无法加入"));
     } else if (c > 0) {
         const qint64 selfId = local_user_id();
         apply_partner_profile(selfId, UserSession::instance().name(),
@@ -622,18 +625,21 @@ void MeetingWidget::handle_remote_host_closed_error() {
     if (_sessionEnding)
         return;
     const bool wasInMeeting = _createmeet || _joinmeet;
-    end_meeting_session();
-    if (wasInMeeting)
-        QMessageBox::warning(this, tr("Meeting Information"), tr("会议结束"));
+    const bool wasVisible = isVisible();
+    close_meeting_window();
+    if (wasInMeeting || wasVisible)
+        QMessageBox::warning(nullptr, tr("Meeting Information"),
+                             tr("会议结束"));
 }
 
 void MeetingWidget::handle_other_net_error() {
     if (_sessionEnding)
         return;
     const bool wasInMeeting = _createmeet || _joinmeet;
-    end_meeting_session();
-    if (wasInMeeting)
-        QMessageBox::warning(this, tr("Network Error"), tr("网络异常"));
+    const bool wasVisible = isVisible();
+    close_meeting_window();
+    if (wasInMeeting || wasVisible)
+        QMessageBox::warning(nullptr, tr("Network Error"), tr("网络异常"));
 }
 
 void MeetingWidget::on_request_message_slot(MessagePtr msg) {
@@ -695,8 +701,8 @@ Partner *MeetingWidget::add_partner(qint64 userId) {
     partner.emplace(userId, p);
     ui->verticalLayout_3->addWidget(tile, 1);
 
-    if (QLabel *label = p->displayLabel())
-        _cameraVideo->addPartnerDisplay(userId, label);
+    if (VideoGLWidget *widget = p->displayWidget())
+        _cameraVideo->addPartnerDisplay(userId, widget);
 
     if (_createmeet || _joinmeet) {
         ui->openAudio->setDisabled(false);
@@ -807,7 +813,7 @@ void MeetingWidget::on_connect_finished_slot(bool ok, QString ip, QString port,
     emit connect_server_finished_signal(ok, ip, port, action);
     if (!ok) {
         spdlog::warn("[MeetingWidget] connect failed");
-        update_meeting_info();
+        close_meeting_window();
         return;
     }
     _sessionActive = true;
@@ -1002,10 +1008,11 @@ void MeetingWidget::on_join_result(xrtc::XRtcError error,
         this,
         [this, error, message]() {
             if (error != xrtc::XRtcError::kNOERROR) {
-                QMessageBox::warning(
-                    this, tr("WebRTC"),
-                    QString::fromUtf8(message.c_str()));
                 spdlog::error("[MeetingWidget] join failed: {}", message);
+                close_meeting_window();
+                QMessageBox::warning(
+                    nullptr, tr("WebRTC"),
+                    QString::fromUtf8(message.c_str()));
                 return;
             }
             spdlog::info("[MeetingWidget] WebRTC join ok");

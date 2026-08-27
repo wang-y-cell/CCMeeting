@@ -258,12 +258,15 @@ void login::onRegisterFinished(QNetworkReply *reply) {
         return;
     }
 
+    ///获取响应数据
     const QByteArray payload = reply->readAll();
     reply->deleteLater();
 
+    ///解析响应数据
     QJsonParseError parseError;
     const QJsonDocument doc = QJsonDocument::fromJson(payload, &parseError);
     if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+        ///解析响应数据失败
         QMessageBox::warning(this, tr("Register Error"), tr("注册响应格式错误"));
         return;
     }
