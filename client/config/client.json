@@ -25,6 +25,16 @@
         "uri": "stun:8.153.155.18:3478",
         "username": "",
         "password": ""
+      },
+      {
+        "uri": "turn:8.153.155.18:3478?transport=udp",
+        "username": "wang_y",
+        "password": "wang_y"
+      },
+      {
+        "uri": "turn:8.153.155.18:3478?transport=tcp",
+        "username": "wang_y",
+        "password": "wang_y"
       }
     ]
   }

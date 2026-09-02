@@ -65,12 +65,6 @@ QTabBar::tab:hover:!selected {
     color: #e8ebf2;
 }
 
-QSplitter::handle:horizontal {
-    background-color: #2a2e38;
-    width: 2px;
-    margin: 4px 1px;
-}
-
 QListWidget {
     background-color: #1a1d25;
     border: 1px solid #2a2e38;

@@ -37,8 +37,12 @@ private:
     qint64 main_user_id_ = 0;
     bool _createmeet = false;
     bool _joinmeet = false;
-    bool _videoMuted = false;
-    bool _audioMuted = false;
+    /** 会议内本地摄像头是否已 start_local_video（真正开采集推流） */
+    bool _localVideoOn = false;
+    /** 会议内本地麦克风是否已 start_local_audio */
+    bool _localAudioOn = false;
+    /** WebRTC join 是否已成功（才可调 start/stop_local_*） */
+    bool _rtcJoined = false;
     bool _sessionActive = false;
     bool _sessionEnding = false;
     bool _connecting = false;
@@ -111,6 +115,13 @@ private:
 
     void start_meeting_media();
     void stop_meeting_media();
+    /** 入会成功后按产品策略开启本地音视频采集 */
+    void start_local_av_after_join();
+    void set_local_video_on(bool on);
+    void set_local_audio_on(bool on);
+    void sync_av_button_ui();
+    /** WebRTC 会话异常结束（ICE failed / leave）时复位并关会 */
+    void handle_rtc_session_lost(const QString &reason);
     void send_local_user_profile();
     void apply_partner_profile(qint64 userId, const QString &displayName,
                                const QString &avatarUrl);
@@ -159,6 +170,7 @@ public slots:
     void on_join_meet_btn_slot(QString room_no);
 
 private slots:
+    ///连接上服务器后的处理
     void on_connect_finished_slot(bool ok, QString ip, QString port,
                                 ConnectAction action, QString room_no);
     void on_request_message_slot(MessagePtr msg);

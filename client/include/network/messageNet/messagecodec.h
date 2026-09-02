@@ -37,10 +37,15 @@ public:
     public:
         /** @brief 重置流式解帧器,清空缓冲区 */
         void reset();
-        /** @brief 喂入数据,将数据添加到缓冲区 */
+        /** @brief 喂入数据,将数据添加到缓冲区,并尽可能解析里面完整的数据包 */
         std::vector<MessagePtr> feed(const std::uint8_t *data, std::size_t len);
 
     private:
+        /// @brief 尽可能解析缓冲区中的完整的包,如果缓冲区没有完整的包也没事,留着下次解析
+        /// 连头部都不够 break，返回空 vector，半数据留在 buffer_
+        /// 头够了但整包不够 break，返回空（或前面已解出的包），半包留下
+        /// 正好一包或多包 解出来放进返回值，已消费部分从 buffer_ 删掉
+        /// 多包 + 后面半包 完整的都解出，半包留到下次
         std::vector<MessagePtr> extract_all(); ///< 提取所有消息
 
         QByteArray buffer_; ///< 缓冲区
