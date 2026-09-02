@@ -51,6 +51,8 @@ signals:
     void text_send_finished();
 
 private:
+    /** @brief 本地客户端待发送的事件循环 
+        @param epoch 发送线程世代号*/
     void send_loop(std::uint64_t epoch);
     /** @brief 发送线程停止信号 */
     void signal_send_stop();
