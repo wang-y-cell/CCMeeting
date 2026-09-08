@@ -2,8 +2,8 @@
 -- 用户名: demo
 -- 密码:   demo123
 -- SHA256(demo123) = d3ad9315b7be5dd53b31a273b3b3aba5defe700808305aa16a3062b76658a791
-
-USE CCMeeting;
+--
+-- 用法: sqlite3 data/auth.db < server2/sql/seed_demo_user.sql
 
 INSERT INTO sys_users (username, password_hash, status)
 VALUES (
@@ -11,20 +11,19 @@ VALUES (
     'd3ad9315b7be5dd53b31a273b3b3aba5defe700808305aa16a3062b76658a791',
     1
 )
-ON DUPLICATE KEY UPDATE
-    password_hash = VALUES(password_hash),
+ON CONFLICT(username) DO UPDATE SET
+    password_hash = excluded.password_hash,
     status = 1;
 
-SET @uid := (SELECT user_id FROM sys_users WHERE username = 'demo' LIMIT 1);
-
 INSERT INTO sys_user_profiles (user_id, nickname, avatar_url, info)
-VALUES (
-    @uid,
+SELECT
+    user_id,
     '演示用户',
     'https://cdn.example.com/avatar/demo.png',
     'CloudMeeting 演示账号'
-)
-ON DUPLICATE KEY UPDATE
-    nickname = VALUES(nickname),
-    avatar_url = VALUES(avatar_url),
-    info = VALUES(info);
+FROM sys_users
+WHERE username = 'demo'
+ON CONFLICT(user_id) DO UPDATE SET
+    nickname = excluded.nickname,
+    avatar_url = excluded.avatar_url,
+    info = excluded.info;

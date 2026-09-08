@@ -8,6 +8,10 @@ log.txt
 # third_party/
 docs/
 server2/uploads/
+server2/data/
+*.db
+*.db-wal
+*.db-shm
 Doxyfile
 need.md
 .clang-format

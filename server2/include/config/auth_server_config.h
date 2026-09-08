@@ -19,17 +19,14 @@ struct AssetsConfig {
 };
 
 /**
- * @brief HTTP 登录服务与 MySQL 连接参数
+ * @brief HTTP 登录服务与 SQLite 参数
  */
 struct AuthServerConfig {
     std::string listen_address{"0.0.0.0"};
     std::uint16_t listen_port{9000};
 
-    std::string mysql_host{"127.0.0.1"};
-    unsigned int mysql_port{3306};
-    std::string mysql_user{"root"};
-    std::string mysql_password{"123456"};
-    std::string mysql_database{"CCMeeting"};
+    /** @brief SQLite 数据库文件路径（相对路径相对于可执行文件目录） */
+    std::string sqlite_path{"data/auth.db"};
 
     AssetsConfig assets;
 
