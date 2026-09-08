@@ -20,6 +20,7 @@
 #include <QtGlobal>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -27,7 +28,9 @@ QT_BEGIN_NAMESPACE
 namespace Ui { class Widget; }
 QT_END_NAMESPACE
 
+class QAction;
 class QListWidgetItem;
+class QMenu;
 
 class MeetingWidget : public FramelessWindow<QWidget>,
                       public xrtc::XRtcEngineObserver {
@@ -47,6 +50,9 @@ private:
     bool _sessionEnding = false;
     bool _connecting = false;
     bool _hasPendingConnect = false;
+    std::string _selectedVideoDeviceId;
+    std::string _selectedAudioDeviceId;
+    std::string _selectedPlayoutDeviceId;
     QString _pendingConnectIp;
     QString _pendingConnectPort;
     ConnectAction _pendingConnectAction = ConnectAction::CreateMeeting;
@@ -129,6 +135,12 @@ private:
     QString partner_avatar_url(qint64 userId) const;
     void update_main_screen_title(qint64 userId);
     xrtc::XRTCJoinConfig build_join_config() const;
+    void show_audio_device_menu();
+    void show_video_device_menu();
+    void apply_selected_playout_device(const std::string &device_id);
+    void apply_selected_audio_device(const std::string &device_id);
+    void apply_selected_video_device(const std::string &device_id);
+    void show_side_panel_tab(int index);
     void schedule_preview_render();
     void schedule_remote_render(qint64 userId);
     void render_preview_frame();
@@ -162,6 +174,13 @@ public slots:
     void on_create_meet_btn_clicked_slot();
     void on_open_vedio_clicked_slot();
     void on_open_audio_clicked_slot();
+    void on_audio_device_btn_clicked_slot();
+    void on_video_device_btn_clicked_slot();
+    void on_leave_meeting_clicked_slot();
+    void on_side_members_clicked_slot();
+    void on_side_chat_clicked_slot();
+    void on_side_info_clicked_slot();
+    void on_toggle_panel_clicked_slot(bool checked);
     void request_connect_to_server_slot(QString ip, QString port,
                                         ConnectAction action,
                                         QString room_no = QString(),

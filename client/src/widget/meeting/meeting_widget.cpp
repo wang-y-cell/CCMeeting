@@ -8,21 +8,27 @@
 #include "screen.h"
 #include "ui_widget.h"
 
+#include <QAction>
+#include <QActionGroup>
 #include <QCloseEvent>
 #include <QCompleter>
 #include <QDateTime>
 #include <QEvent>
 #include <QFile>
 #include <QLabel>
+#include <QMenu>
 #include <QMessageBox>
 #include <QPainter>
+#include <QPoint>
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
 #include <QScrollBar>
 #include <QSoundEffect>
+#include <QStyle>
 #include <QThread>
 #include <QTimer>
 #include <QUrl>
+#include <QVariant>
 #include <climits>
 #include <algorithm>
 #include <qnamespace.h>
@@ -33,13 +39,19 @@ namespace {
 QImage frameToImage(const xrtc::XRTCVideoFrame &frame) {
     if (!frame.argb || frame.width <= 0 || frame.height <= 0)
         return {};
-    return QImage(frame.argb->data(), frame.width, frame.height,
+    return QImage(frame.argb.get(), frame.width, frame.height,
                   frame.width * 4, QImage::Format_ARGB32)
         .copy();
 }
 
-const QString btnStop = "background-color:#d84a38";
-const QString btnStart = "background-color:#007aac";
+QString deviceName(const xrtc::XRTCDeviceInfo &info) {
+    if (!info.device_name.empty()) {
+        return QString::fromUtf8(info.device_name.data(),
+                                 static_cast<int>(info.device_name.size()));
+    }
+    return QString::fromUtf8(info.device_id.data(),
+                             static_cast<int>(info.device_id.size()));
+}
 
 }  // namespace
 
@@ -118,6 +130,20 @@ void MeetingWidget::init_connect() {
             &MeetingWidget::on_open_vedio_clicked_slot);
     connect(ui->openAudio, &QPushButton::clicked, this,
             &MeetingWidget::on_open_audio_clicked_slot);
+    connect(ui->audioDeviceBtn, &QPushButton::clicked, this,
+            &MeetingWidget::on_audio_device_btn_clicked_slot);
+    connect(ui->videoDeviceBtn, &QPushButton::clicked, this,
+            &MeetingWidget::on_video_device_btn_clicked_slot);
+    connect(ui->leaveMeetingBtn, &QPushButton::clicked, this,
+            &MeetingWidget::on_leave_meeting_clicked_slot);
+    connect(ui->btnSideMembers, &QPushButton::clicked, this,
+            &MeetingWidget::on_side_members_clicked_slot);
+    connect(ui->btnSideChat, &QPushButton::clicked, this,
+            &MeetingWidget::on_side_chat_clicked_slot);
+    connect(ui->btnSideInfo, &QPushButton::clicked, this,
+            &MeetingWidget::on_side_info_clicked_slot);
+    connect(ui->btnTogglePanel, &QPushButton::toggled, this,
+            &MeetingWidget::on_toggle_panel_clicked_slot);
     connect(ui->sendmsg, &QPushButton::clicked, this,
             &MeetingWidget::on_send_msg_clicked_slot);
 }
@@ -137,13 +163,24 @@ void MeetingWidget::init_ui() {
         styleFile.close();
     }
 
-    ui->verticalLayout->setContentsMargins(18, 42, 18, 18);
+    // 普通 QWidget 默认不绘制 stylesheet 背景，需显式开启，否则顶栏/底栏
+    // 会透出根窗同色，分层看起来消失。
+    ui->topStatusBar->setAttribute(Qt::WA_StyledBackground, true);
+    ui->avToolbar->setAttribute(Qt::WA_StyledBackground, true);
+    ui->controlPill->setAttribute(Qt::WA_StyledBackground, true);
+    ui->groupBox_2->setAttribute(Qt::WA_StyledBackground, true);
+
+    // 无边框窗的 QSS border 画在客户区内；左右下必须留 1px，
+    // 否则子控件铺满会盖住边框，只剩左上角标题栏空隙露出来一段。
+    ui->verticalLayout->setContentsMargins(1, 42, 1, 1);
     setTitleBarHeight(42);
 
     pos = QRect(0.1 * Screen::width, 0.1 * Screen::height,
                 0.8 * Screen::width, 0.8 * Screen::height);
     ui->openAudio->setText(QString(OPENAUDIO).toUtf8());
     ui->openVedio->setText(QString(OPENVIDEO).toUtf8());
+    ui->openAudio->setProperty("avOn", false);
+    ui->openVedio->setProperty("avOn", false);
 
     const QRect size(pos.x(), pos.y(), pos.width() * 0.5, pos.height() * 0.5);
     setGeometry(size);
@@ -152,6 +189,9 @@ void MeetingWidget::init_ui() {
 
     ui->openAudio->setDisabled(true);
     ui->openVedio->setDisabled(true);
+    ui->audioDeviceBtn->setDisabled(true);
+    ui->videoDeviceBtn->setDisabled(true);
+    ui->leaveMeetingBtn->setEnabled(false);
     ui->sendmsg->setDisabled(true);
     ui->tabWidget->setCurrentIndex(0);
     // 左侧 tab 固定宽度，右侧主屏幕由布局拉伸，不再使用 QSplitter
@@ -211,15 +251,24 @@ void MeetingWidget::flush_pending_connect() {
 void MeetingWidget::reset_meeting_ui() {
     ui->openAudio->setDisabled(true);
     ui->openVedio->setDisabled(true);
+    ui->audioDeviceBtn->setDisabled(true);
+    ui->videoDeviceBtn->setDisabled(true);
+    ui->leaveMeetingBtn->setEnabled(false);
     ui->sendmsg->setDisabled(true);
-    ui->groupBox_2->setTitle(QStringLiteral("主屏幕"));
+    ui->groupBox_2->setTitle(QString());
+    ui->topMainTitle->setText(QStringLiteral("主屏幕"));
     _roomNo = 0;
     _serverAddr.clear();
     _localVideoOn = false;
     _localAudioOn = false;
     _rtcJoined = false;
+    _selectedVideoDeviceId.clear();
+    _selectedAudioDeviceId.clear();
+    _selectedPlayoutDeviceId.clear();
     ui->openVedio->setText(QString(OPENVIDEO).toUtf8());
     ui->openAudio->setText(QString(OPENAUDIO).toUtf8());
+    ui->openVedio->setProperty("avOn", false);
+    ui->openAudio->setProperty("avOn", false);
     update_meeting_info();
     while (ui->listWidget->count() > 0) {
         QListWidgetItem *item = ui->listWidget->takeItem(0);
@@ -230,16 +279,25 @@ void MeetingWidget::reset_meeting_ui() {
 }
 
 void MeetingWidget::update_meeting_info() {
+    QString statusText;
     if (_createmeet) {
-        ui->labelMeetStatus->setText(tr("已创建会议"));
+        statusText = tr("已创建会议");
     } else if (_joinmeet) {
-        ui->labelMeetStatus->setText(tr("已加入会议"));
+        statusText = tr("已加入会议");
     } else {
-        ui->labelMeetStatus->setText(tr("未加入会议"));
+        statusText = tr("未加入会议");
     }
+    ui->labelMeetStatus->setText(statusText);
+    ui->topMeetStatus->setText(statusText);
 
-    ui->labelRoomNo->setText(_roomNo > 0 ? QString::number(_roomNo) : QStringLiteral("-"));
-    ui->labelMemberCount->setText(QString::number(static_cast<int>(partner.size())));
+    const QString roomText =
+        _roomNo > 0 ? QString::number(_roomNo) : QStringLiteral("-");
+    ui->labelRoomNo->setText(roomText);
+    ui->topRoomChip->setText(tr("房间 %1").arg(roomText));
+
+    const int memberCount = static_cast<int>(partner.size());
+    ui->labelMemberCount->setText(QString::number(memberCount));
+    ui->topMemberChip->setText(tr("%1 人").arg(memberCount));
 
     const QString display = UserSession::instance().name();
     ui->labelLocalIp->setText(display.isEmpty()
@@ -257,19 +315,18 @@ void MeetingWidget::update_meeting_info() {
 }
 
 void MeetingWidget::update_speaker_label() {
-    if (!_createmeet && !_joinmeet) {
-        ui->labelSpeaker->setText(QStringLiteral("-"));
-        return;
+    QString speaker = QStringLiteral("-");
+    if (_createmeet || _joinmeet) {
+        if (_localAudioOn) {
+            QString name = UserSession::instance().name();
+            if (name.isEmpty())
+                name = partner_display_name(local_user_id());
+            if (!name.isEmpty())
+                speaker = name;
+        }
     }
-    // 尚无远端音量回调时：本端麦克风开启则显示本端为当前说话人
-    if (_localAudioOn) {
-        QString name = UserSession::instance().name();
-        if (name.isEmpty())
-            name = partner_display_name(local_user_id());
-        ui->labelSpeaker->setText(name.isEmpty() ? QStringLiteral("-") : name);
-    } else {
-        ui->labelSpeaker->setText(QStringLiteral("-"));
-    }
+    ui->labelSpeaker->setText(speaker);
+    ui->topSpeakerLabel->setText(tr("正在讲话: %1").arg(speaker));
 }
 
 void MeetingWidget::end_meeting_session() {
@@ -348,15 +405,21 @@ xrtc::XRTCJoinConfig MeetingWidget::build_join_config() const {
 
     if (_rtc) {
         const auto cameras = _rtc->get_video_device_info();
-        if (!cameras.empty()) {
+        if (!_selectedVideoDeviceId.empty()) {
+            config.video_device_id = _selectedVideoDeviceId;
+        } else if (!cameras.empty()) {
             config.video_device_id = cameras.front().device_id;
         }
         const auto mics = _rtc->get_audio_device_info();
-        if (!mics.empty()) {
+        if (!_selectedAudioDeviceId.empty()) {
+            config.audio_device_id = _selectedAudioDeviceId;
+        } else if (!mics.empty()) {
             config.audio_device_id = mics.front().device_id;
         }
         const auto speakers = _rtc->get_playout_device_info();
-        if (!speakers.empty()) {
+        if (!_selectedPlayoutDeviceId.empty()) {
+            config.playout_device_id = _selectedPlayoutDeviceId;
+        } else if (!speakers.empty()) {
             config.playout_device_id = speakers.front().device_id;
         }
     }
@@ -373,14 +436,25 @@ xrtc::XRTCJoinConfig MeetingWidget::build_join_config() const {
 
 void MeetingWidget::sync_av_button_ui() {
     const bool inMeeting = _createmeet || _joinmeet;
-    ui->openVedio->setDisabled(!inMeeting || !_rtcJoined);
-    ui->openAudio->setDisabled(!inMeeting || !_rtcJoined);
+    const bool canToggle = inMeeting && _rtcJoined;
+    const bool canPickDevice = inMeeting && _rtc != nullptr;
+
+    ui->openVedio->setDisabled(!canToggle);
+    ui->openAudio->setDisabled(!canToggle);
+    ui->audioDeviceBtn->setDisabled(!canPickDevice);
+    ui->videoDeviceBtn->setDisabled(!canPickDevice);
+    ui->leaveMeetingBtn->setEnabled(inMeeting);
+
     ui->openVedio->setText(_localVideoOn ? QString(CLOSEVIDEO).toUtf8()
                                          : QString(OPENVIDEO).toUtf8());
-    ui->openVedio->setStyleSheet(_localVideoOn ? btnStop : btnStart);
     ui->openAudio->setText(_localAudioOn ? QString(CLOSEAUDIO).toUtf8()
                                          : QString(OPENAUDIO).toUtf8());
-    ui->openAudio->setStyleSheet(_localAudioOn ? btnStop : btnStart);
+    ui->openVedio->setProperty("avOn", _localVideoOn);
+    ui->openAudio->setProperty("avOn", _localAudioOn);
+    ui->openVedio->style()->unpolish(ui->openVedio);
+    ui->openVedio->style()->polish(ui->openVedio);
+    ui->openAudio->style()->unpolish(ui->openAudio);
+    ui->openAudio->style()->polish(ui->openAudio);
     update_speaker_label();
 }
 
@@ -438,8 +512,8 @@ void MeetingWidget::start_local_av_after_join() {
         return;
 
     // join 默认不开采不推流：入会后主动开摄像头与麦克风
-    const bool video_ok = _rtc->start_local_video();
-    const bool audio_ok = _rtc->start_local_audio();
+    const bool video_ok = static_cast<bool>(_rtc->start_local_video());
+    const bool audio_ok = static_cast<bool>(_rtc->start_local_audio());
     _localVideoOn = video_ok;
     _localAudioOn = audio_ok;
     sync_av_button_ui();
@@ -591,7 +665,8 @@ QString MeetingWidget::partner_avatar_url(qint64 userId) const {
 }
 
 void MeetingWidget::update_main_screen_title(qint64 userId) {
-    ui->groupBox_2->setTitle(partner_display_name(userId));
+    ui->groupBox_2->setTitle(QString());
+    ui->topMainTitle->setText(partner_display_name(userId));
 }
 
 qint64 MeetingWidget::local_user_id() const {
@@ -619,6 +694,179 @@ void MeetingWidget::on_open_audio_clicked_slot() {
     set_local_audio_on(!_localAudioOn);
 }
 
+void MeetingWidget::on_audio_device_btn_clicked_slot() {
+    show_audio_device_menu();
+}
+
+void MeetingWidget::on_video_device_btn_clicked_slot() {
+    show_video_device_menu();
+}
+
+void MeetingWidget::on_leave_meeting_clicked_slot() {
+    close();
+}
+
+void MeetingWidget::show_side_panel_tab(int index) {
+    if (!ui->tabWidget->isVisible()) {
+        ui->tabWidget->setVisible(true);
+        ui->btnTogglePanel->setChecked(true);
+    }
+    ui->tabWidget->setCurrentIndex(index);
+}
+
+void MeetingWidget::on_side_members_clicked_slot() {
+    show_side_panel_tab(0);
+}
+
+void MeetingWidget::on_side_chat_clicked_slot() {
+    show_side_panel_tab(1);
+}
+
+void MeetingWidget::on_side_info_clicked_slot() {
+    show_side_panel_tab(2);
+}
+
+void MeetingWidget::on_toggle_panel_clicked_slot(bool checked) {
+    ui->tabWidget->setVisible(checked);
+}
+
+void MeetingWidget::apply_selected_playout_device(const std::string &device_id) {
+    if (device_id.empty())
+        return;
+    _selectedPlayoutDeviceId = device_id;
+    if (_rtc) {
+        if (!_rtc->set_playout_device(device_id)) {
+            spdlog::warn("[MeetingWidget] set_playout_device failed id={}",
+                         device_id);
+        }
+    }
+}
+
+void MeetingWidget::apply_selected_audio_device(const std::string &device_id) {
+    if (device_id.empty())
+        return;
+    _selectedAudioDeviceId = device_id;
+    if (_rtc && !_rtc->set_audio_device(device_id)) {
+        // join 前无 session 时返回 false，所选 id 仍由 build_join_config 使用
+        spdlog::info(
+            "[MeetingWidget] set_audio_device deferred until session ready id={}",
+            device_id);
+    }
+}
+
+void MeetingWidget::apply_selected_video_device(const std::string &device_id) {
+    if (device_id.empty())
+        return;
+    _selectedVideoDeviceId = device_id;
+    if (_rtc && !_rtc->set_video_device(device_id)) {
+        spdlog::info(
+            "[MeetingWidget] set_video_device deferred until session ready id={}",
+            device_id);
+    }
+}
+
+void MeetingWidget::show_audio_device_menu() {
+    if (!_rtc)
+        return;
+
+    auto *menu = new QMenu(this);
+    menu->setObjectName(QStringLiteral("deviceSelectMenu"));
+    menu->setAttribute(Qt::WA_DeleteOnClose);
+
+    auto *speakerTitle = menu->addAction(tr("选择扬声器"));
+    speakerTitle->setEnabled(false);
+    auto *speakerGroup = new QActionGroup(menu);
+    speakerGroup->setExclusive(true);
+    const auto speakers = _rtc->get_playout_device_info();
+    if (speakers.empty()) {
+        auto *empty = menu->addAction(tr("（无可用扬声器）"));
+        empty->setEnabled(false);
+    } else {
+        std::string current = _selectedPlayoutDeviceId;
+        if (current.empty())
+            current = speakers.front().device_id;
+        for (const auto &dev : speakers) {
+            auto *act = menu->addAction(deviceName(dev));
+            act->setCheckable(true);
+            act->setChecked(dev.device_id == current);
+            act->setData(QVariant::fromValue(
+                QString::fromStdString(dev.device_id)));
+            speakerGroup->addAction(act);
+            connect(act, &QAction::triggered, this, [this, id = dev.device_id]() {
+                apply_selected_playout_device(id);
+            });
+        }
+    }
+
+    menu->addSeparator();
+    auto *micTitle = menu->addAction(tr("选择麦克风"));
+    micTitle->setEnabled(false);
+    auto *micGroup = new QActionGroup(menu);
+    micGroup->setExclusive(true);
+    const auto mics = _rtc->get_audio_device_info();
+    if (mics.empty()) {
+        auto *empty = menu->addAction(tr("（无可用麦克风）"));
+        empty->setEnabled(false);
+    } else {
+        std::string current = _selectedAudioDeviceId;
+        if (current.empty())
+            current = mics.front().device_id;
+        for (const auto &dev : mics) {
+            auto *act = menu->addAction(deviceName(dev));
+            act->setCheckable(true);
+            act->setChecked(dev.device_id == current);
+            act->setData(QVariant::fromValue(
+                QString::fromStdString(dev.device_id)));
+            micGroup->addAction(act);
+            connect(act, &QAction::triggered, this, [this, id = dev.device_id]() {
+                apply_selected_audio_device(id);
+            });
+        }
+    }
+
+    const QPoint pos = ui->audioDeviceBtn->mapToGlobal(
+        QPoint(0, -menu->sizeHint().height()));
+    menu->popup(pos);
+}
+
+void MeetingWidget::show_video_device_menu() {
+    if (!_rtc)
+        return;
+
+    auto *menu = new QMenu(this);
+    menu->setObjectName(QStringLiteral("deviceSelectMenu"));
+    menu->setAttribute(Qt::WA_DeleteOnClose);
+
+    auto *camTitle = menu->addAction(tr("选择摄像头"));
+    camTitle->setEnabled(false);
+    auto *camGroup = new QActionGroup(menu);
+    camGroup->setExclusive(true);
+    const auto cameras = _rtc->get_video_device_info();
+    if (cameras.empty()) {
+        auto *empty = menu->addAction(tr("（无可用摄像头）"));
+        empty->setEnabled(false);
+    } else {
+        std::string current = _selectedVideoDeviceId;
+        if (current.empty())
+            current = cameras.front().device_id;
+        for (const auto &dev : cameras) {
+            auto *act = menu->addAction(deviceName(dev));
+            act->setCheckable(true);
+            act->setChecked(dev.device_id == current);
+            act->setData(QVariant::fromValue(
+                QString::fromStdString(dev.device_id)));
+            camGroup->addAction(act);
+            connect(act, &QAction::triggered, this, [this, id = dev.device_id]() {
+                apply_selected_video_device(id);
+            });
+        }
+    }
+
+    const QPoint pos = ui->videoDeviceBtn->mapToGlobal(
+        QPoint(0, -menu->sizeHint().height()));
+    menu->popup(pos);
+}
+
 void MeetingWidget::handle_create_meeting_response(const MessagePtr &msg) {
     const auto *resp = dynamic_cast<const CreateMeetingResponseMessage *>(msg.get());
     if (!resp)
@@ -629,8 +877,6 @@ void MeetingWidget::handle_create_meeting_response(const MessagePtr &msg) {
         spdlog::default_logger()->flush();
 
     if (roomno != 0) {
-        ui->groupBox_2->setTitle(
-            QStringLiteral("主屏幕(房间号: %1)").arg(roomno));
         _roomNo = roomno;
         _createmeet = true;
         ui->sendmsg->setDisabled(false);
@@ -893,6 +1139,9 @@ void MeetingWidget::clear_partner() {
     ui->openAudio->setDisabled(true);
     ui->openVedio->setText(QString(OPENVIDEO).toUtf8());
     ui->openVedio->setDisabled(true);
+    ui->audioDeviceBtn->setDisabled(true);
+    ui->videoDeviceBtn->setDisabled(true);
+    ui->leaveMeetingBtn->setEnabled(false);
 }
 
 void MeetingWidget::close_video_for_user(qint64 userId) {

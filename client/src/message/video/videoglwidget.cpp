@@ -1,11 +1,15 @@
 #include "videoglwidget.h"
 
 #include <QMetaObject>
+#include <QOpenGLContext>
 #include <QThread>
 #include <QtMath>
+#include <QDebug>
 
 namespace {
 
+// Desktop GL (#version 110) rejects GLES-only "precision"; ES requires it
+// in fragment shaders. Pick source from context()->isOpenGLES().
 constexpr const char *kVertexShader = R"(attribute vec2 aPos;
 attribute vec2 aTex;
 varying vec2 vTex;
@@ -14,7 +18,14 @@ void main() {
     gl_Position = vec4(aPos, 0.0, 1.0);
 })";
 
-constexpr const char *kFragmentShader = R"(precision mediump float;
+constexpr const char *kFragmentShaderDesktop = R"(
+varying vec2 vTex;
+uniform sampler2D uTex;
+void main() {
+    gl_FragColor = texture2D(uTex, vTex);
+})";
+
+constexpr const char *kFragmentShaderEs = R"(precision mediump float;
 varying vec2 vTex;
 uniform sampler2D uTex;
 void main() {
@@ -105,12 +116,27 @@ void VideoGLWidget::initializeGL() {
     initializeOpenGLFunctions();
     glClearColor(0.07f, 0.08f, 0.10f, 1.0f);
 
+    const bool isEs = context() && context()->isOpenGLES();
+    const char *fragmentSrc =
+        isEs ? kFragmentShaderEs : kFragmentShaderDesktop;
+
     m_program = new QOpenGLShaderProgram(this);
-    m_program->addShaderFromSourceCode(QOpenGLShader::Vertex, kVertexShader);
-    m_program->addShaderFromSourceCode(QOpenGLShader::Fragment, kFragmentShader);
+    if (!m_program->addShaderFromSourceCode(QOpenGLShader::Vertex,
+                                            kVertexShader)) {
+        qWarning() << "[VideoGLWidget] vertex shader failed:"
+                    << m_program->log();
+    }
+    if (!m_program->addShaderFromSourceCode(QOpenGLShader::Fragment,
+                                            fragmentSrc)) {
+        qWarning() << "[VideoGLWidget] fragment shader failed (es=" << isEs
+                    << "):" << m_program->log();
+    }
     m_program->bindAttributeLocation("aPos", 0);
     m_program->bindAttributeLocation("aTex", 1);
-    m_program->link();
+    if (!m_program->link()) {
+        qWarning() << "[VideoGLWidget] shader link failed:"
+                    << m_program->log();
+    }
 
     glGenTextures(1, &m_texture);
     glBindTexture(GL_TEXTURE_2D, m_texture);
@@ -262,6 +288,8 @@ void VideoGLWidget::drawTexturedQuad(const QRectF &dest) {
 
 void VideoGLWidget::paintGL() {
     glClear(GL_COLOR_BUFFER_BIT);
+    if (!m_program || !m_program->isLinked())
+        return;
     if (!m_hasFrame || m_frame.isNull())
         return;
 
