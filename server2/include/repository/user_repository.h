@@ -1,6 +1,6 @@
 #pragma once
 
-#include "db/mysql_client.h"
+#include "db/sqlite_client.h"
 #include "model/user_info.h"
 
 #include <cstdint>
@@ -18,7 +18,7 @@ struct UserCredential {
 
 class UserRepository {
 public:
-    explicit UserRepository(db::MysqlClient mysql);
+    explicit UserRepository(db::SqliteClient db);
 
     std::optional<UserCredential> find_credential_by_username(
         const std::string& username) const;
@@ -42,7 +42,7 @@ public:
     bool user_exists(std::uint64_t user_id) const;
 
 private:
-    db::MysqlClient mysql_;
+    db::SqliteClient db_;
 };
 
 }  // namespace repository

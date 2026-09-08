@@ -15,6 +15,7 @@ namespace json = boost::json;
 
 namespace {
 
+// 获取可执行文件的父目录
 std::filesystem::path executable_dir() {
 #if defined(__linux__)
     std::error_code ec;
@@ -28,8 +29,11 @@ std::filesystem::path executable_dir() {
     return std::filesystem::current_path();
 }
 
+// 读取文件内容,返回字符串
 std::string read_file(const std::filesystem::path& path) {
+    //以二进制的格式打开文件
     std::ifstream in(path, std::ios::binary);
+    // 如果文件打开失败，返回空字符串
     if (!in) {
         return {};
     }
@@ -47,6 +51,7 @@ AuthServerConfigLoader& AuthServerConfigLoader::instance() {
 
 bool AuthServerConfigLoader::load() {
     const std::filesystem::path exe_dir = executable_dir();
+    // 候选路径
     const std::vector<std::filesystem::path> candidates = {
         exe_dir / "config" / "auth_server.json",
         exe_dir / "auth_server.json",
@@ -89,24 +94,10 @@ bool AuthServerConfigLoader::loadFromJsonObject(const json::object& root) {
         }
     }
 
-    if (const auto it = root.find("mysql"); it != root.end() && it->value().is_object()) {
-        const json::object& mysql = it->value().as_object();
-        if (const auto host = mysql.if_contains("host"); host && host->is_string()) {
-            config_.mysql_host = std::string(host->as_string());
-        }
-        if (const auto port = mysql.if_contains("port"); port && port->is_int64()) {
-            config_.mysql_port = static_cast<unsigned int>(port->as_int64());
-        }
-        if (const auto user = mysql.if_contains("user"); user && user->is_string()) {
-            config_.mysql_user = std::string(user->as_string());
-        }
-        if (const auto password = mysql.if_contains("password");
-            password && password->is_string()) {
-            config_.mysql_password = std::string(password->as_string());
-        }
-        if (const auto database = mysql.if_contains("database");
-            database && database->is_string()) {
-            config_.mysql_database = std::string(database->as_string());
+    if (const auto it = root.find("sqlite"); it != root.end() && it->value().is_object()) {
+        const json::object& sqlite = it->value().as_object();
+        if (const auto path = sqlite.if_contains("path"); path && path->is_string()) {
+            config_.sqlite_path = std::string(path->as_string());
         }
     }
 
