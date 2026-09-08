@@ -6,24 +6,10 @@ endif()
 find_package(Boost 1.70 REQUIRED COMPONENTS system json)
 find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(SQLite3 REQUIRED)
 
-find_path(MYSQLCPPCONN_INCLUDE_DIR
-    NAMES mysql_driver.h
-    PATHS /usr/include /usr/local/include
-)
-find_library(MYSQLCPPCONN_LIBRARY
-    NAMES mysqlcppconn
-    PATHS /usr/lib /usr/lib/x86_64-linux-gnu /usr/local/lib
-)
-
-if(NOT MYSQLCPPCONN_INCLUDE_DIR OR NOT MYSQLCPPCONN_LIBRARY)
-    message(FATAL_ERROR
-        "[server2] MySQL Connector/C++ not found. "
-        "Install libmysqlcppconn-dev (headers: mysql_driver.h).")
-endif()
-
-message(STATUS "[server2] MYSQLCPPCONN_INCLUDE_DIR=${MYSQLCPPCONN_INCLUDE_DIR}")
-message(STATUS "[server2] MYSQLCPPCONN_LIBRARY=${MYSQLCPPCONN_LIBRARY}")
+message(STATUS "[server2] SQLite3_INCLUDE_DIRS=${SQLite3_INCLUDE_DIRS}")
+message(STATUS "[server2] SQLite3_LIBRARIES=${SQLite3_LIBRARIES}")
 
 file(GLOB_RECURSE SERVER2_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
@@ -35,7 +21,6 @@ add_executable(CloudMeetingAuthServer ${SERVER2_SOURCES})
 
 target_include_directories(CloudMeetingAuthServer PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
-    "${MYSQLCPPCONN_INCLUDE_DIR}"
 )
 
 target_link_libraries(CloudMeetingAuthServer
@@ -46,7 +31,7 @@ target_link_libraries(CloudMeetingAuthServer
     Threads::Threads
     OpenSSL::Crypto
     spdlog::spdlog
-    "${MYSQLCPPCONN_LIBRARY}"
+    SQLite::SQLite3
 )
 
 if(WIN32)
@@ -68,7 +53,9 @@ add_custom_command(TARGET CloudMeetingAuthServer POST_BUILD
             "$<TARGET_FILE_DIR:CloudMeetingAuthServer>/static"
     COMMAND ${CMAKE_COMMAND} -E make_directory
             "$<TARGET_FILE_DIR:CloudMeetingAuthServer>/uploads"
-    COMMENT "Copy auth config, static assets, and uploads dir"
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+            "$<TARGET_FILE_DIR:CloudMeetingAuthServer>/data"
+    COMMENT "Copy auth config, static assets, and data/uploads dirs"
 )
 
 include(GNUInstallDirs)
