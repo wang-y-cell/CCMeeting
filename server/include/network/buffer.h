@@ -7,10 +7,11 @@
  * 支持 compact（normalize）与按需扩容（expand_if_need）。
  */
 
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
-const static size_t InitBufferSize = 4096;  // 默认初始容量
+const static std::size_t InitBufferSize = 4096;  // 默认初始容量
 
 class Buffer {
 public:
@@ -54,6 +55,6 @@ private:
      * ^            ^ _read_pos     ^ _write_pos    ^ size()
      */
     std::vector<uint8_t> _buffer;
-    size_t _read_pos;
-    size_t _write_pos;
+    std::size_t _read_pos;
+    std::size_t _write_pos;
 };
