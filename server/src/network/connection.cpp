@@ -47,7 +47,8 @@ void Connection::close() {
     _closed = true;
     boost::system::error_code ec;
     if (_socket.is_open()) {
-        _socket.cancel(ec);
+        // Boost.Asio 1.8x+：cancel() 不再接受 error_code 参数
+        _socket.cancel();
         _socket.close(ec);
         if (ec) {
             spdlog::error("connection close error: {}", ec.message());
