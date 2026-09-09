@@ -15,7 +15,6 @@
 
 #include <QCloseEvent>
 #include <QEvent>
-#include <QImage>
 #include <QSoundEffect>
 #include <QtGlobal>
 #include <memory>
@@ -76,11 +75,10 @@ private:
 
     xrtc::IXRtcEngine *_rtc = nullptr;
     std::mutex preview_mutex_;
-    QImage pending_preview_;
+    xrtc::XRTCVideoFrame pending_preview_;
     bool preview_scheduled_ = false;
     std::mutex remote_mutex_;
-    QImage pending_remote_;
-    qint64 pending_remote_user_id_ = 0;
+    std::unordered_map<qint64, xrtc::XRTCVideoFrame> pending_remote_;
     bool remote_scheduled_ = false;
 
 private:

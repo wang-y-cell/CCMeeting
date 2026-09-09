@@ -145,6 +145,15 @@ void ImgDisplay::showImage(const QImage &image) {
     widget->setFrame(image);
 }
 
+void ImgDisplay::showI420(const xrtc::XRTCVideoFrame &frame) {
+    VideoGLWidget *widget = videoWidget();
+    if (!widget || !frame.valid())
+        return;
+
+    applyWidgetSettings(widget);
+    widget->setI420Frame(frame);
+}
+
 void ImgDisplay::showPixmap(const QPixmap &pixmap) {
     showImage(pixmap.toImage());
 }

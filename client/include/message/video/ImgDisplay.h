@@ -8,11 +8,14 @@
 #include <QWidget>
 #include <functional>
 
+#include <xrtc/xrtc_defines.h>
+
 class VideoGLWidget;
 
 /**
  * @brief 将「图片来源 → 缩放/对齐策略 → 显示到控件」从业务逻辑里拆出，
  *        便于在同一处切换绘制方式、绘制区域与刷新方式。
+ *        ImgDisplay 对应着一个显示控件, 他表示这样图片将如何显示
  *
  * 典型用法：绑定 VideoGLWidget，设置 DrawMode / 可选矩形区域，再调用 showImage()。
  */
@@ -123,12 +126,18 @@ public:
     QPixmap preparePixmap(const QImage &image) const;
 
     /**
-     * @brief 显示图像（由 VideoGLWidget 在 GPU 上缩放并绘制）
+     * @brief 这个函数不负责显示图片,而是将图片设置到 VideoGLWidget 上由她来渲染
+     *        这个函数负责将图片渲染方式设置到 VideoGLWidget 上
      * @param image 源图像
      */
     void showImage(const QImage &image);
     /**
-     * @brief 直接显示已有 pixmap
+     * @brief 这个函数不负责显示视频帧,而是将视频帧设置到 VideoGLWidget 上由她来渲染
+     *        这个函数负责将视频帧渲染方式设置到 VideoGLWidget 上
+     */
+    void showI420(const xrtc::XRTCVideoFrame &frame);
+    /**
+     * @brief 将pixmap转换成QImage然后调用showImage函数
      * @param pixmap 图像
      */
     void showPixmap(const QPixmap &pixmap);
@@ -147,6 +156,9 @@ public:
 
 private:
     VideoGLWidget *videoWidget() const;
+    /**
+     * @brief 将当前设置的各项数据应用到 VideoGLWidget 上
+    */
     void applyWidgetSettings(VideoGLWidget *widget) const;
     /**
      * @brief 有效目标尺寸

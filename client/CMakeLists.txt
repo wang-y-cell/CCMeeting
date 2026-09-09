@@ -88,7 +88,7 @@ target_compile_definitions(CloudMeetingClient PRIVATE
 )
 
 if(MSVC)
-    target_compile_options(CloudMeetingClient PRIVATE /utf-8 /bigobj)
+    target_compile_options(CloudMeetingClient PRIVATE /utf-8 /bigobj /wd4068)
     target_compile_definitions(CloudMeetingClient PRIVATE _WIN32_WINNT=0x0A00)
 endif()
 
