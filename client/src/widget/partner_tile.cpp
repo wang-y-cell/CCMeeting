@@ -52,7 +52,7 @@ void PartnerTile::showAvatarImage(const QImage &image) {
         return;
     m_displayWidget->setDrawMode(VideoGLWidget::DrawMode::FitWidgetSmooth);
     m_displayWidget->setAlignment(Qt::AlignCenter);
-    m_displayWidget->setFrame(image);
+    m_displayWidget->setFrame(makeCircularAvatarImage(image));
 }
 
 void PartnerTile::loadAvatar(const QString &avatarUrl) {

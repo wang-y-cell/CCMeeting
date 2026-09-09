@@ -128,41 +128,79 @@ QMessageBox QLabel {
 }
 
 QLabel#cropHint {
-    color: #aeb6c7;
+    color: #9aa3b5;
     font-size: 13px;
+    padding: 2px 0 4px 0;
+}
+
+QWidget#avatarCropCanvas {
+    background-color: #16181e;
+    border: 1px solid #2e3442;
+    border-radius: 12px;
 }
 
 QPushButton#cropToolBtn {
-    background-color: #343a48;
-    min-height: 36px;
-    min-width: 36px;
+    background-color: #2a303c;
+    color: #e8ebf2;
+    border: 1px solid #3a4152;
+    border-radius: 10px;
+    min-height: 40px;
+    min-width: 40px;
     font-size: 18px;
-    font-weight: 700;
+    font-weight: 600;
+    padding: 0;
 }
 
 QPushButton#cropToolBtn:hover {
-    background-color: #455066;
+    background-color: #353c4c;
+    border-color: #4b5468;
+}
+
+QPushButton#cropToolBtn:pressed {
+    background-color: #222833;
 }
 
 QPushButton#cropResetBtn {
-    background-color: #343a48;
-    min-height: 36px;
-    padding: 0 16px;
+    background-color: #2a303c;
+    color: #d7dce8;
+    border: 1px solid #3a4152;
+    border-radius: 10px;
+    min-height: 40px;
+    padding: 0 18px;
+    font-weight: 600;
 }
 
 QPushButton#cropResetBtn:hover {
-    background-color: #455066;
+    background-color: #353c4c;
+    border-color: #4b5468;
 }
 
 QPushButton#cropCancelBtn {
-    background-color: #343a48;
+    background-color: #2a303c;
+    color: #d7dce8;
+    border: 1px solid #3a4152;
+    border-radius: 10px;
     min-height: 44px;
+    font-weight: 600;
 }
 
 QPushButton#cropCancelBtn:hover {
-    background-color: #455066;
+    background-color: #353c4c;
 }
 
 QPushButton#cropOkBtn {
+    background-color: #2f6fed;
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
     min-height: 44px;
+    font-weight: 600;
+}
+
+QPushButton#cropOkBtn:hover {
+    background-color: #3b7fff;
+}
+
+QPushButton#cropOkBtn:pressed {
+    background-color: #255fd4;
 }

@@ -129,16 +129,17 @@ void CameraVideo::showMainAvatarImage(const QImage &avatar) {
         ImgDisplay::DrawMode::ScaleToHeightFractionCentered);
     _mainDisplay->setHeightFraction(0.1);
     _mainDisplay->setAlignment(Qt::AlignCenter);
-    _mainDisplay->showImage(avatar);
+    _mainDisplay->showImage(makeCircularAvatarImage(avatar));
 }
 
 void CameraVideo::displayAvatarImage(qint64 userId, const QImage &avatar) {
     if (avatar.isNull()) {
         return;
     }
+    const QImage circular = makeCircularAvatarImage(avatar);
     _lastFrames.remove(userId);
     if (ImgDisplay *display = _partnerDisplays.value(userId, nullptr)) {
-        display->showImage(avatar);
+        display->showImage(circular);
     }
     if (userId == _mainUserId) {
         showMainAvatarImage(avatar);

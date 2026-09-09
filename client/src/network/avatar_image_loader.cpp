@@ -7,9 +7,41 @@
 #include <QNetworkDiskCache>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QPainter>
+#include <QPainterPath>
 #include <QPointer>
 #include <QStandardPaths>
 #include <QUrl>
+
+QImage makeCircularAvatarImage(const QImage &src) {
+    if (src.isNull()) {
+        return {};
+    }
+
+    QImage square = src.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    const int side = qMin(square.width(), square.height());
+    if (side <= 0) {
+        return {};
+    }
+    if (square.width() != side || square.height() != side) {
+        const int x = (square.width() - side) / 2;
+        const int y = (square.height() - side) / 2;
+        square = square.copy(x, y, side, side);
+    }
+
+    QImage out(side, side, QImage::Format_ARGB32_Premultiplied);
+    out.fill(Qt::transparent);
+
+    QPainter painter(&out);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    QPainterPath clip;
+    clip.addEllipse(QRectF(0, 0, side, side));
+    painter.setClipPath(clip);
+    painter.drawImage(0, 0, square);
+    painter.end();
+    return out;
+}
 
 namespace {
 
