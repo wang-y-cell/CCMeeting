@@ -8,16 +8,18 @@
 
 namespace {
 
-constexpr qreal kMinScale = 0.05;
-constexpr qreal kMaxScale = 8.0;
+constexpr qreal kMaxZoomFactor = 6.0; ///< 相对 cover 最小缩放的最大倍数
 constexpr qreal kWheelFactor = 1.12;
 
-}  // namespace
+} // namespace
 
 AvatarCropCanvas::AvatarCropCanvas(QWidget *parent) : QWidget(parent) {
+    setObjectName(QStringLiteral("avatarCropCanvas"));
     setMinimumSize(320, 320);
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
+    setCursor(Qt::OpenHandCursor);
+    setAttribute(Qt::WA_StyledBackground, true);
 }
 
 void AvatarCropCanvas::setImage(const QImage &image) {
@@ -27,11 +29,19 @@ void AvatarCropCanvas::setImage(const QImage &image) {
 }
 
 qreal AvatarCropCanvas::cropRadiusPx() const {
-    return qMin(width(), height()) * 0.36;
+    return qMin(width(), height()) * 0.38;
 }
 
 QPointF AvatarCropCanvas::cropCenterPx() const {
     return QPointF(width() * 0.5, height() * 0.5);
+}
+
+qreal AvatarCropCanvas::coverMinScale() const {
+    if (m_image.isNull() || m_image.width() <= 0 || m_image.height() <= 0) {
+        return 1.0;
+    }
+    const qreal diameter = cropRadiusPx() * 2.0;
+    return qMax(diameter / m_image.width(), diameter / m_image.height());
 }
 
 void AvatarCropCanvas::resetTransform() {
@@ -41,17 +51,11 @@ void AvatarCropCanvas::resetTransform() {
         return;
     }
 
-    const qreal radius = cropRadiusPx();
-    const qreal diameter = radius * 2.0;
-    //diameter / width：只按宽度拉满圆需要的缩放
-    //diameter / height：只按高度拉满圆需要的缩放
-    m_scale = qMax(diameter / m_image.width(), diameter / m_image.height());
+    m_scale = coverMinScale();
 
-    //计算出要重新绘制的图像宽高
     const qreal drawW = m_image.width() * m_scale;
     const qreal drawH = m_image.height() * m_scale;
-    const QPointF center = cropCenterPx(); //计算出画布的中心点
-    //计算出图片的偏移量,m_offset是图片的左上角相对于画布中心的偏移量
+    const QPointF center = cropCenterPx();
     m_offset = QPointF(center.x() - drawW * 0.5, center.y() - drawH * 0.5);
     clampOffset();
 }
@@ -68,28 +72,22 @@ void AvatarCropCanvas::clampOffset() {
 
     const qreal drawW = m_image.width() * m_scale;
     const qreal drawH = m_image.height() * m_scale;
-    QRectF imageRect(m_offset.x(), m_offset.y(), drawW, drawH);
 
-    if (imageRect.width() <= cropRect.width()) {
+    // 图不够宽/高时只能居中；否则允许拖到「裁剪区贴齐图片边缘」
+    if (drawW <= cropRect.width() + 0.5) {
         m_offset.setX(center.x() - drawW * 0.5);
     } else {
-        if (imageRect.left() > cropRect.left()) {
-            m_offset.setX(cropRect.left());
-        }
-        if (imageRect.right() < cropRect.right()) {
-            m_offset.setX(cropRect.right() - drawW);
-        }
+        const qreal minX = cropRect.right() - drawW;
+        const qreal maxX = cropRect.left();
+        m_offset.setX(qBound(minX, m_offset.x(), maxX));
     }
 
-    if (imageRect.height() <= cropRect.height()) {
+    if (drawH <= cropRect.height() + 0.5) {
         m_offset.setY(center.y() - drawH * 0.5);
     } else {
-        if (imageRect.top() > cropRect.top()) {
-            m_offset.setY(cropRect.top());
-        }
-        if (imageRect.bottom() < cropRect.bottom()) {
-            m_offset.setY(cropRect.bottom() - drawH);
-        }
+        const qreal minY = cropRect.bottom() - drawH;
+        const qreal maxY = cropRect.top();
+        m_offset.setY(qBound(minY, m_offset.y(), maxY));
     }
 }
 
@@ -99,7 +97,15 @@ void AvatarCropCanvas::zoomAt(const QPointF &anchor, qreal factor) {
     }
 
     const qreal oldScale = m_scale;
-    m_scale = qBound(kMinScale, m_scale * factor, kMaxScale);
+    const qreal minScale = coverMinScale();
+    const qreal maxScale = minScale * kMaxZoomFactor;
+    m_scale = qBound(minScale, m_scale * factor, maxScale);
+    if (qFuzzyCompare(oldScale, m_scale)) {
+        clampOffset();
+        update();
+        return;
+    }
+
     const qreal ratio = m_scale / oldScale;
     m_offset = anchor - (anchor - m_offset) * ratio;
     clampOffset();
@@ -143,7 +149,13 @@ void AvatarCropCanvas::paintEvent(QPaintEvent *event) {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-    painter.fillRect(rect(), QColor(28, 31, 40));
+
+    // 圆角底
+    QPainterPath bg;
+    bg.addRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), 12, 12);
+    painter.fillPath(bg, QColor(22, 24, 30));
+
+    painter.setClipPath(bg);
 
     if (!m_image.isNull()) {
         const qreal drawW = m_image.width() * m_scale;
@@ -160,13 +172,18 @@ void AvatarCropCanvas::paintEvent(QPaintEvent *event) {
     QPainterPath circlePath;
     circlePath.addEllipse(center, radius, radius);
     dimPath = dimPath.subtracted(circlePath);
- 
-    painter.fillPath(dimPath, QColor(0, 0, 0, 150));
+    painter.fillPath(dimPath, QColor(8, 10, 14, 168));
 
-    QPen ringPen(QColor(255, 255, 255, 220));
-    ringPen.setWidth(2);
-    painter.setPen(ringPen);
+    // 外圈柔和描边 + 内圈高光
+    QPen outerPen(QColor(255, 255, 255, 70));
+    outerPen.setWidthF(3.0);
+    painter.setPen(outerPen);
     painter.setBrush(Qt::NoBrush);
+    painter.drawEllipse(center, radius + 1.5, radius + 1.5);
+
+    QPen ringPen(QColor(255, 255, 255, 230));
+    ringPen.setWidthF(2.0);
+    painter.setPen(ringPen);
     painter.drawEllipse(center, radius, radius);
 }
 
@@ -174,6 +191,7 @@ void AvatarCropCanvas::mousePressEvent(QMouseEvent *event) {
     if (event->button() == Qt::LeftButton && hasImage()) {
         m_dragging = true;
         m_lastMousePos = event->position();
+        setCursor(Qt::ClosedHandCursor);
         event->accept();
         return;
     }
@@ -195,6 +213,7 @@ void AvatarCropCanvas::mouseMoveEvent(QMouseEvent *event) {
 void AvatarCropCanvas::mouseReleaseEvent(QMouseEvent *event) {
     if (event->button() == Qt::LeftButton && m_dragging) {
         m_dragging = false;
+        setCursor(Qt::OpenHandCursor);
         event->accept();
         return;
     }
@@ -223,5 +242,12 @@ void AvatarCropCanvas::zoomOut() {
 
 void AvatarCropCanvas::resizeEvent(QResizeEvent *event) {
     QWidget::resizeEvent(event);
-    clampOffset();
+    if (!m_image.isNull()) {
+        const qreal minScale = coverMinScale();
+        if (m_scale < minScale) {
+            m_scale = minScale;
+        }
+        clampOffset();
+    }
+    update();
 }

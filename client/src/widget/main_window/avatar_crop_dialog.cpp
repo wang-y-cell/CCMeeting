@@ -8,36 +8,42 @@
 
 AvatarCropDialog::AvatarCropDialog(const QImage &source, QWidget *parent)
     : FramelessWindow<QDialog>(parent), m_source(source) {
+    setObjectName(QStringLiteral("avatarCropDialog"));
     setWindowTitle(tr("裁剪头像"));
-    setTitleBarHeight(36);
+    setTitleBarHeight(40);
     setMaximizable(false);
     setResizable(false);
     setModal(true);
-    resize(480, 560);
+    resize(520, 620);
 
     auto *root = new QVBoxLayout(this);
-    root->setContentsMargins(18, 42, 18, 18);
-    root->setSpacing(12);
+    root->setContentsMargins(20, 48, 20, 20);
+    root->setSpacing(14);
 
-    auto *title = new QLabel(tr("拖动图片调整位置，滚轮缩放"), this);
+    auto *title = new QLabel(tr("拖动调整位置，滚轮缩放"), this);
     title->setAlignment(Qt::AlignCenter);
     title->setObjectName(QStringLiteral("cropHint"));
     root->addWidget(title);
 
     m_canvas = new AvatarCropCanvas(this);
+    m_canvas->setMinimumHeight(360);
     m_canvas->setImage(m_source);
     root->addWidget(m_canvas, 1);
 
     auto *toolRow = new QHBoxLayout();
-    toolRow->setSpacing(8);
-    auto *zoomOutBtn = new QPushButton(QStringLiteral("-"), this);
+    toolRow->setSpacing(10);
+    auto *zoomOutBtn = new QPushButton(QStringLiteral("－"), this);
     zoomOutBtn->setObjectName(QStringLiteral("cropToolBtn"));
-    zoomOutBtn->setFixedSize(36, 36);
+    zoomOutBtn->setFixedSize(40, 40);
+    zoomOutBtn->setToolTip(tr("缩小"));
     auto *resetBtn = new QPushButton(tr("重置"), this);
     resetBtn->setObjectName(QStringLiteral("cropResetBtn"));
-    auto *zoomInBtn = new QPushButton(QStringLiteral("+"), this);
+    resetBtn->setFixedHeight(40);
+    resetBtn->setMinimumWidth(88);
+    auto *zoomInBtn = new QPushButton(QStringLiteral("＋"), this);
     zoomInBtn->setObjectName(QStringLiteral("cropToolBtn"));
-    zoomInBtn->setFixedSize(36, 36);
+    zoomInBtn->setFixedSize(40, 40);
+    zoomInBtn->setToolTip(tr("放大"));
     toolRow->addStretch();
     toolRow->addWidget(zoomOutBtn);
     toolRow->addWidget(resetBtn);
@@ -49,11 +55,13 @@ AvatarCropDialog::AvatarCropDialog(const QImage &source, QWidget *parent)
     btnRow->setSpacing(12);
     auto *cancelBtn = new QPushButton(tr("取消"), this);
     cancelBtn->setObjectName(QStringLiteral("cropCancelBtn"));
-    auto *okBtn = new QPushButton(tr("确定"), this);
+    cancelBtn->setMinimumHeight(44);
+    auto *okBtn = new QPushButton(tr("完成"), this);
     okBtn->setObjectName(QStringLiteral("cropOkBtn"));
+    okBtn->setMinimumHeight(44);
     okBtn->setDefault(true);
-    btnRow->addWidget(cancelBtn);
-    btnRow->addWidget(okBtn);
+    btnRow->addWidget(cancelBtn, 1);
+    btnRow->addWidget(okBtn, 1);
     root->addLayout(btnRow);
 
     connect(zoomInBtn, &QPushButton::clicked, this, &AvatarCropDialog::onZoomIn);

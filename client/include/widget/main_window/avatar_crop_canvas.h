@@ -76,6 +76,10 @@ private:
      */
     void clampOffset();
     /**
+     * @brief 刚好盖住裁剪圆所需的最小缩放（cover）
+     */
+    qreal coverMinScale() const;
+    /**
      * @brief 相对锚点缩放，并更新偏移使锚点下图像点尽量不动
      * @param anchor 控件坐标锚点（滚轮位置或圆心）
      * @param factor 缩放倍率（>1 放大，<1 缩小）
