@@ -1,13 +1,12 @@
 #include "cameravideo.h"
 #include "avatar_image_loader.h"
 #include "videoglwidget.h"
-#include <spdlog/spdlog.h>
 
 namespace {
 
 constexpr int kDefaultAvatarPx = 256;
 
-}  // namespace
+} // namespace
 
 CameraVideo::CameraVideo(QWidget *parent) : QObject(parent), _parent(parent) {}
 
@@ -29,7 +28,7 @@ void CameraVideo::setAvatarUrlForUser(qint64 userId, const QString &avatarUrl) {
 }
 
 bool CameraVideo::hasActiveVideo(qint64 userId) const {
-    return _lastImages.contains(userId);
+    return _lastFrames.contains(userId) && _lastFrames.value(userId).valid();
 }
 
 void CameraVideo::addPartnerDisplay(qint64 userId, VideoGLWidget *widget) {
@@ -52,7 +51,7 @@ void CameraVideo::clearAllPartnerDisplays() {
         }
     }
     _partnerDisplays.clear();
-    _lastImages.clear();
+    _lastFrames.clear();
     _avatarUrls.clear();
     _avatarLoadGen.clear();
 }
@@ -62,7 +61,7 @@ void CameraVideo::removePartnerDisplay(qint64 userId) {
         display->setTarget(nullptr);
         display->deleteLater();
     }
-    _lastImages.remove(userId);
+    _lastFrames.remove(userId);
     _avatarUrls.remove(userId);
     _avatarLoadGen.remove(userId);
 }
@@ -113,7 +112,7 @@ void CameraVideo::clearMainDisplay() {
 }
 
 void CameraVideo::clearVideoForUser(qint64 userId) {
-    _lastImages.remove(userId);
+    _lastFrames.remove(userId);
     if (ImgDisplay *display = _partnerDisplays.value(userId, nullptr)) {
         display->clear();
     }
@@ -137,7 +136,7 @@ void CameraVideo::displayAvatarImage(qint64 userId, const QImage &avatar) {
     if (avatar.isNull()) {
         return;
     }
-    _lastImages.remove(userId);
+    _lastFrames.remove(userId);
     if (ImgDisplay *display = _partnerDisplays.value(userId, nullptr)) {
         display->showImage(avatar);
     }
@@ -146,11 +145,34 @@ void CameraVideo::displayAvatarImage(qint64 userId, const QImage &avatar) {
     }
 }
 
+void CameraVideo::showVideoForUser(qint64 userId,
+                                   const xrtc::XRTCVideoFrame &frame) {
+    if (!frame.valid())
+        return;
+
+    _lastFrames[userId] = frame;
+    if (ImgDisplay *display = _partnerDisplays.value(userId, nullptr)) {
+        display->showI420(frame);
+    }
+    if (userId == _mainUserId) {
+        showMainVideo(frame);
+    }
+}
+
+void CameraVideo::showMainVideo(const xrtc::XRTCVideoFrame &frame) {
+    if (!_mainDisplay || !frame.valid()) {
+        return;
+    }
+    _mainDisplay->setDrawMode(ImgDisplay::DrawMode::FitWidgetSmooth);
+    _mainDisplay->setAlignment(Qt::AlignCenter);
+    _mainDisplay->showI420(frame);
+}
+
 void CameraVideo::showImageForUser(qint64 userId, const QImage &image) {
     if (image.isNull())
         return;
 
-    _lastImages[userId] = image;
+    _lastFrames.remove(userId);
     if (ImgDisplay *display = _partnerDisplays.value(userId, nullptr)) {
         display->showImage(image);
     }
@@ -178,7 +200,7 @@ void CameraVideo::showMainAvatar() {
         return;
     }
     if (hasActiveVideo(_mainUserId)) {
-        showMainImage(_lastImages.value(_mainUserId));
+        showMainVideo(_lastFrames.value(_mainUserId));
         return;
     }
     loadAndShowAvatar(_mainUserId, true);
@@ -187,7 +209,7 @@ void CameraVideo::showMainAvatar() {
 void CameraVideo::refreshMainForUser(qint64 userId) {
     _mainUserId = userId;
     if (hasActiveVideo(userId)) {
-        showMainImage(_lastImages.value(userId));
+        showMainVideo(_lastFrames.value(userId));
     } else {
         showMainAvatar();
     }
@@ -200,7 +222,7 @@ void CameraVideo::endVideo() {
             display->clear();
         }
     }
-    _lastImages.clear();
+    _lastFrames.clear();
 }
 
 void CameraVideo::detachFromWidgets() {
@@ -214,7 +236,7 @@ void CameraVideo::detachFromWidgets() {
         }
     }
     _partnerDisplays.clear();
-    _lastImages.clear();
+    _lastFrames.clear();
     _avatarUrls.clear();
     _avatarLoadGen.clear();
 }

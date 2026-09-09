@@ -36,14 +36,6 @@
 
 namespace {
 
-QImage frameToImage(const xrtc::XRTCVideoFrame &frame) {
-    if (!frame.argb || frame.width <= 0 || frame.height <= 0)
-        return {};
-    return QImage(frame.argb.get(), frame.width, frame.height,
-                  frame.width * 4, QImage::Format_ARGB32)
-        .copy();
-}
-
 QString deviceName(const xrtc::XRTCDeviceInfo &info) {
     if (!info.device_name.empty()) {
         return QString::fromUtf8(info.device_name.data(),
@@ -479,7 +471,7 @@ void MeetingWidget::set_local_video_on(bool on) {
     _localVideoOn = false;
     {
         std::lock_guard<std::mutex> lock(preview_mutex_);
-        pending_preview_ = QImage();
+        pending_preview_ = {};
     }
     if (_network) {
         _network->sendCloseCamera();
@@ -598,7 +590,7 @@ void MeetingWidget::stop_meeting_media() {
     _feed_to_user.clear();
     {
         std::lock_guard<std::mutex> lock(preview_mutex_);
-        pending_preview_ = QImage();
+        pending_preview_ = {};
         preview_scheduled_ = false;
     }
     if (_cameraVideo)
@@ -1340,8 +1332,7 @@ void MeetingWidget::schedule_preview_render() {
                               Qt::QueuedConnection);
 }
 
-void MeetingWidget::schedule_remote_render(qint64 userId) {
-    pending_remote_user_id_ = userId;
+void MeetingWidget::schedule_remote_render(qint64 /*userId*/) {
     if (remote_scheduled_)
         return;
     remote_scheduled_ = true;
@@ -1350,32 +1341,31 @@ void MeetingWidget::schedule_remote_render(qint64 userId) {
 }
 
 void MeetingWidget::render_preview_frame() {
-    QImage image;
+    xrtc::XRTCVideoFrame frame;
     {
         std::lock_guard<std::mutex> lock(preview_mutex_);
-        image = pending_preview_;
-        pending_preview_ = QImage();
+        frame = std::move(pending_preview_);
+        pending_preview_ = {};
         preview_scheduled_ = false;
     }
     // stop_local_video 会停采集；关闭后不再渲染本地预览
-    if (!_localVideoOn || image.isNull())
+    if (!_localVideoOn || !frame.valid())
         return;
-    _cameraVideo->showImageForUser(local_user_id(), image);
+    _cameraVideo->showVideoForUser(local_user_id(), frame);
 }
 
 void MeetingWidget::render_remote_frame() {
-    QImage image;
-    qint64 userId = 0;
+    std::unordered_map<qint64, xrtc::XRTCVideoFrame> frames;
     {
         std::lock_guard<std::mutex> lock(remote_mutex_);
-        image = pending_remote_;
-        userId = pending_remote_user_id_;
-        pending_remote_ = QImage();
+        frames.swap(pending_remote_);
         remote_scheduled_ = false;
     }
-    if (image.isNull() || userId == 0)
-        return;
-    _cameraVideo->showImageForUser(userId, image);
+    for (auto &entry : frames) {
+        if (entry.first == 0 || !entry.second.valid())
+            continue;
+        _cameraVideo->showVideoForUser(entry.first, entry.second);
+    }
 }
 
 void MeetingWidget::video_source_start_event(xrtc::IXRtcMediaSource *,
@@ -1386,12 +1376,11 @@ void MeetingWidget::video_source_stop_event(xrtc::IXRtcMediaSource *,
 
 void MeetingWidget::on_video_frame(xrtc::IXRtcMediaSource *,
                                    const xrtc::XRTCVideoFrame &frame) {
-    QImage image = frameToImage(frame);
-    if (image.isNull())
+    if (!frame.valid())
         return;
     {
         std::lock_guard<std::mutex> lock(preview_mutex_);
-        pending_preview_ = std::move(image);
+        pending_preview_ = frame;
     }
     schedule_preview_render();
 }
@@ -1480,8 +1469,7 @@ void MeetingWidget::on_remote_user_left(const xrtc::XRTCRemoteUser &user) {
 
 void MeetingWidget::on_remote_video_frame(uint64_t feed_id,
                                           const xrtc::XRTCVideoFrame &frame) {
-    QImage image = frameToImage(frame);
-    if (image.isNull())
+    if (!frame.valid())
         return;
     qint64 userId = 0;
     {
@@ -1493,8 +1481,7 @@ void MeetingWidget::on_remote_video_frame(uint64_t feed_id,
         return;
     {
         std::lock_guard<std::mutex> lock(remote_mutex_);
-        pending_remote_ = std::move(image);
-        pending_remote_user_id_ = userId;
+        pending_remote_[userId] = frame;
     }
     schedule_remote_render(userId);
 }

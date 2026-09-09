@@ -43,11 +43,15 @@ void AvatarCropCanvas::resetTransform() {
 
     const qreal radius = cropRadiusPx();
     const qreal diameter = radius * 2.0;
+    //diameter / width：只按宽度拉满圆需要的缩放
+    //diameter / height：只按高度拉满圆需要的缩放
     m_scale = qMax(diameter / m_image.width(), diameter / m_image.height());
 
+    //计算出要重新绘制的图像宽高
     const qreal drawW = m_image.width() * m_scale;
     const qreal drawH = m_image.height() * m_scale;
-    const QPointF center = cropCenterPx();
+    const QPointF center = cropCenterPx(); //计算出画布的中心点
+    //计算出图片的偏移量,m_offset是图片的左上角相对于画布中心的偏移量
     m_offset = QPointF(center.x() - drawW * 0.5, center.y() - drawH * 0.5);
     clampOffset();
 }
@@ -156,7 +160,7 @@ void AvatarCropCanvas::paintEvent(QPaintEvent *event) {
     QPainterPath circlePath;
     circlePath.addEllipse(center, radius, radius);
     dimPath = dimPath.subtracted(circlePath);
-
+ 
     painter.fillPath(dimPath, QColor(0, 0, 0, 150));
 
     QPen ringPen(QColor(255, 255, 255, 220));

@@ -1,15 +1,11 @@
 #include "videoglwidget.h"
 
-#include <QMetaObject>
-#include <QOpenGLContext>
-#include <QThread>
-#include <QtMath>
 #include <QDebug>
+#include <QOpenGLContext>
+#include <algorithm>
 
 namespace {
 
-// Desktop GL (#version 110) rejects GLES-only "precision"; ES requires it
-// in fragment shaders. Pick source from context()->isOpenGLES().
 constexpr const char *kVertexShader = R"(attribute vec2 aPos;
 attribute vec2 aTex;
 varying vec2 vTex;
@@ -18,21 +14,50 @@ void main() {
     gl_Position = vec4(aPos, 0.0, 1.0);
 })";
 
-constexpr const char *kFragmentShaderDesktop = R"(
+// Desktop GL (#version 110) rejects GLES-only "precision"
+constexpr const char *kYuvFragDesktop = R"(varying vec2 vTex;
+uniform sampler2D tex_y;
+uniform sampler2D tex_u;
+uniform sampler2D tex_v;
+void main() {
+    float y = texture2D(tex_y, vTex).r;
+    float u = texture2D(tex_u, vTex).r - 0.5;
+    float v = texture2D(tex_v, vTex).r - 0.5;
+    float r = y + 1.402 * v;
+    float g = y - 0.344136 * u - 0.714136 * v;
+    float b = y + 1.772 * u;
+    gl_FragColor = vec4(r, g, b, 1.0);
+})";
+
+constexpr const char *kYuvFragEs = R"(precision mediump float;
+varying vec2 vTex;
+uniform sampler2D tex_y;
+uniform sampler2D tex_u;
+uniform sampler2D tex_v;
+void main() {
+    float y = texture2D(tex_y, vTex).r;
+    float u = texture2D(tex_u, vTex).r - 0.5;
+    float v = texture2D(tex_v, vTex).r - 0.5;
+    float r = y + 1.402 * v;
+    float g = y - 0.344136 * u - 0.714136 * v;
+    float b = y + 1.772 * u;
+    gl_FragColor = vec4(r, g, b, 1.0);
+})";
+
+constexpr const char *kRgbaFragDesktop = R"(varying vec2 vTex;
+uniform sampler2D uTex;
+void main() {
+    gl_FragColor = texture2D(uTex, vTex);
+})";
+
+constexpr const char *kRgbaFragEs = R"(precision mediump float;
 varying vec2 vTex;
 uniform sampler2D uTex;
 void main() {
     gl_FragColor = texture2D(uTex, vTex);
 })";
 
-constexpr const char *kFragmentShaderEs = R"(precision mediump float;
-varying vec2 vTex;
-uniform sampler2D uTex;
-void main() {
-    gl_FragColor = texture2D(uTex, vTex);
-})";
-
-QImage toRgbaImage(const QImage &image) {
+QImage toRgba8888(const QImage &image) {
     if (image.format() == QImage::Format_RGBA8888)
         return image;
     return image.convertToFormat(QImage::Format_RGBA8888);
@@ -46,20 +71,13 @@ VideoGLWidget::VideoGLWidget(QWidget *parent) : QOpenGLWidget(parent) {
 }
 
 VideoGLWidget::~VideoGLWidget() {
-    // MeetingWidget 可能从未 show，initializeGL 未执行；此时 makeCurrent() 会触发 0xC0000005
-    if (!m_program) {
+    if (!m_glReady)
         return;
-    }
     if (context() && context()->isValid()) {
         makeCurrent();
-        if (m_texture != 0)
-            glDeleteTextures(1, &m_texture);
-        if (m_vbo != 0)
-            glDeleteBuffers(1, &m_vbo);
+        destroyGl();
         doneCurrent();
     }
-    delete m_program;
-    m_program = nullptr;
 }
 
 void VideoGLWidget::setDrawMode(DrawMode mode) { m_drawMode = mode; }
@@ -79,76 +97,238 @@ void VideoGLWidget::setHeightFraction(double fraction) {
         m_heightFraction = fraction;
 }
 
+void VideoGLWidget::setI420Frame(xrtc::XRTCVideoFrame frame) {
+    if (!frame.valid())
+        return;
+    {
+        QMutexLocker lock(&m_mutex);
+        m_pendingI420 = std::move(frame);
+        m_pendingRgba = QImage();
+        m_pendingKind = ContentKind::I420;
+        m_dirty = true;
+        m_clearRequested = false;
+    }
+    update();
+}
+
 void VideoGLWidget::setFrame(QImage image) {
     if (image.isNull())
         return;
-
-    if (QThread::currentThread() != thread()) {
-        QMetaObject::invokeMethod(
-            this,
-            [this, image = std::move(image)]() mutable {
-                setFrame(std::move(image));
-            },
-            Qt::QueuedConnection);
-        return;
+    image = toRgba8888(image);
+    {
+        QMutexLocker lock(&m_mutex);
+        m_pendingRgba = std::move(image);
+        m_pendingI420 = {};
+        m_pendingKind = ContentKind::Rgba;
+        m_dirty = true;
+        m_clearRequested = false;
     }
-
-    m_frame = toRgbaImage(image);
-    m_hasFrame = true;
-    m_textureDirty = true;
     update();
 }
 
 void VideoGLWidget::clearFrame() {
-    if (QThread::currentThread() != thread()) {
-        QMetaObject::invokeMethod(this, &VideoGLWidget::clearFrame,
-                                  Qt::QueuedConnection);
-        return;
+    {
+        QMutexLocker lock(&m_mutex);
+        m_pendingI420 = {};
+        m_pendingRgba = QImage();
+        m_pendingKind = ContentKind::None;
+        m_dirty = false;
+        m_clearRequested = true;
     }
-
-    m_frame = QImage();
-    m_hasFrame = false;
-    m_textureDirty = false;
     update();
 }
 
 void VideoGLWidget::initializeGL() {
     initializeOpenGLFunctions();
     glClearColor(0.07f, 0.08f, 0.10f, 1.0f);
+    m_glReady = true;
 
-    const bool isEs = context() && context()->isOpenGLES();
-    const char *fragmentSrc =
-        isEs ? kFragmentShaderEs : kFragmentShaderDesktop;
-
-    m_program = new QOpenGLShaderProgram(this);
-    if (!m_program->addShaderFromSourceCode(QOpenGLShader::Vertex,
-                                            kVertexShader)) {
-        qWarning() << "[VideoGLWidget] vertex shader failed:"
-                    << m_program->log();
-    }
-    if (!m_program->addShaderFromSourceCode(QOpenGLShader::Fragment,
-                                            fragmentSrc)) {
-        qWarning() << "[VideoGLWidget] fragment shader failed (es=" << isEs
-                    << "):" << m_program->log();
-    }
-    m_program->bindAttributeLocation("aPos", 0);
-    m_program->bindAttributeLocation("aTex", 1);
-    if (!m_program->link()) {
-        qWarning() << "[VideoGLWidget] shader link failed:"
-                    << m_program->log();
-    }
-
-    glGenTextures(1, &m_texture);
-    glBindTexture(GL_TEXTURE_2D, m_texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    ensureYuvProgram();
+    ensureRgbaProgram();
 
     glGenBuffers(1, &m_vbo);
 }
 
 void VideoGLWidget::resizeGL(int, int) { update(); }
+
+void VideoGLWidget::destroyGl() {
+    if (m_texY) {
+        glDeleteTextures(1, &m_texY);
+        m_texY = 0;
+    }
+    if (m_texU) {
+        glDeleteTextures(1, &m_texU);
+        m_texU = 0;
+    }
+    if (m_texV) {
+        glDeleteTextures(1, &m_texV);
+        m_texV = 0;
+    }
+    if (m_texRgba) {
+        glDeleteTextures(1, &m_texRgba);
+        m_texRgba = 0;
+    }
+    if (m_vbo) {
+        glDeleteBuffers(1, &m_vbo);
+        m_vbo = 0;
+    }
+    delete m_yuvProgram;
+    m_yuvProgram = nullptr;
+    delete m_rgbaProgram;
+    m_rgbaProgram = nullptr;
+    m_yuvTexW = m_yuvTexH = 0;
+    m_rgbaTexW = m_rgbaTexH = 0;
+    m_glReady = false;
+}
+
+bool VideoGLWidget::ensureYuvProgram() {
+    if (m_yuvProgram)
+        return m_yuvProgram->isLinked();
+
+    const bool isEs = context() && context()->isOpenGLES();
+    m_yuvProgram = new QOpenGLShaderProgram(this);
+    if (!m_yuvProgram->addShaderFromSourceCode(QOpenGLShader::Vertex,
+                                               kVertexShader) ||
+        !m_yuvProgram->addShaderFromSourceCode(
+            QOpenGLShader::Fragment, isEs ? kYuvFragEs : kYuvFragDesktop)) {
+        qWarning() << "[VideoGLWidget] YUV shader compile failed:"
+                    << m_yuvProgram->log();
+        delete m_yuvProgram;
+        m_yuvProgram = nullptr;
+        return false;
+    }
+    m_yuvProgram->bindAttributeLocation("aPos", 0);
+    m_yuvProgram->bindAttributeLocation("aTex", 1);
+    if (!m_yuvProgram->link()) {
+        qWarning() << "[VideoGLWidget] YUV shader link failed:"
+                    << m_yuvProgram->log();
+        delete m_yuvProgram;
+        m_yuvProgram = nullptr;
+        return false;
+    }
+    return true;
+}
+
+bool VideoGLWidget::ensureRgbaProgram() {
+    if (m_rgbaProgram)
+        return m_rgbaProgram->isLinked();
+
+    const bool isEs = context() && context()->isOpenGLES();
+    m_rgbaProgram = new QOpenGLShaderProgram(this);
+    if (!m_rgbaProgram->addShaderFromSourceCode(QOpenGLShader::Vertex,
+                                                kVertexShader) ||
+        !m_rgbaProgram->addShaderFromSourceCode(
+            QOpenGLShader::Fragment, isEs ? kRgbaFragEs : kRgbaFragDesktop)) {
+        qWarning() << "[VideoGLWidget] RGBA shader compile failed:"
+                    << m_rgbaProgram->log();
+        delete m_rgbaProgram;
+        m_rgbaProgram = nullptr;
+        return false;
+    }
+    m_rgbaProgram->bindAttributeLocation("aPos", 0);
+    m_rgbaProgram->bindAttributeLocation("aTex", 1);
+    if (!m_rgbaProgram->link()) {
+        qWarning() << "[VideoGLWidget] RGBA shader link failed:"
+                    << m_rgbaProgram->log();
+        delete m_rgbaProgram;
+        m_rgbaProgram = nullptr;
+        return false;
+    }
+    return true;
+}
+
+void VideoGLWidget::ensureYuvTextures(int width, int height) {
+    if (width <= 0 || height <= 0)
+        return;
+    if (m_texY != 0 && m_yuvTexW == width && m_yuvTexH == height)
+        return;
+
+    auto alloc = [this](GLuint &tex, int w, int h) {
+        if (tex == 0)
+            glGenTextures(1, &tex);
+        glBindTexture(GL_TEXTURE_2D, tex);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        // R8：单通道；兼容桌面核心/较新驱动
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, w, h, 0, GL_RED,
+                     GL_UNSIGNED_BYTE, nullptr);
+    };
+
+    const int cw = std::max(1, (width + 1) / 2);
+    const int ch = std::max(1, (height + 1) / 2);
+    alloc(m_texY, width, height);
+    alloc(m_texU, cw, ch);
+    alloc(m_texV, cw, ch);
+    m_yuvTexW = width;
+    m_yuvTexH = height;
+}
+
+void VideoGLWidget::ensureRgbaTexture(int width, int height) {
+    if (width <= 0 || height <= 0)
+        return;
+    if (m_texRgba != 0 && m_rgbaTexW == width && m_rgbaTexH == height)
+        return;
+    if (m_texRgba == 0)
+        glGenTextures(1, &m_texRgba);
+    glBindTexture(GL_TEXTURE_2D, m_texRgba);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,
+                 GL_UNSIGNED_BYTE, nullptr);
+    m_rgbaTexW = width;
+    m_rgbaTexH = height;
+}
+
+void VideoGLWidget::uploadI420(const xrtc::XRTCVideoFrame &frame) {
+    ensureYuvTextures(frame.width, frame.height);
+    if (m_texY == 0)
+        return;
+
+    const int cw = std::max(1, (frame.width + 1) / 2);
+    const int ch = std::max(1, (frame.height + 1) / 2);
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+    auto upload = [this](GLuint tex, int w, int h, int stride,
+                         const uint8_t *data) {
+        glBindTexture(GL_TEXTURE_2D, tex);
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, stride);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RED, GL_UNSIGNED_BYTE,
+                        data);
+    };
+
+    upload(m_texY, frame.width, frame.height, frame.stride_y, frame.data_y);
+    upload(m_texU, cw, ch, frame.stride_u, frame.data_u);
+    upload(m_texV, cw, ch, frame.stride_v, frame.data_v);
+
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    m_videoW = frame.width;
+    m_videoH = frame.height;
+    m_drawnKind = ContentKind::I420;
+}
+
+void VideoGLWidget::uploadRgba(const QImage &image) {
+    ensureRgbaTexture(image.width(), image.height());
+    if (m_texRgba == 0)
+        return;
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    glBindTexture(GL_TEXTURE_2D, m_texRgba);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.width(), image.height(),
+                    GL_RGBA, GL_UNSIGNED_BYTE, image.constBits());
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    m_videoW = image.width();
+    m_videoH = image.height();
+    m_drawnKind = ContentKind::Rgba;
+}
 
 QRect VideoGLWidget::effectiveContentRect() const {
     if (m_contentRect.isValid())
@@ -223,27 +403,10 @@ QRectF VideoGLWidget::destRectForFrame(int frameW, int frameH) const {
     return QRectF(x, y, destW, destH);
 }
 
-void VideoGLWidget::uploadTexture(const QImage &image) {
-    if (image.isNull())
-        return;
-
-    const int w = image.width();
-    const int h = image.height();
-    glBindTexture(GL_TEXTURE_2D, m_texture);
-    if (w != m_texWidth || h != m_texHeight) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA,
-                     GL_UNSIGNED_BYTE, image.constBits());
-        m_texWidth = w;
-        m_texHeight = h;
-    } else {
-        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE,
-                        image.constBits());
-    }
-    m_textureDirty = false;
-}
-
-void VideoGLWidget::drawTexturedQuad(const QRectF &dest) {
-    if (!m_program || width() <= 0 || height() <= 0 || dest.isEmpty())
+void VideoGLWidget::drawTexturedQuad(const QRectF &dest, bool yuv) {
+    QOpenGLShaderProgram *program = yuv ? m_yuvProgram : m_rgbaProgram;
+    if (!program || !program->isLinked() || width() <= 0 || height() <= 0 ||
+        dest.isEmpty())
         return;
 
     const auto toNdcX = [this](qreal px) {
@@ -263,16 +426,28 @@ void VideoGLWidget::drawTexturedQuad(const QRectF &dest) {
         x1, y1, 1.f, 0.f, x0, y1, 0.f, 0.f,
     };
 
-    m_program->bind();
-    m_program->setUniformValue("uTex", 0);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, m_texture);
+    program->bind();
+    if (yuv) {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, m_texY);
+        program->setUniformValue("tex_y", 0);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, m_texU);
+        program->setUniformValue("tex_u", 1);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, m_texV);
+        program->setUniformValue("tex_v", 2);
+    } else {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, m_texRgba);
+        program->setUniformValue("uTex", 0);
+    }
 
     glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
 
-    m_program->enableAttributeArray(0);
-    m_program->enableAttributeArray(1);
+    program->enableAttributeArray(0);
+    program->enableAttributeArray(1);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
                           reinterpret_cast<void *>(0));
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
@@ -280,22 +455,56 @@ void VideoGLWidget::drawTexturedQuad(const QRectF &dest) {
 
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
-    m_program->disableAttributeArray(0);
-    m_program->disableAttributeArray(1);
+    program->disableAttributeArray(0);
+    program->disableAttributeArray(1);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-    m_program->release();
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    program->release();
 }
 
 void VideoGLWidget::paintGL() {
+    xrtc::XRTCVideoFrame i420;
+    QImage rgba;
+    ContentKind kind = ContentKind::None;
+    bool doClear = false;
+    {
+        QMutexLocker lock(&m_mutex);
+        if (m_clearRequested) {
+            doClear = true;
+            m_clearRequested = false;
+            m_dirty = false;
+            m_pendingI420 = {};
+            m_pendingRgba = QImage();
+            m_pendingKind = ContentKind::None;
+        } else if (m_dirty) {
+            kind = m_pendingKind;
+            if (kind == ContentKind::I420) {
+                i420 = std::move(m_pendingI420);
+                m_pendingI420 = {};
+            } else if (kind == ContentKind::Rgba) {
+                rgba = std::move(m_pendingRgba);
+                m_pendingRgba = QImage();
+            }
+            m_pendingKind = ContentKind::None;
+            m_dirty = false;
+        }
+    }
+
+    if (doClear) {
+        m_drawnKind = ContentKind::None;
+        m_videoW = 0;
+        m_videoH = 0;
+    } else if (kind == ContentKind::I420 && i420.valid()) {
+        uploadI420(i420);
+    } else if (kind == ContentKind::Rgba && !rgba.isNull()) {
+        uploadRgba(rgba);
+    }
+
     glClear(GL_COLOR_BUFFER_BIT);
-    if (!m_program || !m_program->isLinked())
-        return;
-    if (!m_hasFrame || m_frame.isNull())
+    if (m_drawnKind == ContentKind::None || m_videoW <= 0 || m_videoH <= 0)
         return;
 
-    if (m_textureDirty)
-        uploadTexture(m_frame);
-
-    const QRectF dest = destRectForFrame(m_frame.width(), m_frame.height());
-    drawTexturedQuad(dest);
+    const QRectF dest = destRectForFrame(m_videoW, m_videoH);
+    drawTexturedQuad(dest, m_drawnKind == ContentKind::I420);
 }
