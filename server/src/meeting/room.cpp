@@ -126,8 +126,7 @@ void Room::close_room() {
     _closed = true;
 
     if (_expire_timer) {
-        boost::system::error_code ec;
-        _expire_timer->cancel(ec);
+        _expire_timer->cancel();
         _expire_timer.reset();
     }
 
