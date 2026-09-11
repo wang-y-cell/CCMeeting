@@ -88,7 +88,8 @@ public:
                        const protocol::Packet& packet);
 
     /**
-     * @brief 新人加入后：广播 PARTNER_JOIN，并向新人发送 PARTNER_JOIN2（在场用户 ID 列表）
+     * @brief 新人加入后：广播 PARTNER_JOIN，向新人发送 PARTNER_JOIN2（在场用户 ID），
+     *        并补发已缓存的 UserProfile，避免新人看不到对方名称
      * @param newcomer 新人
      */
     void notify_user_joined(std::shared_ptr<network::Connection> newcomer);

@@ -24,6 +24,7 @@ PartnerTile::PartnerTile(Partner *partner, QWidget *parent)
     m_nameLabel->setAlignment(Qt::AlignCenter);
     m_nameLabel->setWordWrap(true);
     m_nameLabel->setStyleSheet(QStringLiteral("color:#c5ccd9;font-size:11px;"));
+    m_nameLabel->setText(m_partner->fallbackLabel());
 
     layout->addWidget(m_displayWidget, 1);
     layout->addWidget(m_nameLabel, 0);
@@ -33,6 +34,7 @@ PartnerTile::PartnerTile(Partner *partner, QWidget *parent)
     setFixedHeight(m_side + 18);
     updateLabelGeometry();
     resetBorder();
+    setToolTip(m_partner->fallbackLabel());
 
     m_partner->setTile(this);
 }

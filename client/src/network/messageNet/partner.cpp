@@ -28,9 +28,7 @@ void Partner::setTile(PartnerTile *tile) {
 
     if (m_tile) {
         connect(m_tile, &PartnerTile::clicked, this, &Partner::clicked);
-        if (!m_displayName.isEmpty() || !m_avatarUrl.isEmpty()) {
-            m_tile->updateProfile(m_displayName, m_avatarUrl);
-        }
+        m_tile->updateProfile(m_displayName, m_avatarUrl);
     }
 }
 
