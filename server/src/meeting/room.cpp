@@ -239,6 +239,37 @@ void Room::handle_packet(std::shared_ptr<network::Connection> from,
     }
 }
 
+namespace {
+
+protocol::Packet make_user_profile_packet(const Participant& p) {
+    protocol::Packet packet;
+    packet.type = protocol::MessageType::UserProfile;
+    packet.user_id = p.user_id;
+
+    const auto& name = p.display_name;
+    const auto& avatar = p.avatar_url;
+    packet.payload.reserve(12 + name.size() + avatar.size());
+
+    uint8_t id_wire[8];
+    write_be64(id_wire, p.user_id);
+    packet.payload.insert(packet.payload.end(), id_wire, id_wire + 8);
+
+    const uint16_t name_len = htons(static_cast<uint16_t>(name.size()));
+    const auto* name_len_bytes = reinterpret_cast<const uint8_t*>(&name_len);
+    packet.payload.insert(packet.payload.end(), name_len_bytes,
+                          name_len_bytes + sizeof(name_len));
+    packet.payload.insert(packet.payload.end(), name.begin(), name.end());
+
+    const uint16_t avatar_len = htons(static_cast<uint16_t>(avatar.size()));
+    const auto* avatar_len_bytes = reinterpret_cast<const uint8_t*>(&avatar_len);
+    packet.payload.insert(packet.payload.end(), avatar_len_bytes,
+                          avatar_len_bytes + sizeof(avatar_len));
+    packet.payload.insert(packet.payload.end(), avatar.begin(), avatar.end());
+    return packet;
+}
+
+}  // namespace
+
 void Room::notify_user_joined(std::shared_ptr<network::Connection> newcomer) {
     if (_closed || !newcomer) {
         return;
@@ -267,6 +298,19 @@ void Room::notify_user_joined(std::shared_ptr<network::Connection> newcomer) {
                                     id_wire + sizeof(id_wire));
     }
     send_to(newcomer, partner_list);
+
+    // PartnerJoin2 只有 userId；把房内已缓存的资料补发给新人，否则新人看不到对方名称
+    for (const auto& item : _participants) {
+        if (item.first == newcomer->id()) {
+            continue;
+        }
+        const auto& p = item.second;
+        if (p.user_id == 0 ||
+            (p.display_name.empty() && p.avatar_url.empty())) {
+            continue;
+        }
+        send_to(newcomer, make_user_profile_packet(p));
+    }
 }
 
 }  // namespace meeting

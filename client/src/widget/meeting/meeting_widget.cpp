@@ -587,7 +587,12 @@ void MeetingWidget::stop_meeting_media() {
         xrtc::destroy_xrtc_engine(_rtc);
         _rtc = nullptr;
     }
-    _feed_to_user.clear();
+    {
+        std::lock_guard<std::mutex> lock(remote_mutex_);
+        _feed_to_user.clear();
+        pending_remote_.clear();
+        remote_scheduled_ = false;
+    }
     {
         std::lock_guard<std::mutex> lock(preview_mutex_);
         pending_preview_ = {};
@@ -957,6 +962,9 @@ void MeetingWidget::handle_partner_join(const MessagePtr &msg) {
         _cameraVideo->showAvatarForUser(msg->user_id());
         update_meeting_info();
     }
+    // 已在房成员收到新人加入后重发自己的资料，覆盖服务端尚未缓存到资料的竞态
+    if (_createmeet || _joinmeet)
+        send_local_user_profile();
 }
 
 void MeetingWidget::handle_partner_exit(const MessagePtr &msg) {
@@ -1426,6 +1434,7 @@ void MeetingWidget::on_leave(xrtc::XRtcError error) {
 
 void MeetingWidget::on_connection_state(xrtc::XRTCConnectionState state) {
     spdlog::info("[MeetingWidget] rtc state={}", static_cast<int>(state));
+    // 仅处理发布者 PC 状态；订阅路失败由 SDK 内部重试，不再拆整场
     if (state != xrtc::XRTCConnectionState::kFailed &&
         state != xrtc::XRTCConnectionState::kClosed) {
         return;
@@ -1443,26 +1452,40 @@ void MeetingWidget::on_connection_state(xrtc::XRTCConnectionState state) {
 
 void MeetingWidget::on_remote_user_joined(const xrtc::XRTCRemoteUser &user) {
     bool ok = false;
-    const std::uint64_t userId = QString::fromUtf8(user.display.c_str()).toULongLong(&ok);
-    if (!ok)
+    const std::uint64_t userId =
+        QString::fromUtf8(user.display.c_str()).toULongLong(&ok);
+    if (!ok || userId == 0) {
+        spdlog::warn(
+            "[MeetingWidget] remote joined feed={} display='{}' "
+            "(expected numeric userId); cannot map video",
+            user.feed_id, user.display);
         return;
-    QMetaObject::invokeMethod(
-        this,
-        [this, feed_id = user.feed_id, userId]() {
-            _feed_to_user[feed_id] = static_cast<qint64>(userId);
-        },
-        Qt::QueuedConnection);
+    }
+    // 媒体线程也可能立刻回调 on_remote_video_frame，映射需同步写入
+    {
+        std::lock_guard<std::mutex> lock(remote_mutex_);
+        _feed_to_user[user.feed_id] = static_cast<qint64>(userId);
+    }
+    spdlog::info("[MeetingWidget] map feed {} -> user {}", user.feed_id,
+                 userId);
 }
 
 void MeetingWidget::on_remote_user_left(const xrtc::XRTCRemoteUser &user) {
     QMetaObject::invokeMethod(
         this,
         [this, feed_id = user.feed_id]() {
-            const auto it = _feed_to_user.find(feed_id);
-            if (it != _feed_to_user.end()) {
-                close_video_for_user(it->second);
-                _feed_to_user.erase(it);
+            qint64 userId = 0;
+            {
+                std::lock_guard<std::mutex> lock(remote_mutex_);
+                const auto it = _feed_to_user.find(feed_id);
+                if (it != _feed_to_user.end()) {
+                    userId = it->second;
+                    _feed_to_user.erase(it);
+                    pending_remote_.erase(userId);
+                }
             }
+            if (userId != 0)
+                close_video_for_user(userId);
         },
         Qt::QueuedConnection);
 }
@@ -1473,14 +1496,12 @@ void MeetingWidget::on_remote_video_frame(uint64_t feed_id,
         return;
     qint64 userId = 0;
     {
+        std::lock_guard<std::mutex> lock(remote_mutex_);
         const auto it = _feed_to_user.find(feed_id);
         if (it != _feed_to_user.end())
             userId = it->second;
-    }
-    if (userId == 0)
-        return;
-    {
-        std::lock_guard<std::mutex> lock(remote_mutex_);
+        if (userId == 0)
+            return;
         pending_remote_[userId] = frame;
     }
     schedule_remote_render(userId);
