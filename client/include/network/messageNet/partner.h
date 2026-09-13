@@ -13,9 +13,12 @@ class Partner : public QObject {
 public:
     explicit Partner(qint64 userId, QObject *parent = nullptr);
 
+    /// 获得用户id
     qint64 userId() const { return m_userId; }
 
+    /// 获得用户昵称
     QString displayName() const { return m_displayName; }
+    /// 获得用户头像url
     QString avatarUrl() const { return m_avatarUrl; }
     QString fallbackLabel() const;
 
@@ -33,10 +36,10 @@ signals:
     void clicked(qint64 userId);
 
 private:
-    qint64 m_userId = 0;
-    QString m_displayName;
-    QString m_avatarUrl;
-    PartnerTile *m_tile = nullptr;
+    qint64 m_userId = 0; /// 用户id
+    QString m_displayName; /// 用户昵称
+    QString m_avatarUrl; /// 用户头像url,服务端的url
+    PartnerTile *m_tile = nullptr; /// 用户对应的tile
 };
 
 #endif // PARTNER_H

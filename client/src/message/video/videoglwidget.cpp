@@ -117,13 +117,13 @@ void VideoGLWidget::setFrame(QImage image) {
     image = toRgba8888(image);
     {
         QMutexLocker lock(&m_mutex);
-        m_pendingRgba = std::move(image);
+        m_pendingRgba = std::move(image);// 先缓存头像图
         m_pendingI420 = {};
         m_pendingKind = ContentKind::Rgba;
         m_dirty = true;
         m_clearRequested = false;
     }
-    update();
+    update(); // 更新头像图,图片绘制再paintGL中
 }
 
 void VideoGLWidget::clearFrame() {
@@ -268,19 +268,26 @@ void VideoGLWidget::ensureYuvTextures(int width, int height) {
 void VideoGLWidget::ensureRgbaTexture(int width, int height) {
     if (width <= 0 || height <= 0)
         return;
+    //如果纹理已经存在并且尺寸相同,则直接返回
     if (m_texRgba != 0 && m_rgbaTexW == width && m_rgbaTexH == height)
         return;
+    //如果纹理不存在,则创建
     if (m_texRgba == 0)
         glGenTextures(1, &m_texRgba);
     glBindTexture(GL_TEXTURE_2D, m_texRgba);
+    //缩小采样用线性插值（更平滑）
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    //放大采样用线性插值（更平滑）
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    //横向超出 [0,1] 时夹到边缘，不重复贴图
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    //纵向同样夹到边缘
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    //按宽高分配一块 RGBA 显存；nullptr 表示先只分配不填数据（像素后面 glTexSubImage2D 再传）
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,
                  GL_UNSIGNED_BYTE, nullptr);
-    m_rgbaTexW = width;
-    m_rgbaTexH = height;
+    m_rgbaTexW = width; // 记录纹理宽度
+    m_rgbaTexH = height; // 记录纹理高度
 }
 
 void VideoGLWidget::uploadI420(const xrtc::XRTCVideoFrame &frame) {
@@ -314,20 +321,26 @@ void VideoGLWidget::uploadI420(const xrtc::XRTCVideoFrame &frame) {
 }
 
 void VideoGLWidget::uploadRgba(const QImage &image) {
+    //按图片宽高准备 GPU 上的 RGBA 纹理；没有就创建，尺寸变了就重建
     ensureRgbaTexture(image.width(), image.height());
     if (m_texRgba == 0)
         return;
 
+    //告诉 OpenGL：从内存读像素时，每行按 4 字节对齐（RGBA8888 常见）
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    //每行像素数按 width 本身算，不另设 stride（0 = 默认）
     glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    //绑定纹理,准备上传数据
     glBindTexture(GL_TEXTURE_2D, m_texRgba);
+    //把整张图（宽×高、RGBA、每通道 1 字节）从 image 内存写入纹理；Sub 表示往已有纹理里填数据，不重新分配尺寸
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image.width(), image.height(),
                     GL_RGBA, GL_UNSIGNED_BYTE, image.constBits());
+    //解绑纹理,表示上传完成
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    m_videoW = image.width();
-    m_videoH = image.height();
-    m_drawnKind = ContentKind::Rgba;
+    m_videoW = image.width(); // 记录纹理宽度
+    m_videoH = image.height(); // 记录纹理高度
+    m_drawnKind = ContentKind::Rgba; // 记录当前纹理上已上传的类型
 }
 
 QRect VideoGLWidget::effectiveContentRect() const {
@@ -480,14 +493,14 @@ void VideoGLWidget::paintGL() {
         } else if (m_dirty) {
             kind = m_pendingKind;
             if (kind == ContentKind::I420) {
-                i420 = std::move(m_pendingI420);
+                i420 = std::move(m_pendingI420); // 获得视频帧
                 m_pendingI420 = {};
             } else if (kind == ContentKind::Rgba) {
-                rgba = std::move(m_pendingRgba);
+                rgba = std::move(m_pendingRgba); // 获得头像图
                 m_pendingRgba = QImage();
             }
-            m_pendingKind = ContentKind::None;
-            m_dirty = false;
+            m_pendingKind = ContentKind::None; // 清空缓存
+            m_dirty = false;  // 清空脏标志,表示没有需要绘制的图
         }
     }
 
@@ -501,10 +514,14 @@ void VideoGLWidget::paintGL() {
         uploadRgba(rgba);
     }
 
+    //清空画布
     glClear(GL_COLOR_BUFFER_BIT);
+    //如果当前纹理上没有上传任何类型,或者纹理宽度或高度为0,则直接返回
     if (m_drawnKind == ContentKind::None || m_videoW <= 0 || m_videoH <= 0)
         return;
 
+    //计算视频帧或头像图在画布上的显示区域
     const QRectF dest = destRectForFrame(m_videoW, m_videoH);
+    //绘制视频帧或头像图
     drawTexturedQuad(dest, m_drawnKind == ContentKind::I420);
 }

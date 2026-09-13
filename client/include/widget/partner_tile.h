@@ -8,6 +8,8 @@ class QLabel;
 class Partner;
 class VideoGLWidget;
 
+
+///是会议侧边栏里单个成员的小格子 UI
 class PartnerTile : public QWidget {
     Q_OBJECT
 public:
@@ -34,9 +36,13 @@ private:
     void loadAvatar(const QString &avatarUrl);
     void showAvatarImage(const QImage &image);
 
+    /// 对应的成员信息
     Partner *m_partner = nullptr;
+    /// 显示头像或该人的小视频的预览
     VideoGLWidget *m_displayWidget = nullptr;
+    // 显示成员名字
     QLabel *m_nameLabel = nullptr;
+    // 小格子的大小
     int m_side = 40;
 };
 
