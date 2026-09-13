@@ -126,7 +126,7 @@ private:
      */
     void uploadI420(const xrtc::XRTCVideoFrame &frame);
     /**
-     * @brief 将 RGBA8888 图像上传到单纹理
+     * @brief 将 RGBA8888 图像上传到GPU纹理,为后面的绘制做准备
      * @param image 源图
      */
     void uploadRgba(const QImage &image);
@@ -157,8 +157,8 @@ private:
     xrtc::XRTCVideoFrame m_pendingI420;  ///< 待上传的最新 I420
     QImage m_pendingRgba;                ///< 待上传的最新 RGBA
     bool m_dirty = false;                ///< 有新帧待 paintGL 取走
-    bool m_clearRequested = false;       ///< 请求清空画面
-    ContentKind m_pendingKind = ContentKind::None; ///< pending 帧类型
+    bool m_clearRequested = false;       ///< 请求清空画面,表示是否请求清空画面
+    ContentKind m_pendingKind = ContentKind::None; ///< pending 帧类型,表示缓存的是视频帧还是头像图
 
     ContentKind m_drawnKind = ContentKind::None; ///< 当前纹理上已上传的类型
     int m_videoW = 0; ///< 已上传帧宽
@@ -170,7 +170,7 @@ private:
     GLuint m_texY = 0;    ///< Y 平面
     GLuint m_texU = 0;    ///< U 平面
     GLuint m_texV = 0;    ///< V 平面
-    GLuint m_texRgba = 0; ///< RGBA 平面
+    GLuint m_texRgba = 0; ///< RGBA 纹理
     int m_yuvTexW = 0;    ///< YUV 纹理当前宽
     int m_yuvTexH = 0;    ///< YUV 纹理当前高
     int m_rgbaTexW = 0;   ///< RGBA 纹理当前宽
