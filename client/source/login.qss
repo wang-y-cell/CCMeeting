@@ -1,6 +1,6 @@
 QDialog#login { /* 登录对话框 */
     background-color: #17191f; /* 背景颜色 */
-    border: 1px solid #2a2e38; /* 边框颜色 */
+    border: 2px solid #2F6FED; /* 边框颜色 */
     border-radius: 0px; /* 圆角 */
 }
 

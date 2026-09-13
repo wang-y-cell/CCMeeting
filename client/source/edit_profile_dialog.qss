@@ -1,0 +1,140 @@
+QDialog#editProfileDialog {
+    background-color: #14161c;
+    border: 2px solid #2F6FED;
+}
+
+QLabel#pageTitle {
+    color: #f3f5f8;
+    font-size: 22px;
+    font-weight: 700;
+    background: transparent;
+    border: none;
+}
+
+QLabel#profileAvatarLarge {
+    border-radius: 64px;
+    background-color: #232733;
+    border: 2px solid #343a48;
+}
+
+QLabel#fieldLabelNickname,
+QLabel#fieldLabelUsername,
+QLabel#fieldLabelUserId,
+QLabel#fieldLabelInfo {
+    color: #aeb6c7;
+    font-size: 13px;
+    font-weight: 600;
+    background: transparent;
+    border: none;
+}
+
+QLabel#valueUsername,
+QLabel#valueUserId {
+    color: #eef1f6;
+    font-size: 14px;
+    background: transparent;
+    border: none;
+}
+
+QLineEdit#nicknameEdit {
+    background-color: #232733;
+    color: #eef1f6;
+    border: 1px solid #343a48;
+    border-radius: 10px;
+    padding: 0 14px;
+    min-height: 40px;
+    font-size: 14px;
+}
+
+QLineEdit#nicknameEdit:hover {
+    border-color: #455066;
+}
+
+QLineEdit#nicknameEdit:focus {
+    border: 1px solid #3b82f6;
+    background-color: #262b38;
+}
+
+QTextEdit#infoEdit {
+    background-color: #232733;
+    color: #eef1f6;
+    border: 1px solid #343a48;
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 14px;
+}
+
+QTextEdit#infoEdit:focus {
+    border: 1px solid #3b82f6;
+    background-color: #262b38;
+}
+
+QPushButton#changeAvatarBtn {
+    background-color: #2f6fed;
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    min-height: 36px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+QPushButton#changeAvatarBtn:hover {
+    background-color: #3b7fff;
+}
+
+QPushButton#editSaveBtn {
+    background-color: #2f6fed;
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    min-height: 40px;
+    min-width: 96px;
+    font-weight: 600;
+}
+
+QPushButton#editSaveBtn:hover {
+    background-color: #3b7fff;
+}
+
+QPushButton#editCancelBtn {
+    background-color: #343a48;
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    min-height: 40px;
+    min-width: 96px;
+    font-weight: 600;
+}
+
+QPushButton#editCancelBtn:hover {
+    background-color: #455066;
+}
+
+QPushButton#framelessCloseBtn {
+    background-color: transparent;
+    border: none;
+    color: #8b93a7;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 6px;
+}
+
+QPushButton#framelessCloseBtn:hover {
+    background-color: #e81123;
+    color: #ffffff;
+}
+
+QPushButton#framelessMaxBtn {
+    background-color: transparent;
+    border: none;
+    color: #8b93a7;
+    font-size: 14px;
+    font-weight: bold;
+    border-radius: 6px;
+}
+
+QPushButton#framelessMaxBtn:hover {
+    background-color: #2a3040;
+    color: #ffffff;
+}

@@ -4,6 +4,7 @@
 #include "avatar_image_loader.h"
 #include "configure/client_config.h"
 #include "configure/user_session.h"
+#include "style_loader.h"
 
 #include <QBuffer>
 #include <QFileDialog>
@@ -137,6 +138,8 @@ EditProfileDialog::EditProfileDialog(QWidget *parent)
     setModal(true);
 
     ui.setupUi(this);
+    loadWidgetStyleSheet(
+        this, QStringLiteral(":/Style/source/edit_profile_dialog.qss"));
     loadFromSession();
 
     connect(ui.changeAvatarBtn, &QPushButton::clicked, this,

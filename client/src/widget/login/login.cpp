@@ -3,8 +3,8 @@
 
 #include "configure/client_config.h"
 #include "configure/user_session.h"
+#include "style_loader.h"
 
-#include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMessageBox>
@@ -73,15 +73,7 @@ login::login(QWidget *parent)
 }
 
 void login::set_style() {
-    QFile file(":/Style/source/login.qss");
-    if (file.open(QFile::ReadOnly)) {
-        spdlog::info("login.qss loaded");
-        QString styleSheet = file.readAll();
-        this->setStyleSheet(styleSheet);
-        file.close();
-    } else {
-        spdlog::warn("login.qss not found");
-    }
+    loadWidgetStyleSheet(this, QStringLiteral(":/Style/source/login.qss"));
 }
 
 login::~login() { delete ui; }
