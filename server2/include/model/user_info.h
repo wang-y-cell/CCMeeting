@@ -20,4 +20,12 @@ struct AvatarUploadResult {
     std::string avatar_url;
 };
 
+struct ProfileUpdateResult {
+    bool success{false};
+    int code{0};
+    std::string message;
+    std::string name;
+    std::string info;
+};
+
 }  // namespace model

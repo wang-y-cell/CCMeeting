@@ -219,6 +219,31 @@ bool UserRepository::update_avatar_url(std::uint64_t user_id,
     }
 }
 
+bool UserRepository::update_profile(std::uint64_t user_id,
+                                    const std::string& nickname,
+                                    const std::string& info) const {
+    if (user_id == 0) {
+        return false;
+    }
+
+    try {
+        auto lock = db_.acquire_lock();
+        Stmt stmt(db_.db(),
+                  "UPDATE sys_user_profiles SET nickname = ?, info = ?, "
+                  "updated_at = datetime('now') WHERE user_id = ?");
+        sqlite3_bind_text(stmt.get(), 1, nickname.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt.get(), 2, info.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int64(stmt.get(), 3, static_cast<sqlite3_int64>(user_id));
+        if (sqlite3_step(stmt.get()) != SQLITE_DONE) {
+            throw std::runtime_error(sqlite3_errmsg(db_.db()));
+        }
+        return sqlite3_changes(db_.db()) > 0;
+    } catch (const std::exception& ex) {
+        spdlog::warn("[UserRepository] update_profile failed: {}", ex.what());
+        return false;
+    }
+}
+
 bool UserRepository::user_exists(std::uint64_t user_id) const {
     if (user_id == 0) {
         return false;

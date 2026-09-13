@@ -1,18 +1,34 @@
 #ifndef STACK_USER_PROFILE_H
 #define STACK_USER_PROFILE_H
 
-#include "ui_stack_user_profile.h"
-#include <QImage>
 #include <QWidget>
 
-class QNetworkReply;
+class QLabel;
+class QPushButton;
 
+/** 个人资料页纯 UI，不含业务逻辑 */
+class Ui_stack_user_profile {
+public:
+    QLabel *pageTitle = nullptr;
+    QLabel *pageDesc = nullptr;
+    QLabel *profileAvatarLarge = nullptr;
+    QLabel *valueNickname = nullptr;
+    QLabel *valueUsername = nullptr;
+    QLabel *valueUserId = nullptr;
+    QLabel *valueInfo = nullptr;
+    QPushButton *editProfileBtn = nullptr;
+    QPushButton *backHomeBtn = nullptr;
+
+    void setupUi(QWidget *parent);
+};
+
+/** 个人资料页：展示资料，打开修改窗口 */
 class stack_user_profile : public QWidget {
     Q_OBJECT
 
 public:
     explicit stack_user_profile(QWidget *parent = nullptr);
-    ~stack_user_profile();
+    ~stack_user_profile() override = default;
 
     void refreshFromSession();
 
@@ -21,16 +37,11 @@ signals:
     void avatarUpdated();
 
 private slots:
-    void on_change_avatar_clicked();
-    void on_upload_finished();
+    void onEditProfileClicked();
+    void onProfileSaved();
 
 private:
-    void uploadCroppedAvatar(const QImage &cropped);
-
-    Ui::stack_user_profile *ui = nullptr;
-    QString m_pendingOldAvatar;
-    bool m_uploadInFlight = false;
-    QNetworkReply *m_uploadReply = nullptr;
+    Ui_stack_user_profile ui;
 };
 
 #endif // STACK_USER_PROFILE_H

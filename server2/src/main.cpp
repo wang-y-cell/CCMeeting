@@ -72,7 +72,7 @@ int main() {
                      config.listen_port);
         spdlog::info(
             "POST /api/login  POST /api/register  POST /api/upload-avatar  "
-            "GET /health  GET /static/*  GET /uploads/*");
+            "POST /api/update-profile  GET /health  GET /static/*  GET /uploads/*");
 
         ioc.run();
     } catch (const std::exception& ex) {

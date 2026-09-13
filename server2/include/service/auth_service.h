@@ -26,6 +26,10 @@ public:
                                             const std::string& mime,
                                             const std::string& data_base64) const;
 
+    model::ProfileUpdateResult update_profile(std::uint64_t user_id,
+                                              const std::string& nickname,
+                                              const std::string& info) const;
+
 private:
     repository::UserRepository repository_;
     config::AuthServerConfig config_;

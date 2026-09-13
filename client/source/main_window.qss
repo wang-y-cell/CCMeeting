@@ -199,11 +199,32 @@ QPushButton#changeAvatarBtn {
     font-size: 13px;
 }
 
+QPushButton#editProfileBtn {
+    min-height: 40px;
+    min-width: 120px;
+    font-size: 13px;
+}
+
 QPushButton#backHomeBtn {
     background-color: #343a48;
     max-width: 160px;
 }
 
 QPushButton#backHomeBtn:hover {
+    background-color: #455066;
+}
+
+QPushButton#editSaveBtn {
+    min-height: 40px;
+    min-width: 96px;
+}
+
+QPushButton#editCancelBtn {
+    min-height: 40px;
+    min-width: 96px;
+    background-color: #343a48;
+}
+
+QPushButton#editCancelBtn:hover {
     background-color: #455066;
 }

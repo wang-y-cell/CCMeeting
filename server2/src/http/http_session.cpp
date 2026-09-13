@@ -214,6 +214,39 @@ void HttpSession::handle_request(http::request<http::string_body>&& req) {
         return;
     }
 
+    if (req.method() == http::verb::post && target == "/api/update-profile") {
+        std::uint64_t user_id = 0;
+        std::string nickname;
+        std::string info;
+        if (!util::parse_update_profile_request(req.body(), user_id, nickname,
+                                                info)) {
+            model::ProfileUpdateResult bad;
+            bad.code = 400;
+            bad.message = "invalid json body";
+            send_response(make_json_response(
+                http::status::bad_request,
+                util::to_profile_update_response_json(bad), version, keep_alive));
+            return;
+        }
+
+        const model::ProfileUpdateResult result =
+            auth_service_->update_profile(user_id, nickname, info);
+
+        http::status status = http::status::bad_request;
+        if (result.success) {
+            status = http::status::ok;
+        } else if (result.code == 404) {
+            status = http::status::not_found;
+        } else if (result.code == 500) {
+            status = http::status::internal_server_error;
+        }
+
+        send_response(make_json_response(
+            status, util::to_profile_update_response_json(result), version,
+            keep_alive));
+        return;
+    }
+
     model::LoginResult not_found;
     not_found.code = 404;
     not_found.message = "not found";

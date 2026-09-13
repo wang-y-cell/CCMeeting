@@ -272,4 +272,56 @@ model::AvatarUploadResult AuthService::upload_avatar(
     }
 }
 
+model::ProfileUpdateResult AuthService::update_profile(
+    std::uint64_t user_id,
+    const std::string& nickname,
+    const std::string& info) const {
+    model::ProfileUpdateResult result;
+
+    if (user_id == 0) {
+        result.code = 400;
+        result.message = "user_id is required";
+        return result;
+    }
+
+    if (nickname.empty()) {
+        result.code = 400;
+        result.message = "nickname is required";
+        return result;
+    }
+
+    if (nickname.size() > 64) {
+        result.code = 400;
+        result.message = "nickname too long";
+        return result;
+    }
+
+    if (info.size() > 512) {
+        result.code = 400;
+        result.message = "info too long";
+        return result;
+    }
+
+    if (!repository_.user_exists(user_id)) {
+        result.code = 404;
+        result.message = "user not found";
+        return result;
+    }
+
+    if (!repository_.update_profile(user_id, nickname, info)) {
+        result.code = 500;
+        result.message = "failed to update profile";
+        return result;
+    }
+
+    result.success = true;
+    result.code = 0;
+    result.message = "ok";
+    result.name = nickname;
+    result.info = info;
+    spdlog::info("[AuthService] update_profile ok user_id={} nickname={}",
+                 user_id, nickname);
+    return result;
+}
+
 }  // namespace service
