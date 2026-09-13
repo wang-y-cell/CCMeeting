@@ -6,6 +6,7 @@
 #include "netheader.h"
 #include "partner_tile.h"
 #include "screen.h"
+#include "style_loader.h"
 #include "ui_widget.h"
 
 #include <QAction>
@@ -14,7 +15,6 @@
 #include <QCompleter>
 #include <QDateTime>
 #include <QEvent>
-#include <QFile>
 #include <QLabel>
 #include <QMenu>
 #include <QMessageBox>
@@ -149,11 +149,8 @@ void MeetingWidget::init_ui() {
     setAttribute(Qt::WA_StyledBackground, true);
     setObjectName(QStringLiteral("meetingWidget"));
 
-    QFile styleFile(":/Style/source/widget.qss");
-    if (styleFile.open(QFile::ReadOnly)) {
-        setStyleSheet(QLatin1String(styleFile.readAll()));
-        styleFile.close();
-    }
+    loadWidgetStyleSheet(this,
+                         QStringLiteral(":/Style/source/meeting_widget.qss"));
 
     // 普通 QWidget 默认不绘制 stylesheet 背景，需显式开启，否则顶栏/底栏
     // 会透出根窗同色，分层看起来消失。

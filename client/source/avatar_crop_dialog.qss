@@ -1,0 +1,114 @@
+QDialog#avatarCropDialog {
+    background-color: #17191f;
+    border: 2px solid #2F6FED;
+}
+
+QLabel#cropHint {
+    color: #9aa3b5;
+    font-size: 13px;
+    padding: 2px 0 4px 0;
+    background: transparent;
+    border: none;
+}
+
+QWidget#avatarCropCanvas {
+    background-color: #16181e;
+    border: 1px solid #2e3442;
+    border-radius: 12px;
+}
+
+QPushButton#cropToolBtn {
+    background-color: #2a303c;
+    color: #e8ebf2;
+    border: 1px solid #3a4152;
+    border-radius: 10px;
+    min-height: 40px;
+    min-width: 40px;
+    font-size: 18px;
+    font-weight: 600;
+    padding: 0;
+}
+
+QPushButton#cropToolBtn:hover {
+    background-color: #353c4c;
+    border-color: #4b5468;
+}
+
+QPushButton#cropToolBtn:pressed {
+    background-color: #222833;
+}
+
+QPushButton#cropResetBtn {
+    background-color: #2a303c;
+    color: #d7dce8;
+    border: 1px solid #3a4152;
+    border-radius: 10px;
+    min-height: 40px;
+    padding: 0 18px;
+    font-weight: 600;
+}
+
+QPushButton#cropResetBtn:hover {
+    background-color: #353c4c;
+    border-color: #4b5468;
+}
+
+QPushButton#cropCancelBtn {
+    background-color: #2a303c;
+    color: #d7dce8;
+    border: 1px solid #3a4152;
+    border-radius: 10px;
+    min-height: 44px;
+    font-weight: 600;
+}
+
+QPushButton#cropCancelBtn:hover {
+    background-color: #353c4c;
+}
+
+QPushButton#cropOkBtn {
+    background-color: #2f6fed;
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    min-height: 44px;
+    font-weight: 600;
+}
+
+QPushButton#cropOkBtn:hover {
+    background-color: #3b7fff;
+}
+
+QPushButton#cropOkBtn:pressed {
+    background-color: #255fd4;
+}
+
+QPushButton#framelessCloseBtn {
+    background-color: transparent;
+    border: none;
+    color: #8b93a7;
+    font-size: 16px;
+    font-weight: bold;
+    padding: 0;
+    border-radius: 6px;
+}
+
+QPushButton#framelessCloseBtn:hover {
+    background-color: #e81123;
+    color: #ffffff;
+}
+
+QPushButton#framelessMaxBtn {
+    background-color: transparent;
+    border: none;
+    color: #8b93a7;
+    font-size: 14px;
+    font-weight: bold;
+    padding: 0;
+    border-radius: 6px;
+}
+
+QPushButton#framelessMaxBtn:hover {
+    background-color: #2a3040;
+    color: #ffffff;
+}

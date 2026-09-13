@@ -3,9 +3,9 @@
 #include "configure/client_config.h"
 #include "configure/user_session.h"
 #include "stack_join_meet.h"
+#include "style_loader.h"
 
 #include <QEvent>
-#include <QFile>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
@@ -63,15 +63,7 @@ main_window::main_window(QWidget *parent) : FramelessWindow<QWidget>(parent) {
 }
 
 void main_window::set_style() {
-    QFile file(":/Style/source/main_window.qss");
-    if (file.open(QFile::ReadOnly)) {
-        spdlog::info("main_window.qss loaded");
-        QString styleSheet = file.readAll();
-        this->setStyleSheet(styleSheet);
-        file.close();
-    } else {
-        spdlog::warn("main_window.qss not found");
-    }
+    loadWidgetStyleSheet(this, QStringLiteral(":/Style/source/main_window.qss"));
 }
 
 void main_window::destroyMeetingWidget() {

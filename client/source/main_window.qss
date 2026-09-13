@@ -1,6 +1,6 @@
 QWidget#main_window { /* 主窗口 */
     background-color: #14161c; /* 背景颜色 */
-    border: 1px solid #2a2e38; /* 边框颜色 */
+    border: 2px solid #2F6FED; /* 边框颜色 */
 }
 
 QListWidget#sideNav { /* 侧边栏 */
@@ -201,7 +201,7 @@ QPushButton#changeAvatarBtn {
 
 QPushButton#editProfileBtn {
     min-height: 40px;
-    min-width: 120px;
+    min-width: 160px;
     font-size: 13px;
 }
 
@@ -211,20 +211,5 @@ QPushButton#backHomeBtn {
 }
 
 QPushButton#backHomeBtn:hover {
-    background-color: #455066;
-}
-
-QPushButton#editSaveBtn {
-    min-height: 40px;
-    min-width: 96px;
-}
-
-QPushButton#editCancelBtn {
-    min-height: 40px;
-    min-width: 96px;
-    background-color: #343a48;
-}
-
-QPushButton#editCancelBtn:hover {
     background-color: #455066;
 }
