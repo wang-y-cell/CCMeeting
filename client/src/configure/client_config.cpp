@@ -76,6 +76,9 @@ bool ClientConfig::loadFromJsonObject(const QJsonObject& root) {
         auth_.upload_avatar_path =
             auth.value(QStringLiteral("upload_avatar_path"))
                 .toString(auth_.upload_avatar_path);
+        auth_.update_profile_path =
+            auth.value(QStringLiteral("update_profile_path"))
+                .toString(auth_.update_profile_path);
         auth_.public_base_url =
             auth.value(QStringLiteral("public_base_url")).toString();
         auth_.default_avatar_path =

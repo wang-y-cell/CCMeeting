@@ -39,6 +39,10 @@ public:
     bool update_avatar_url(std::uint64_t user_id,
                            const std::string& avatar_url) const;
 
+    bool update_profile(std::uint64_t user_id,
+                        const std::string& nickname,
+                        const std::string& info) const;
+
     bool user_exists(std::uint64_t user_id) const;
 
 private:

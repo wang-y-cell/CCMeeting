@@ -90,4 +90,52 @@ std::string to_avatar_upload_response_json(const model::AvatarUploadResult& resu
     return json::serialize(root);
 }
 
+bool parse_update_profile_request(const std::string& body,
+                                  std::uint64_t& user_id,
+                                  std::string& nickname,
+                                  std::string& info) {
+    try {
+        const json::value root = json::parse(body);
+        if (!root.is_object()) {
+            return false;
+        }
+        const json::object& obj = root.as_object();
+        if (!obj.contains("user_id") || !obj.contains("nickname")) {
+            return false;
+        }
+        if (!obj.at("nickname").is_string()) {
+            return false;
+        }
+        if (obj.at("user_id").is_int64()) {
+            user_id = static_cast<std::uint64_t>(obj.at("user_id").as_int64());
+        } else if (obj.at("user_id").is_uint64()) {
+            user_id = obj.at("user_id").as_uint64();
+        } else {
+            return false;
+        }
+        nickname = std::string(obj.at("nickname").as_string());
+        info.clear();
+        if (obj.contains("info") && obj.at("info").is_string()) {
+            info = std::string(obj.at("info").as_string());
+        }
+        return user_id != 0;
+    } catch (...) {
+        return false;
+    }
+}
+
+std::string to_profile_update_response_json(
+    const model::ProfileUpdateResult& result) {
+    json::object root;
+    root["code"] = result.code;
+    root["message"] = result.message;
+    if (result.success) {
+        json::object data;
+        data["name"] = result.name;
+        data["info"] = result.info;
+        root["data"] = std::move(data);
+    }
+    return json::serialize(root);
+}
+
 }  // namespace util

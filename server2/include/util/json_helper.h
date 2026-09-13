@@ -17,8 +17,16 @@ bool parse_upload_avatar_request(const std::string& body,
                                  std::string& mime,
                                  std::string& data_base64);
 
+bool parse_update_profile_request(const std::string& body,
+                                  std::uint64_t& user_id,
+                                  std::string& nickname,
+                                  std::string& info);
+
 std::string to_login_response_json(const model::LoginResult& result);
 
 std::string to_avatar_upload_response_json(const model::AvatarUploadResult& result);
+
+std::string to_profile_update_response_json(
+    const model::ProfileUpdateResult& result);
 
 }  // namespace util

@@ -1,184 +1,158 @@
 #include "stack_user_profile.h"
 
-#include "avatar_crop_dialog.h"
 #include "avatar_image_loader.h"
-#include "configure/client_config.h"
 #include "configure/user_session.h"
+#include "edit_profile_dialog.h"
 
-#include <QBuffer>
-#include <QFileDialog>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonParseError>
+#include <QFormLayout>
+#include <QFrame>
+#include <QHBoxLayout>
+#include <QLabel>
 #include <QMessageBox>
-#include <QNetworkReply>
-#include <QNetworkRequest>
 #include <QPushButton>
-#include <QUrl>
+#include <QSpacerItem>
+#include <QVBoxLayout>
 
 namespace {
 
-QUrl authUrl(const QString &path) {
-    QUrl url;
-    url.setScheme(QStringLiteral("http"));
-    const auto &auth = ClientConfig::instance().auth();
-    url.setHost(auth.host);
-    url.setPort(auth.port);
-    url.setPath(path);
-    return url;
+QLabel *makeFieldLabel(const QString &objectName, const QString &text,
+                       QWidget *parent) {
+    auto *label = new QLabel(text, parent);
+    label->setObjectName(objectName);
+    return label;
 }
 
-QNetworkRequest makeJsonRequest(const QUrl &url) {
-    QNetworkRequest request(url);
-    request.setHeader(QNetworkRequest::ContentTypeHeader,
-                      QStringLiteral("application/json; charset=utf-8"));
-    request.setHeader(QNetworkRequest::UserAgentHeader,
-                      QStringLiteral("CloudMeetingClient/1.0"));
-    return request;
+QLabel *makeValueLabel(const QString &objectName, QWidget *parent,
+                       bool wordWrap = false) {
+    auto *label = new QLabel(QStringLiteral("-"), parent);
+    label->setObjectName(objectName);
+    label->setWordWrap(wordWrap);
+    return label;
 }
 
 }  // namespace
 
-stack_user_profile::stack_user_profile(QWidget *parent)
-    : QWidget(parent), ui(new Ui::stack_user_profile) {
-    ui->setupUi(this);
-    connect(ui->changeAvatarBtn, &QPushButton::clicked, this,
-            &stack_user_profile::on_change_avatar_clicked);
-    connect(ui->backHomeBtn, &QPushButton::clicked, this,
+void Ui_stack_user_profile::setupUi(QWidget *parent) {
+    parent->setObjectName(QStringLiteral("stack_user_profile"));
+    parent->resize(680, 520);
+
+    auto *root = new QVBoxLayout(parent);
+    root->setSpacing(16);
+    root->setContentsMargins(8, 8, 8, 8);
+
+    pageTitle = new QLabel(QObject::tr("个人资料"), parent);
+    pageTitle->setObjectName(QStringLiteral("pageTitle"));
+    root->addWidget(pageTitle);
+
+    pageDesc = new QLabel(QObject::tr("查看账号信息"), parent);
+    pageDesc->setObjectName(QStringLiteral("pageDesc"));
+    root->addWidget(pageDesc);
+
+    auto *profileFrame = new QFrame(parent);
+    profileFrame->setObjectName(QStringLiteral("profileFrame"));
+    profileFrame->setFrameShape(QFrame::StyledPanel);
+
+    auto *profileLayout = new QHBoxLayout(profileFrame);
+    profileLayout->setSpacing(24);
+    profileLayout->setContentsMargins(24, 24, 24, 24);
+    profileLayout->setAlignment(Qt::AlignTop);
+
+    auto *avatarColumn = new QVBoxLayout();
+    avatarColumn->setSpacing(0);
+    avatarColumn->setAlignment(Qt::AlignTop | Qt::AlignHCenter);
+
+    profileAvatarLarge = new QLabel(parent);
+    profileAvatarLarge->setObjectName(QStringLiteral("profileAvatarLarge"));
+    profileAvatarLarge->setFixedSize(128, 128);
+    profileAvatarLarge->setScaledContents(true);
+    profileAvatarLarge->setAlignment(Qt::AlignCenter);
+    avatarColumn->addWidget(profileAvatarLarge);
+
+    auto *infoForm = new QFormLayout();
+    infoForm->setHorizontalSpacing(16);
+    infoForm->setVerticalSpacing(12);
+    infoForm->setFormAlignment(Qt::AlignTop);
+    infoForm->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
+
+    valueNickname = makeValueLabel(QStringLiteral("valueNickname"), parent);
+    valueUsername = makeValueLabel(QStringLiteral("valueUsername"), parent);
+    valueUserId = makeValueLabel(QStringLiteral("valueUserId"), parent);
+    valueInfo = makeValueLabel(QStringLiteral("valueInfo"), parent, true);
+
+    infoForm->addRow(
+        makeFieldLabel(QStringLiteral("fieldLabelNickname"), QObject::tr("昵称"),
+                       parent),
+        valueNickname);
+    infoForm->addRow(
+        makeFieldLabel(QStringLiteral("fieldLabelUsername"), QObject::tr("账号"),
+                       parent),
+        valueUsername);
+    infoForm->addRow(
+        makeFieldLabel(QStringLiteral("fieldLabelUserId"), QObject::tr("用户 ID"),
+                       parent),
+        valueUserId);
+    infoForm->addRow(
+        makeFieldLabel(QStringLiteral("fieldLabelInfo"), QObject::tr("简介"),
+                       parent),
+        valueInfo);
+
+    profileLayout->addLayout(avatarColumn);
+    profileLayout->addLayout(infoForm, 1);
+    root->addWidget(profileFrame);
+
+    editProfileBtn = new QPushButton(QObject::tr("修改资料"), parent);
+    editProfileBtn->setObjectName(QStringLiteral("editProfileBtn"));
+    root->addWidget(editProfileBtn, 0, Qt::AlignLeft);
+
+    backHomeBtn = new QPushButton(QObject::tr("返回首页"), parent);
+    backHomeBtn->setObjectName(QStringLiteral("backHomeBtn"));
+    root->addWidget(backHomeBtn);
+    root->addItem(
+        new QSpacerItem(20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding));
+}
+
+stack_user_profile::stack_user_profile(QWidget *parent) : QWidget(parent) {
+    ui.setupUi(this);
+    connect(ui.editProfileBtn, &QPushButton::clicked, this,
+            &stack_user_profile::onEditProfileClicked);
+    connect(ui.backHomeBtn, &QPushButton::clicked, this,
             &stack_user_profile::backHomeRequested);
 }
 
-stack_user_profile::~stack_user_profile() { delete ui; }
-
 void stack_user_profile::refreshFromSession() {
     const auto &session = UserSession::instance();
-    ui->valueNickname->setText(session.name().isEmpty() ? QStringLiteral("-")
-                                                        : session.name());
-    ui->valueUsername->setText(session.username().isEmpty()
-                                   ? QStringLiteral("-")
-                                   : session.username());
-    ui->valueUserId->setText(session.userId() > 0
-                                 ? QString::number(session.userId())
-                                 : QStringLiteral("-"));
-    ui->valueInfo->setText(session.info().isEmpty() ? QStringLiteral("-")
-                                                    : session.info());
+    ui.valueNickname->setText(session.name().isEmpty() ? QStringLiteral("-")
+                                                       : session.name());
+    ui.valueUsername->setText(session.username().isEmpty()
+                                  ? QStringLiteral("-")
+                                  : session.username());
+    ui.valueUserId->setText(session.userId() > 0
+                                ? QString::number(session.userId())
+                                : QStringLiteral("-"));
+    ui.valueInfo->setText(session.info().isEmpty() ? QStringLiteral("-")
+                                                   : session.info());
 
     AvatarImageLoader::instance().load(
-        session.avatar(), ui->profileAvatarLarge->size(), this,
+        session.avatar(), ui.profileAvatarLarge->size(), this,
         [this](const QPixmap &pixmap) {
-            ui->profileAvatarLarge->setPixmap(pixmap);
+            ui.profileAvatarLarge->setPixmap(pixmap);
         });
 }
 
-void stack_user_profile::on_change_avatar_clicked() {
-    if (m_uploadInFlight) {
-        return;
-    }
+void stack_user_profile::onEditProfileClicked() {
     if (!UserSession::instance().isLoggedIn()) {
-        QMessageBox::warning(this, tr("更换头像"), tr("请先登录"));
+        QMessageBox::warning(this, tr("修改资料"), tr("请先登录"));
         return;
     }
 
-    const QString filePath = QFileDialog::getOpenFileName(
-        this, tr("选择头像"), QString(),
-        tr("Images (*.png *.jpg *.jpeg *.webp)"));
-    if (filePath.isEmpty()) {
-        return;
-    }
-
-    const auto cropped = AvatarCropDialog::cropFromFile(this, filePath);
-    if (!cropped.has_value() || cropped->isNull()) {
-        return;
-    }
-
-    uploadCroppedAvatar(cropped.value());
+    auto *dialog = new EditProfileDialog(this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    connect(dialog, &EditProfileDialog::profileSaved, this,
+            &stack_user_profile::onProfileSaved);
+    dialog->open();
 }
 
-void stack_user_profile::uploadCroppedAvatar(const QImage &cropped) {
-    QByteArray bytes;
-    QBuffer buffer(&bytes);
-    buffer.open(QIODevice::WriteOnly);
-    if (!cropped.save(&buffer, "PNG")) {
-        QMessageBox::warning(this, tr("更换头像"), tr("无法编码裁剪结果"));
-        return;
-    }
-
-    auto *nam = AvatarImageLoader::instance().networkManager();
-    if (!nam) {
-        QMessageBox::warning(this, tr("更换头像"), tr("网络模块未初始化"));
-        return;
-    }
-
-    QJsonObject body;
-    body.insert(QStringLiteral("user_id"), UserSession::instance().userId());
-    body.insert(QStringLiteral("mime"), QStringLiteral("image/png"));
-    body.insert(QStringLiteral("data_base64"),
-                QString::fromLatin1(bytes.toBase64()));
-
-    m_pendingOldAvatar = UserSession::instance().avatar();
-    m_uploadInFlight = true;
-    ui->changeAvatarBtn->setEnabled(false);
-
-    const QUrl url =
-        authUrl(ClientConfig::instance().auth().upload_avatar_path);
-    auto *reply =
-        nam->post(makeJsonRequest(url),
-                  QJsonDocument(body).toJson(QJsonDocument::Compact));
-    m_uploadReply = reply;
-    connect(reply, &QNetworkReply::finished, this,
-            &stack_user_profile::on_upload_finished);
-}
-
-void stack_user_profile::on_upload_finished() {
-    m_uploadInFlight = false;
-    ui->changeAvatarBtn->setEnabled(true);
-
-    QNetworkReply *reply = m_uploadReply;
-    m_uploadReply = nullptr;
-    if (!reply) {
-        QMessageBox::warning(this, tr("更换头像"), tr("上传失败"));
-        return;
-    }
-
-    const QByteArray payload = reply->readAll();
-    const auto netErr = reply->error();
-    reply->deleteLater();
-
-    if (netErr != QNetworkReply::NoError) {
-        QMessageBox::warning(this, tr("更换头像"), tr("上传请求失败"));
-        return;
-    }
-
-    QJsonParseError parseError;
-    const QJsonDocument doc = QJsonDocument::fromJson(payload, &parseError);
-    if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
-        QMessageBox::warning(this, tr("更换头像"), tr("服务器响应格式错误"));
-        return;
-    }
-
-    const QJsonObject root = doc.object();
-    const int code = root.value(QStringLiteral("code")).toInt(-1);
-    if (code != 0) {
-        const QString message = root.value(QStringLiteral("message")).toString();
-        QMessageBox::warning(this, tr("更换头像"),
-                             message.isEmpty() ? tr("上传失败") : message);
-        return;
-    }
-
-    const QString newAvatar =
-        root.value(QStringLiteral("data"))
-            .toObject()
-            .value(QStringLiteral("avatar"))
-            .toString();
-    if (newAvatar.isEmpty()) {
-        QMessageBox::warning(this, tr("更换头像"), tr("服务器未返回头像地址"));
-        return;
-    }
-
-    AvatarImageLoader::instance().invalidate(m_pendingOldAvatar);
-    UserSession::instance().setAvatar(newAvatar);
-    m_pendingOldAvatar.clear();
+void stack_user_profile::onProfileSaved() {
     refreshFromSession();
     emit avatarUpdated();
-    QMessageBox::information(this, tr("更换头像"), tr("头像已更新"));
 }
