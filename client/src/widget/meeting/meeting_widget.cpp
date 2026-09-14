@@ -204,23 +204,23 @@ void MeetingWidget::closeEvent(QCloseEvent *event) {
 void MeetingWidget::close_meeting_window() {
     releaseMouse();
     unsetCursor();
-    _hasPendingConnect = false;
-    if (!_sessionEnding)
+    _state._hasPendingConnect = false;
+    if (!_state._sessionEnding)
         end_meeting_session();
     if (isVisible())
         hide();
 }
 
 void MeetingWidget::on_network_disconnected_slot() {
-    _sessionActive = false;
-    _sessionEnding = false;
-    _connecting = false;
+    _state._sessionActive = false;
+    _state._sessionEnding = false;
+    _state._connecting = false;
     update_meeting_info();
     flush_pending_connect();
 }
 
 void MeetingWidget::flush_pending_connect() {
-    if (!_hasPendingConnect)
+    if (!_state._hasPendingConnect)
         return;
     const QString ip = _pendingConnectIp;
     const QString port = _pendingConnectPort;
@@ -228,7 +228,7 @@ void MeetingWidget::flush_pending_connect() {
     const QString roomNo = _pendingConnectRoomNo;
     const quint32 max_participants = _pendingMaxParticipants;
     const quint32 duration_minutes = _pendingDurationMinutes;
-    _hasPendingConnect = false;
+    _state._hasPendingConnect = false;
     _pendingConnectIp.clear();
     _pendingConnectPort.clear();
     _pendingConnectRoomNo.clear();
@@ -248,9 +248,9 @@ void MeetingWidget::reset_meeting_ui() {
     ui->topMainTitle->setText(QStringLiteral("主屏幕"));
     _roomNo = 0;
     _serverAddr.clear();
-    _localVideoOn = false;
-    _localAudioOn = false;
-    _rtcJoined = false;
+    _state._localVideoOn = false;
+    _state._localAudioOn = false;
+    _state._rtcJoined = false;
     _selectedVideoDeviceId.clear();
     _selectedAudioDeviceId.clear();
     _selectedPlayoutDeviceId.clear();
@@ -269,9 +269,9 @@ void MeetingWidget::reset_meeting_ui() {
 
 void MeetingWidget::update_meeting_info() {
     QString statusText;
-    if (_createmeet) {
+    if (_state._createmeet) {
         statusText = tr("已创建会议");
-    } else if (_joinmeet) {
+    } else if (_state._joinmeet) {
         statusText = tr("已加入会议");
     } else {
         statusText = tr("未加入会议");
@@ -293,9 +293,9 @@ void MeetingWidget::update_meeting_info() {
                                   ? QString::number(local_user_id())
                                   : display);
 
-    if (_sessionActive && !_serverAddr.isEmpty())
+    if (_state._sessionActive && !_serverAddr.isEmpty())
         ui->labelServer->setText(_serverAddr);
-    else if (_sessionActive)
+    else if (_state._sessionActive)
         ui->labelServer->setText(tr("已连接"));
     else
         ui->labelServer->setText(tr("未连接"));
@@ -305,8 +305,8 @@ void MeetingWidget::update_meeting_info() {
 
 void MeetingWidget::update_speaker_label() {
     QString speaker = QStringLiteral("-");
-    if (_createmeet || _joinmeet) {
-        if (_localAudioOn) {
+    if (_state._createmeet || _state._joinmeet) {
+        if (_state._localAudioOn) {
             QString name = UserSession::instance().name();
             if (name.isEmpty())
                 name = partner_display_name(local_user_id());
@@ -321,16 +321,16 @@ void MeetingWidget::update_speaker_label() {
 void MeetingWidget::end_meeting_session() {
     stop_meeting_media();
 
-    _createmeet = false;
-    _joinmeet = false;
-    const bool wasConnecting = _connecting;
-    _connecting = false;
+    _state._createmeet = false;
+    _state._joinmeet = false;
+    const bool wasConnecting = _state._connecting;
+    _state._connecting = false;
 
     clear_partner();
     reset_meeting_ui();
 
-    if (_network && (_sessionActive || wasConnecting)) {
-        _sessionEnding = true;
+    if (_network && (_state._sessionActive || wasConnecting)) {
+        _state._sessionEnding = true;
         if (_controller) {
             QMetaObject::invokeMethod(
                 _controller.get(),
@@ -339,13 +339,13 @@ void MeetingWidget::end_meeting_session() {
         } else {
             _network->disconnectFromHost();
         }
-        _sessionActive = false;
+        _state._sessionActive = false;
         QTimer::singleShot(800, this, [this]() {
-            if (!_sessionEnding)
+            if (!_state._sessionEnding)
                 return;
-            _sessionEnding = false;
-            _sessionActive = false;
-            _connecting = false;
+            _state._sessionEnding = false;
+            _state._sessionActive = false;
+            _state._connecting = false;
             update_meeting_info();
             flush_pending_connect();
         });
@@ -383,7 +383,7 @@ xrtc::XRTCJoinConfig MeetingWidget::build_join_config() const {
     config.janus_ws_url = to_std(cfg.janus_ws_url);
     config.room_id = static_cast<uint64_t>(_roomNo);
     config.display_name = to_std(QString::number(session.userId()));
-    config.create_room_if_missing = _createmeet;
+    config.create_room_if_missing = _state._createmeet;
     config.room_description = to_std(session.name());
     config.max_publishers = _createMaxParticipants;
     config.admin_key = to_std(cfg.admin_key);
@@ -424,8 +424,8 @@ xrtc::XRTCJoinConfig MeetingWidget::build_join_config() const {
 }
 
 void MeetingWidget::sync_av_button_ui() {
-    const bool inMeeting = _createmeet || _joinmeet;
-    const bool canToggle = inMeeting && _rtcJoined;
+    const bool inMeeting = _state._createmeet || _state._joinmeet;
+    const bool canToggle = inMeeting && _state._rtcJoined;
     const bool canPickDevice = inMeeting && _rtc != nullptr;
 
     ui->openVedio->setDisabled(!canToggle);
@@ -434,12 +434,12 @@ void MeetingWidget::sync_av_button_ui() {
     ui->videoDeviceBtn->setDisabled(!canPickDevice);
     ui->leaveMeetingBtn->setEnabled(inMeeting);
 
-    ui->openVedio->setText(_localVideoOn ? QString(CLOSEVIDEO).toUtf8()
+    ui->openVedio->setText(_state._localVideoOn ? QString(CLOSEVIDEO).toUtf8()
                                          : QString(OPENVIDEO).toUtf8());
-    ui->openAudio->setText(_localAudioOn ? QString(CLOSEAUDIO).toUtf8()
+    ui->openAudio->setText(_state._localAudioOn ? QString(CLOSEAUDIO).toUtf8()
                                          : QString(OPENAUDIO).toUtf8());
-    ui->openVedio->setProperty("avOn", _localVideoOn);
-    ui->openAudio->setProperty("avOn", _localAudioOn);
+    ui->openVedio->setProperty("avOn", _state._localVideoOn);
+    ui->openAudio->setProperty("avOn", _state._localAudioOn);
     ui->openVedio->style()->unpolish(ui->openVedio);
     ui->openVedio->style()->polish(ui->openVedio);
     ui->openAudio->style()->unpolish(ui->openAudio);
@@ -448,7 +448,7 @@ void MeetingWidget::sync_av_button_ui() {
 }
 
 void MeetingWidget::set_local_video_on(bool on) {
-    if (!_rtc || !_rtcJoined || on == _localVideoOn)
+    if (!_rtc || !_state._rtcJoined || on == _state._localVideoOn)
         return;
 
     if (on) {
@@ -459,13 +459,13 @@ void MeetingWidget::set_local_video_on(bool on) {
             sync_av_button_ui();
             return;
         }
-        _localVideoOn = true;
+        _state._localVideoOn = true;
         sync_av_button_ui();
         return;
     }
 
     _rtc->stop_local_video();
-    _localVideoOn = false;
+    _state._localVideoOn = false;
     {
         std::lock_guard<std::mutex> lock(preview_mutex_);
         pending_preview_ = {};
@@ -478,7 +478,7 @@ void MeetingWidget::set_local_video_on(bool on) {
 }
 
 void MeetingWidget::set_local_audio_on(bool on) {
-    if (!_rtc || !_rtcJoined || on == _localAudioOn)
+    if (!_rtc || !_state._rtcJoined || on == _state._localAudioOn)
         return;
 
     if (on) {
@@ -492,19 +492,19 @@ void MeetingWidget::set_local_audio_on(bool on) {
     } else {
         _rtc->stop_local_audio();
     }
-    _localAudioOn = on;
+    _state._localAudioOn = on;
     sync_av_button_ui();
 }
 
 void MeetingWidget::start_local_av_after_join() {
-    if (!_rtc || !_rtcJoined)
+    if (!_rtc || !_state._rtcJoined)
         return;
 
     // join 默认不开采不推流：入会后主动开摄像头与麦克风
     const bool video_ok = static_cast<bool>(_rtc->start_local_video());
     const bool audio_ok = static_cast<bool>(_rtc->start_local_audio());
-    _localVideoOn = video_ok;
-    _localAudioOn = audio_ok;
+    _state._localVideoOn = video_ok;
+    _state._localAudioOn = audio_ok;
     sync_av_button_ui();
     spdlog::info("[MeetingWidget] local A/V after join video={} audio={}",
                  video_ok, audio_ok);
@@ -517,14 +517,14 @@ void MeetingWidget::start_local_av_after_join() {
 
 void MeetingWidget::handle_rtc_session_lost(const QString &reason) {
     // 仅在仍认为「已进房」时处理；主动 leave 前会先清 _rtcJoined，避免误报
-    if (!_rtcJoined)
+    if (!_state._rtcJoined)
         return;
 
     spdlog::warn("[MeetingWidget] rtc session lost: {}",
                  reason.toUtf8().constData());
-    _rtcJoined = false;
-    _localVideoOn = false;
-    _localAudioOn = false;
+    _state._rtcJoined = false;
+    _state._localVideoOn = false;
+    _state._localAudioOn = false;
     sync_av_button_ui();
 
     const QString text =
@@ -544,9 +544,9 @@ void MeetingWidget::start_meeting_media() {
             spdlog::info("[MeetingWidget] create_xrtc_engine ok");
         }
 
-        _localVideoOn = false;
-        _localAudioOn = false;
-        _rtcJoined = false;
+        _state._localVideoOn = false;
+        _state._localAudioOn = false;
+        _state._rtcJoined = false;
         sync_av_button_ui();
 
         const auto &cfg = ClientConfig::instance().webrtc();
@@ -576,9 +576,9 @@ void MeetingWidget::start_meeting_media() {
 
 void MeetingWidget::stop_meeting_media() {
     // 先清状态，避免 leave 触发的 Failed/Closed 回调误弹「会议已结束」
-    _localVideoOn = false;
-    _localAudioOn = false;
-    _rtcJoined = false;
+    _state._localVideoOn = false;
+    _state._localAudioOn = false;
+    _state._rtcJoined = false;
     if (_rtc) {
         // leave/destroy 内部会停采集；此处不再重复 stop，减少二次回调
         xrtc::destroy_xrtc_engine(_rtc);
@@ -668,7 +668,7 @@ qint64 MeetingWidget::local_user_id() const {
 }
 
 void MeetingWidget::on_create_meet_btn_clicked_slot() {
-    if (!_createmeet) {
+    if (!_state._createmeet) {
         ui->openAudio->setDisabled(true);
         ui->openVedio->setDisabled(true);
         emit create_meeting_requested_signal(_createMaxParticipants,
@@ -677,15 +677,15 @@ void MeetingWidget::on_create_meet_btn_clicked_slot() {
 }
 
 void MeetingWidget::on_open_vedio_clicked_slot() {
-    if (!_rtc || !_rtcJoined || (!_createmeet && !_joinmeet))
+    if (!_rtc || !_state._rtcJoined || (!_state._createmeet && !_state._joinmeet))
         return;
-    set_local_video_on(!_localVideoOn);
+    set_local_video_on(!_state._localVideoOn);
 }
 
 void MeetingWidget::on_open_audio_clicked_slot() {
-    if (!_rtc || !_rtcJoined || (!_createmeet && !_joinmeet))
+    if (!_rtc || !_state._rtcJoined || (!_state._createmeet && !_state._joinmeet))
         return;
-    set_local_audio_on(!_localAudioOn);
+    set_local_audio_on(!_state._localAudioOn);
 }
 
 void MeetingWidget::on_audio_device_btn_clicked_slot() {
@@ -872,7 +872,7 @@ void MeetingWidget::handle_create_meeting_response(const MessagePtr &msg) {
 
     if (roomno != 0) {
         _roomNo = roomno;
-        _createmeet = true;
+        _state._createmeet = true;
         ui->sendmsg->setDisabled(false);
 
         const qint64 selfId = local_user_id();
@@ -925,7 +925,7 @@ void MeetingWidget::handle_join_meeting_response(const MessagePtr &msg) {
         update_main_screen_title(main_user_id_);
         _cameraVideo->showMainAvatar();
         ui->sendmsg->setDisabled(false);
-        _joinmeet = true;
+        _state._joinmeet = true;
         start_meeting_media();
         update_meeting_info();
         QMessageBox::information(this, tr("Meeting information"), tr("加入成功"));
@@ -960,7 +960,7 @@ void MeetingWidget::handle_partner_join(const MessagePtr &msg) {
         update_meeting_info();
     }
     // 已在房成员收到新人加入后重发自己的资料，覆盖服务端尚未缓存到资料的竞态
-    if (_createmeet || _joinmeet)
+    if (_state._createmeet || _state._joinmeet)
         send_local_user_profile();
 }
 
@@ -1009,9 +1009,9 @@ void MeetingWidget::handle_user_profile(const MessagePtr &msg) {
 }
 
 void MeetingWidget::handle_remote_host_closed_error() {
-    if (_sessionEnding)
+    if (_state._sessionEnding)
         return;
-    const bool wasInMeeting = _createmeet || _joinmeet;
+    const bool wasInMeeting = _state._createmeet || _state._joinmeet;
     const bool wasVisible = isVisible();
     close_meeting_window();
     if (wasInMeeting || wasVisible)
@@ -1020,9 +1020,9 @@ void MeetingWidget::handle_remote_host_closed_error() {
 }
 
 void MeetingWidget::handle_other_net_error() {
-    if (_sessionEnding)
+    if (_state._sessionEnding)
         return;
-    const bool wasInMeeting = _createmeet || _joinmeet;
+    const bool wasInMeeting = _state._createmeet || _state._joinmeet;
     const bool wasVisible = isVisible();
     close_meeting_window();
     if (wasInMeeting || wasVisible)
@@ -1091,7 +1091,7 @@ Partner *MeetingWidget::add_partner(qint64 userId) {
     if (VideoGLWidget *widget = p->displayWidget())
         _cameraVideo->addPartnerDisplay(userId, widget);
 
-    if (_createmeet || _joinmeet) {
+    if (_state._createmeet || _state._joinmeet) {
         ui->openAudio->setDisabled(false);
         ui->sendmsg->setDisabled(false);
     }
@@ -1173,8 +1173,8 @@ void MeetingWidget::on_join_meet_btn_slot(QString room_no) {
 void MeetingWidget::request_connect_to_server_slot(
     QString ip, QString port, ConnectAction action, QString room_no,
     quint32 max_participants, quint32 duration_minutes) {
-    if (_sessionEnding || _connecting) {
-        _hasPendingConnect = true;
+    if (_state._sessionEnding || _state._connecting) {
+        _state._hasPendingConnect = true;
         _pendingConnectIp = ip;
         _pendingConnectPort = port;
         _pendingConnectAction = action;
@@ -1183,7 +1183,7 @@ void MeetingWidget::request_connect_to_server_slot(
         _pendingDurationMinutes = duration_minutes;
         return;
     }
-    _connecting = true;
+    _state._connecting = true;
     _serverAddr = ip + QStringLiteral(":") + port;
     _createMaxParticipants = max_participants;
     _createDurationMinutes = duration_minutes;
@@ -1199,14 +1199,14 @@ void MeetingWidget::on_connect_finished_slot(bool ok, QString ip, QString port,
     if (spdlog::default_logger())
         spdlog::default_logger()->flush();
 
-    _connecting = false;
+    _state._connecting = false;
     emit connect_server_finished_signal(ok, ip, port, action);
     if (!ok) {
         spdlog::warn("[MeetingWidget] connect failed");
         close_meeting_window();
         return;
     }
-    _sessionActive = true;
+    _state._sessionActive = true;
     update_meeting_info();
     if (action == ConnectAction::CreateMeeting) {
         spdlog::info("[MeetingWidget] request create_meeting max={} duration={}",
@@ -1354,7 +1354,7 @@ void MeetingWidget::render_preview_frame() {
         preview_scheduled_ = false;
     }
     // stop_local_video 会停采集；关闭后不再渲染本地预览
-    if (!_localVideoOn || !frame.valid())
+    if (!_state._localVideoOn || !frame.valid())
         return;
     _cameraVideo->showVideoForUser(local_user_id(), frame);
 }
@@ -1397,9 +1397,9 @@ void MeetingWidget::on_join_result(xrtc::XRtcError error,
         [this, error, message]() {
             if (error != xrtc::XRtcError::kNOERROR) {
                 spdlog::error("[MeetingWidget] join failed: {}", message);
-                _rtcJoined = false;
-                _localVideoOn = false;
-                _localAudioOn = false;
+                _state._rtcJoined = false;
+                _state._localVideoOn = false;
+                _state._localAudioOn = false;
                 close_meeting_window();
                 QMessageBox::warning(
                     nullptr, tr("WebRTC"),
@@ -1407,7 +1407,7 @@ void MeetingWidget::on_join_result(xrtc::XRtcError error,
                 return;
             }
             spdlog::info("[MeetingWidget] WebRTC join ok");
-            _rtcJoined = true;
+            _state._rtcJoined = true;
             // join 只准备轨，默认不开采不推流；此处真正打开本地音视频
             //start_local_av_after_join();
             sync_av_button_ui();
