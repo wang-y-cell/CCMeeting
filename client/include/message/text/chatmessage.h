@@ -3,8 +3,42 @@
 
 #include <QWidget>
 #include <QLabel>
+#include <QtGlobal>
 
 class QMovie;
+
+struct ChatBubbleMetrics {
+    double ratio = 0.7; ///< 等比例缩放
+
+    int fontPointSize = 12;
+    int ipFontPointSize = 10;
+    int timeFontPointSize = 10;
+
+    int loading = 40;       ///< 发送中 GIF 宽高
+    int timeRowHeight = 40; ///< 时间分隔行高度
+    int loadingGap = 10;    ///< 加载动画与气泡间距
+
+    int minBubbleHeight = 30;
+    int icon = 40;
+    int iconSpace = 20;
+    int iconBorder = 5;
+    int iconTop = 10;
+    int iconTopExtra = 10;
+    int triangleW = 6;
+    int frameMargin = 20;
+    int textPadding = 12;
+    int minKuangWidth = 20;
+    int topPad = 10;
+    int bottomExtra = 15;
+    int ipHeight = 20;
+    int ipLeftYOffset = -20;
+    int ipRightYOffset = -30;
+    int triangleHalf = 5;
+    int cornerRadius = 4;
+    int borderPad = 1;
+
+    int s(int v) const { return qRound(static_cast<qreal>(v) * ratio); }
+};
 
 /**
  * @brief 聊天列表中单条消息视图：自绘头像、三角、气泡、正文与时间/IP；配合 QListWidgetItem 的 sizeHint 使用
@@ -83,6 +117,8 @@ protected:
      */
     void paintEvent(QPaintEvent *event);
 private:
+    ChatBubbleMetrics m_metrics;
+
     QString m_msg;       ///< 消息正文
     QString m_time;      ///< 原始时间字段（多为秒级时间戳字符串）
     QString m_curTime;   ///< 格式化后的显示时间，如 "ddd hh:mm"
@@ -108,7 +144,7 @@ private:
     QRect m_textRightRect;   ///< 右侧气泡内文本绘制区
     QPixmap m_leftPixmap;    ///< 左侧头像图
     QPixmap m_rightPixmap;   ///< 右侧头像图
-    QLabel* m_loading = Q_NULLPTR;   ///< 「发送中」GIF 容器
+    QLabel* m_loading = Q_NULLPTR;   ///< 「发送中」GIF 容器,发送旋转动画将在这个label上
     QMovie* m_loadingMovie = Q_NULLPTR; ///< 「发送中」动画
     bool m_isSending = false; ///< 本人消息是否已标记发送成功（与 setTextSuccess 配合）
     quint64 m_avatarLoadGen = 0;

@@ -260,11 +260,13 @@ void MeetingWidget::reset_meeting_ui() {
     ui->openAudio->setProperty("avOn", false);
     update_meeting_info();
     while (ui->listWidget->count() > 0) {
-        QListWidgetItem *item = ui->listWidget->takeItem(0);
-        ChatMessage *chat = qobject_cast<ChatMessage *>(ui->listWidget->itemWidget(item));
+        QListWidgetItem *item = ui->listWidget->item(0);
+        QWidget *chat = ui->listWidget->itemWidget(item);
+        ui->listWidget->takeItem(0);
         delete chat;
         delete item;
     }
+    _pendingChatSend = nullptr;
 }
 
 void MeetingWidget::update_meeting_info() {
@@ -1234,7 +1236,10 @@ void MeetingWidget::on_send_msg_clicked_slot() {
     deal_message_time(time);
     deal_message(message, item, msg, time, UserSession::instance().name(),
                  ChatMessage::User_Me, UserSession::instance().avatar());
+    _pendingChatSend = message;
     if (!_network) {
+        message->setTextSuccess();
+        _pendingChatSend = nullptr;
         ui->sendmsg->setDisabled(false);
         return;
     }
@@ -1250,13 +1255,9 @@ void MeetingWidget::on_send_msg_clicked_slot() {
 }
 
 void MeetingWidget::on_text_send_slot() {
-    if (ui->listWidget->count() <= 0)
-        return;
-    QListWidgetItem *lastItem =
-        ui->listWidget->item(ui->listWidget->count() - 1);
-    if (auto *messageW =
-            qobject_cast<ChatMessage *>(ui->listWidget->itemWidget(lastItem))) {
-        messageW->setTextSuccess();
+    if (_pendingChatSend) {
+        _pendingChatSend->setTextSuccess();
+        _pendingChatSend = nullptr;
     }
     ui->sendmsg->setDisabled(false);
 }

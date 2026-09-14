@@ -15,6 +15,7 @@
 
 #include <QCloseEvent>
 #include <QEvent>
+#include <QPointer>
 #include <QSoundEffect>
 #include <QtGlobal>
 #include <memory>
@@ -74,6 +75,7 @@ private:
     QSoundEffect *_soundEffect = nullptr;
     int m_lastChatListWidth = -1;
     bool m_inChatRelayout = false;
+    QPointer<ChatMessage> _pendingChatSend;
     CameraVideo *_cameraVideo = nullptr;
     int _roomNo = 0;
     QString _serverAddr;
