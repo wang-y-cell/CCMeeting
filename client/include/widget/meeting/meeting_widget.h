@@ -31,24 +31,29 @@ class QAction;
 class QListWidgetItem;
 class QMenu;
 
+struct state {
+    bool _createmeet = false; //是否创建会议
+    bool _joinmeet = false; //是否加入会议
+
+    /** 会议内本地摄像头是否已 start_local_video（真正开采集推流） */
+    bool _rtcJoined = false; //WebRTC join 是否已成功（才可调 start/stop_local_*）
+    bool _localVideoOn = false; //会议内本地摄像头是否已 start_local_video（真正开采集推流）
+    bool _localAudioOn = false; //会议内本地麦克风是否已 start_local_audio
+
+    bool _sessionActive = false; //会议是否活跃
+    bool _sessionEnding = false; //会议是否结束
+
+    bool _connecting = false; //是否连接中
+    bool _hasPendingConnect = false; //是否有未处理的连接请求
+};
+
 class MeetingWidget : public FramelessWindow<QWidget>,
                       public xrtc::XRtcEngineObserver {
     Q_OBJECT
 private:
     static QRect pos;
+    state _state; //维护会议状态
     qint64 main_user_id_ = 0;
-    bool _createmeet = false;
-    bool _joinmeet = false;
-    /** 会议内本地摄像头是否已 start_local_video（真正开采集推流） */
-    bool _localVideoOn = false;
-    /** 会议内本地麦克风是否已 start_local_audio */
-    bool _localAudioOn = false;
-    /** WebRTC join 是否已成功（才可调 start/stop_local_*） */
-    bool _rtcJoined = false;
-    bool _sessionActive = false;
-    bool _sessionEnding = false;
-    bool _connecting = false;
-    bool _hasPendingConnect = false;
     std::string _selectedVideoDeviceId;
     std::string _selectedAudioDeviceId;
     std::string _selectedPlayoutDeviceId;
@@ -73,6 +78,7 @@ private:
     int _roomNo = 0;
     QString _serverAddr;
 
+    /// WebRTC 引擎
     xrtc::IXRtcEngine *_rtc = nullptr;
     std::mutex preview_mutex_;
     xrtc::XRTCVideoFrame pending_preview_;
@@ -117,6 +123,7 @@ private:
     void handle_remote_host_closed_error();
     void handle_other_net_error();
 
+    /// 连接janus服务器
     void start_meeting_media();
     void stop_meeting_media();
     /** 入会成功后按产品策略开启本地音视频采集 */
