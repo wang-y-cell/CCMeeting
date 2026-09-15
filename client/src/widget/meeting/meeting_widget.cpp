@@ -1326,7 +1326,7 @@ void MeetingWidget::deal_message_time(QString curMsgTime) {
     ui.listWidget->addItem(itemTime);
     const int listWidth = ui.listWidget->viewport()->width();
     const int w = listWidth > 0 ? listWidth : ui.listWidget->width();
-    const QSize size(w, 40);
+    const QSize size(w, 20);
     messageTime->setFixedWidth(w);
     messageTime->resize(size);
     itemTime->setSizeHint(size);

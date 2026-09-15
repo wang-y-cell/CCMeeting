@@ -162,6 +162,7 @@ void Ui_meeting_widget::setupUi(QWidget *parent) {
     verticalLayout_6->setContentsMargins(0, 0, 0, 0);
 
     listWidget = new QListWidget(tab_6);
+    listWidget->setSelectionMode(QAbstractItemView::NoSelection);
     listWidget->setObjectName(QStringLiteral("listWidget"));
     listWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
     listWidget->setFocusPolicy(Qt::NoFocus);
