@@ -1,4 +1,4 @@
-#include "meeting_widget.h"
+﻿#include "meeting_widget.h"
 #include "configure/client_config.h"
 #include "configure/configure.h"
 #include "configure/user_session.h"
@@ -7,7 +7,8 @@
 #include "partner_tile.h"
 #include "screen.h"
 #include "style_loader.h"
-#include "ui_widget.h"
+#include "text/mytextedit.h"
+#include "videoglwidget.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -15,20 +16,25 @@
 #include <QCompleter>
 #include <QDateTime>
 #include <QEvent>
+#include <QGroupBox>
 #include <QLabel>
+#include <QListWidget>
 #include <QMenu>
 #include <QMessageBox>
 #include <QPainter>
 #include <QPoint>
+#include <QPushButton>
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
 #include <QScrollBar>
 #include <QSoundEffect>
 #include <QStyle>
+#include <QTabWidget>
 #include <QThread>
 #include <QTimer>
 #include <QUrl>
 #include <QVariant>
+#include <QVBoxLayout>
 #include <climits>
 #include <algorithm>
 #include <qnamespace.h>
@@ -50,7 +56,7 @@ QString deviceName(const xrtc::XRTCDeviceInfo &info) {
 QRect MeetingWidget::pos = QRect(-1, -1, -1, -1);
 
 MeetingWidget::MeetingWidget(QWidget *parent)
-    : FramelessWindow<QWidget>(parent), ui(new Ui::Widget) {
+    : FramelessWindow<QWidget>(parent) {
     qRegisterMetaType<MessagePtr>("MessagePtr");
     qRegisterMetaType<ConnectAction>("ConnectAction");
     spdlog::info("[MeetingWidget] ctor begin");
@@ -64,7 +70,7 @@ MeetingWidget::MeetingWidget(QWidget *parent)
 
     main_user_id_ = 0;
     _cameraVideo = new CameraVideo(this);
-    _cameraVideo->setMainTarget(ui->mainshow_label);
+    _cameraVideo->setMainTarget(ui.mainshow_label);
     spdlog::info("[MeetingWidget] CameraVideo ready");
     spdlog::default_logger()->flush();
 
@@ -91,8 +97,6 @@ MeetingWidget::~MeetingWidget() {
     if (_cameraVideo) {
         _cameraVideo->detachFromWidgets();
     }
-    delete ui;
-    ui = nullptr;
 }
 
 void MeetingWidget::init_connect() {
@@ -118,25 +122,25 @@ void MeetingWidget::init_connect() {
             _controller.get(), &MeetingController::join_meeting_slot,
             Qt::QueuedConnection);
 
-    connect(ui->openVedio, &QPushButton::clicked, this,
+    connect(ui.openVedio, &QPushButton::clicked, this,
             &MeetingWidget::on_open_vedio_clicked_slot);
-    connect(ui->openAudio, &QPushButton::clicked, this,
+    connect(ui.openAudio, &QPushButton::clicked, this,
             &MeetingWidget::on_open_audio_clicked_slot);
-    connect(ui->audioDeviceBtn, &QPushButton::clicked, this,
+    connect(ui.audioDeviceBtn, &QPushButton::clicked, this,
             &MeetingWidget::on_audio_device_btn_clicked_slot);
-    connect(ui->videoDeviceBtn, &QPushButton::clicked, this,
+    connect(ui.videoDeviceBtn, &QPushButton::clicked, this,
             &MeetingWidget::on_video_device_btn_clicked_slot);
-    connect(ui->leaveMeetingBtn, &QPushButton::clicked, this,
+    connect(ui.leaveMeetingBtn, &QPushButton::clicked, this,
             &MeetingWidget::on_leave_meeting_clicked_slot);
-    connect(ui->btnSideMembers, &QPushButton::clicked, this,
+    connect(ui.btnSideMembers, &QPushButton::clicked, this,
             &MeetingWidget::on_side_members_clicked_slot);
-    connect(ui->btnSideChat, &QPushButton::clicked, this,
+    connect(ui.btnSideChat, &QPushButton::clicked, this,
             &MeetingWidget::on_side_chat_clicked_slot);
-    connect(ui->btnSideInfo, &QPushButton::clicked, this,
+    connect(ui.btnSideInfo, &QPushButton::clicked, this,
             &MeetingWidget::on_side_info_clicked_slot);
-    connect(ui->btnTogglePanel, &QPushButton::toggled, this,
+    connect(ui.btnTogglePanel, &QPushButton::toggled, this,
             &MeetingWidget::on_toggle_panel_clicked_slot);
-    connect(ui->sendmsg, &QPushButton::clicked, this,
+    connect(ui.sendmsg, &QPushButton::clicked, this,
             &MeetingWidget::on_send_msg_clicked_slot);
 }
 
@@ -145,7 +149,7 @@ void MeetingWidget::init_partner_connect(Partner *p) {
 }
 
 void MeetingWidget::init_ui() {
-    ui->setupUi(this);
+    ui.setupUi(this);
     setAttribute(Qt::WA_StyledBackground, true);
     setObjectName(QStringLiteral("meetingWidget"));
 
@@ -154,37 +158,37 @@ void MeetingWidget::init_ui() {
 
     // 普通 QWidget 默认不绘制 stylesheet 背景，需显式开启，否则顶栏/底栏
     // 会透出根窗同色，分层看起来消失。
-    ui->topStatusBar->setAttribute(Qt::WA_StyledBackground, true);
-    ui->avToolbar->setAttribute(Qt::WA_StyledBackground, true);
-    ui->controlPill->setAttribute(Qt::WA_StyledBackground, true);
-    ui->groupBox_2->setAttribute(Qt::WA_StyledBackground, true);
+    ui.topStatusBar->setAttribute(Qt::WA_StyledBackground, true);
+    ui.avToolbar->setAttribute(Qt::WA_StyledBackground, true);
+    ui.controlPill->setAttribute(Qt::WA_StyledBackground, true);
+    ui.groupBox_2->setAttribute(Qt::WA_StyledBackground, true);
 
     // 无边框窗的 QSS border 画在客户区内；左右下必须留 1px，
     // 否则子控件铺满会盖住边框，只剩左上角标题栏空隙露出来一段。
-    ui->verticalLayout->setContentsMargins(1, 42, 1, 1);
+    ui.verticalLayout->setContentsMargins(1, 42, 1, 1);
     setTitleBarHeight(42);
 
     pos = QRect(0.1 * Screen::width, 0.1 * Screen::height,
                 0.8 * Screen::width, 0.8 * Screen::height);
-    ui->openAudio->setText(QString(OPENAUDIO).toUtf8());
-    ui->openVedio->setText(QString(OPENVIDEO).toUtf8());
-    ui->openAudio->setProperty("avOn", false);
-    ui->openVedio->setProperty("avOn", false);
+    ui.openAudio->setText(QString(OPENAUDIO).toUtf8());
+    ui.openVedio->setText(QString(OPENVIDEO).toUtf8());
+    ui.openAudio->setProperty("avOn", false);
+    ui.openVedio->setProperty("avOn", false);
 
     const QRect size(pos.x(), pos.y(), pos.width() * 0.5, pos.height() * 0.5);
     setGeometry(size);
     setMinimumSize(QSize(pos.width() * 0.7, pos.height() * 0.7));
     setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
 
-    ui->openAudio->setDisabled(true);
-    ui->openVedio->setDisabled(true);
-    ui->audioDeviceBtn->setDisabled(true);
-    ui->videoDeviceBtn->setDisabled(true);
-    ui->leaveMeetingBtn->setEnabled(false);
-    ui->sendmsg->setDisabled(true);
-    ui->tabWidget->setCurrentIndex(0);
+    ui.openAudio->setDisabled(true);
+    ui.openVedio->setDisabled(true);
+    ui.audioDeviceBtn->setDisabled(true);
+    ui.videoDeviceBtn->setDisabled(true);
+    ui.leaveMeetingBtn->setEnabled(false);
+    ui.sendmsg->setDisabled(true);
+    ui.tabWidget->setCurrentIndex(0);
     // 左侧 tab 固定宽度，右侧主屏幕由布局拉伸，不再使用 QSplitter
-    ui->listWidget->viewport()->installEventFilter(this);
+    ui.listWidget->viewport()->installEventFilter(this);
     update_meeting_info();
 }
 
@@ -238,14 +242,14 @@ void MeetingWidget::flush_pending_connect() {
 }
 
 void MeetingWidget::reset_meeting_ui() {
-    ui->openAudio->setDisabled(true);
-    ui->openVedio->setDisabled(true);
-    ui->audioDeviceBtn->setDisabled(true);
-    ui->videoDeviceBtn->setDisabled(true);
-    ui->leaveMeetingBtn->setEnabled(false);
-    ui->sendmsg->setDisabled(true);
-    ui->groupBox_2->setTitle(QString());
-    ui->topMainTitle->setText(QStringLiteral("主屏幕"));
+    ui.openAudio->setDisabled(true);
+    ui.openVedio->setDisabled(true);
+    ui.audioDeviceBtn->setDisabled(true);
+    ui.videoDeviceBtn->setDisabled(true);
+    ui.leaveMeetingBtn->setEnabled(false);
+    ui.sendmsg->setDisabled(true);
+    ui.groupBox_2->setTitle(QString());
+    ui.topMainTitle->setText(QStringLiteral("主屏幕"));
     _roomNo = 0;
     _serverAddr.clear();
     _state._localVideoOn = false;
@@ -254,15 +258,15 @@ void MeetingWidget::reset_meeting_ui() {
     _selectedVideoDeviceId.clear();
     _selectedAudioDeviceId.clear();
     _selectedPlayoutDeviceId.clear();
-    ui->openVedio->setText(QString(OPENVIDEO).toUtf8());
-    ui->openAudio->setText(QString(OPENAUDIO).toUtf8());
-    ui->openVedio->setProperty("avOn", false);
-    ui->openAudio->setProperty("avOn", false);
+    ui.openVedio->setText(QString(OPENVIDEO).toUtf8());
+    ui.openAudio->setText(QString(OPENAUDIO).toUtf8());
+    ui.openVedio->setProperty("avOn", false);
+    ui.openAudio->setProperty("avOn", false);
     update_meeting_info();
-    while (ui->listWidget->count() > 0) {
-        QListWidgetItem *item = ui->listWidget->item(0);
-        QWidget *chat = ui->listWidget->itemWidget(item);
-        ui->listWidget->takeItem(0);
+    while (ui.listWidget->count() > 0) {
+        QListWidgetItem *item = ui.listWidget->item(0);
+        QWidget *chat = ui.listWidget->itemWidget(item);
+        ui.listWidget->takeItem(0);
         delete chat;
         delete item;
     }
@@ -278,29 +282,29 @@ void MeetingWidget::update_meeting_info() {
     } else {
         statusText = tr("未加入会议");
     }
-    ui->labelMeetStatus->setText(statusText);
-    ui->topMeetStatus->setText(statusText);
+    ui.labelMeetStatus->setText(statusText);
+    ui.topMeetStatus->setText(statusText);
 
     const QString roomText =
         _roomNo > 0 ? QString::number(_roomNo) : QStringLiteral("-");
-    ui->labelRoomNo->setText(roomText);
-    ui->topRoomChip->setText(tr("房间 %1").arg(roomText));
+    ui.labelRoomNo->setText(roomText);
+    ui.topRoomChip->setText(tr("房间 %1").arg(roomText));
 
     const int memberCount = static_cast<int>(partner.size());
-    ui->labelMemberCount->setText(QString::number(memberCount));
-    ui->topMemberChip->setText(tr("%1 人").arg(memberCount));
+    ui.labelMemberCount->setText(QString::number(memberCount));
+    ui.topMemberChip->setText(tr("%1 人").arg(memberCount));
 
     const QString display = UserSession::instance().name();
-    ui->labelLocalIp->setText(display.isEmpty()
+    ui.labelLocalIp->setText(display.isEmpty()
                                   ? QString::number(local_user_id())
                                   : display);
 
     if (_state._sessionActive && !_serverAddr.isEmpty())
-        ui->labelServer->setText(_serverAddr);
+        ui.labelServer->setText(_serverAddr);
     else if (_state._sessionActive)
-        ui->labelServer->setText(tr("已连接"));
+        ui.labelServer->setText(tr("已连接"));
     else
-        ui->labelServer->setText(tr("未连接"));
+        ui.labelServer->setText(tr("未连接"));
 
     update_speaker_label();
 }
@@ -316,8 +320,8 @@ void MeetingWidget::update_speaker_label() {
                 speaker = name;
         }
     }
-    ui->labelSpeaker->setText(speaker);
-    ui->topSpeakerLabel->setText(tr("正在讲话: %1").arg(speaker));
+    ui.labelSpeaker->setText(speaker);
+    ui.topSpeakerLabel->setText(tr("正在讲话: %1").arg(speaker));
 }
 
 void MeetingWidget::end_meeting_session() {
@@ -430,22 +434,22 @@ void MeetingWidget::sync_av_button_ui() {
     const bool canToggle = inMeeting && _state._rtcJoined;
     const bool canPickDevice = inMeeting && _rtc != nullptr;
 
-    ui->openVedio->setDisabled(!canToggle);
-    ui->openAudio->setDisabled(!canToggle);
-    ui->audioDeviceBtn->setDisabled(!canPickDevice);
-    ui->videoDeviceBtn->setDisabled(!canPickDevice);
-    ui->leaveMeetingBtn->setEnabled(inMeeting);
+    ui.openVedio->setDisabled(!canToggle);
+    ui.openAudio->setDisabled(!canToggle);
+    ui.audioDeviceBtn->setDisabled(!canPickDevice);
+    ui.videoDeviceBtn->setDisabled(!canPickDevice);
+    ui.leaveMeetingBtn->setEnabled(inMeeting);
 
-    ui->openVedio->setText(_state._localVideoOn ? QString(CLOSEVIDEO).toUtf8()
+    ui.openVedio->setText(_state._localVideoOn ? QString(CLOSEVIDEO).toUtf8()
                                          : QString(OPENVIDEO).toUtf8());
-    ui->openAudio->setText(_state._localAudioOn ? QString(CLOSEAUDIO).toUtf8()
+    ui.openAudio->setText(_state._localAudioOn ? QString(CLOSEAUDIO).toUtf8()
                                          : QString(OPENAUDIO).toUtf8());
-    ui->openVedio->setProperty("avOn", _state._localVideoOn);
-    ui->openAudio->setProperty("avOn", _state._localAudioOn);
-    ui->openVedio->style()->unpolish(ui->openVedio);
-    ui->openVedio->style()->polish(ui->openVedio);
-    ui->openAudio->style()->unpolish(ui->openAudio);
-    ui->openAudio->style()->polish(ui->openAudio);
+    ui.openVedio->setProperty("avOn", _state._localVideoOn);
+    ui.openAudio->setProperty("avOn", _state._localAudioOn);
+    ui.openVedio->style()->unpolish(ui.openVedio);
+    ui.openVedio->style()->polish(ui.openVedio);
+    ui.openAudio->style()->unpolish(ui.openAudio);
+    ui.openAudio->style()->polish(ui.openAudio);
     update_speaker_label();
 }
 
@@ -640,7 +644,7 @@ void MeetingWidget::apply_partner_profile(qint64 userId,
     const QString atTag = QStringLiteral("@") + displayName;
     if (std::find(iplist.begin(), iplist.end(), atTag) == iplist.end()) {
         iplist.push_back(atTag);
-        ui->plainTextEdit->setCompleter(iplist);
+        ui.plainTextEdit->setCompleter(iplist);
     }
 }
 
@@ -661,8 +665,8 @@ QString MeetingWidget::partner_avatar_url(qint64 userId) const {
 }
 
 void MeetingWidget::update_main_screen_title(qint64 userId) {
-    ui->groupBox_2->setTitle(QString());
-    ui->topMainTitle->setText(partner_display_name(userId));
+    ui.groupBox_2->setTitle(QString());
+    ui.topMainTitle->setText(partner_display_name(userId));
 }
 
 qint64 MeetingWidget::local_user_id() const {
@@ -671,8 +675,8 @@ qint64 MeetingWidget::local_user_id() const {
 
 void MeetingWidget::on_create_meet_btn_clicked_slot() {
     if (!_state._createmeet) {
-        ui->openAudio->setDisabled(true);
-        ui->openVedio->setDisabled(true);
+        ui.openAudio->setDisabled(true);
+        ui.openVedio->setDisabled(true);
         emit create_meeting_requested_signal(_createMaxParticipants,
                                              _createDurationMinutes);
     }
@@ -703,11 +707,11 @@ void MeetingWidget::on_leave_meeting_clicked_slot() {
 }
 
 void MeetingWidget::show_side_panel_tab(int index) {
-    if (!ui->tabWidget->isVisible()) {
-        ui->tabWidget->setVisible(true);
-        ui->btnTogglePanel->setChecked(true);
+    if (!ui.tabWidget->isVisible()) {
+        ui.tabWidget->setVisible(true);
+        ui.btnTogglePanel->setChecked(true);
     }
-    ui->tabWidget->setCurrentIndex(index);
+    ui.tabWidget->setCurrentIndex(index);
 }
 
 void MeetingWidget::on_side_members_clicked_slot() {
@@ -723,7 +727,7 @@ void MeetingWidget::on_side_info_clicked_slot() {
 }
 
 void MeetingWidget::on_toggle_panel_clicked_slot(bool checked) {
-    ui->tabWidget->setVisible(checked);
+    ui.tabWidget->setVisible(checked);
 }
 
 void MeetingWidget::apply_selected_playout_device(const std::string &device_id) {
@@ -820,7 +824,7 @@ void MeetingWidget::show_audio_device_menu() {
         }
     }
 
-    const QPoint pos = ui->audioDeviceBtn->mapToGlobal(
+    const QPoint pos = ui.audioDeviceBtn->mapToGlobal(
         QPoint(0, -menu->sizeHint().height()));
     menu->popup(pos);
 }
@@ -858,7 +862,7 @@ void MeetingWidget::show_video_device_menu() {
         }
     }
 
-    const QPoint pos = ui->videoDeviceBtn->mapToGlobal(
+    const QPoint pos = ui.videoDeviceBtn->mapToGlobal(
         QPoint(0, -menu->sizeHint().height()));
     menu->popup(pos);
 }
@@ -875,7 +879,7 @@ void MeetingWidget::handle_create_meeting_response(const MessagePtr &msg) {
     if (roomno != 0) {
         _roomNo = roomno;
         _state._createmeet = true;
-        ui->sendmsg->setDisabled(false);
+        ui.sendmsg->setDisabled(false);
 
         const qint64 selfId = local_user_id();
         main_user_id_ = selfId;
@@ -926,7 +930,7 @@ void MeetingWidget::handle_join_meeting_response(const MessagePtr &msg) {
         add_partner(selfId);
         update_main_screen_title(main_user_id_);
         _cameraVideo->showMainAvatar();
-        ui->sendmsg->setDisabled(false);
+        ui.sendmsg->setDisabled(false);
         _state._joinmeet = true;
         start_meeting_media();
         update_meeting_info();
@@ -942,7 +946,7 @@ void MeetingWidget::handle_text_recv(const MessagePtr &msg) {
         text_msg->text().c_str(), static_cast<int>(text_msg->text().size()));
     const QString time =
         QString::number(QDateTime::currentDateTimeUtc().toSecsSinceEpoch());
-    ChatMessage *message = new ChatMessage(ui->listWidget);
+    ChatMessage *message = new ChatMessage(ui.listWidget);
     QListWidgetItem *item = new QListWidgetItem();
     deal_message_time(time);
     deal_message(message, item, str, time, partner_display_name(text_msg->user_id()),
@@ -977,7 +981,7 @@ void MeetingWidget::handle_partner_exit(const MessagePtr &msg) {
     const auto it = std::find(iplist.begin(), iplist.end(), atTag);
     if (it != iplist.end()) {
         iplist.erase(it);
-        ui->plainTextEdit->setCompleter(iplist);
+        ui.plainTextEdit->setCompleter(iplist);
     }
     update_meeting_info();
 }
@@ -995,7 +999,7 @@ void MeetingWidget::handle_partner_join2(const MessagePtr &msg) {
         if (add_partner(userId))
             _cameraVideo->showAvatarForUser(userId);
     }
-    ui->openVedio->setDisabled(false);
+    ui.openVedio->setDisabled(false);
     update_meeting_info();
 }
 
@@ -1085,17 +1089,17 @@ Partner *MeetingWidget::add_partner(qint64 userId) {
         return partner[userId];
 
     Partner *p = new Partner(userId, this);
-    auto *tile = new PartnerTile(p, ui->scrollAreaWidgetContents);
+    auto *tile = new PartnerTile(p, ui.scrollAreaWidgetContents);
     init_partner_connect(p);
     partner.emplace(userId, p);
-    ui->verticalLayout_3->addWidget(tile, 1);
+    ui.verticalLayout_3->addWidget(tile, 1);
 
     if (VideoGLWidget *widget = p->displayWidget())
         _cameraVideo->addPartnerDisplay(userId, widget);
 
     if (_state._createmeet || _state._joinmeet) {
-        ui->openAudio->setDisabled(false);
-        ui->sendmsg->setDisabled(false);
+        ui.openAudio->setDisabled(false);
+        ui.sendmsg->setDisabled(false);
     }
     return p;
 }
@@ -1108,7 +1112,7 @@ void MeetingWidget::remove_partner(qint64 userId) {
     disconnect(p, &Partner::clicked, this, &MeetingWidget::on_recv_user_slot);
     _cameraVideo->removePartnerDisplay(userId);
     if (PartnerTile *tile = p->tile()) {
-        ui->verticalLayout_3->removeWidget(tile);
+        ui.verticalLayout_3->removeWidget(tile);
         p->setTile(nullptr);
         tile->deleteLater();
     }
@@ -1127,20 +1131,20 @@ void MeetingWidget::clear_partner() {
         Partner *p = it->second;
         disconnect(p, &Partner::clicked, this, &MeetingWidget::on_recv_user_slot);
         if (PartnerTile *tile = p->tile()) {
-            ui->verticalLayout_3->removeWidget(tile);
+            ui.verticalLayout_3->removeWidget(tile);
             p->setTile(nullptr);
             tile->deleteLater();
         }
         p->deleteLater();
         it = partner.erase(it);
     }
-    ui->openAudio->setText(QString(OPENAUDIO).toUtf8());
-    ui->openAudio->setDisabled(true);
-    ui->openVedio->setText(QString(OPENVIDEO).toUtf8());
-    ui->openVedio->setDisabled(true);
-    ui->audioDeviceBtn->setDisabled(true);
-    ui->videoDeviceBtn->setDisabled(true);
-    ui->leaveMeetingBtn->setEnabled(false);
+    ui.openAudio->setText(QString(OPENAUDIO).toUtf8());
+    ui.openAudio->setDisabled(true);
+    ui.openVedio->setText(QString(OPENVIDEO).toUtf8());
+    ui.openVedio->setDisabled(true);
+    ui.audioDeviceBtn->setDisabled(true);
+    ui.videoDeviceBtn->setDisabled(true);
+    ui.leaveMeetingBtn->setEnabled(false);
 }
 
 void MeetingWidget::close_video_for_user(qint64 userId) {
@@ -1225,13 +1229,13 @@ void MeetingWidget::on_connect_finished_slot(bool ok, QString ip, QString port,
 }
 
 void MeetingWidget::on_send_msg_clicked_slot() {
-    const QString msg = ui->plainTextEdit->toPlainText().trimmed();
+    const QString msg = ui.plainTextEdit->toPlainText().trimmed();
     if (msg.isEmpty())
         return;
-    ui->plainTextEdit->setPlainText("");
+    ui.plainTextEdit->setPlainText("");
     const QString time =
         QString::number(QDateTime::currentDateTimeUtc().toSecsSinceEpoch());
-    ChatMessage *message = new ChatMessage(ui->listWidget);
+    ChatMessage *message = new ChatMessage(ui.listWidget);
     QListWidgetItem *item = new QListWidgetItem();
     deal_message_time(time);
     deal_message(message, item, msg, time, UserSession::instance().name(),
@@ -1240,7 +1244,7 @@ void MeetingWidget::on_send_msg_clicked_slot() {
     if (!_network) {
         message->setTextSuccess();
         _pendingChatSend = nullptr;
-        ui->sendmsg->setDisabled(false);
+        ui.sendmsg->setDisabled(false);
         return;
     }
     // 禁止 QString::toStdString()：在当前 MSVC/_ITERATOR_DEBUG_LEVEL 下会得到
@@ -1251,7 +1255,7 @@ void MeetingWidget::on_send_msg_clicked_slot() {
         spdlog::default_logger()->flush();
     _network->sendText(
         std::string(utf8.constData(), static_cast<std::size_t>(utf8.size())));
-    ui->sendmsg->setDisabled(true);
+    ui.sendmsg->setDisabled(true);
 }
 
 void MeetingWidget::on_text_send_slot() {
@@ -1259,11 +1263,11 @@ void MeetingWidget::on_text_send_slot() {
         _pendingChatSend->setTextSuccess();
         _pendingChatSend = nullptr;
     }
-    ui->sendmsg->setDisabled(false);
+    ui.sendmsg->setDisabled(false);
 }
 
 bool MeetingWidget::eventFilter(QObject *watched, QEvent *event) {
-    if (watched == ui->listWidget->viewport() &&
+    if (watched == ui.listWidget->viewport() &&
         event->type() == QEvent::Resize) {
         relayout_chat_messages();
     }
@@ -1273,20 +1277,20 @@ bool MeetingWidget::eventFilter(QObject *watched, QEvent *event) {
 void MeetingWidget::relayout_chat_messages() {
     if (m_inChatRelayout)
         return;
-    const int listWidth = ui->listWidget->viewport()->width();
+    const int listWidth = ui.listWidget->viewport()->width();
     if (listWidth <= 0 || listWidth == m_lastChatListWidth)
         return;
     m_inChatRelayout = true;
     m_lastChatListWidth = listWidth;
-    ui->listWidget->setUpdatesEnabled(false);
-    for (int i = 0; i < ui->listWidget->count(); ++i) {
-        QListWidgetItem *item = ui->listWidget->item(i);
+    ui.listWidget->setUpdatesEnabled(false);
+    for (int i = 0; i < ui.listWidget->count(); ++i) {
+        QListWidgetItem *item = ui.listWidget->item(i);
         if (auto *messageW =
-                qobject_cast<ChatMessage *>(ui->listWidget->itemWidget(item))) {
+                qobject_cast<ChatMessage *>(ui.listWidget->itemWidget(item))) {
             item->setSizeHint(messageW->relayoutForWidth(listWidth));
         }
     }
-    ui->listWidget->setUpdatesEnabled(true);
+    ui.listWidget->setUpdatesEnabled(true);
     m_inChatRelayout = false;
 }
 
@@ -1294,22 +1298,22 @@ void MeetingWidget::deal_message(ChatMessage *messageW, QListWidgetItem *item,
                                  QString text, QString time, QString ip,
                                  ChatMessage::User_Type type,
                                  const QString &avatarUrl) {
-    ui->listWidget->addItem(item);
-    const int listWidth = ui->listWidget->viewport()->width();
-    messageW->setFixedWidth(listWidth > 0 ? listWidth : ui->listWidget->width());
+    ui.listWidget->addItem(item);
+    const int listWidth = ui.listWidget->viewport()->width();
+    messageW->setFixedWidth(listWidth > 0 ? listWidth : ui.listWidget->width());
     const QSize size = messageW->fontRect(text);
     item->setSizeHint(size);
     messageW->setText(text, time, size, ip, type, avatarUrl);
-    ui->listWidget->setItemWidget(item, messageW);
+    ui.listWidget->setItemWidget(item, messageW);
 }
 
 void MeetingWidget::deal_message_time(QString curMsgTime) {
-    bool isShowTime = ui->listWidget->count() == 0;
+    bool isShowTime = ui.listWidget->count() == 0;
     if (!isShowTime) {
         QListWidgetItem *lastItem =
-            ui->listWidget->item(ui->listWidget->count() - 1);
+            ui.listWidget->item(ui.listWidget->count() - 1);
         if (auto *messageW = qobject_cast<ChatMessage *>(
-                ui->listWidget->itemWidget(lastItem))) {
+                ui.listWidget->itemWidget(lastItem))) {
             isShowTime =
                 (curMsgTime.toInt() - messageW->time().toInt()) > 60;
         }
@@ -1317,17 +1321,17 @@ void MeetingWidget::deal_message_time(QString curMsgTime) {
     if (!isShowTime)
         return;
 
-    ChatMessage *messageTime = new ChatMessage(ui->listWidget);
+    ChatMessage *messageTime = new ChatMessage(ui.listWidget);
     QListWidgetItem *itemTime = new QListWidgetItem();
-    ui->listWidget->addItem(itemTime);
-    const int listWidth = ui->listWidget->viewport()->width();
-    const int w = listWidth > 0 ? listWidth : ui->listWidget->width();
+    ui.listWidget->addItem(itemTime);
+    const int listWidth = ui.listWidget->viewport()->width();
+    const int w = listWidth > 0 ? listWidth : ui.listWidget->width();
     const QSize size(w, 40);
     messageTime->setFixedWidth(w);
     messageTime->resize(size);
     itemTime->setSizeHint(size);
     messageTime->setText(curMsgTime, curMsgTime, size);
-    ui->listWidget->setItemWidget(itemTime, messageTime);
+    ui.listWidget->setItemWidget(itemTime, messageTime);
 }
 
 void MeetingWidget::schedule_preview_render() {

@@ -24,7 +24,6 @@ struct ChatBubbleMetrics {
     int iconBorder = 5;
     int iconTop = 10;
     int iconTopExtra = 10;
-    int triangleW = 6;
     int frameMargin = 20;
     int textPadding = 12;
     int minKuangWidth = 20;
@@ -33,7 +32,6 @@ struct ChatBubbleMetrics {
     int ipHeight = 20;
     int ipLeftYOffset = -20;
     int ipRightYOffset = -30;
-    int triangleHalf = 5;
     int cornerRadius = 4;
     int borderPad = 1;
 
@@ -41,7 +39,7 @@ struct ChatBubbleMetrics {
 };
 
 /**
- * @brief 聊天列表中单条消息视图：自绘头像、三角、气泡、正文与时间/IP；配合 QListWidgetItem 的 sizeHint 使用
+ * @brief 聊天列表中单条消息视图：自绘头像、气泡、正文与时间/昵称；配合 QListWidgetItem 的 sizeHint 使用
  */
 class ChatMessage : public QWidget
 {
@@ -65,11 +63,11 @@ public:
     /** @brief 标记本人消息已发送成功，隐藏「发送中」动画 */
     void setTextSuccess();
     /**
-     * @brief 设置文案、时间戳、列表项整体尺寸、可选 IP 与角色；会触发重绘并在本人未成功时显示加载动画
+     * @brief 设置文案、时间戳、列表项整体尺寸、可选昵称与角色；会触发重绘并在本人未成功时显示加载动画
      * @param text 消息正文
      * @param time 时间戳字符串
      * @param allSize 列表/容器尺寸
-     * @param ip 可选 IP
+     * @param ip 可选昵称（历史字段名）
      * @param userType 消息角色
      */
     void setText(QString text, QString time, QSize allSize, QString ip = "",
@@ -112,17 +110,17 @@ public:
     inline User_Type userType() {return m_userType;}
 protected:
     /**
-     * @brief 自绘气泡、头像、三角与正文
+     * @brief 自绘气泡、头像与正文
      * @param event 绘制事件
      */
-    void paintEvent(QPaintEvent *event);
+    void paintEvent(QPaintEvent *event) override;
 private:
     ChatBubbleMetrics m_metrics;
 
     QString m_msg;       ///< 消息正文
     QString m_time;      ///< 原始时间字段（多为秒级时间戳字符串）
     QString m_curTime;   ///< 格式化后的显示时间，如 "ddd hh:mm"
-    QString m_ip;        ///< 可选，用于在气泡旁显示 IP
+    QString m_ip;        ///< 对方昵称（历史字段名）
 
     QSize m_allSize;     ///< 所属列表/容器尺寸，用于布局参考
     User_Type m_userType = User_System; ///< 消息角色
@@ -132,12 +130,9 @@ private:
     int m_spaceWid;      ///< 控件宽度减去文本宽度，左右留白相关
     int m_lineHeight;    ///< 当前字体行高（由 QFontMetrics 得到）
 
-    QRect m_ipLeftRect;      ///< 左侧 IP 文字区域
-    QRect m_ipRightRect;     ///< 右侧 IP 文字区域
+    QRect m_ipLeftRect;      ///< 对方昵称区域
     QRect m_iconLeftRect;    ///< 左侧头像
     QRect m_iconRightRect;   ///< 右侧头像
-    QRect m_sanjiaoLeftRect; ///< 左侧气泡小三角
-    QRect m_sanjiaoRightRect;///< 右侧气泡小三角
     QRect m_kuangLeftRect;   ///< 左侧气泡矩形
     QRect m_kuangRightRect;  ///< 右侧气泡矩形
     QRect m_textLeftRect;    ///< 左侧气泡内文本绘制区
