@@ -35,7 +35,6 @@ add_subdirectory("${XRTC_ROOT}" "${CMAKE_BINARY_DIR}/xrtc-build" EXCLUDE_FROM_AL
 file(GLOB_RECURSE CLIENT_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.ui"
 )
 
 list(SORT CLIENT_SOURCES)
@@ -67,6 +66,7 @@ target_include_directories(CloudMeetingClient PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include/network"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/network/messageNet"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/widget"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/widget/ui"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/widget/meeting"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/widget/login"
     "${CMAKE_CURRENT_SOURCE_DIR}/include/widget/main_window"

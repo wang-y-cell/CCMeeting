@@ -1,4 +1,4 @@
-#include "meeting_widget.h"
+#include "meeting_widget_ui.h"
 
 #include "text/mytextedit.h"
 #include "videoglwidget.h"

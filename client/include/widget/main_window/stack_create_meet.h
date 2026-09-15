@@ -1,7 +1,8 @@
 #ifndef STACK_CREATE_MEET_H
 #define STACK_CREATE_MEET_H
 
-#include "ui_stack_create_meet.h"
+#include "stack_create_meet_ui.h"
+
 #include <QWidget>
 #include <cstdint>
 
@@ -30,7 +31,7 @@ public:
      * @param parent 父控件
      */
     explicit stack_create_meet(QWidget *parent = nullptr);
-    ~stack_create_meet();
+    ~stack_create_meet() override = default;
 
 signals:
     /**
@@ -45,7 +46,7 @@ private slots:
     void on_create_clicked();
 
 private:
-    Ui::stack_create_meet *ui; ///< UI
+    Ui_stack_create_meet ui;
 };
 
 #endif // STACK_CREATE_MEET_H

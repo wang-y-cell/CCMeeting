@@ -1,12 +1,10 @@
 #ifndef STACK_JOIN_MEET_H
 #define STACK_JOIN_MEET_H
 
+#include "stack_join_meet_ui.h"
+
 #include <QWidget>
 #include <QString>
-
-namespace Ui {
-class stack_join_meet;
-}
 
 /**
  * @brief 加入会议入口页
@@ -21,10 +19,7 @@ public:
      * @param parent 父控件
      */
     explicit stack_join_meet(QWidget *parent = nullptr);
-    ~stack_join_meet();
-
-private:
-    Ui::stack_join_meet *ui; ///< UI
+    ~stack_join_meet() override = default;
 
 signals:
     /**
@@ -32,6 +27,9 @@ signals:
      * @param roomNo 房间号
      */
     void joinMeetingClicked(const QString &roomNo);
+
+private:
+    Ui_stack_join_meet ui;
 };
 
 #endif // STACK_JOIN_MEET_H
