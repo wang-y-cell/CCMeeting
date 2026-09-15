@@ -121,7 +121,6 @@ QSize ChatMessage::fontRect(QString str) {
     const int iconRectW = m_metrics.s(m_metrics.iconBorder);
     const int iconTMPH = m_metrics.s(m_metrics.iconTop);
     const int iconTopExtra = m_metrics.s(m_metrics.iconTopExtra);
-    const int sanJiaoW = m_metrics.s(m_metrics.triangleW);
     const int kuangTMP = m_metrics.s(m_metrics.frameMargin);
     const int textSpaceRect = m_metrics.s(m_metrics.textPadding);
     const int topPad = m_metrics.s(m_metrics.topPad);
@@ -144,31 +143,21 @@ QSize ChatMessage::fontRect(QString str) {
     spdlog::debug("[ChatMessage] fontRect size {}x{}", size.width(),
                   size.height());
     int hei = size.height() < minHei ? minHei : size.height();
-    const int sanjiaoHei = qMax(1, hei - m_lineHeight);
-
-    m_sanjiaoLeftRect = QRect(iconWH + iconSpaceW + iconRectW,
-                              m_lineHeight / 2 + topPad, sanJiaoW, sanjiaoHei);
-    m_sanjiaoRightRect =
-        QRect(this->width() - iconRectW - iconWH - iconSpaceW - sanJiaoW,
-              m_lineHeight / 2 + topPad, sanJiaoW, sanjiaoHei);
+    const int kuangXLeft = iconWH + iconSpaceW + iconRectW;
+    const int kuangY = m_lineHeight / 4 * 3 + topPad;
+    const int kuangH = hei - m_lineHeight;
 
     if (size.width() < (m_textWidth + m_spaceWid)) {
-        m_kuangLeftRect.setRect(
-            m_sanjiaoLeftRect.x() + m_sanjiaoLeftRect.width(),
-            m_lineHeight / 4 * 3 + topPad,
-            size.width() - m_spaceWid + 2 * textSpaceRect, hei - m_lineHeight);
+        const int kuangW = size.width() - m_spaceWid + 2 * textSpaceRect;
+        m_kuangLeftRect.setRect(kuangXLeft, kuangY, kuangW, kuangH);
         m_kuangRightRect.setRect(
-            this->width() - size.width() + m_spaceWid - 2 * textSpaceRect -
-                iconWH - iconSpaceW - iconRectW - sanJiaoW,
-            m_lineHeight / 4 * 3 + topPad,
-            size.width() - m_spaceWid + 2 * textSpaceRect, hei - m_lineHeight);
+            this->width() - kuangW - iconWH - iconSpaceW - iconRectW, kuangY,
+            kuangW, kuangH);
     } else {
-        m_kuangLeftRect.setRect(
-            m_sanjiaoLeftRect.x() + m_sanjiaoLeftRect.width(),
-            m_lineHeight / 4 * 3 + topPad, m_kuangWidth, hei - m_lineHeight);
+        m_kuangLeftRect.setRect(kuangXLeft, kuangY, m_kuangWidth, kuangH);
         m_kuangRightRect.setRect(
-            iconWH + kuangTMP + iconSpaceW + iconRectW - sanJiaoW,
-            m_lineHeight / 4 * 3 + topPad, m_kuangWidth, hei - m_lineHeight);
+            this->width() - m_kuangWidth - iconWH - iconSpaceW - iconRectW,
+            kuangY, m_kuangWidth, kuangH);
     }
 
     m_textLeftRect.setRect(m_kuangLeftRect.x() + textSpaceRect,
@@ -180,14 +169,9 @@ QSize ChatMessage::fontRect(QString str) {
                             m_kuangRightRect.width() - 2 * textSpaceRect,
                             m_kuangRightRect.height() - 2 * textSpaceRect);
 
-    m_ipLeftRect.setRect(
-        m_kuangLeftRect.x(),
-        m_kuangLeftRect.y() + iconTMPH + m_metrics.s(m_metrics.ipLeftYOffset),
-        m_kuangLeftRect.width() - 2 * textSpaceRect + iconWH * 2, ipHeight);
-    m_ipRightRect.setRect(
-        m_kuangRightRect.x(),
-        m_kuangRightRect.y() + iconTMPH + m_metrics.s(m_metrics.ipRightYOffset),
-        m_kuangRightRect.width() - 2 * textSpaceRect + iconWH * 2, ipHeight);
+    m_ipLeftRect.setRect(m_kuangLeftRect.x(),
+                         m_kuangLeftRect.y() - ipHeight,
+                         qMax(m_kuangLeftRect.width(), iconWH * 3), ipHeight);
     return QSize(size.width(), hei + bottomExtra);
 }
 
@@ -224,45 +208,35 @@ void ChatMessage::paintEvent(QPaintEvent *event) {
     painter.setPen(Qt::NoPen);
     painter.setBrush(QBrush(Qt::gray));
 
-    const int radius = m_metrics.s(m_metrics.cornerRadius);
-    const int borderPad = m_metrics.s(m_metrics.borderPad);
-    const int triHalf = m_metrics.s(m_metrics.triangleHalf);
+    const int radius = m_metrics.s(m_metrics.cornerRadius); //圆角半径
+    const int borderPad = m_metrics.s(m_metrics.borderPad); //边框内边距
 
     if (m_userType == User_Type::User_She) {
+        //绘制对方头像
         painter.drawPixmap(m_iconLeftRect, m_leftPixmap);
 
+        //绘制气泡边框
         QColor col_KuangB(234, 234, 234);
         painter.setBrush(QBrush(col_KuangB));
-        painter.drawRoundedRect(
+        painter.drawRoundedRect( //绘制圆角矩形
             m_kuangLeftRect.adjusted(-borderPad, -borderPad, borderPad,
-                                     borderPad),
-            radius, radius);
+                                     borderPad), radius, radius);
+        //绘制气泡填充
         QColor col_Kuang(255, 255, 255);
         painter.setBrush(QBrush(col_Kuang));
         painter.drawRoundedRect(m_kuangLeftRect, radius, radius);
 
-        const qreal cy = m_sanjiaoLeftRect.center().y();
-        QPointF points[3] = {
-            QPointF(m_sanjiaoLeftRect.x(), cy),
-            QPointF(m_sanjiaoLeftRect.x() + m_sanjiaoLeftRect.width(),
-                    cy - triHalf),
-            QPointF(m_sanjiaoLeftRect.x() + m_sanjiaoLeftRect.width(),
-                    cy + triHalf),
-        };
-        QPen pen;
-        pen.setColor(col_Kuang);
-        painter.setPen(pen);
-        painter.drawPolygon(points, 3);
-
+        //绘制对方昵称
         QPen penIp;
         penIp.setColor(Qt::darkGray);
         painter.setPen(penIp);
         QFont f = this->font();
         f.setPointSize(m_metrics.s(m_metrics.ipFontPointSize));
-        QTextOption op(Qt::AlignHCenter | Qt::AlignVCenter);
+        QTextOption op(Qt::AlignLeft | Qt::AlignVCenter);
         painter.setFont(f);
         painter.drawText(m_ipLeftRect, m_ip, op);
 
+        //绘制正文
         QPen penText;
         penText.setColor(QColor(51, 51, 51));
         painter.setPen(penText);
@@ -271,32 +245,15 @@ void ChatMessage::paintEvent(QPaintEvent *event) {
         painter.setFont(this->font());
         painter.drawText(m_textLeftRect, m_msg, option);
     } else if (m_userType == User_Type::User_Me) {
+        //绘制自己头像
         painter.drawPixmap(m_iconRightRect, m_rightPixmap);
 
+        //绘制气泡边框
         QColor col_Kuang(75, 164, 242);
         painter.setBrush(QBrush(col_Kuang));
         painter.drawRoundedRect(m_kuangRightRect, radius, radius);
 
-        const qreal cy = m_sanjiaoRightRect.center().y();
-        QPointF points[3] = {
-            QPointF(m_sanjiaoRightRect.x() + m_sanjiaoRightRect.width(), cy),
-            QPointF(m_sanjiaoRightRect.x(), cy - triHalf),
-            QPointF(m_sanjiaoRightRect.x(), cy + triHalf),
-        };
-        QPen pen;
-        pen.setColor(col_Kuang);
-        painter.setPen(pen);
-        painter.drawPolygon(points, 3);
-
-        QPen penIp;
-        penIp.setColor(Qt::black);
-        painter.setPen(penIp);
-        QFont f = this->font();
-        f.setPointSize(m_metrics.s(m_metrics.ipFontPointSize));
-        QTextOption op(Qt::AlignHCenter | Qt::AlignVCenter);
-        painter.setFont(f);
-        painter.drawText(m_ipRightRect, m_ip, op);
-
+        //绘制正文
         QPen penText;
         penText.setColor(Qt::white);
         painter.setPen(penText);
