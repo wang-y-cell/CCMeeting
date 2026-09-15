@@ -1,15 +1,18 @@
 #include "login.h"
-#include "ui_login.h"
 
 #include "configure/client_config.h"
 #include "configure/user_session.h"
 #include "style_loader.h"
 
 #include <QJsonDocument>
+#include <QLabel>
+#include <QLineEdit>
+#include <QPushButton>
 #include <QJsonObject>
 #include <QMessageBox>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QStackedWidget>
 #include <QUrl>
 
 #include <spdlog/spdlog.h>
@@ -49,18 +52,18 @@ QNetworkRequest makeJsonRequest(const QUrl &url) {
 }  // namespace
 
 login::login(QWidget *parent)
-    : FramelessWindow<QDialog>(parent), ui(new Ui::login) {
-    ui->setupUi(this);
+    : FramelessWindow<QDialog>(parent) {
+    ui.setupUi(this);
     setWindowTitle(tr("登录"));
     setResizable(false);
     setMaximizable(false);
     set_style();
 
-    connect(ui->login_button, &QPushButton::clicked, this, &login::Login);
-    connect(ui->register_button, &QPushButton::clicked, this, &login::Register);
-    connect(ui->createUserLink, &QLabel::linkActivated, this,
+    connect(ui.login_button, &QPushButton::clicked, this, &login::Login);
+    connect(ui.register_button, &QPushButton::clicked, this, &login::Register);
+    connect(ui.createUserLink, &QLabel::linkActivated, this,
             [this](const QString &) { showRegisterPage(); });
-    connect(ui->backToLoginLink, &QLabel::linkActivated, this,
+    connect(ui.backToLoginLink, &QLabel::linkActivated, this,
             [this](const QString &) { showLoginPage(); });
     connect(&m_nam, &QNetworkAccessManager::finished, this,
             [this](QNetworkReply *reply) {
@@ -76,15 +79,13 @@ void login::set_style() {
     loadWidgetStyleSheet(this, QStringLiteral(":/Style/source/login.qss"));
 }
 
-login::~login() { delete ui; }
-
 void login::showRegisterPage() {
-    ui->stackedWidget->setCurrentWidget(ui->registerPage);
+    ui.stackedWidget->setCurrentWidget(ui.registerPage);
     setWindowTitle(tr("创建账号"));
 }
 
 void login::showLoginPage() {
-    ui->stackedWidget->setCurrentWidget(ui->loginPage);
+    ui.stackedWidget->setCurrentWidget(ui.loginPage);
     setWindowTitle(tr("登录"));
 }
 
@@ -93,8 +94,8 @@ void login::Login() {
         return;
     }
 
-    const QString username = ui->account_line->text().trimmed();
-    const QString password = ui->password_line->text();
+    const QString username = ui.account_line->text().trimmed();
+    const QString password = ui.password_line->text();
 
     if (username.isEmpty() || password.isEmpty()) {
         QMessageBox::warning(this, tr("Login Error"), tr("请输入账号和密码"));
@@ -109,7 +110,7 @@ void login::Login() {
 
     m_pendingRequest = PendingRequest::Login;
     m_requestInFlight = true;
-    ui->login_button->setEnabled(false);
+    ui.login_button->setEnabled(false);
     spdlog::info("[login] POST {}", qutf8(url.toString()));
     flush_log();
     m_nam.post(makeJsonRequest(url),
@@ -121,8 +122,8 @@ void login::Register() {
         return;
     }
 
-    const QString username = ui->register_username_line->text().trimmed();
-    const QString password = ui->register_password_line->text();
+    const QString username = ui.register_username_line->text().trimmed();
+    const QString password = ui.register_password_line->text();
 
     if (username.isEmpty() || password.isEmpty()) {
         QMessageBox::warning(this, tr("Register Error"), tr("请输入用户名和密码"));
@@ -137,7 +138,7 @@ void login::Register() {
 
     m_pendingRequest = PendingRequest::Register;
     m_requestInFlight = true;
-    ui->register_button->setEnabled(false);
+    ui.register_button->setEnabled(false);
     spdlog::info("[register] POST {}", qutf8(url.toString()));
     flush_log();
     m_nam.post(makeJsonRequest(url),
@@ -151,7 +152,7 @@ void login::onLoginFinished(QNetworkReply *reply) {
 
     m_requestInFlight = false;
     m_pendingRequest = PendingRequest::None;
-    ui->login_button->setEnabled(true);
+    ui.login_button->setEnabled(true);
 
     spdlog::info("[login] onLoginFinished enter");
     flush_log();
@@ -216,7 +217,7 @@ void login::onLoginFinished(QNetworkReply *reply) {
 
     UserSession::instance().setUser(
         userId,
-        username.isEmpty() ? ui->account_line->text().trimmed() : username,
+        username.isEmpty() ? ui.account_line->text().trimmed() : username,
         name, avatar, info);
     spdlog::info("[login] success id={} name_bytes={}", userId,
                  name.toUtf8().size());
@@ -234,9 +235,9 @@ void login::onRegisterFinished(QNetworkReply *reply) {
 
     m_requestInFlight = false;
     m_pendingRequest = PendingRequest::None;
-    ui->register_button->setEnabled(true);
+    ui.register_button->setEnabled(true);
 
-    const QString username = ui->register_username_line->text().trimmed();
+    const QString username = ui.register_username_line->text().trimmed();
 
     if (!reply) {
         QMessageBox::warning(this, tr("Register Error"), tr("注册请求失败"));
@@ -277,9 +278,9 @@ void login::onRegisterFinished(QNetworkReply *reply) {
         return;
     }
 
-    ui->register_password_line->clear();
-    ui->account_line->setText(username);
-    ui->password_line->clear();
+    ui.register_password_line->clear();
+    ui.account_line->setText(username);
+    ui.password_line->clear();
     showLoginPage();
     QMessageBox::information(this, tr("Register Success"),
                              tr("注册成功，请使用新账号登录"));

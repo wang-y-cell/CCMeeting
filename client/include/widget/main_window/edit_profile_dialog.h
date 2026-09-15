@@ -2,30 +2,12 @@
 #define EDIT_PROFILE_DIALOG_H
 
 #include "frameless_window.h"
+#include "edit_profile_dialog_ui.h"
 
 #include <QDialog>
 #include <QImage>
 
-class QLabel;
-class QLineEdit;
 class QNetworkReply;
-class QPushButton;
-class QTextEdit;
-
-/** 修改资料弹窗纯 UI */
-class Ui_edit_profile_dialog {
-public:
-    QLabel *avatarPreview = nullptr;
-    QPushButton *changeAvatarBtn = nullptr;
-    QLineEdit *nicknameEdit = nullptr;
-    QLabel *usernameValue = nullptr;
-    QLabel *userIdValue = nullptr;
-    QTextEdit *infoEdit = nullptr;
-    QPushButton *saveBtn = nullptr;
-    QPushButton *cancelBtn = nullptr;
-
-    void setupUi(QWidget *parent);
-};
 
 /** 修改昵称 / 简介 / 头像 */
 class EditProfileDialog : public FramelessWindow<QDialog> {
