@@ -25,6 +25,12 @@ CREATE TABLE IF NOT EXISTS sys_user_profiles (
     nickname TEXT,
     avatar_url TEXT,
     info TEXT,
+    gender TEXT,
+    birthday TEXT,
+    address TEXT,
+    phone TEXT,
+    email TEXT,
+    extra_json TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (user_id) REFERENCES sys_users(user_id)
@@ -146,6 +152,23 @@ void SqliteClient::open() {
     exec_unchecked("PRAGMA foreign_keys = ON;"); //启用外键约束
     exec_unchecked("PRAGMA journal_mode = WAL;"); //使用WAL模式
     exec_unchecked(kSchemaSql); //执行建表脚本
+
+    // 兼容旧库：缺列时补充（已存在则忽略错误）
+    const char* migrations[] = {
+        "ALTER TABLE sys_user_profiles ADD COLUMN gender TEXT",
+        "ALTER TABLE sys_user_profiles ADD COLUMN birthday TEXT",
+        "ALTER TABLE sys_user_profiles ADD COLUMN address TEXT",
+        "ALTER TABLE sys_user_profiles ADD COLUMN phone TEXT",
+        "ALTER TABLE sys_user_profiles ADD COLUMN email TEXT",
+        "ALTER TABLE sys_user_profiles ADD COLUMN extra_json TEXT",
+    };
+    for (const char* sql : migrations) {
+        char* err = nullptr;
+        if (sqlite3_exec(db_, sql, nullptr, nullptr, &err) != SQLITE_OK) {
+            sqlite3_free(err);
+        }
+    }
+
     spdlog::info("[SqliteClient] opened {}", path_);
 }
 

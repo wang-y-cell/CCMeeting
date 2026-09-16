@@ -218,8 +218,15 @@ void HttpSession::handle_request(http::request<http::string_body>&& req) {
         std::uint64_t user_id = 0;
         std::string nickname;
         std::string info;
+        std::string gender;
+        std::string birthday;
+        std::string address;
+        std::string phone;
+        std::string email;
+        std::string extra_json;
         if (!util::parse_update_profile_request(req.body(), user_id, nickname,
-                                                info)) {
+                                                info, gender, birthday, address,
+                                                phone, email, extra_json)) {
             model::ProfileUpdateResult bad;
             bad.code = 400;
             bad.message = "invalid json body";
@@ -229,8 +236,9 @@ void HttpSession::handle_request(http::request<http::string_body>&& req) {
             return;
         }
 
-        const model::ProfileUpdateResult result =
-            auth_service_->update_profile(user_id, nickname, info);
+        const model::ProfileUpdateResult result = auth_service_->update_profile(
+            user_id, nickname, info, gender, birthday, address, phone, email,
+            extra_json);
 
         http::status status = http::status::bad_request;
         if (result.success) {

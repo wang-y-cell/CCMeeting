@@ -8,6 +8,14 @@
 #include <QMessageBox>
 #include <QPushButton>
 
+namespace {
+
+QString dashIfEmpty(const QString &value) {
+    return value.trimmed().isEmpty() ? QStringLiteral("-") : value.trimmed();
+}
+
+}  // namespace
+
 stack_user_profile::stack_user_profile(QWidget *parent) : QWidget(parent) {
     ui.setupUi(this);
     connect(ui.editProfileBtn, &QPushButton::clicked, this,
@@ -18,16 +26,20 @@ stack_user_profile::stack_user_profile(QWidget *parent) : QWidget(parent) {
 
 void stack_user_profile::refreshFromSession() {
     const auto &session = UserSession::instance();
-    ui.valueNickname->setText(session.name().isEmpty() ? QStringLiteral("-")
-                                                       : session.name());
-    ui.valueUsername->setText(session.username().isEmpty()
-                                  ? QStringLiteral("-")
-                                  : session.username());
+    ui.valueNickname->setText(dashIfEmpty(session.name()));
+    ui.valueUsername->setText(dashIfEmpty(session.username()));
     ui.valueUserId->setText(session.userId() > 0
                                 ? QString::number(session.userId())
                                 : QStringLiteral("-"));
-    ui.valueInfo->setText(session.info().isEmpty() ? QStringLiteral("-")
-                                                   : session.info());
+    ui.valueGender->setText(
+        UserSession::genderDisplayText(session.gender()));
+    const int age = session.ageYears();
+    ui.valueAge->setText(age >= 0 ? QString::number(age) : QStringLiteral("-"));
+    ui.valueBirthday->setText(dashIfEmpty(session.birthday()));
+    ui.valueAddress->setText(dashIfEmpty(session.address()));
+    ui.valuePhone->setText(dashIfEmpty(session.phone()));
+    ui.valueEmail->setText(dashIfEmpty(session.email()));
+    ui.valueInfo->setText(dashIfEmpty(session.info()));
 
     AvatarImageLoader::instance().load(
         session.avatar(), ui.profileAvatarLarge->size(), this,

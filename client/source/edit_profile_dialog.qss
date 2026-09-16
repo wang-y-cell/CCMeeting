@@ -20,6 +20,12 @@ QLabel#profileAvatarLarge {
 QLabel#fieldLabelNickname,
 QLabel#fieldLabelUsername,
 QLabel#fieldLabelUserId,
+QLabel#fieldLabelGender,
+QLabel#fieldLabelAge,
+QLabel#fieldLabelBirthday,
+QLabel#fieldLabelAddress,
+QLabel#fieldLabelPhone,
+QLabel#fieldLabelEmail,
 QLabel#fieldLabelInfo {
     color: #aeb6c7;
     font-size: 13px;
@@ -29,14 +35,26 @@ QLabel#fieldLabelInfo {
 }
 
 QLabel#valueUsername,
-QLabel#valueUserId {
+QLabel#valueUserId,
+QLabel#valueGender,
+QLabel#valueAge,
+QLabel#valueBirthday,
+QLabel#valueAddress,
+QLabel#valuePhone,
+QLabel#valueEmail,
+QLabel#valueNickname,
+QLabel#valueInfo,
+QLabel#ageValue {
     color: #eef1f6;
     font-size: 14px;
     background: transparent;
     border: none;
 }
 
-QLineEdit#nicknameEdit {
+QLineEdit#nicknameEdit,
+QLineEdit#addressEdit,
+QLineEdit#phoneEdit,
+QLineEdit#emailEdit {
     background-color: #232733;
     color: #eef1f6;
     border: 1px solid #343a48;
@@ -46,13 +64,54 @@ QLineEdit#nicknameEdit {
     font-size: 14px;
 }
 
-QLineEdit#nicknameEdit:hover {
+QLineEdit#nicknameEdit:hover,
+QLineEdit#addressEdit:hover,
+QLineEdit#phoneEdit:hover,
+QLineEdit#emailEdit:hover {
     border-color: #455066;
 }
 
-QLineEdit#nicknameEdit:focus {
+QLineEdit#nicknameEdit:focus,
+QLineEdit#addressEdit:focus,
+QLineEdit#phoneEdit:focus,
+QLineEdit#emailEdit:focus {
     border: 1px solid #3b82f6;
     background-color: #262b38;
+}
+
+QComboBox#genderCombo,
+QDateEdit#birthdayEdit {
+    background-color: #232733;
+    color: #eef1f6;
+    border: 1px solid #343a48;
+    border-radius: 10px;
+    padding: 0 10px;
+    min-height: 40px;
+    font-size: 14px;
+}
+
+QComboBox#genderCombo:hover,
+QDateEdit#birthdayEdit:hover {
+    border-color: #455066;
+}
+
+QComboBox#genderCombo:focus,
+QDateEdit#birthdayEdit:focus {
+    border: 1px solid #3b82f6;
+}
+
+QComboBox#genderCombo::drop-down {
+    border: none;
+    width: 28px;
+}
+
+QScrollArea#editProfileScroll {
+    background: transparent;
+    border: none;
+}
+
+QWidget#editProfileScrollContent {
+    background: transparent;
 }
 
 QTextEdit#infoEdit {

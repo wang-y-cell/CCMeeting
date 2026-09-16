@@ -180,6 +180,12 @@ QFrame#profileFrame {
 QLabel#fieldLabelNickname,
 QLabel#fieldLabelUsername,
 QLabel#fieldLabelUserId,
+QLabel#fieldLabelGender,
+QLabel#fieldLabelAge,
+QLabel#fieldLabelBirthday,
+QLabel#fieldLabelAddress,
+QLabel#fieldLabelPhone,
+QLabel#fieldLabelEmail,
 QLabel#fieldLabelInfo {
     color: #aeb6c7;
     font-size: 13px;
@@ -189,6 +195,12 @@ QLabel#fieldLabelInfo {
 QLabel#valueNickname,
 QLabel#valueUsername,
 QLabel#valueUserId,
+QLabel#valueGender,
+QLabel#valueAge,
+QLabel#valueBirthday,
+QLabel#valueAddress,
+QLabel#valuePhone,
+QLabel#valueEmail,
 QLabel#valueInfo {
     color: #eef1f6;
     font-size: 14px;

@@ -16,6 +16,12 @@ CREATE TABLE IF NOT EXISTS sys_user_profiles (
     nickname TEXT,
     avatar_url TEXT,
     info TEXT,
+    gender TEXT,
+    birthday TEXT,
+    address TEXT,
+    phone TEXT,
+    email TEXT,
+    extra_json TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (user_id) REFERENCES sys_users(user_id)

@@ -28,7 +28,13 @@ public:
 
     model::ProfileUpdateResult update_profile(std::uint64_t user_id,
                                               const std::string& nickname,
-                                              const std::string& info) const;
+                                              const std::string& info,
+                                              const std::string& gender,
+                                              const std::string& birthday,
+                                              const std::string& address,
+                                              const std::string& phone,
+                                              const std::string& email,
+                                              const std::string& extra_json) const;
 
 private:
     repository::UserRepository repository_;

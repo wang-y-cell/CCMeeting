@@ -3,6 +3,7 @@
 
 class QLabel;
 class QPushButton;
+class QScrollArea;
 class QWidget;
 
 /** 个人资料页纯 UI，不含业务逻辑 */
@@ -14,9 +15,16 @@ public:
     QLabel *valueNickname = nullptr;
     QLabel *valueUsername = nullptr;
     QLabel *valueUserId = nullptr;
+    QLabel *valueGender = nullptr;
+    QLabel *valueAge = nullptr;
+    QLabel *valueBirthday = nullptr;
+    QLabel *valueAddress = nullptr;
+    QLabel *valuePhone = nullptr;
+    QLabel *valueEmail = nullptr;
     QLabel *valueInfo = nullptr;
     QPushButton *editProfileBtn = nullptr;
     QPushButton *backHomeBtn = nullptr;
+    QScrollArea *scrollArea = nullptr;
 
     void setupUi(QWidget *parent);
 };

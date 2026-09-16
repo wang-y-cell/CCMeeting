@@ -95,12 +95,65 @@ QTabBar::tab:hover:!selected {
     color: #e8ebf2;
 }
 
-QListWidget {
+QListWidget,
+QListWidget#listWidget {
     background-color: #141820;
-    border: 1px solid #2a2e38;
+    border: none;
+    outline: none;
     border-radius: 0px;
     color: #e8ebf2;
-    padding: 4px;
+    padding: 4px 0 4px 4px;
+}
+
+QListWidget::item,
+QListWidget#listWidget::item {
+    border: none;
+    outline: none;
+    background: transparent;
+    padding: 0;
+    margin: 0;
+}
+
+QListWidget::viewport,
+QListWidget#listWidget::viewport {
+    background-color: #141820;
+    border: none;
+    outline: none;
+}
+
+QListWidget QScrollBar:vertical,
+QListWidget#listWidget QScrollBar:vertical,
+QScrollArea QScrollBar:vertical {
+    background: #141820;
+    border: none;
+    margin: 0;
+    width: 6px;
+}
+
+QListWidget QScrollBar::handle:vertical {
+    background: #3a4252;
+    border: none;
+    border-radius: 4px;
+    min-height: 24px;
+}
+
+QListWidget QScrollBar::add-line:vertical,
+QListWidget QScrollBar::sub-line:vertical {
+    height: 0;
+    width: 0;
+    border: none;
+    background: transparent;
+}
+
+QListWidget QScrollBar::add-page:vertical,
+QListWidget QScrollBar::sub-page:vertical {
+    background: #141820;
+    border: none;
+}
+
+QAbstractScrollArea::corner {
+    background: #141820;
+    border: none;
 }
 
 QScrollArea {

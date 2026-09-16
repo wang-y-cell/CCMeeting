@@ -214,11 +214,18 @@ void login::onLoginFinished(QNetworkReply *reply) {
     const QString name = data.value(QStringLiteral("name")).toString();
     const QString avatar = data.value(QStringLiteral("avatar")).toString();
     const QString info = data.value(QStringLiteral("info")).toString();
+    UserProfileExtras extras;
+    extras.gender = data.value(QStringLiteral("gender")).toString();
+    extras.birthday = data.value(QStringLiteral("birthday")).toString();
+    extras.address = data.value(QStringLiteral("address")).toString();
+    extras.phone = data.value(QStringLiteral("phone")).toString();
+    extras.email = data.value(QStringLiteral("email")).toString();
+    extras.extraJson = data.value(QStringLiteral("extra_json")).toString();
 
     UserSession::instance().setUser(
         userId,
         username.isEmpty() ? ui.account_line->text().trimmed() : username,
-        name, avatar, info);
+        name, avatar, info, extras);
     spdlog::info("[login] success id={} name_bytes={}", userId,
                  name.toUtf8().size());
     spdlog::info("[login] calling accept()");
