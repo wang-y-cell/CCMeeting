@@ -275,7 +275,13 @@ model::AvatarUploadResult AuthService::upload_avatar(
 model::ProfileUpdateResult AuthService::update_profile(
     std::uint64_t user_id,
     const std::string& nickname,
-    const std::string& info) const {
+    const std::string& info,
+    const std::string& gender,
+    const std::string& birthday,
+    const std::string& address,
+    const std::string& phone,
+    const std::string& email,
+    const std::string& extra_json) const {
     model::ProfileUpdateResult result;
 
     if (user_id == 0) {
@@ -302,13 +308,37 @@ model::ProfileUpdateResult AuthService::update_profile(
         return result;
     }
 
+    if (!(gender.empty() || gender == "male" || gender == "female" ||
+          gender == "other")) {
+        result.code = 400;
+        result.message = "invalid gender";
+        return result;
+    }
+
+    if (!birthday.empty()) {
+        // YYYY-MM-DD
+        if (birthday.size() != 10 || birthday[4] != '-' || birthday[7] != '-') {
+            result.code = 400;
+            result.message = "invalid birthday";
+            return result;
+        }
+    }
+
+    if (address.size() > 256 || phone.size() > 32 || email.size() > 128 ||
+        extra_json.size() > 2048) {
+        result.code = 400;
+        result.message = "field too long";
+        return result;
+    }
+
     if (!repository_.user_exists(user_id)) {
         result.code = 404;
         result.message = "user not found";
         return result;
     }
 
-    if (!repository_.update_profile(user_id, nickname, info)) {
+    if (!repository_.update_profile(user_id, nickname, info, gender, birthday,
+                                    address, phone, email, extra_json)) {
         result.code = 500;
         result.message = "failed to update profile";
         return result;
@@ -319,6 +349,12 @@ model::ProfileUpdateResult AuthService::update_profile(
     result.message = "ok";
     result.name = nickname;
     result.info = info;
+    result.gender = gender;
+    result.birthday = birthday;
+    result.address = address;
+    result.phone = phone;
+    result.email = email;
+    result.extra_json = extra_json;
     spdlog::info("[AuthService] update_profile ok user_id={} nickname={}",
                  user_id, nickname);
     return result;

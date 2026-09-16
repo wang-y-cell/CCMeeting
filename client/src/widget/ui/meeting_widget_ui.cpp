@@ -3,6 +3,7 @@
 #include "text/mytextedit.h"
 #include "videoglwidget.h"
 
+#include <QAbstractScrollArea>
 #include <QFormLayout>
 #include <QFrame>
 #include <QGridLayout>
@@ -12,6 +13,7 @@
 #include <QListWidget>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QSpacerItem>
 #include <QTabWidget>
 #include <QVBoxLayout>
@@ -42,6 +44,29 @@ QFrame *makePillSep(const QString &objectName, QWidget *parent) {
     sep->setFixedSize(1, 28);
     sep->setFrameShape(QFrame::NoFrame);
     return sep;
+}
+
+/** AsNeeded 显示滚动条，不需要时用 viewport 右边距占位，避免内容区宽度跳动 */
+void setupStableVerticalScrollBar(QAbstractScrollArea *area) {
+    if (!area)
+        return;
+    area->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    auto *sb = area->verticalScrollBar();
+    // 窄滚动条：固定宽度，预留与显示一致，避免系统默认 ~16px 过宽
+    constexpr int kScrollBarWidth = 6;
+    sb->setFixedWidth(kScrollBarWidth);
+
+    // setViewportMargins 为 protected，经派生类访问
+    struct MarginAccess : QAbstractScrollArea {
+        using QAbstractScrollArea::setViewportMargins;
+    };
+    const auto sync = [area, sb]() {
+        static_cast<MarginAccess *>(area)->setViewportMargins(
+            0, 0, sb->maximum() > 0 ? 0 : kScrollBarWidth, 0);
+    };
+    QObject::connect(sb, &QScrollBar::rangeChanged, area,
+                     [sync](int, int) { sync(); });
+    sync();
 }
 
 }  // namespace
@@ -135,9 +160,10 @@ void Ui_meeting_widget::setupUi(QWidget *parent) {
     auto *scrollArea = new QScrollArea(tab_5);
     scrollArea->setObjectName(QStringLiteral("scrollArea"));
     scrollArea->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
+    scrollArea->setFrameShape(QFrame::NoFrame);
     scrollArea->setLineWidth(0);
-    scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
     scrollArea->setWidgetResizable(true);
+    setupStableVerticalScrollBar(scrollArea);
 
     scrollAreaWidgetContents = new QWidget();
     scrollAreaWidgetContents->setObjectName(
@@ -148,6 +174,7 @@ void Ui_meeting_widget::setupUi(QWidget *parent) {
     verticalLayout_3->setObjectName(QStringLiteral("verticalLayout_3"));
     verticalLayout_3->setSpacing(6);
     verticalLayout_3->setContentsMargins(8, 8, 8, 8);
+    verticalLayout_3->setAlignment(Qt::AlignTop);
     scrollArea->setWidget(scrollAreaWidgetContents);
     verticalLayout_5->addWidget(scrollArea);
     tabWidget->addTab(tab_5, QObject::tr("成员"));
@@ -162,14 +189,21 @@ void Ui_meeting_widget::setupUi(QWidget *parent) {
     verticalLayout_6->setContentsMargins(0, 0, 0, 0);
 
     listWidget = new QListWidget(tab_6);
+    listWidget->setFrameShape(QFrame::NoFrame);
+    listWidget->setFrameShadow(QFrame::Plain);
+    listWidget->setLineWidth(0);
+    listWidget->setMidLineWidth(0);
     listWidget->setSelectionMode(QAbstractItemView::NoSelection);
     listWidget->setObjectName(QStringLiteral("listWidget"));
     listWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
     listWidget->setFocusPolicy(Qt::NoFocus);
-    listWidget->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
     listWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     listWidget->setSizeAdjustPolicy(QAbstractScrollArea::AdjustIgnored);
     listWidget->setAutoScrollMargin(0);
+    listWidget->viewport()->setAutoFillBackground(true);
+    listWidget->viewport()->setStyleSheet(
+        QStringLiteral("background-color: #141820; border: none; outline: none;"));
+    setupStableVerticalScrollBar(listWidget);
     verticalLayout_6->addWidget(listWidget);
 
     plainTextEdit = new MyTextEdit(tab_6);
@@ -223,23 +257,23 @@ void Ui_meeting_widget::setupUi(QWidget *parent) {
                   QObject::tr("会议状态"), tab_meetInfo),
         labelMeetStatus);
     formLayout_meetInfo->addRow(
-        makeLabel(QStringLiteral("labelRoomNoTitle"), QObject::tr("房间号"),
+        makeLabel(QStringLiteral("labelRoomNoTitle"), QObject::tr("房间号: "),
                   tab_meetInfo),
         labelRoomNo);
     formLayout_meetInfo->addRow(
-        makeLabel(QStringLiteral("labelMemberCountTitle"), QObject::tr("人数"),
+        makeLabel(QStringLiteral("labelMemberCountTitle"), QObject::tr("人数: "),
                   tab_meetInfo),
         labelMemberCount);
     formLayout_meetInfo->addRow(
-        makeLabel(QStringLiteral("labelLocalIpTitle"), QObject::tr("本机 IP"),
+        makeLabel(QStringLiteral("labelLocalIpTitle"), QObject::tr("本机: "),
                   tab_meetInfo),
         labelLocalIp);
     formLayout_meetInfo->addRow(
-        makeLabel(QStringLiteral("labelServerTitle"), QObject::tr("服务器"),
+        makeLabel(QStringLiteral("labelServerTitle"), QObject::tr("服务器: "),
                   tab_meetInfo),
         labelServer);
     formLayout_meetInfo->addRow(
-        makeLabel(QStringLiteral("labelSpeakerTitle"), QObject::tr("当前说话"),
+        makeLabel(QStringLiteral("labelSpeakerTitle"), QObject::tr("当前说话: "),
                   tab_meetInfo),
         labelSpeaker);
 

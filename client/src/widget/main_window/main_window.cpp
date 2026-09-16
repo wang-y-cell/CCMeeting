@@ -2,20 +2,14 @@
 #include "avatar_image_loader.h"
 #include "configure/client_config.h"
 #include "configure/user_session.h"
-#include "stack_join_meet.h"
 #include "style_loader.h"
 
 #include <QEvent>
-#include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
 #include <QMessageBox>
 #include <QMouseEvent>
 #include <QStackedWidget>
-#include <QUrl>
-#include <QVBoxLayout>
-#include <QStringList>
-#include <qnamespace.h>
 #include <spdlog/spdlog.h>
 
 namespace {
@@ -85,24 +79,24 @@ void main_window::closeEvent(QCloseEvent *event) {
 }
 
 void main_window::refreshUserCard() {
-    if (!name_label_ || !avatar_label_) {
+    if (!ui.nameLabel || !ui.avatarLabel) {
         return;
     }
 
     const auto &session = UserSession::instance();
-    name_label_->setText(session.isLoggedIn() ? session.name() : tr("未登录"));
+    ui.nameLabel->setText(session.isLoggedIn() ? session.name() : tr("未登录"));
 
     AvatarImageLoader::instance().load(
-        session.avatar(), avatar_label_->size(), this,
+        session.avatar(), ui.avatarLabel->size(), this,
         [this](const QPixmap &pixmap) {
-            if (avatar_label_) {
-                avatar_label_->setPixmap(pixmap);
+            if (ui.avatarLabel) {
+                ui.avatarLabel->setPixmap(pixmap);
             }
         });
 }
 
 bool main_window::eventFilter(QObject *watched, QEvent *event) {
-    if (watched == user_card_ && event->type() == QEvent::MouseButtonRelease) {
+    if (watched == ui.userCard && event->type() == QEvent::MouseButtonRelease) {
         auto *mouseEvent = static_cast<QMouseEvent *>(event);
         if (mouseEvent->button() == Qt::LeftButton) {
             onUserCardClicked();
@@ -119,14 +113,14 @@ void main_window::onUserCardClicked() {
     if (user_profile_widget) {
         user_profile_widget->refreshFromSession();
     }
-    if (content_stack_) {
-        content_stack_->setCurrentWidget(user_profile_widget);
+    if (ui.contentStack) {
+        ui.contentStack->setCurrentWidget(user_profile_widget);
     }
 }
 
 void main_window::onProfileBackHome() {
-    if (content_stack_ && create_meeting_widget) {
-        content_stack_->setCurrentWidget(create_meeting_widget);
+    if (ui.contentStack && create_meeting_widget) {
+        ui.contentStack->setCurrentWidget(create_meeting_widget);
     }
 }
 
@@ -135,100 +129,30 @@ void main_window::onProfileAvatarUpdated() {
 }
 
 void main_window::init_ui() {
-    setObjectName(QStringLiteral("main_window"));
-    resize(960, 640);
-    setMinimumSize(760, 480);
-    setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
     setAttribute(Qt::WA_StyledBackground, true);
+    ui.setupUi(this);
 
-    auto *mainLayout = new QHBoxLayout(this);
-    mainLayout->setContentsMargins(18, 42, 18, 18);
-    mainLayout->setSpacing(16);
-
-    auto *leftColumn = new QVBoxLayout();
-    leftColumn->setSpacing(12);
-
-    user_card_ = new QWidget(this);
-    user_card_->setObjectName(QStringLiteral("userProfile"));
-    user_card_->setCursor(Qt::PointingHandCursor);
-    user_card_->installEventFilter(this);
-    auto *userLayout = new QVBoxLayout(user_card_);
-    userLayout->setContentsMargins(12, 12, 12, 12);
-    userLayout->setSpacing(8);
-
-    avatar_label_ = new QLabel(user_card_);
-    avatar_label_->setObjectName(QStringLiteral("userAvatar"));
-    avatar_label_->setFixedSize(72, 72);
-    avatar_label_->setAlignment(Qt::AlignCenter);
-    avatar_label_->setScaledContents(true);
-
-    name_label_ = new QLabel(user_card_);
-    name_label_->setObjectName(QStringLiteral("userName"));
-    name_label_->setAlignment(Qt::AlignCenter);
-    name_label_->setWordWrap(true);
-
-    userLayout->addWidget(avatar_label_, 0, Qt::AlignHCenter);
-    userLayout->addWidget(name_label_);
-    leftColumn->addWidget(user_card_);
-
-    auto *left_bar = new QListWidget(this);
-    left_bar->setObjectName(QStringLiteral("sideNav"));
-    left_bar->setSpacing(4);
-    left_bar->setFrameShape(QListWidget::NoFrame);
-    left_bar->setFocusPolicy(Qt::NoFocus);
-    left_bar->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    left_bar->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-
-    const QStringList left_bar_items = {
-        QStringLiteral("创建会议"),
-        QStringLiteral("加入会议"),
-    };
-
-    for (const auto &item : left_bar_items) {
-        auto *listWidgetItem = new QListWidgetItem(item);
-        listWidgetItem->setSizeHint(QSize(0, 48));
-        listWidgetItem->setTextAlignment(Qt::AlignCenter);
-        QFont font = listWidgetItem->font();
-        font.setPointSize(11);
-        font.setWeight(QFont::DemiBold);
-        listWidgetItem->setFont(font);
-        left_bar->addItem(listWidgetItem);
-    }
-
-    content_stack_ = new QStackedWidget(this);
-    content_stack_->setObjectName(QStringLiteral("contentStack"));
-
-    leftColumn->addWidget(left_bar, 1);
-
-    auto *leftWrap = new QWidget(this);
-    leftWrap->setFixedWidth(196);
-    auto *leftWrapLayout = new QVBoxLayout(leftWrap);
-    leftWrapLayout->setContentsMargins(0, 0, 0, 0);
-    leftWrapLayout->setSpacing(0);
-    leftWrapLayout->addLayout(leftColumn);
-
-    mainLayout->addWidget(leftWrap);
-    mainLayout->addWidget(content_stack_, 1);
+    ui.userCard->installEventFilter(this);
 
     create_meeting_widget = new stack_create_meet(this);
-    content_stack_->addWidget(create_meeting_widget);
+    ui.contentStack->addWidget(create_meeting_widget);
 
     join_meeting_widget = new stack_join_meet(this);
-    content_stack_->addWidget(join_meeting_widget);
+    ui.contentStack->addWidget(join_meeting_widget);
 
     user_profile_widget = new stack_user_profile(this);
-    content_stack_->addWidget(user_profile_widget);
+    ui.contentStack->addWidget(user_profile_widget);
 
-    left_bar->setCurrentRow(0);
-    connect(left_bar, &QListWidget::currentRowChanged, this,
+    ui.sideNav->setCurrentRow(0);
+    connect(ui.sideNav, &QListWidget::currentRowChanged, this,
             [this](int row) {
-                if (!content_stack_) {
+                if (!ui.contentStack) {
                     return;
                 }
                 if (row == 0 && create_meeting_widget) {
-                    content_stack_->setCurrentWidget(create_meeting_widget);
+                    ui.contentStack->setCurrentWidget(create_meeting_widget);
                 } else if (row == 1 && join_meeting_widget) {
-                    content_stack_->setCurrentWidget(join_meeting_widget);
+                    ui.contentStack->setCurrentWidget(join_meeting_widget);
                 }
             });
 }

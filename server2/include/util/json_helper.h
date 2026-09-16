@@ -20,7 +20,13 @@ bool parse_upload_avatar_request(const std::string& body,
 bool parse_update_profile_request(const std::string& body,
                                   std::uint64_t& user_id,
                                   std::string& nickname,
-                                  std::string& info);
+                                  std::string& info,
+                                  std::string& gender,
+                                  std::string& birthday,
+                                  std::string& address,
+                                  std::string& phone,
+                                  std::string& email,
+                                  std::string& extra_json);
 
 std::string to_login_response_json(const model::LoginResult& result);
 

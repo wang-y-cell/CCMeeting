@@ -1,9 +1,12 @@
 #ifndef EDIT_PROFILE_DIALOG_UI_H
 #define EDIT_PROFILE_DIALOG_UI_H
 
+class QComboBox;
+class QDateEdit;
 class QLabel;
 class QLineEdit;
 class QPushButton;
+class QScrollArea;
 class QTextEdit;
 class QWidget;
 
@@ -13,11 +16,16 @@ public:
     QLabel *avatarPreview = nullptr;
     QPushButton *changeAvatarBtn = nullptr;
     QLineEdit *nicknameEdit = nullptr;
-    QLabel *usernameValue = nullptr;
-    QLabel *userIdValue = nullptr;
+    QComboBox *genderCombo = nullptr;
+    QDateEdit *birthdayEdit = nullptr;
+    QLabel *ageValue = nullptr;
+    QLineEdit *addressEdit = nullptr;
+    QLineEdit *phoneEdit = nullptr;
+    QLineEdit *emailEdit = nullptr;
     QTextEdit *infoEdit = nullptr;
     QPushButton *saveBtn = nullptr;
     QPushButton *cancelBtn = nullptr;
+    QScrollArea *scrollArea = nullptr;
 
     void setupUi(QWidget *parent);
 };

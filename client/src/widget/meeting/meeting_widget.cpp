@@ -1092,7 +1092,7 @@ Partner *MeetingWidget::add_partner(qint64 userId) {
     auto *tile = new PartnerTile(p, ui.scrollAreaWidgetContents);
     init_partner_connect(p);
     partner.emplace(userId, p);
-    ui.verticalLayout_3->addWidget(tile, 1);
+    ui.verticalLayout_3->addWidget(tile);
 
     if (VideoGLWidget *widget = p->displayWidget())
         _cameraVideo->addPartnerDisplay(userId, widget);

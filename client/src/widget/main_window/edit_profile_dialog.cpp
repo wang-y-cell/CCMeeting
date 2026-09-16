@@ -7,10 +7,10 @@
 #include "style_loader.h"
 
 #include <QBuffer>
+#include <QComboBox>
+#include <QDate>
+#include <QDateEdit>
 #include <QFileDialog>
-#include <QFormLayout>
-#include <QFrame>
-#include <QHBoxLayout>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
@@ -22,7 +22,6 @@
 #include <QPushButton>
 #include <QTextEdit>
 #include <QUrl>
-#include <QVBoxLayout>
 
 namespace {
 
@@ -45,6 +44,17 @@ QNetworkRequest makeJsonRequest(const QUrl &url) {
     return request;
 }
 
+UserProfileExtras extrasFromJson(const QJsonObject &data) {
+    UserProfileExtras extras;
+    extras.gender = data.value(QStringLiteral("gender")).toString();
+    extras.birthday = data.value(QStringLiteral("birthday")).toString();
+    extras.address = data.value(QStringLiteral("address")).toString();
+    extras.phone = data.value(QStringLiteral("phone")).toString();
+    extras.email = data.value(QStringLiteral("email")).toString();
+    extras.extraJson = data.value(QStringLiteral("extra_json")).toString();
+    return extras;
+}
+
 }  // namespace
 
 EditProfileDialog::EditProfileDialog(QWidget *parent)
@@ -52,7 +62,7 @@ EditProfileDialog::EditProfileDialog(QWidget *parent)
     setWindowTitle(tr("修改资料"));
     setTitleBarHeight(40);
     setMaximizable(false);
-    setResizable(false);
+    setResizable(true);
     setModal(true);
 
     ui.setupUi(this);
@@ -65,22 +75,62 @@ EditProfileDialog::EditProfileDialog(QWidget *parent)
     connect(ui.saveBtn, &QPushButton::clicked, this,
             &EditProfileDialog::onSaveClicked);
     connect(ui.cancelBtn, &QPushButton::clicked, this, &QDialog::reject);
+    connect(ui.birthdayEdit, &QDateEdit::dateChanged, this,
+            &EditProfileDialog::refreshAgeLabel);
+}
+
+void EditProfileDialog::refreshAgeLabel() {
+    if (!ui.ageValue || !ui.birthdayEdit) {
+        return;
+    }
+    const QDate date = ui.birthdayEdit->date();
+    if (date <= ui.birthdayEdit->minimumDate()) {
+        ui.ageValue->setText(QStringLiteral("-"));
+        return;
+    }
+    const int age =
+        UserSession::ageFromBirthday(date.toString(Qt::ISODate));
+    ui.ageValue->setText(age >= 0 ? QString::number(age) : QStringLiteral("-"));
 }
 
 void EditProfileDialog::loadFromSession() {
     const auto &session = UserSession::instance();
     ui.nicknameEdit->setText(session.name());
-    ui.usernameValue->setText(session.username().isEmpty()
-                                  ? QStringLiteral("-")
-                                  : session.username());
-    ui.userIdValue->setText(session.userId() > 0
-                                ? QString::number(session.userId())
-                                : QStringLiteral("-"));
     ui.infoEdit->setPlainText(session.info());
+    ui.addressEdit->setText(session.address());
+    ui.phoneEdit->setText(session.phone());
+    ui.emailEdit->setText(session.email());
+
+    const int genderIndex =
+        ui.genderCombo->findData(session.gender());
+    ui.genderCombo->setCurrentIndex(genderIndex >= 0 ? genderIndex : 0);
+
+    const QDate born = QDate::fromString(session.birthday(), Qt::ISODate);
+    if (born.isValid()) {
+        ui.birthdayEdit->setDate(born);
+    } else {
+        ui.birthdayEdit->setDate(ui.birthdayEdit->minimumDate());
+    }
+    refreshAgeLabel();
 
     AvatarImageLoader::instance().load(
         session.avatar(), ui.avatarPreview->size(), this,
         [this](const QPixmap &pixmap) { ui.avatarPreview->setPixmap(pixmap); });
+}
+
+UserProfileExtras EditProfileDialog::collectExtras() const {
+    UserProfileExtras extras = UserSession::instance().extras();
+    extras.gender = ui.genderCombo->currentData().toString();
+    const QDate date = ui.birthdayEdit->date();
+    if (date > ui.birthdayEdit->minimumDate()) {
+        extras.birthday = date.toString(Qt::ISODate);
+    } else {
+        extras.birthday.clear();
+    }
+    extras.address = ui.addressEdit->text().trimmed();
+    extras.phone = ui.phoneEdit->text().trimmed();
+    extras.email = ui.emailEdit->text().trimmed();
+    return extras;
 }
 
 void EditProfileDialog::setBusy(bool busy) {
@@ -89,6 +139,11 @@ void EditProfileDialog::setBusy(bool busy) {
     ui.cancelBtn->setEnabled(!busy);
     ui.changeAvatarBtn->setEnabled(!busy);
     ui.nicknameEdit->setEnabled(!busy);
+    ui.genderCombo->setEnabled(!busy);
+    ui.birthdayEdit->setEnabled(!busy);
+    ui.addressEdit->setEnabled(!busy);
+    ui.phoneEdit->setEnabled(!busy);
+    ui.emailEdit->setEnabled(!busy);
     ui.infoEdit->setEnabled(!busy);
 }
 
@@ -231,11 +286,18 @@ void EditProfileDialog::submitProfileUpdate() {
         return;
     }
 
+    const UserProfileExtras extras = collectExtras();
     QJsonObject body;
     body.insert(QStringLiteral("user_id"), UserSession::instance().userId());
     body.insert(QStringLiteral("nickname"),
                 ui.nicknameEdit->text().trimmed());
     body.insert(QStringLiteral("info"), ui.infoEdit->toPlainText().trimmed());
+    body.insert(QStringLiteral("gender"), extras.gender);
+    body.insert(QStringLiteral("birthday"), extras.birthday);
+    body.insert(QStringLiteral("address"), extras.address);
+    body.insert(QStringLiteral("phone"), extras.phone);
+    body.insert(QStringLiteral("email"), extras.email);
+    body.insert(QStringLiteral("extra_json"), extras.extraJson);
 
     const QUrl url =
         authUrl(ClientConfig::instance().auth().update_profile_path);
@@ -286,8 +348,13 @@ void EditProfileDialog::onProfileUpdateFinished() {
         ui.nicknameEdit->text().trimmed());
     const QString info = data.value(QStringLiteral("info")).toString(
         ui.infoEdit->toPlainText().trimmed());
+    UserProfileExtras extras = extrasFromJson(data);
+    if (extras.gender.isEmpty() && extras.birthday.isEmpty() &&
+        extras.address.isEmpty()) {
+        extras = collectExtras();
+    }
 
-    UserSession::instance().updateProfile(name, QString(), info);
+    UserSession::instance().updateProfile(name, QString(), info, extras);
     setBusy(false);
     emit profileSaved();
     accept();

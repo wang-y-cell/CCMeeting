@@ -82,7 +82,8 @@ model::UserInfo UserRepository::load_user_info(
 
     auto lock = db_.acquire_lock();
     Stmt stmt(db_.db(),
-              "SELECT u.username, p.nickname, p.avatar_url, p.info "
+              "SELECT u.username, p.nickname, p.avatar_url, p.info, "
+              "p.gender, p.birthday, p.address, p.phone, p.email, p.extra_json "
               "FROM sys_users u "
               "LEFT JOIN sys_user_profiles p ON u.user_id = p.user_id "
               "WHERE u.user_id = ? LIMIT 1");
@@ -103,6 +104,12 @@ model::UserInfo UserRepository::load_user_info(
     }
     info.avatar = column_text(stmt.get(), 2);
     info.info = column_text(stmt.get(), 3);
+    info.gender = column_text(stmt.get(), 4);
+    info.birthday = column_text(stmt.get(), 5);
+    info.address = column_text(stmt.get(), 6);
+    info.phone = column_text(stmt.get(), 7);
+    info.email = column_text(stmt.get(), 8);
+    info.extra_json = column_text(stmt.get(), 9);
     return info;
 }
 
@@ -221,7 +228,13 @@ bool UserRepository::update_avatar_url(std::uint64_t user_id,
 
 bool UserRepository::update_profile(std::uint64_t user_id,
                                     const std::string& nickname,
-                                    const std::string& info) const {
+                                    const std::string& info,
+                                    const std::string& gender,
+                                    const std::string& birthday,
+                                    const std::string& address,
+                                    const std::string& phone,
+                                    const std::string& email,
+                                    const std::string& extra_json) const {
     if (user_id == 0) {
         return false;
     }
@@ -230,10 +243,19 @@ bool UserRepository::update_profile(std::uint64_t user_id,
         auto lock = db_.acquire_lock();
         Stmt stmt(db_.db(),
                   "UPDATE sys_user_profiles SET nickname = ?, info = ?, "
+                  "gender = ?, birthday = ?, address = ?, phone = ?, "
+                  "email = ?, extra_json = ?, "
                   "updated_at = datetime('now') WHERE user_id = ?");
         sqlite3_bind_text(stmt.get(), 1, nickname.c_str(), -1, SQLITE_TRANSIENT);
         sqlite3_bind_text(stmt.get(), 2, info.c_str(), -1, SQLITE_TRANSIENT);
-        sqlite3_bind_int64(stmt.get(), 3, static_cast<sqlite3_int64>(user_id));
+        sqlite3_bind_text(stmt.get(), 3, gender.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt.get(), 4, birthday.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt.get(), 5, address.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt.get(), 6, phone.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt.get(), 7, email.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt.get(), 8, extra_json.c_str(), -1,
+                          SQLITE_TRANSIENT);
+        sqlite3_bind_int64(stmt.get(), 9, static_cast<sqlite3_int64>(user_id));
         if (sqlite3_step(stmt.get()) != SQLITE_DONE) {
             throw std::runtime_error(sqlite3_errmsg(db_.db()));
         }
