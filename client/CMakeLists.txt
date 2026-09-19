@@ -1,3 +1,8 @@
+#-------------------------------------------------
+#
+# CloudMeeting client（Qt6 + xrtc）
+#
+#-------------------------------------------------
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -8,53 +13,57 @@ set(CMAKE_AUTOUIC_SEARCH_PATHS
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Qt / WebRTC / xrtc 路径（可通过 -D 覆盖）
-if(NOT QT_INSTALL_PATH)
-    if(DEFINED ENV{Qt6_DIR})
-        # 取得Qt根目录的绝对路径,赋值给QT_INSTALL_PATH
-        get_filename_component(QT_INSTALL_PATH "$ENV{Qt6_DIR}/../.." ABSOLUTE)
-        message(STATUS "[client] QT_INSTALL_PATH from Qt6_DIR: ${QT_INSTALL_PATH}")
-    else()
-        set(QT_INSTALL_PATH "F:/Qt/6.8.3/msvc2022_64")
-        message(STATUS "[client] QT_INSTALL_PATH default: ${QT_INSTALL_PATH}")
-    endif()
+# ---------- Qt ----------
+set(QT_INSTALL_PATH "F:/Qt/6.8.3/msvc2022_64" CACHE PATH
+    "Qt6 install prefix (msvc2022_64)")
+if(DEFINED ENV{Qt6_DIR} AND QT_INSTALL_PATH STREQUAL "F:/Qt/6.8.3/msvc2022_64")
+    get_filename_component(QT_INSTALL_PATH "$ENV{Qt6_DIR}/../.." ABSOLUTE)
 endif()
+if(NOT EXISTS "${QT_INSTALL_PATH}")
+    message(FATAL_ERROR
+        "[client] Qt 路径不存在: ${QT_INSTALL_PATH}\n"
+        "请传入 -DQT_INSTALL_PATH=F:/Qt/6.8.3/msvc2022_64类似的路径")
+endif()
+message(STATUS "[client] QT_INSTALL_PATH=${QT_INSTALL_PATH}")
 list(PREPEND CMAKE_PREFIX_PATH "${QT_INSTALL_PATH}")
-
-set(XRTC_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/webrtcSDK" CACHE PATH "xrtc SDK root")
-set(WEBRTC_INCLUDE "F:/wy/webrtc/src" CACHE PATH "libwebrtc headers")
-set(WEBRTC_LIB "F:/wy/webrtc/src/out/Default/obj" CACHE PATH "libwebrtc libs")
-set(Boost_ROOT "F:/wy/boost_install" CACHE PATH "Boost install prefix")
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets Network Multimedia OpenGLWidgets OpenGL)
 find_package(Threads REQUIRED)
 
+# ---------- xrtc（third_party/webrtcSDK，自包含 WebRTC/json/Boost）----------
+set(XRTC_ROOT "${CMAKE_SOURCE_DIR}/third_party/webrtcSDK" CACHE PATH "xrtc SDK root")
+if(NOT EXISTS "${XRTC_ROOT}/CMakeLists.txt")
+    message(FATAL_ERROR
+        "[client] 缺少 xrtc: ${XRTC_ROOT}\n"
+        "请执行: git submodule update --init --recursive")
+endif()
+
+# 可选：本机 Boost 头文件，跳过 xrtc 内下载
+if(NOT Boost_ROOT)
+    if(EXISTS "F:/wy/boost_install/boost/version.hpp")
+        set(Boost_ROOT "F:/wy/boost_install" CACHE PATH
+            "Optional Boost headers for xrtc" FORCE)
+    elseif(EXISTS "F:/wy/boost_install/include/boost/version.hpp")
+        set(Boost_ROOT "F:/wy/boost_install" CACHE PATH
+            "Optional Boost headers for xrtc" FORCE)
+    endif()
+endif()
+
 set(BUILD_XRTC_DEMO OFF CACHE BOOL "" FORCE)
+set(BUILD_XRTC_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory("${XRTC_ROOT}" "${CMAKE_BINARY_DIR}/xrtc-build" EXCLUDE_FROM_ALL)
 
+# ---------- sources ----------
 file(GLOB_RECURSE CLIENT_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
 )
-
 list(SORT CLIENT_SOURCES)
 
 qt_add_executable(CloudMeetingClient
     MANUAL_FINALIZATION
     ${CLIENT_SOURCES}
     resource.qrc
-)
-
-target_link_libraries(CloudMeetingClient
-    PRIVATE
-    Qt6::Widgets
-    Qt6::Network
-    Qt6::Multimedia
-    Qt6::OpenGLWidgets
-    Qt6::OpenGL
-    Threads::Threads
-    spdlog::spdlog
-    xrtc
 )
 
 target_include_directories(CloudMeetingClient PRIVATE
@@ -72,19 +81,25 @@ target_include_directories(CloudMeetingClient PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include/widget/main_window"
 )
 
+target_link_libraries(CloudMeetingClient
+    PRIVATE
+        Qt6::Widgets
+        Qt6::Network
+        Qt6::Multimedia
+        Qt6::OpenGLWidgets
+        Qt6::OpenGL
+        Threads::Threads
+        spdlog::spdlog
+        xrtc
+)
+
+# 添加编译期宏
 target_compile_definitions(CloudMeetingClient PRIVATE
-    # 声明当前是 Windows 平台，这是 WebRTC 源码中用于条件编译的关键宏
-    WEBRTC_WIN
-    # Windows 的 <windows.h> 头文件中默认定义了 min 和 max 宏，这会与 C++ 标准库（如 std::min）
-    # 或 WebRTC 内部的同名函数发生严重冲突。定义此宏可以禁用 Windows 的 min/max 宏。
-    NOMINMAX
-    # 用于排除 Windows 头文件中不常用的 API（如 Cryptography、DDE、RPC 等），
-    # 从而加快编译速度并减少符号冲突
-    WIN32_LEAN_AND_MEAN
-    # 仅在 Debug 配置下，将 _ITERATOR_DEBUG_LEVEL 设为 0。这会关闭 MSVC 标准库容器的迭代器调试检查
-    $<$<CONFIG:Debug>:_ITERATOR_DEBUG_LEVEL=0>
-    # 仅在 Debug 配置下，将 _HAS_ITERATOR_DEBUGGING 设为 0。这会禁用 MSVC 的迭代器调试功能
-    $<$<CONFIG:Debug>:_HAS_ITERATOR_DEBUGGING=0>
+    WEBRTC_WIN # 定义了 WEBRTC_WIN 宏，表示在 Windows 平台上使用 WebRTC
+    NOMINMAX # 定义了 NOMINMAX 宏，表示使用最小化最大值和最小化最小值
+    WIN32_LEAN_AND_MEAN # 定义了 WIN32_LEAN_AND_MEAN 宏，表示使用最小化 Windows 头文件
+    _ITERATOR_DEBUG_LEVEL=0 # 定义了 _ITERATOR_DEBUG_LEVEL 宏，表示使用迭代器调试级别
+    _HAS_ITERATOR_DEBUGGING=0 # 定义了 _HAS_ITERATOR_DEBUGGING 宏，表示使用迭代器调试
 )
 
 if(MSVC)
@@ -106,7 +121,7 @@ set_target_properties(CloudMeetingClient PROPERTIES
 
 add_custom_command(TARGET CloudMeetingClient POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory
-            "$<TARGET_FILE_DIR:CloudMeetingClient>/config"
+            "$<TARGET_FILE_DIR:CloudMeetingClient>/config" # 创建config目录
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CMAKE_CURRENT_SOURCE_DIR}/config/client.json"
             "$<TARGET_FILE_DIR:CloudMeetingClient>/config/client.json"

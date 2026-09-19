@@ -12,144 +12,115 @@
 - 成员列表、主画面切换、会议信息展示
 - 无边框窗口（拖动、边缘缩放、最大化）
 
-**消息服务器（server）**
+**消息服务器（message_server）**
 
 - 会议室创建与成员进出管理
 - 基于 TCP 的控制面消息转发（请求、文本、成员状态等；音视频走 WebRTC）
 
-**认证服务器（server2）**
+**认证服务器（data_server）**
 
-- HTTP 用户注册 / 登录
-- MySQL 用户数据持久化，OpenSSL 密码哈希
+- HTTP 用户注册 / 登录 / 资料与头像
+- SQLite 用户数据持久化，OpenSSL 密码哈希
 
 ## 技术栈与第三方库
 
+仓库内统一 submodule（`third_party/`）：
+
+```bash
+git submodule update --init --recursive
+```
+
 | 组件 | 依赖 | 说明 |
 |------|------|------|
-| 客户端 | **Qt 6**（Widgets、Network、Multimedia） | GUI、网络；Multimedia 仅用于聊天提示音 |
-| 客户端 | **xrtc / libwebrtc**、**Boost**（Beast WebSocket） | WebRTC 音视频与 Janus 信令 |
-| 客户端 / 服务端 | **spdlog** | 日志 |
-| 客户端 / 服务端 | **C++17**、**Threads** | 标准与线程库 |
-| 消息服务器 | **Boost.Asio / Boost.System**（≥ 1.70） | 异步网络 |
-| 认证服务器 | **Boost.Asio / Boost.System / Boost.JSON**（≥ 1.70） | HTTP 与 JSON |
-| 认证服务器 | **OpenSSL**、**MySQL Connector/C++** | 密码哈希、数据库 |
+| 客户端 | **Qt 6** + **MSVC** | 与 xrtc/webrtc 预编译库 ABI 一致 |
+| 客户端 | **xrtc**（`third_party/webrtcSDK`） | `add_subdirectory` 后链接 `xrtc`；WebRTC/Boost/json 由 xrtc 自动准备 |
+| 消息服务器 | **Boost.Asio / System**（≥ 1.70） | 异步 TCP；无本机 Boost 时自动下载头文件包 |
+| 认证服务器 | **Boost.Asio / Beast** + **nlohmann/json** | HTTP + JSON；Boost 同上 |
+| 共用 | **spdlog** | 日志 |
+| 认证服务器 | **OpenSSL**、**SQLite3** | 密码哈希、数据库 |
 
-构建工具：**CMake ≥ 3.16**，推荐使用仓库根目录的 `build.py`。
+构建：**仅使用 CMake**（不再提供 `build.py`）。CMake ≥ 3.19，推荐 **Ninja**（不要用 `depot_tools` 里的 ninja）。
 
-> 说明：spdlog 由根 `CMakeLists.txt` 自动引入。若存在 `third_party/spdlog` 源码（含其 `CMakeLists.txt`）则直接 `add_subdirectory`；否则配置阶段通过 FetchContent 拉取 **v1.17.0**。
-
-## 目录结构
-
-```text
-CCMeeting/
-├── CMakeLists.txt          # 根工程（可选构建 client / server / server2）
-├── build.py                # 一键构建脚本
-├── client/                 # Qt 客户端（含 webrtcSDK/xrtc 子模块）
-│   ├── include/
-│   ├── src/
-│   ├── webrtcSDK/          # xrtc WebRTC 封装
-│   ├── config/
-│   └── CMakeLists.txt
-├── server/                 # 消息服务器
-│   ├── include/
-│   ├── src/
-│   └── CMakeLists.txt
-├── server2/                # 认证 / HTTP 服务器
-│   ├── include/
-│   ├── src/
-│   └── CMakeLists.txt
-├── third_party/            # 可选：放入 spdlog 源码后优先本地构建
-├── docs/                   # Doxygen 生成输出（默认不入库）
-└── Doxyfile                # Doxygen 配置（可选）
-```
+依赖通过 **git submodule** 落在 `third_party/`（配置阶段会自动 `git submodule update --init --recursive`）；**不使用** FetchContent 下到 build 目录。客户端的 WebRTC / Boost 头等由 **xrtc** 下载到 `third_party/webrtcSDK/` 源码树内；服务端 Boost（Asio/Beast，仅头文件）由根 CMake 下载到 `third_party/boost-*/`（删 build 一般无需重下）。
 
 ## 环境准备
 
-1. 安装 **CMake**、**C++17** 编译器（MSVC / MinGW / GCC / Clang）、**Python 3**（用于 `build.py`）
-2. 安装 **Qt 6**（建议 6.x，需含 Network、Multimedia 等模块；客户端音视频依赖预编译 libwebrtc 与 Boost）
-3. **spdlog**：无需预装；首次配置需能访问 GitHub（或事先把源码放到 `third_party/spdlog`）
-4. 若构建消息服务器：安装 **Boost**（含 `system`，≥ 1.70）
-5. 若构建认证服务器：额外需要 Boost `json`、**OpenSSL**、**MySQL Connector/C++**（如 `libmysqlcppconn-dev`）
-6. 客户端需 **MSVC** 工具链（与 libwebrtc 一致），并配置 `WEBRTC_INCLUDE` / `WEBRTC_LIB` / Boost 路径（见 `client/CMakeLists.txt`）
+1. **客户端**：Visual Studio（与 xrtc 要求一致的 MSVC 工具集）、Qt 6（如 `F:/Qt/6.8.3/msvc2022_64`）、独立 Ninja（如 `F:/ninja/ninja.exe`）
+2. **服务端**：GCC/MinGW 或 MSVC 均可；**Boost 可选**（未指定时自动下载）；认证服另需 OpenSSL、SQLite3
+3. `git submodule update --init --recursive`
+4. 客户端 / 服务端首次配置可能从 GitHub 下载依赖（需能访问网络；国内可设代理）
 
-## 编译
+## 编译（CMake）
 
-推荐在仓库根目录使用 `build.py`。默认自动选用 Ninja（若已安装）；未指定 Qt 路径时，会尝试环境变量 `QT_INSTALL_PATH` / `Qt6_DIR`，或本机默认路径 `F:/Qt/6.8.3/mingw_64`。
+### 客户端（MSVC + Ninja）
 
-### 使用 build.py（推荐）
+PowerShell 里不要直接 `& vcvars64.bat`（环境不会留下）。用 **一条 cmd** 加载工具链后再配置、编译：
 
-```bash
-# 仅客户端
-python build.py --client
+```powershell
+$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+$vs = & $vswhere -latest -products * `
+  -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+  -property installationPath
+$vcvars = Join-Path $vs "VC\Auxiliary\Build\vcvars64.bat"
 
-# 仅消息服务器
-python build.py --message_server --boost-root=<Boost安装路径>
+Remove-Item -Recurse -Force build\client -ErrorAction SilentlyContinue
 
-# 仅认证服务器
-python build.py --data_server --boost-root=<Boost安装路径>
-
-# 全部构建
-python build.py --all --boost-root=<Boost安装路径>
-
-# 常用选项
-python build.py --client --clean          # 清理后重新配置
-python build.py --client --qt-path=F:/Qt/6.8.3/mingw_64
-python build.py --client --config Debug -j 8
+cmd /c "`"$vcvars`" && cmake -S . -B build/client -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=F:/ninja/ninja.exe -DBUILD_CLIENT=ON -DBUILD_SERVER=OFF -DBUILD_SERVER2=OFF -DQT_INSTALL_PATH=F:/Qt/6.8.3/msvc2022_64 && cmake --build build/client -j"
 ```
 
-| 参数 | 构建目录 | 可执行文件 |
-|------|----------|------------|
-| `--client` | `build/` | `CloudMeetingClient` |
-| `--message_server` | `build-server/` | `CloudMeetingServer` |
-| `--data_server` | `build-server2/` | `CloudMeetingAuthServer` |
+可选：已有 Boost 头文件时加 `-DBoost_ROOT=F:/wy/boost_install`，跳过 xrtc 内下载。
 
-### 手动 CMake
+可执行文件：`build/client/client/CloudMeeting.exe`。
 
-**仅客户端（默认）**
+Release：把 `Debug` 换成 `Release`，并改 `-DCMAKE_BUILD_TYPE=Release`。
+
+### 消息服务器
 
 ```bash
-cmake -S . -B build -DBUILD_CLIENT=ON -DBUILD_SERVER=OFF -DBUILD_SERVER2=OFF -DQT_INSTALL_PATH=<你的Qt路径>
-cmake --build build
+cmake -S . -B build/message_server -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DBUILD_CLIENT=OFF -DBUILD_SERVER=ON -DBUILD_SERVER2=OFF
+cmake --build build/message_server -j
 ```
 
-**仅消息服务器**
+首次配置若本机没有 Boost，会自动下载头文件包到 `third_party/boost-*/`（可加 `-DBoost_ROOT=<路径>` 跳过下载）。
+
+输出：`build/message_server/message_server/CloudMeetingServer`（Windows 下为 `.exe`）。
+
+### 认证服务器
 
 ```bash
-cmake -S . -B build-server -DBUILD_CLIENT=OFF -DBUILD_SERVER=ON -DBUILD_SERVER2=OFF -DBOOST_ROOT=<Boost安装路径>
-cmake --build build-server
+cmake -S . -B build/data_server -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DBUILD_CLIENT=OFF -DBUILD_SERVER=OFF -DBUILD_SERVER2=ON
+cmake --build build/data_server -j
 ```
 
-**仅认证服务器**
+Boost 处理同上；另需本机 OpenSSL、SQLite3。
 
-```bash
-cmake -S . -B build-server2 -DBUILD_CLIENT=OFF -DBUILD_SERVER=OFF -DBUILD_SERVER2=ON -DBOOST_ROOT=<Boost安装路径>
-cmake --build build-server2
-```
+输出：`build/data_server/data_server/CloudMeetingAuthServer`。
 
-**同时构建全部**
+### 常用 -D 选项
 
-```bash
-cmake -S . -B build-all -DBUILD_CLIENT=ON -DBUILD_SERVER=ON -DBUILD_SERVER2=ON -DQT_INSTALL_PATH=<Qt路径> -DBOOST_ROOT=<Boost路径>
-cmake --build build-all
-```
-
-也可设置环境变量 `Qt6_DIR` 指向 Qt 的 CMake 配置目录，而不传 `-DQT_INSTALL_PATH`。
-
-> 若更换 CMake 生成器（如 MinGW Makefiles → Ninja），需先删除对应构建目录或使用 `python build.py --client --clean`。
+| 变量 | 含义 |
+|------|------|
+| `BUILD_CLIENT` / `BUILD_SERVER` / `BUILD_SERVER2` | 开关各目标（默认只开客户端） |
+| `QT_INSTALL_PATH` | Qt6 根目录（仅客户端） |
+| `Boost_ROOT` | Boost 根目录（可选；有则跳过自动下载） |
+| `CCMEETING_BOOST_URL` | 服务端 Boost 源码包 URL（可选覆盖） |
+| `CMAKE_BUILD_TYPE` | `Debug` / `Release`（Ninja 单配置） |
+| `CMAKE_MAKE_PROGRAM` | Ninja 可执行文件路径 |
 
 ## 运行说明
 
-1. （可选）启动 **CloudMeetingAuthServer**，用于注册 / 登录
-2. 启动 **CloudMeetingServer** 消息服务器
-3. 启动 **CloudMeetingClient** 客户端，填写服务器地址与端口并连接
-4. 创建会议或加入已有房间号；音视频经 Janus/WebRTC，文字与房间控制经消息服务器
+1. （可选）启动 **CloudMeetingAuthServer**
+2. 启动 **CloudMeetingServer**
+3. 启动 **CloudMeeting** 客户端并连接（可将 Qt `bin` 加入 PATH，或用 `windeployqt` 部署依赖）
 
 ## 文档（可选）
-
-若本机已安装 Doxygen，可在仓库根目录生成 API 文档：
 
 ```bash
 doxygen Doxyfile
 ```
 
-浏览器打开 `docs/html/index.html` 查看。生成结果默认被 `.gitignore` 忽略。
+打开 `docs/html/index.html`。生成结果默认被 `.gitignore` 忽略。
