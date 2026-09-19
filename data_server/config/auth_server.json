@@ -1,0 +1,16 @@
+{
+  "http": {
+    "listen_address": "0.0.0.0",
+    "listen_port": 9000
+  },
+  "sqlite": {
+    "path": "data/auth.db"
+  },
+  "assets": {
+    "public_base_url": "http://8.153.155.18:9000",
+    "static_root": "./static",
+    "upload_root": "./uploads",
+    "default_avatar_path": "/static/avatar/default.png",
+    "max_avatar_bytes": 2097152
+  }
+}

@@ -1,3 +1,15 @@
-[submodule "client/webrtcSDK"]
-	path = client/webrtcSDK
-	url = git@github.com:wang-y-cell/xrtc.git
+[submodule "third_party/webrtcSDK"]
+	path = third_party/webrtcSDK
+	url = https://github.com/wang-y-cell/xrtc.git
+[submodule "third_party/spdlog"]
+	path = third_party/spdlog
+	url = https://github.com/gabime/spdlog.git
+[submodule "third_party/json"]
+	path = third_party/json
+	url = https://github.com/nlohmann/json.git
+[submodule "third_party/gtest"]
+	path = third_party/gtest
+	url = https://github.com/google/googletest.git
+[submodule "third_party/httplib"]
+	path = third_party/httplib
+	url = https://github.com/yhirose/cpp-httplib.git

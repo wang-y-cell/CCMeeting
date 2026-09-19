@@ -6,6 +6,9 @@ build-server2/
 log.txt
 # 可选本地 spdlog 源码目录（也可用 FetchContent，不必提交）
 # third_party/
+# 服务端自动下载的 Boost 源码包（体积大，不提交）
+third_party/boost-*/
+third_party/boost_*/
 docs/
 server2/uploads/
 server2/data/
