@@ -3,7 +3,7 @@
 # data_server（Boost.Beast HTTP + nlohmann/json + SQLite）
 #
 #-------------------------------------------------
-# Boost::headers / Boost::system 由根 CMake ccmmeeting_ensure_boost_for_servers 提供
+# Boost::headers / Boost::system 由根 CMake ccmeeting_ensure_boost_for_servers 提供
 if(NOT TARGET Boost::headers OR NOT TARGET Boost::system)
     if(Boost_ROOT)
         list(PREPEND CMAKE_PREFIX_PATH "${Boost_ROOT}")
@@ -24,6 +24,8 @@ file(GLOB_RECURSE SERVER2_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
 )
+# 参考/备份入口，勿与 main.cpp 同时编进可执行文件
+list(FILTER SERVER2_SOURCES EXCLUDE REGEX "main_boost_ref\\.cpp$")
 list(SORT SERVER2_SOURCES)
 
 add_executable(CloudMeetingAuthServer ${SERVER2_SOURCES})
