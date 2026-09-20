@@ -46,14 +46,21 @@ public:
     static ClientConfig& instance();
 
     bool load();
+    /// 写入 exe 旁 config/client.json（保留未在设置页编辑的字段）
+    bool save() const;
 
     const AuthConfigData& auth() const { return auth_; }
     const MeetingServerConfig& meeting_server() const { return meeting_server_; }
     const WebRtcConfig& webrtc() const { return webrtc_; }
 
+    AuthConfigData& auth() { return auth_; }
+    MeetingServerConfig& meeting_server() { return meeting_server_; }
+    WebRtcConfig& webrtc() { return webrtc_; }
+
 private:
     ClientConfig() = default;
     bool loadFromJsonObject(const QJsonObject& root);
+    QJsonObject toJsonObject() const;
 
     AuthConfigData auth_;
     MeetingServerConfig meeting_server_;

@@ -9,6 +9,7 @@
 #include <QListWidget>
 #include <QMessageBox>
 #include <QMouseEvent>
+#include <QSettings>
 #include <QStackedWidget>
 #include <spdlog/spdlog.h>
 
@@ -38,15 +39,12 @@ main_window::main_window(QWidget *parent) : FramelessWindow<QWidget>(parent) {
     set_style();
     refreshUserCard();
 
-    widget = new MeetingWidget(nullptr);
-    widget->hide();
-
+    // 延迟创建 MeetingWidget：其 QSoundEffect 会加载 Qt Multimedia(FFmpeg)，
+    // 过早加载后 WebRTC 摄像头枚举（设置页）在部分环境会直接崩溃。
     connect(create_meeting_widget, &stack_create_meet::createMeetingClicked,
             this, &main_window::CreateMeeting_button_clicked);
     connect(join_meeting_widget, &stack_join_meet::joinMeetingClicked, this,
             &main_window::JoinMeeting_button_clicked);
-    connect(widget, &MeetingWidget::connect_server_finished_signal, this,
-            &main_window::onConnectServerFinished);
     connect(user_profile_widget, &stack_user_profile::backHomeRequested, this,
             &main_window::onProfileBackHome);
     connect(user_profile_widget, &stack_user_profile::avatarUpdated, this,
@@ -67,6 +65,21 @@ void main_window::destroyMeetingWidget() {
     widget->hide();
     delete widget;
     widget = nullptr;
+}
+
+MeetingWidget *main_window::ensureMeetingWidget() {
+    if (widget) {
+        return widget;
+    }
+    spdlog::info("[main_window] lazy create MeetingWidget");
+    spdlog::default_logger()->flush();
+    widget = new MeetingWidget(nullptr);
+    widget->hide();
+    connect(widget, &MeetingWidget::connect_server_finished_signal, this,
+            &main_window::onConnectServerFinished);
+    spdlog::info("[main_window] MeetingWidget ready");
+    spdlog::default_logger()->flush();
+    return widget;
 }
 
 main_window::~main_window() {
@@ -140,6 +153,9 @@ void main_window::init_ui() {
     join_meeting_widget = new stack_join_meet(this);
     ui.contentStack->addWidget(join_meeting_widget);
 
+    setting_widget = new stack_setting(this);
+    ui.contentStack->addWidget(setting_widget);
+
     user_profile_widget = new stack_user_profile(this);
     ui.contentStack->addWidget(user_profile_widget);
 
@@ -153,8 +169,23 @@ void main_window::init_ui() {
                     ui.contentStack->setCurrentWidget(create_meeting_widget);
                 } else if (row == 1 && join_meeting_widget) {
                     ui.contentStack->setCurrentWidget(join_meeting_widget);
+                } else if (row == 2 && setting_widget) {
+                    ui.contentStack->setCurrentWidget(setting_widget);
                 }
             });
+
+    connect(setting_widget, &stack_setting::uiPrefsChanged, this, [this]() {
+        // 预留：主题等后续可在此刷新
+        Q_UNUSED(this);
+    });
+
+    {
+        QSettings s(QStringLiteral("CCMeeting"), QStringLiteral("Client"));
+        const int startPage = s.value(QStringLiteral("ui/startPage"), 0).toInt();
+        if (startPage >= 0 && startPage < ui.sideNav->count()) {
+            ui.sideNav->setCurrentRow(startPage);
+        }
+    }
 }
 
 void main_window::CreateMeeting_button_clicked(quint32 max_participants,
@@ -162,17 +193,18 @@ void main_window::CreateMeeting_button_clicked(quint32 max_participants,
     spdlog::info(
         "[main_window] CreateMeeting max_participants={} duration_minutes={}",
         max_participants, duration_minutes);
-    if (widget == nullptr) {
+    MeetingWidget *meeting = ensureMeetingWidget();
+    if (meeting == nullptr) {
         QMessageBox::warning(this, "warning", "会议窗口未初始化");
         return;
     }
-    if (widget->isVisible()) {
+    if (meeting->isVisible()) {
         QMessageBox::warning(this, "warning", "目前有一打开的会议");
         return;
     }
 
-    widget->show();
-    widget->request_connect_to_server_slot(
+    meeting->show();
+    meeting->request_connect_to_server_slot(
         meeting_server_host(), meeting_server_port(),
         ConnectAction::CreateMeeting, QString(), max_participants,
         duration_minutes);
@@ -181,11 +213,12 @@ void main_window::CreateMeeting_button_clicked(quint32 max_participants,
 void main_window::JoinMeeting_button_clicked(const QString &roomNo) {
     spdlog::info("[main_window] JoinMeeting roomNo={}",
                  roomNo.toUtf8().constData());
-    if (widget == nullptr) {
+    MeetingWidget *meeting = ensureMeetingWidget();
+    if (meeting == nullptr) {
         QMessageBox::warning(this, "warning", "会议窗口未初始化");
         return;
     }
-    if (widget->isVisible()) {
+    if (meeting->isVisible()) {
         QMessageBox::warning(this, "warning", "目前有一打开的会议");
         return;
     }
@@ -194,8 +227,8 @@ void main_window::JoinMeeting_button_clicked(const QString &roomNo) {
         return;
     }
 
-    widget->show();
-    widget->request_connect_to_server_slot(meeting_server_host(),
+    meeting->show();
+    meeting->request_connect_to_server_slot(meeting_server_host(),
                                            meeting_server_port(),
                                            ConnectAction::JoinMeeting, roomNo);
 }

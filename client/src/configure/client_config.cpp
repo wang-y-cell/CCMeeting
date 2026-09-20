@@ -1,6 +1,7 @@
 #include "configure/client_config.h"
 
 #include <QCoreApplication>
+#include <QDir>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -120,5 +121,67 @@ bool ClientConfig::loadFromJsonObject(const QJsonObject& root) {
         }
     }
 
+    return true;
+}
+
+QJsonObject ClientConfig::toJsonObject() const {
+    QJsonObject root;
+
+    QJsonObject auth;
+    auth.insert(QStringLiteral("host"), auth_.host);
+    auth.insert(QStringLiteral("port"), auth_.port);
+    auth.insert(QStringLiteral("login_path"), auth_.login_path);
+    auth.insert(QStringLiteral("register_path"), auth_.register_path);
+    auth.insert(QStringLiteral("upload_avatar_path"), auth_.upload_avatar_path);
+    auth.insert(QStringLiteral("update_profile_path"), auth_.update_profile_path);
+    auth.insert(QStringLiteral("public_base_url"), auth_.public_base_url);
+    auth.insert(QStringLiteral("default_avatar_path"), auth_.default_avatar_path);
+    root.insert(QStringLiteral("auth"), auth);
+
+    QJsonObject meeting;
+    meeting.insert(QStringLiteral("host"), meeting_server_.host);
+    meeting.insert(QStringLiteral("port"), meeting_server_.port);
+    root.insert(QStringLiteral("meeting_server"), meeting);
+
+    QJsonObject webrtc;
+    webrtc.insert(QStringLiteral("janus_ws_url"), webrtc_.janus_ws_url);
+    webrtc.insert(QStringLiteral("admin_key"), webrtc_.admin_key);
+    QJsonObject video;
+    video.insert(QStringLiteral("width"), webrtc_.video.width);
+    video.insert(QStringLiteral("height"), webrtc_.video.height);
+    video.insert(QStringLiteral("fps"), webrtc_.video.fps);
+    webrtc.insert(QStringLiteral("video"), video);
+    QJsonArray ice;
+    for (const IceServerConfig &s : webrtc_.ice_servers) {
+        QJsonObject o;
+        o.insert(QStringLiteral("uri"), s.uri);
+        o.insert(QStringLiteral("username"), s.username);
+        o.insert(QStringLiteral("password"), s.password);
+        ice.append(o);
+    }
+    webrtc.insert(QStringLiteral("ice_servers"), ice);
+    root.insert(QStringLiteral("webrtc"), webrtc);
+
+    return root;
+}
+
+bool ClientConfig::save() const {
+    const QString dirPath =
+        QCoreApplication::applicationDirPath() + QStringLiteral("/config");
+    QDir().mkpath(dirPath);
+    const QString path = dirPath + QStringLiteral("/client.json");
+
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        spdlog::error("[ClientConfig] cannot write {}", path.toStdString());
+        return false;
+    }
+    const QByteArray bytes =
+        QJsonDocument(toJsonObject()).toJson(QJsonDocument::Indented);
+    if (file.write(bytes) != bytes.size()) {
+        spdlog::error("[ClientConfig] write incomplete {}", path.toStdString());
+        return false;
+    }
+    spdlog::info("[ClientConfig] saved {}", path.toStdString());
     return true;
 }

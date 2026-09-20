@@ -7,6 +7,7 @@
 #include "stack_create_meet.h"
 #include "stack_join_meet.h"
 #include "stack_user_profile.h"
+#include "stack_setting.h"
 
 #include <QCloseEvent>
 #include <QWidget>
@@ -37,6 +38,7 @@ protected:
 
 private:
     void destroyMeetingWidget();
+    MeetingWidget *ensureMeetingWidget();
 
     Ui_main_window ui;
     MeetingWidget *widget = nullptr;
@@ -44,6 +46,7 @@ private:
     stack_create_meet *create_meeting_widget = nullptr;
     stack_join_meet *join_meeting_widget = nullptr;
     stack_user_profile *user_profile_widget = nullptr;
+    stack_setting *setting_widget = nullptr;
 };
 
 #endif // MAIN_WINDOW_H

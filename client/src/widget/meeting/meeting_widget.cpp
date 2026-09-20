@@ -27,6 +27,7 @@
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
 #include <QScrollBar>
+#include <QSettings>
 #include <QSoundEffect>
 #include <QStyle>
 #include <QTabWidget>
@@ -74,11 +75,9 @@ MeetingWidget::MeetingWidget(QWidget *parent)
     spdlog::info("[MeetingWidget] CameraVideo ready");
     spdlog::default_logger()->flush();
 
-    _soundEffect = new QSoundEffect(this);
-    _soundEffect->setSource(QUrl("qrc:/myEffect/2.wav"));
-    _soundEffect->setVolume(1.0);
-    spdlog::info("[MeetingWidget] QSoundEffect ready");
-    spdlog::default_logger()->flush();
+    // 延迟创建 QSoundEffect：构造时加载 Qt Multimedia(FFmpeg) 会与 WebRTC
+    // 摄像头枚举冲突，导致设置页一点开就崩。
+    _soundEffect = nullptr;
 
     spdlog::info("[MeetingWidget] init_permanent_workers begin");
     spdlog::default_logger()->flush();
@@ -399,17 +398,30 @@ xrtc::XRTCJoinConfig MeetingWidget::build_join_config() const {
     config.select_strategy = xrtc::XRTCVideoSelectStrategy::kPreferRequested;
 
     if (_rtc) {
+        QSettings prefs(QStringLiteral("CCMeeting"), QStringLiteral("Client"));
         const auto cameras = _rtc->get_video_device_info();
         if (!_selectedVideoDeviceId.empty()) {
             config.video_device_id = _selectedVideoDeviceId;
-        } else if (!cameras.empty()) {
-            config.video_device_id = cameras.front().device_id;
+        } else {
+            const QString savedVideo =
+                prefs.value(QStringLiteral("video/deviceId")).toString();
+            if (!savedVideo.isEmpty()) {
+                config.video_device_id = savedVideo.toStdString();
+            } else if (!cameras.empty()) {
+                config.video_device_id = cameras.front().device_id;
+            }
         }
         const auto mics = _rtc->get_audio_device_info();
         if (!_selectedAudioDeviceId.empty()) {
             config.audio_device_id = _selectedAudioDeviceId;
-        } else if (!mics.empty()) {
-            config.audio_device_id = mics.front().device_id;
+        } else {
+            const QString savedAudio =
+                prefs.value(QStringLiteral("audio/deviceId")).toString();
+            if (!savedAudio.isEmpty()) {
+                config.audio_device_id = savedAudio.toStdString();
+            } else if (!mics.empty()) {
+                config.audio_device_id = mics.front().device_id;
+            }
         }
         const auto speakers = _rtc->get_playout_device_info();
         if (!_selectedPlayoutDeviceId.empty()) {
@@ -953,6 +965,11 @@ void MeetingWidget::handle_text_recv(const MessagePtr &msg) {
                    ChatMessage::User_She, partner_avatar_url(text_msg->user_id()));
     const QString myName = UserSession::instance().name();
     if (!myName.isEmpty() && str.contains(QStringLiteral("@") + myName)) {
+        if (!_soundEffect) {
+            _soundEffect = new QSoundEffect(this);
+            _soundEffect->setSource(QUrl("qrc:/myEffect/2.wav"));
+            _soundEffect->setVolume(1.0);
+        }
         _soundEffect->play();
     }
 }
