@@ -11,7 +11,7 @@
 void Ui_main_window::setupUi(QWidget *parent) {
     parent->setObjectName(QStringLiteral("main_window"));
     parent->resize(960, 640);
-    parent->setMinimumSize(760, 480);
+    parent->setMinimumSize(1200, 720);
     parent->setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
 
     auto *mainLayout = new QHBoxLayout(parent);
@@ -54,6 +54,7 @@ void Ui_main_window::setupUi(QWidget *parent) {
     const QStringList sideNavItems = {
         QObject::tr("创建会议"),
         QObject::tr("加入会议"),
+        QObject::tr("设置"),
     };
     for (const auto &item : sideNavItems) {
         auto *listItem = new QListWidgetItem(item);

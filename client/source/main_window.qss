@@ -225,3 +225,103 @@ QPushButton#backHomeBtn {
 QPushButton#backHomeBtn:hover {
     background-color: #455066;
 }
+
+QListWidget#settingCategoryList {
+    background-color: #232733;
+    border: 1px solid #343a48;
+    border-radius: 12px;
+    padding: 8px 6px;
+    outline: none;
+}
+
+QListWidget#settingCategoryList::item {
+    color: #a9b1c3;
+    border-radius: 8px;
+    margin: 2px 0;
+    padding: 4px;
+}
+
+QListWidget#settingCategoryList::item:hover {
+    background-color: #2a3040;
+    color: #ffffff;
+}
+
+QListWidget#settingCategoryList::item:selected {
+    background-color: #2f6fed;
+    color: #ffffff;
+}
+
+QStackedWidget#settingPageStack {
+    background: transparent;
+    border: none;
+}
+
+QComboBox,
+QSpinBox {
+    background-color: #232733;
+    color: #eef1f6;
+    border: 1px solid #343a48;
+    border-radius: 10px;
+    padding: 4px 10px;
+    min-height: 36px;
+    font-size: 14px;
+}
+
+QComboBox:hover,
+QSpinBox:hover {
+    border-color: #455066;
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: 24px;
+}
+
+QCheckBox {
+    color: #eef1f6;
+    font-size: 14px;
+    spacing: 8px;
+}
+
+QCheckBox::indicator {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 1px solid #455066;
+    background: #232733;
+}
+
+QCheckBox::indicator:checked {
+    background: #2f6fed;
+    border-color: #2f6fed;
+}
+
+QPushButton#settingsResetBtn {
+    background-color: #343a48;
+}
+
+QPushButton#settingsResetBtn:hover {
+    background-color: #455066;
+}
+
+QProgressBar#micLevelBar {
+    background-color: #232733;
+    border: 1px solid #343a48;
+    border-radius: 6px;
+    text-align: center;
+    color: #eef1f6;
+}
+
+QProgressBar#micLevelBar::chunk {
+    background-color: #2f6fed;
+    border-radius: 5px;
+}
+
+QLabel#settingsVideoPreview {
+    background-color: #12141a;
+    border: 1px solid #343a48;
+    border-radius: 12px;
+    color: #8a90a0;
+}
+
+
