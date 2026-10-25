@@ -1,5 +1,7 @@
 #ifndef NETHEADER_H
 #define NETHEADER_H
+#include "room_settings_flags.h"
+
 #include <QMetaType>
 #include <cstdint>
 
@@ -38,6 +40,7 @@ enum MSG_TYPE : std::uint8_t {
     EXIT_MEETING,
     JOIN_MEETING,
     CLOSE_CAMERA,
+    ROOM_SETTINGS,  // 客户端 -> 服务器：房主修改房间开关（4 字节 BE flags）
 
     CREATE_MEETING_RESPONSE = 20,
     PARTNER_EXIT,
@@ -46,10 +49,12 @@ enum MSG_TYPE : std::uint8_t {
     PARTNER_JOIN2,
 
     USER_PROFILE = 25,
+    ROOM_SETTINGS_NOTIFY = 26,  // 服务器 -> 客户端：房间开关当前值
 
     RemoteHostClosedError = 40,
     OtherNetError
 };
 Q_DECLARE_METATYPE(MSG_TYPE);
+
 
 #endif // NETHEADER_H

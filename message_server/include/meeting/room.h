@@ -59,6 +59,10 @@ public:
      * @brief 获取会议时长（分钟）
      */
     uint32_t duration_minutes() const { return _options.duration_minutes; }
+    /**
+     * @brief 房间开关位掩码（允许录制 / 允许成员共享屏幕等）
+     */
+    uint32_t settings() const { return _settings; }
 
     /**
      * @brief 启动到期关房定时器（须在 shared_ptr 管理下调用）
@@ -126,6 +130,7 @@ private:
     boost::asio::io_context& _io_ctx;/*IO上下文，用于到期定时器*/
     std::unique_ptr<boost::asio::steady_timer> _expire_timer;/*到期关房定时器*/
     bool _closed = false;/*房间是否关闭*/
+    uint32_t _settings = protocol::kRoomSettingsDefault;/*房间开关，仅房主可改*/
     std::unordered_map<network::Connection::Id, Participant> _participants;/*连接ID和参与者的映射*/
     CloseCallback _close_callback;/*关闭回调*/
 };

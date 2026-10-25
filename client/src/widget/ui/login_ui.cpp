@@ -29,12 +29,20 @@ void Ui_login::setupUi(QWidget *parent) {
     loginPageLayout->setSpacing(0);
     loginPageLayout->setContentsMargins(0, 0, 0, 0);
 
+    logoLabel = new QLabel(QObject::tr("云"), loginPage);
+    logoLabel->setObjectName(QStringLiteral("logoLabel"));
+    logoLabel->setAlignment(Qt::AlignCenter);
+    logoLabel->setFixedSize(52, 52);
+    loginPageLayout->addWidget(logoLabel, 0, Qt::AlignHCenter);
+    loginPageLayout->addItem(
+        new QSpacerItem(20, 18, QSizePolicy::Minimum, QSizePolicy::Fixed));
+
     brandLabel = new QLabel(QObject::tr("云会议"), loginPage);
     brandLabel->setObjectName(QStringLiteral("brandLabel"));
     brandLabel->setAlignment(Qt::AlignCenter);
     loginPageLayout->addWidget(brandLabel);
     loginPageLayout->addItem(
-        new QSpacerItem(20, 8, QSizePolicy::Minimum, QSizePolicy::Fixed));
+        new QSpacerItem(20, 6, QSizePolicy::Minimum, QSizePolicy::Fixed));
 
     subtitleLabel =
         new QLabel(QObject::tr("登录以开始你的云会议"), loginPage);
@@ -42,7 +50,7 @@ void Ui_login::setupUi(QWidget *parent) {
     subtitleLabel->setAlignment(Qt::AlignCenter);
     loginPageLayout->addWidget(subtitleLabel);
     loginPageLayout->addItem(
-        new QSpacerItem(20, 40, QSizePolicy::Minimum, QSizePolicy::Fixed));
+        new QSpacerItem(20, 32, QSizePolicy::Minimum, QSizePolicy::Fixed));
 
     account_line = new QLineEdit(loginPage);
     account_line->setObjectName(QStringLiteral("account_line"));

@@ -43,8 +43,19 @@ void stack_user_profile::refreshFromSession() {
 
     AvatarImageLoader::instance().load(
         session.avatar(), ui.profileAvatarLarge->size(), this,
-        [this](const QPixmap &pixmap) {
-            ui.profileAvatarLarge->setPixmap(pixmap);
+        [this, monogram = session.name().left(1)](const QPixmap &pixmap) {
+            if (!ui.profileAvatarLarge) {
+                return;
+            }
+            if (pixmap.isNull()) {
+                // 头像加载失败时用姓名首字兜底，不留空白圆
+                ui.profileAvatarLarge->setPixmap(QPixmap());
+                ui.profileAvatarLarge->setText(
+                    monogram.isEmpty() ? QStringLiteral("?") : monogram);
+            } else {
+                ui.profileAvatarLarge->setText(QString());
+                ui.profileAvatarLarge->setPixmap(pixmap);
+            }
         });
 }
 

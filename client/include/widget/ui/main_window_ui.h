@@ -12,6 +12,8 @@ public:
     QWidget *userCard = nullptr;
     QLabel *avatarLabel = nullptr;
     QLabel *nameLabel = nullptr;
+    QLabel *sideBarStatus = nullptr;
+    QLabel *sideBarVersion = nullptr;
     QListWidget *sideNav = nullptr;
     QStackedWidget *contentStack = nullptr;
 

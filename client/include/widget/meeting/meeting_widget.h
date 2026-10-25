@@ -2,6 +2,9 @@
 #define MEETING_WIDGET_H
 
 #include "frameless_window.h"
+#include "meeting_recorder.h"
+#include "meeting_settings_popup.h"
+#include "room_settings_flags.h"
 #include "meeting_controller.h"
 #include "networkmanager.h"
 #include "message.h"
@@ -38,6 +41,8 @@ struct state {
     bool _rtcJoined = false; //WebRTC join 是否已成功（才可调 start/stop_local_*）
     bool _localVideoOn = false; //会议内本地摄像头是否已 start_local_video（真正开采集推流）
     bool _localAudioOn = false; //会议内本地麦克风是否已 start_local_audio
+    /** 会议内是否正在共享屏幕（与摄像头互斥，xrtc 内共用同一条视频轨） */
+    bool _localScreenOn = false;
 
     bool _sessionActive = false; //会议是否活跃
     bool _sessionEnding = false; //会议是否结束
@@ -53,6 +58,15 @@ private:
     static QRect pos;
     state _state; //维护会议状态
     qint64 main_user_id_ = 0;
+    /** 房间开关位掩码（房主修改，服务端广播） */
+    std::uint32_t _roomSettings = ROOM_SETTINGS_DEFAULT;
+    MeetingSettingsPopup *_settingsPopup = nullptr;
+    /** 本地录制器（录制当前主画面） */
+    MeetingRecorder *_recorder = nullptr;
+    /** 仅用于首次记录本地预览分辨率（诊断用） */
+    bool _previewSizeLogged = false;
+    /** 本次会议开始时刻（用于统计时长），0 表示未开始 */
+    qint64 _sessionStartMs = 0;
     std::string _selectedVideoDeviceId;
     std::string _selectedAudioDeviceId;
     std::string _selectedPlayoutDeviceId;
@@ -91,12 +105,26 @@ private:
     void init_ui();
     void init_connect();
     void init_partner_connect(Partner *p);
+    /** @brief 创建会议设置弹出面板并连接其信号 */
+    void init_settings_popup();
     void init_permanent_workers();
     void end_meeting_session();
     /** 结束会议会话并隐藏会议窗口（加入失败 / 断线 / 超时等） */
     void close_meeting_window();
     void reset_meeting_ui();
-    void update_meeting_info();
+void update_meeting_info();
+    /** @brief 本端是否房主（创建会议者为房主） */
+    bool is_room_host() const;
+    /** @brief 当前是否允许本端共享屏幕（房主恒允许，成员看房间开关） */
+    bool can_share_screen() const;
+    /** @brief 应用服务端下发的房间开关并刷新界面 */
+    void apply_room_settings(std::uint32_t flags);
+    /** @brief 本场是否允许录制（看房间开关） */
+    bool can_record_meeting() const;
+    /** @brief 开始录制主画面 */
+    bool start_recording();
+    /** @brief 停止录制 */
+    void stop_recording();
     void update_speaker_label();
     void shutdown_all_workers();
 
@@ -131,6 +159,14 @@ private:
     void start_local_av_after_join();
     void set_local_video_on(bool on);
     void set_local_audio_on(bool on);
+    /**
+     * @brief 开/停本地屏幕共享
+     * @param on true=开始共享；false=停止共享
+     * @param screen_id 目标显示器 id，空则用已选显示器或主屏
+     */
+    void set_local_screen_on(bool on, const std::string &screen_id = std::string());
+    /** @brief 解析本次要共享的显示器：已选且仍存在 > 主屏 > 第一个 */
+    std::string preferred_screen_id() const;
     void sync_av_button_ui();
     /** WebRTC 会话异常结束（ICE failed / leave）时复位并关会 */
     void handle_rtc_session_lost(const QString &reason);
@@ -182,6 +218,9 @@ public slots:
     void on_open_audio_clicked_slot();
     void on_audio_device_btn_clicked_slot();
     void on_video_device_btn_clicked_slot();
+    void on_share_screen_clicked_slot();
+    /** @brief 顶栏「会议设置」按钮：弹出房间设置面板 */
+    void on_meeting_settings_clicked_slot();
     void on_leave_meeting_clicked_slot();
     void on_side_members_clicked_slot();
     void on_side_chat_clicked_slot();
@@ -208,6 +247,15 @@ private slots:
     void flush_pending_connect();
 
 signals:
+    /**
+     * @brief 服务端确认开会/入会成功（用于写会议记录）
+     * @param created true=我创建的会议；false=我加入的会议
+     * @param room_no 房间号
+     */
+    void meeting_confirmed_signal(bool created, int room_no);
+    /** @brief 会议会话结束，附带本次时长（毫秒） */
+    void meeting_closed_signal(qint64 duration_ms);
+
     void request_connect_signal(QString ip, QString port, ConnectAction action,
                                 QString room_no);
     void create_meeting_requested_signal(quint32 max_participants,

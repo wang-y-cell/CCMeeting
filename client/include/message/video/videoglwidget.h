@@ -83,6 +83,13 @@ public:
      * @param image 非空图像；可跨线程调用
      */
     void setFrame(QImage image);
+    /**
+     * @brief 设置清屏颜色（默认 #07080B，与会议画布一致）
+     *
+     * 头像这类带透明通道的图需要透明的角落与背后界面同色，
+     * 否则会出现一圈/一块异色方块。
+     */
+    void setClearColor(const QColor &color);
     /** @brief 清空画面（下一帧 paintGL 只清背景） */
     void clearFrame();
 
@@ -155,7 +162,8 @@ private:
 
     QMutex m_mutex;                      ///< 保护 pending 帧与标志
     xrtc::XRTCVideoFrame m_pendingI420;  ///< 待上传的最新 I420
-    QImage m_pendingRgba;                ///< 待上传的最新 RGBA
+    QImage m_pendingRgba;
+    QColor m_clearColor{7, 8, 11};                ///< 待上传的最新 RGBA
     bool m_dirty = false;                ///< 有新帧待 paintGL 取走
     bool m_clearRequested = false;       ///< 请求清空画面,表示是否请求清空画面
     ContentKind m_pendingKind = ContentKind::None; ///< pending 帧类型,表示缓存的是视频帧还是头像图

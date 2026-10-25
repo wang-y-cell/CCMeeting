@@ -140,7 +140,7 @@ void VideoGLWidget::clearFrame() {
 
 void VideoGLWidget::initializeGL() {
     initializeOpenGLFunctions();
-    glClearColor(0.07f, 0.08f, 0.10f, 1.0f);
+    // 清屏色在 paintGL 里按 m_clearColor 设置（见 setClearColor）
     m_glReady = true;
 
     ensureYuvProgram();
@@ -440,6 +440,11 @@ void VideoGLWidget::drawTexturedQuad(const QRectF &dest, bool yuv) {
     };
 
     program->bind();
+    // 头像（RGBA）带透明通道：必须开混合，否则透明角落会被写成黑色方块
+    if (!yuv) {
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    }
     if (yuv) {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, m_texY);
@@ -473,7 +478,18 @@ void VideoGLWidget::drawTexturedQuad(const QRectF &dest, bool yuv) {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, 0);
+    if (!yuv) {
+        glDisable(GL_BLEND);
+    }
     program->release();
+}
+
+void VideoGLWidget::setClearColor(const QColor &color) {
+    if (!color.isValid()) {
+        return;
+    }
+    m_clearColor = color;
+    update();
 }
 
 void VideoGLWidget::paintGL() {
@@ -515,6 +531,9 @@ void VideoGLWidget::paintGL() {
     }
 
     //清空画布
+    glClearColor(static_cast<float>(m_clearColor.redF()),
+                 static_cast<float>(m_clearColor.greenF()),
+                 static_cast<float>(m_clearColor.blueF()), 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
     //如果当前纹理上没有上传任何类型,或者纹理宽度或高度为0,则直接返回
     if (m_drawnKind == ContentKind::None || m_videoW <= 0 || m_videoH <= 0)

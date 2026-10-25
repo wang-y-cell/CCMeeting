@@ -20,7 +20,118 @@
 #include "main_window.h"
 #include "screen.h"
 
+#ifdef _WIN32
+#include <windows.h>
+
+#include <dbghelp.h>
+#endif
+
 namespace {
+
+// ---------------- 原生崩溃栈记录 ----------------
+// std::terminate 只能抓 C++ 异常；访问违例等结构化异常会直接结束进程，
+// 日志里看不出崩在哪。这里用 DbgHelp 走一遍栈，落盘 crash_stack.txt。
+#ifdef _WIN32
+namespace {
+
+void append_line(HANDLE file, const char *text) {
+    if (file == INVALID_HANDLE_VALUE || text == nullptr) {
+        return;
+    }
+    DWORD written = 0;
+    WriteFile(file, text, static_cast<DWORD>(::strlen(text)), &written, nullptr);
+}
+
+LONG WINAPI crash_handler(EXCEPTION_POINTERS *ep) {
+    char module_path[MAX_PATH] = {};
+    GetModuleFileNameA(nullptr, module_path, MAX_PATH);
+    std::string dump_path(module_path);
+    const std::size_t slash = dump_path.find_last_of("\\/");
+    dump_path = (slash == std::string::npos)
+                    ? std::string("crash_stack.txt")
+                    : dump_path.substr(0, slash + 1) + "crash_stack.txt";
+
+    HANDLE file = CreateFileA(dump_path.c_str(), GENERIC_WRITE, 0, nullptr,
+                              CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+
+    char line[1024] = {};
+    const DWORD code = ep->ExceptionRecord->ExceptionCode;
+    std::snprintf(line, sizeof(line),
+                  "=== 崩溃 ===\n异常码: 0x%08lX\n异常地址: %p\n线程: %lu\n\n",
+                  static_cast<unsigned long>(code),
+                  ep->ExceptionRecord->ExceptionAddress,
+                  static_cast<unsigned long>(GetCurrentThreadId()));
+    append_line(file, line);
+
+    SymSetOptions(SYMOPT_UNDNAME | SYMOPT_LOAD_LINES |
+                  SYMOPT_FAIL_CRITICAL_ERRORS | SYMOPT_NO_PROMPTS);
+    const HANDLE process = GetCurrentProcess();
+    if (!SymInitialize(process, nullptr, TRUE)) {
+        std::snprintf(line, sizeof(line), "SymInitialize 失败: %lu\n",
+                      static_cast<unsigned long>(GetLastError()));
+        append_line(file, line);
+        if (file != INVALID_HANDLE_VALUE) CloseHandle(file);
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+
+    CONTEXT context = *ep->ContextRecord;
+    STACKFRAME64 frame = {};
+    frame.AddrPC.Offset = context.Rip;
+    frame.AddrPC.Mode = AddrModeFlat;
+    frame.AddrFrame.Offset = context.Rbp;
+    frame.AddrFrame.Mode = AddrModeFlat;
+    frame.AddrStack.Offset = context.Rsp;
+    frame.AddrStack.Mode = AddrModeFlat;
+
+    append_line(file, "调用栈（#序号 模块!函数 + 偏移  源文件:行）:\n");
+    for (int index = 0; index < 64; ++index) {
+        if (!StackWalk64(IMAGE_FILE_MACHINE_AMD64, process, GetCurrentThread(),
+                         &frame, &context, nullptr, SymFunctionTableAccess64,
+                         SymGetModuleBase64, nullptr)) {
+            break;
+        }
+        if (frame.AddrPC.Offset == 0) {
+            break;
+        }
+
+        BYTE storage[sizeof(SYMBOL_INFO) + 512] = {};
+        auto *info = reinterpret_cast<SYMBOL_INFO *>(storage);
+        info->SizeOfStruct = sizeof(SYMBOL_INFO);
+        info->MaxNameLen = 511;
+        DWORD64 displacement = 0;
+
+        char source[300] = "?";
+        const char *name = "?";
+        if (SymFromAddr(process, frame.AddrPC.Offset, &displacement, info)) {
+            name = info->Name;
+        }
+        IMAGEHLP_LINE64 src = {};
+        src.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
+        DWORD line_displacement = 0;
+        if (SymGetLineFromAddr64(process, frame.AddrPC.Offset,
+                                 &line_displacement, &src)) {
+            const char *base = ::strrchr(src.FileName, '\\');
+            std::snprintf(source, sizeof(source), "%s:%lu",
+                          base ? base + 1 : src.FileName,
+                          static_cast<unsigned long>(src.LineNumber));
+        }
+        std::snprintf(line, sizeof(line), "#%02d 0x%llX %s + 0x%llX  %s\n",
+                      index, static_cast<unsigned long long>(frame.AddrPC.Offset),
+                      name, static_cast<unsigned long long>(displacement),
+                      source);
+        append_line(file, line);
+    }
+    append_line(file, "=== 结束 ===\n");
+
+    SymCleanup(process);
+    if (file != INVALID_HANDLE_VALUE) {
+        CloseHandle(file);
+    }
+    return EXCEPTION_CONTINUE_SEARCH; // 继续走系统默认处理（仍会生成 WER 报告）
+}
+
+} // namespace
+#endif
 
 std::string qutf8(const QString &s) {
     const QByteArray bytes = s.toUtf8();
@@ -97,6 +208,10 @@ int main(int argc, char *argv[]) {
     //在程序因为未捕获的异常而即将崩溃（调用 std::terminate）时，
     //拦截这个异常，提取出有用的错误信息并记录到日志中，最后再安全地终止程序
     std::set_terminate(on_terminate);
+#ifdef _WIN32
+    // 访问违例这类结构化异常不会走 terminate，用 SEH 过滤器记录调用栈
+    SetUnhandledExceptionFilter(crash_handler);
+#endif
 
     QApplication app(argc, argv);
     qInstallMessageHandler(qt_message_handler);

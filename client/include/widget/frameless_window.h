@@ -355,6 +355,7 @@ private:
         }
     }
 
+protected:
     /**
      * @brief 切换最大化 / 普通状态（按钮或双击调用）
      *
@@ -385,6 +386,7 @@ private:
         updateTitleButtonsGeometry();
     }
 
+private:
     /**
      * @brief 最大化状态下拖动标题栏时的还原逻辑
      * @param globalPos 鼠标屏幕坐标

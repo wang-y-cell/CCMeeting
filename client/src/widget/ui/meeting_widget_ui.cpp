@@ -106,6 +106,13 @@ void Ui_meeting_widget::setupUi(QWidget *parent) {
         makeLabel(QStringLiteral("topMeetStatus"), QObject::tr("未加入会议"),
                   topStatusBar);
 
+    // 顶栏右侧：会议设置入口（点开后是锚定在按钮下方的弹出面板）
+    btnMeetingSettings = new QPushButton(QObject::tr("会议设置"), topStatusBar);
+    btnMeetingSettings->setObjectName(QStringLiteral("btnMeetingSettings"));
+    btnMeetingSettings->setCursor(Qt::PointingHandCursor);
+    btnMeetingSettings->setToolTip(QObject::tr("房间权限与会议快捷操作"));
+    btnMeetingSettings->setFixedHeight(26);
+
     topStatusLayout->addWidget(topMainTitle);
     topStatusLayout->addWidget(topRoomChip);
     topStatusLayout->addWidget(topMemberChip);
@@ -113,6 +120,7 @@ void Ui_meeting_widget::setupUi(QWidget *parent) {
         new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum));
     topStatusLayout->addWidget(topSpeakerLabel);
     topStatusLayout->addWidget(topMeetStatus);
+    topStatusLayout->addWidget(btnMeetingSettings);
     verticalLayout->addWidget(topStatusBar);
 
     // ---- 主区域：画面 + 侧栏 ----
@@ -136,6 +144,20 @@ void Ui_meeting_widget::setupUi(QWidget *parent) {
     mainshow_label->setObjectName(QStringLiteral("mainshow_label"));
     mainshow_label->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Expanding);
     gridLayout->addWidget(mainshow_label, 0, 0);
+
+    // 未入会时的画布占位提示（与画面同格叠放，入会后隐藏）
+    canvasHint = new QLabel(groupBox_2);
+    canvasHint->setObjectName(QStringLiteral("canvasHint"));
+    canvasHint->setAlignment(Qt::AlignCenter);
+    canvasHint->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+    canvasHint->setText(
+        QStringLiteral("<div style='font-size:15px;color:#7A8496;'>%1</div>"
+                       "<div style='font-size:12px;color:#4E5666;"
+                       "margin-top:8px;'>%2</div>")
+            .arg(QObject::tr("未加入会议"),
+                 QObject::tr("创建或加入会议后，这里显示画面")));
+    gridLayout->addWidget(canvasHint, 0, 0, Qt::AlignCenter);
+
     main_box_layout->addWidget(groupBox_2, 1);
 
     tabWidget = new QTabWidget(parent);
@@ -331,6 +353,11 @@ void Ui_meeting_widget::setupUi(QWidget *parent) {
                        QSize(28, 48), controlPill, QObject::tr("选择摄像头"));
     videoDeviceBtn->setMaximumWidth(28);
 
+    shareScreenBtn =
+        makeToolButton(QStringLiteral("shareScreenBtn"), QObject::tr("共享屏幕"),
+                       QSize(88, 48), controlPill,
+                       QObject::tr("共享屏幕（与摄像头互斥，共用同一路视频）"));
+
     btnTogglePanel =
         makeToolButton(QStringLiteral("btnTogglePanel"), QObject::tr("侧栏"),
                        QSize(64, 48), controlPill,
@@ -351,6 +378,7 @@ void Ui_meeting_widget::setupUi(QWidget *parent) {
     controlPillLayout->addWidget(audioDeviceBtn);
     controlPillLayout->addWidget(openVedio);
     controlPillLayout->addWidget(videoDeviceBtn);
+    controlPillLayout->addWidget(shareScreenBtn);
     controlPillLayout->addWidget(makePillSep(QStringLiteral("pillSep2"),
                                              controlPill));
     controlPillLayout->addWidget(btnTogglePanel);

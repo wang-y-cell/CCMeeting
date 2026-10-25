@@ -24,6 +24,8 @@ std::string get_type_name(MessageType type) {
             return "JoinMeeting";
         case MessageType::CloseCamera:
             return "CloseCamera";
+        case MessageType::RoomSettings:
+            return "RoomSettings";
         case MessageType::CreateMeetingResponse:
             return "CreateMeetingResponse";
         case MessageType::PartnerExit:
@@ -36,6 +38,8 @@ std::string get_type_name(MessageType type) {
             return "PartnerJoin2";
         case MessageType::UserProfile:
             return "UserProfile";
+        case MessageType::RoomSettingsNotify:
+            return "RoomSettingsNotify";
         default:
             return "Unknown";
     }

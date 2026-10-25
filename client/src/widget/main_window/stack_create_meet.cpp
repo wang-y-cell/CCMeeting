@@ -1,5 +1,7 @@
 #include "stack_create_meet.h"
 
+#include "recent_meeting_list.h"
+
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
@@ -43,4 +45,11 @@ void stack_create_meet::on_create_clicked() {
     }
 
     emit createMeetingClicked(max_participants, duration_minutes);
+}
+
+void stack_create_meet::showEvent(QShowEvent *event) {
+    QWidget::showEvent(event);
+    if (ui.recent) {
+        ui.recent->refresh();
+    }
 }

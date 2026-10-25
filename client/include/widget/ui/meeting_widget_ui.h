@@ -21,8 +21,10 @@ public:
     QLabel *topMemberChip = nullptr;
     QLabel *topSpeakerLabel = nullptr;
     QLabel *topMeetStatus = nullptr;
+    QPushButton *btnMeetingSettings = nullptr;
     QGroupBox *groupBox_2 = nullptr;
     VideoGLWidget *mainshow_label = nullptr;
+    QLabel *canvasHint = nullptr;
     QTabWidget *tabWidget = nullptr;
     QWidget *scrollAreaWidgetContents = nullptr;
     QVBoxLayout *verticalLayout_3 = nullptr;
@@ -44,6 +46,7 @@ public:
     QPushButton *audioDeviceBtn = nullptr;
     QPushButton *openVedio = nullptr;
     QPushButton *videoDeviceBtn = nullptr;
+    QPushButton *shareScreenBtn = nullptr;
     QPushButton *btnTogglePanel = nullptr;
     QPushButton *leaveMeetingBtn = nullptr;
 

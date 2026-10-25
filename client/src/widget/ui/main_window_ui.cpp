@@ -54,12 +54,14 @@ void Ui_main_window::setupUi(QWidget *parent) {
     const QStringList sideNavItems = {
         QObject::tr("创建会议"),
         QObject::tr("加入会议"),
+        QObject::tr("会议记录"),
+        QObject::tr("录制"),
         QObject::tr("设置"),
     };
     for (const auto &item : sideNavItems) {
         auto *listItem = new QListWidgetItem(item);
         listItem->setSizeHint(QSize(0, 48));
-        listItem->setTextAlignment(Qt::AlignCenter);
+        listItem->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
         QFont font = listItem->font();
         font.setPointSize(11);
         font.setWeight(QFont::DemiBold);
@@ -68,10 +70,22 @@ void Ui_main_window::setupUi(QWidget *parent) {
     }
     leftColumn->addWidget(sideNav, 1);
 
+    // 侧边栏底部：连接状态 + 版本，给左下角一个落点，避免大片空白
+    sideBarStatus = new QLabel(QObject::tr("● 服务就绪"), parent);
+    sideBarStatus->setObjectName(QStringLiteral("sideBarStatus"));
+    sideBarStatus->setContentsMargins(4, 0, 4, 0);
+    leftColumn->addWidget(sideBarStatus);
+
+    sideBarVersion = new QLabel(QStringLiteral("CloudMeeting 1.0"), parent);
+    sideBarVersion->setObjectName(QStringLiteral("sideBarVersion"));
+    sideBarVersion->setContentsMargins(4, 0, 4, 4);
+    leftColumn->addWidget(sideBarVersion);
+
     auto *leftWrap = new QWidget(parent);
-    leftWrap->setFixedWidth(196);
+    leftWrap->setObjectName(QStringLiteral("sideBar"));
+    leftWrap->setFixedWidth(200);
     auto *leftWrapLayout = new QVBoxLayout(leftWrap);
-    leftWrapLayout->setContentsMargins(0, 0, 0, 0);
+    leftWrapLayout->setContentsMargins(10, 10, 10, 10);
     leftWrapLayout->setSpacing(0);
     leftWrapLayout->addLayout(leftColumn);
 

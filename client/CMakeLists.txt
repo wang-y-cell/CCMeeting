@@ -107,6 +107,11 @@ if(MSVC)
     target_compile_definitions(CloudMeetingClient PRIVATE _WIN32_WINNT=0x0A00)
 endif()
 
+# 崩溃栈记录（main.cpp 的 SEH 过滤器用 DbgHelp 走栈）
+if(WIN32)
+    target_link_libraries(CloudMeetingClient PRIVATE dbghelp)
+endif()
+
 if(${Qt6_VERSION} VERSION_LESS 6.1.0)
     set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.yourcompany.CloudMeeting)
 endif()
@@ -136,3 +141,73 @@ install(TARGETS CloudMeetingClient
 )
 
 qt_finalize_executable(CloudMeetingClient)
+
+#-------------------------------------------------
+# UI 预览工具（离线渲染各窗口截图，用于设计评审）
+#
+#   cmake ... -DBUILD_UI_PREVIEW=ON
+#   UiPreview.exe <输出目录>
+#
+# 与客户端共享全部源码与资源，唯一区别是入口为 tools/ui_preview.cpp：
+# 不联网、不登录，逐窗口 grab() 成 PNG。
+#-------------------------------------------------
+option(BUILD_UI_PREVIEW "Build offline UI preview tool (renders windows to PNG)" OFF)
+if(BUILD_UI_PREVIEW)
+    set(UIPREVIEW_SOURCES ${CLIENT_SOURCES})
+    list(FILTER UIPREVIEW_SOURCES EXCLUDE REGEX "/src/main\\.cpp$")
+    list(APPEND UIPREVIEW_SOURCES
+        "${CMAKE_CURRENT_SOURCE_DIR}/tools/ui_preview.cpp")
+
+    add_executable(UiPreview ${UIPREVIEW_SOURCES} resource.qrc)
+
+    target_include_directories(UiPreview PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/configure"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/message"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/message/video"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/message/text"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/network"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/network/messageNet"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/widget"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/widget/ui"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/widget/meeting"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/widget/login"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/widget/main_window"
+    )
+
+    target_link_libraries(UiPreview
+        PRIVATE
+            Qt6::Widgets
+            Qt6::Network
+            Qt6::Multimedia
+            Qt6::OpenGLWidgets
+            Qt6::OpenGL
+            Threads::Threads
+            spdlog::spdlog
+            xrtc
+    )
+
+    target_compile_definitions(UiPreview PRIVATE
+        WEBRTC_WIN
+        NOMINMAX
+        WIN32_LEAN_AND_MEAN
+        _ITERATOR_DEBUG_LEVEL=0
+        _HAS_ITERATOR_DEBUGGING=0
+    )
+
+    if(MSVC)
+        target_compile_options(UiPreview PRIVATE /utf-8 /bigobj /wd4068)
+        target_compile_definitions(UiPreview PRIVATE _WIN32_WINNT=0x0A00)
+    endif()
+
+    set_target_properties(UiPreview PROPERTIES OUTPUT_NAME UiPreview)
+
+    add_custom_command(TARGET UiPreview POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:UiPreview>/config"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_CURRENT_SOURCE_DIR}/config/client.json"
+                "$<TARGET_FILE_DIR:UiPreview>/config/client.json"
+        COMMENT "Copy client.json to UiPreview output directory"
+    )
+endif()

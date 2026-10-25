@@ -79,7 +79,7 @@ void Ui_stack_user_profile::setupUi(QWidget *parent) {
     infoForm->setHorizontalSpacing(16);
     infoForm->setVerticalSpacing(12);
     infoForm->setFormAlignment(Qt::AlignTop);
-    infoForm->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
+    infoForm->setLabelAlignment(Qt::AlignLeft | Qt::AlignVCenter);
 
     valueNickname = makeValueLabel(QStringLiteral("valueNickname"), scrollContent);
     valueUsername = makeValueLabel(QStringLiteral("valueUsername"), scrollContent);
@@ -142,11 +142,19 @@ void Ui_stack_user_profile::setupUi(QWidget *parent) {
     scrollArea->setWidget(scrollContent);
     root->addWidget(scrollArea, 1);
 
+    // 底部操作条：主操作在左，返回做成次级按钮，同一行排列
+    auto *actionRow = new QHBoxLayout();
+    actionRow->setObjectName(QStringLiteral("profileActionRow"));
+    actionRow->setSpacing(10);
+
     editProfileBtn = new QPushButton(QObject::tr("修改资料"), parent);
     editProfileBtn->setObjectName(QStringLiteral("editProfileBtn"));
-    root->addWidget(editProfileBtn, 0, Qt::AlignLeft);
+    actionRow->addWidget(editProfileBtn);
 
     backHomeBtn = new QPushButton(QObject::tr("返回首页"), parent);
     backHomeBtn->setObjectName(QStringLiteral("backHomeBtn"));
-    root->addWidget(backHomeBtn);
+    actionRow->addWidget(backHomeBtn);
+
+    actionRow->addStretch(1);
+    root->addLayout(actionRow);
 }

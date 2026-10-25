@@ -2,6 +2,7 @@
 #include "avatar_image_loader.h"
 #include "partner.h"
 #include "videoglwidget.h"
+#include <QColor>
 #include <QLabel>
 #include <QMouseEvent>
 #include <QResizeEvent>
@@ -16,6 +17,8 @@ PartnerTile::PartnerTile(Partner *partner, QWidget *parent)
     layout->setSpacing(2);
 
     m_displayWidget = new VideoGLWidget(this);
+    // 头像透明角落要和成员面板底色一致，否则会出现异色方块
+    m_displayWidget->setClearColor(QColor(0x10, 0x13, 0x19));
     m_displayWidget->setDrawMode(VideoGLWidget::DrawMode::FitWidgetSmooth);
     m_displayWidget->setAlignment(Qt::AlignCenter);
     m_displayWidget->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);

@@ -1,0 +1,159 @@
+/* ============================================================
+ * meeting_settings_popup.qss — 会议设置弹出面板
+ *
+ * 说明：该面板是 Qt::Popup 顶层窗口，拿不到 MeetingWidget 的样式表，
+ * 因此单独加载自己的 qss（与项目其它窗口一致）。
+ * 令牌取值见 style.qss 顶部注释。
+ * ============================================================ */
+/* ---------- 会议设置弹出面板（Qt::Popup，锚定在按钮下方）---------- */
+
+QWidget#meetingSettingsPopup {
+    background-color: #12161D;
+    border: 1px solid #2A3341;
+    border-radius: 12px;
+}
+
+QLabel#msTitle {
+    color: #E9EDF4;
+    font-size: 13px;
+    font-weight: 600;
+    background: transparent;
+    border: none;
+}
+
+QLabel#msSection {
+    color: #6A7383;
+    font-size: 11px;
+    background: transparent;
+    border: none;
+}
+
+QLabel#msValue {
+    color: #E9EDF4;
+    font-size: 12px;
+    font-weight: 600;
+    background: transparent;
+    border: none;
+}
+
+QLabel#msHint {
+    color: #4E5666;
+    font-size: 11px;
+    background: transparent;
+    border: none;
+}
+
+QLabel#msRoleBadge {
+    color: #98A2B3;
+    background-color: #1B2029;
+    border: 1px solid #232A35;
+    border-radius: 9px;
+    padding: 1px 8px;
+    font-size: 11px;
+}
+
+QLabel#msRoleBadge[isHost="true"] {
+    color: #4C8DFF;
+    background-color: rgba(76, 141, 255, 0.14);
+    border: 1px solid rgba(76, 141, 255, 0.28);
+}
+
+QFrame#msSep {
+    background-color: #1E2530;
+    border: none;
+}
+
+QCheckBox#msSwitch {
+    color: #E9EDF4;
+    font-size: 12px;
+    spacing: 8px;
+    padding: 2px 0;
+    background: transparent;
+}
+
+QCheckBox#msSwitch:disabled {
+    color: #6A7383;
+}
+
+QCheckBox#msSwitch::indicator {
+    width: 15px;
+    height: 15px;
+    border-radius: 4px;
+    border: 1px solid #2E3846;
+    background: #1B2029;
+}
+
+QCheckBox#msSwitch::indicator:hover {
+    border-color: #4C8DFF;
+}
+
+QCheckBox#msSwitch::indicator:checked {
+    background: #4C8DFF;
+    border-color: #4C8DFF;
+}
+
+QCheckBox#msSwitch::indicator:disabled {
+    background: #14181F;
+    border-color: #232A35;
+}
+
+QPushButton#msAction {
+    background-color: #1B2029;
+    border: 1px solid #232A35;
+    border-radius: 8px;
+    color: #E9EDF4;
+    font-size: 12px;
+    min-height: 30px;
+    padding: 0 12px;
+    text-align: left;
+}
+
+QPushButton#msAction:hover {
+    background-color: #212836;
+    border-color: #2E3846;
+}
+
+QPushButton#msAction:pressed {
+    background-color: #161A21;
+}
+/* ---------- 录制按钮与状态 ---------- */
+
+QPushButton#msRecordBtn {
+    background-color: #1B2029;
+    border: 1px solid #2A3341;
+    border-radius: 8px;
+    color: #E9EDF4;
+    font-size: 12px;
+    font-weight: 500;
+    min-height: 30px;
+    padding: 0 16px;
+}
+
+QPushButton#msRecordBtn:hover {
+    background-color: #212836;
+    border-color: #3A4557;
+}
+
+QPushButton#msRecordBtn[recording="true"] {
+    background-color: rgba(229, 72, 77, 0.16);
+    border: 1px solid rgba(229, 72, 77, 0.38);
+    color: #F05C60;
+}
+
+QPushButton#msRecordBtn[recording="true"]:hover {
+    background-color: rgba(229, 72, 77, 0.24);
+    border-color: rgba(229, 72, 77, 0.52);
+}
+
+QPushButton#msRecordBtn:disabled {
+    background-color: #14181F;
+    border-color: #1E2530;
+    color: #4E5666;
+}
+
+QLabel#msRecordStatus {
+    color: #6A7383;
+    font-size: 11px;
+    background: transparent;
+    border: none;
+}

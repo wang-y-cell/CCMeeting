@@ -1,4 +1,34 @@
-/* 全局仅保留跨窗口共用的基础项；各窗口样式见独立 *.qss */
+/* ============================================================
+ * style.qss — 全局基础样式（跨窗口共用）
+ *
+ * 设计令牌（QSS 无变量，集中记录于此，各窗口文件沿用同名取值）
+ *
+ * 表面（由深到浅，用于表现层级）
+ *   canvas      #0B0D11   窗口底色
+ *   sidebar     #101319   侧边栏
+ *   surface     #161A21   卡片
+ *   surface2    #1B2029   输入框 / 次级表面
+ *   raised      #212836   选中项 / 悬浮工具条
+ *
+ * 描边
+ *   border      #232A35   常规 1px 分隔
+ *   borderStr   #2E3846   强调描边（hover）
+ *
+ * 文字
+ *   text        #E9EDF4   主文字
+ *   text2       #98A2B3   次要文字（描述、标签）
+ *   text3       #6A7383   弱化文字（占位、禁用）
+ *
+ * 强调与语义
+ *   accent      #4C8DFF   hover #5E9BFF   pressed #3B7AE8
+ *   accentSoft  rgba(76, 141, 255, 0.16)
+ *   danger      #E5484D   hover #F05C60
+ *   success     #3DD68C
+ *   warning     #F5B544
+ *
+ * 圆角：控件 8px / 卡片 12px / 大卡片 14px / 胶囊 999px
+ * 控件高度：输入 40px / 主按钮 42px / 次按钮 36px / 小按钮 28px
+ * ============================================================ */
 
 * {
     font-family: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei";
@@ -6,17 +36,39 @@
 }
 
 QToolTip {
-    background-color: #2a2f3c;
-    color: #e8ebf2;
-    border: 1px solid #3a4152;
-    padding: 6px 8px;
+    background-color: #212836;
+    color: #E9EDF4;
+    border: 1px solid #2E3846;
     border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
 }
 
 QMessageBox {
-    background-color: #1e2129;
+    background-color: #161A21;
 }
 
 QMessageBox QLabel {
-    color: #e8ebf2;
+    color: #E9EDF4;
+    font-size: 13px;
+}
+
+QMessageBox QPushButton {
+    min-width: 76px;
+    min-height: 32px;
+    border: 1px solid #2E3846;
+    border-radius: 8px;
+    background-color: #1B2029;
+    color: #E9EDF4;
+    font-size: 13px;
+    padding: 0 14px;
+}
+
+QMessageBox QPushButton:hover {
+    background-color: #212836;
+    border-color: #3A4557;
+}
+
+QMessageBox QPushButton:pressed {
+    background-color: #171C24;
 }
