@@ -3,6 +3,7 @@
 
 class QLabel;
 class QListWidget;
+class QPushButton;
 class QStackedWidget;
 class QWidget;
 
@@ -14,6 +15,7 @@ public:
     QLabel *nameLabel = nullptr;
     QLabel *sideBarStatus = nullptr;
     QLabel *sideBarVersion = nullptr;
+    QPushButton *btnLogout = nullptr;
     QListWidget *sideNav = nullptr;
     QStackedWidget *contentStack = nullptr;
 

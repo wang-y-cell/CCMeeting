@@ -9,6 +9,7 @@
 #include <QAudioFormat>
 #include <QAudioSource>
 #include <QCamera>
+#include <QElapsedTimer>
 #include <QDesktopServices>
 #include <QDir>
 #include <QUrl>
@@ -29,7 +30,7 @@
 #include <QProgressBar>
 #include <QPushButton>
 #include <QStyle>
-#include <QSettings>
+#include "storage.h"
 #include <QSize>
 #include <QStackedWidget>
 #include <QThreadPool>
@@ -49,6 +50,8 @@ namespace {
 
 constexpr const char *kSettingsOrg = "CCMeeting";
 constexpr const char *kSettingsApp = "Client";
+///首次进入设置页时延迟枚举设备，确保页面先绘制出来
+constexpr int kDeviceRefreshDelayMs = 50;
 
 void clearPreviewLabel(QLabel *label) {
     if (!label) {
@@ -146,8 +149,7 @@ stack_setting::stack_setting(QWidget *parent) : QWidget(parent) {
 
     // 预览默认值来自「通用」里的开关（默认关闭）
     {
-        QSettings s(QString::fromLatin1(kSettingsOrg),
-                    QString::fromLatin1(kSettingsApp));
+        Storage &s = Storage::instance();
         video_preview_enabled_ =
             s.value(QStringLiteral("video/autoPreview"), false).toBool();
     }
@@ -167,15 +169,30 @@ stack_setting::~stack_setting() {
 
 void stack_setting::showEvent(QShowEvent *event) {
     QWidget::showEvent(event);
-    // 先让设置页完成切换绘制，再刷新列表；预览另走异步
-    QTimer::singleShot(0, this, [this]() {
+
+    // 设备枚举冷启动要 500ms+（Qt Multimedia 首次加载插件 + 枚举 WMF 设备）。
+    // 若放在 0ms 定时器里，执行会排到首帧绘制之前，表现为"点设置卡一下"。
+    // 这里先让设备框进入占位态、页面立刻绘制，再延后枚举。
+    if (ui->videoDeviceCombo && ui->videoDeviceCombo->count() == 0) {
+        ui->videoDeviceCombo->addItem(tr("检测设备中…"));
+        ui->videoDeviceCombo->setEnabled(false);
+    }
+    if (ui->audioDeviceCombo && ui->audioDeviceCombo->count() == 0) {
+        ui->audioDeviceCombo->addItem(tr("检测设备中…"));
+        ui->audioDeviceCombo->setEnabled(false);
+    }
+
+    QTimer::singleShot(kDeviceRefreshDelayMs, this, [this]() {
         if (!isVisible()) {
             return;
         }
-        spdlog::info("[stack_setting] show: refresh devices (Qt Multimedia)");
+        QElapsedTimer timer;
+        timer.start();
         refreshVideoDevices();
         refreshAudioDevices();
         syncPreviewForCategory(ui->categoryList->currentRow());
+        spdlog::info("[stack_setting] show: devices refreshed in {}ms",
+                     static_cast<long long>(timer.elapsed()));
     });
 }
 
@@ -223,8 +240,7 @@ void stack_setting::refreshVideoDevices() {
         return;
     }
 
-    QSettings s(QString::fromLatin1(kSettingsOrg),
-                QString::fromLatin1(kSettingsApp));
+    Storage &s = Storage::instance();
     const QString savedId =
         s.value(QStringLiteral("video/deviceId")).toString();
 
@@ -262,8 +278,7 @@ void stack_setting::refreshAudioDevices() {
         return;
     }
 
-    QSettings s(QString::fromLatin1(kSettingsOrg),
-                QString::fromLatin1(kSettingsApp));
+    Storage &s = Storage::instance();
     const QString savedId =
         s.value(QStringLiteral("audio/deviceId")).toString();
 
@@ -312,8 +327,7 @@ void stack_setting::rebuildResolutionList() {
     }
 
     const auto &cfg = ClientConfig::instance().webrtc().video;
-    QSettings s(QString::fromLatin1(kSettingsOrg),
-                QString::fromLatin1(kSettingsApp));
+    Storage &s = Storage::instance();
     const int preferW =
         s.value(QStringLiteral("video/width"), cfg.width).toInt();
     const int preferH =
@@ -357,8 +371,7 @@ void stack_setting::rebuildFpsList() {
 
     const QSize res = currentResolution();
     const auto &cfg = ClientConfig::instance().webrtc().video;
-    QSettings s(QString::fromLatin1(kSettingsOrg),
-                QString::fromLatin1(kSettingsApp));
+    Storage &s = Storage::instance();
     const int preferFps =
         s.value(QStringLiteral("video/fps"), cfg.fps).toInt();
 
@@ -601,8 +614,7 @@ void stack_setting::onOpenRecordDirClicked() {
 }
 
 void stack_setting::onResetRecordDirClicked() {
-    QSettings settings(QString::fromLatin1(kSettingsOrg),
-                       QString::fromLatin1(kSettingsApp));
+    Storage &settings = Storage::instance();
     settings.remove(QStringLiteral("record/saveDir"));
     refreshRecordDirLabel();
 }
@@ -776,8 +788,7 @@ void stack_setting::onMicTestClicked() {
 
 void stack_setting::reloadFromConfig() {
     // 通用页：录制目录 / 帧率 / 提示音 / 预览默认值（不涉及服务器连接参数）
-    QSettings s(QString::fromLatin1(kSettingsOrg),
-                QString::fromLatin1(kSettingsApp));
+    Storage &s = Storage::instance();
     refreshRecordDirLabel();
     const int fps = s.value(QStringLiteral("record/fps"), 15).toInt();
     const int fpsIndex = ui->recordFps->findData(fps);
@@ -792,8 +803,7 @@ void stack_setting::reloadFromConfig() {
 }
 
 void stack_setting::loadUiPrefs() {
-    QSettings s(QString::fromLatin1(kSettingsOrg),
-                QString::fromLatin1(kSettingsApp));
+    Storage &s = Storage::instance();
     ui->audioMuteOnJoin->setChecked(
         s.value(QStringLiteral("audio/muteOnJoin"), false).toBool());
     ui->audioEchoCancel->setChecked(
@@ -807,8 +817,7 @@ void stack_setting::loadUiPrefs() {
 }
 
 void stack_setting::saveUiPrefs() const {
-    QSettings s(QString::fromLatin1(kSettingsOrg),
-                QString::fromLatin1(kSettingsApp));
+    Storage &s = Storage::instance();
     s.setValue(QStringLiteral("audio/muteOnJoin"),
                ui->audioMuteOnJoin->isChecked());
     s.setValue(QStringLiteral("audio/echoCancel"),
@@ -886,11 +895,11 @@ void stack_setting::onResetClicked() {
     ui->recordFps->setCurrentIndex(0);  // 15 fps
     ui->soundEnabled->setChecked(true);
     ui->videoAutoPreview->setChecked(false);
-    QSettings().remove(QStringLiteral("record/saveDir"));
+    Storage &reset_settings = Storage::instance();
+    reset_settings.remove(QStringLiteral("record/saveDir"));
     refreshRecordDirLabel();
 
-    QSettings s(QString::fromLatin1(kSettingsOrg),
-                QString::fromLatin1(kSettingsApp));
+    Storage &s = Storage::instance();
     s.setValue(QStringLiteral("video/width"), 640);
     s.setValue(QStringLiteral("video/height"), 480);
     s.setValue(QStringLiteral("video/fps"), 30);

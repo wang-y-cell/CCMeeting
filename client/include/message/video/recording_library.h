@@ -42,8 +42,14 @@ public:
     /** @brief 删除视频与同名 .json 元数据；返回是否成功 */
     static bool remove(const RecordingEntry &entry);
 
+    /** @brief 录制占用总字节数；count 可选出参文件数 */
+    static qint64 total_bytes(int *count = nullptr);
+
     /** @brief 为某房间生成新的输出路径（同时生成父目录） */
     static QString make_output_path(int room_no, const QDateTime &started_at);
+
+    /** @brief 只扫文件系统（数据库不可用时的实现） */
+    static QVector<RecordingEntry> scan_files();
 
     /** @brief 写 sidecar 元数据（录制结束时调用） */
     static void write_meta(const QString &video_path, int room_no,

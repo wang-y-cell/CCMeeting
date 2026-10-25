@@ -25,7 +25,14 @@ public:
     void set_style();
     void refreshUserCard();
 
+signals:
+    /** @brief 用户点了「退出登录」：凭据已清除，需要回到登录界面 */
+    void logoutRequested();
+
+
 private slots:
+    /** @brief 退出登录 */
+    void onLogoutClicked();
     /** @brief 服务端确认开会/入会成功 → 写会议记录 */
     void onMeetingConfirmed(bool created, int roomNo);
     /** @brief 会议结束 → 回填时长并刷新列表 */

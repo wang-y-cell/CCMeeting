@@ -71,7 +71,8 @@ void stack_recordings::build_ui() {
     _emptyHint = new QLabel(tr("还没有录制文件"), this);
     _emptyHint->setObjectName(QStringLiteral("recEmpty"));
     _emptyHint->setAlignment(Qt::AlignCenter);
-    root->addWidget(_emptyHint);
+    // 空状态由它吸收剩余高度，否则布局会把余量平摊到标题与说明上
+    root->addWidget(_emptyHint, 1);
 
     connect(_refreshBtn, &QPushButton::clicked, this, &stack_recordings::refresh);
     connect(_folderBtn, &QPushButton::clicked, this,

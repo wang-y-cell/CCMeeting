@@ -1,6 +1,14 @@
 #include <QApplication>
+#include <QElapsedTimer>
+#include <QCameraDevice>
+#include <QAudioDevice>
+#include <QMediaDevices>
+#include <QProcess>
+#include <QTimer>
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QDir>
+#include <QStandardPaths>
 #include <QFile>
 #include <QFileInfo>
 #include <QMessageLogContext>
@@ -10,10 +18,12 @@
 #include <exception>
 #include <memory>
 #include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/spdlog.h>
 #include <string>
 
 #include "configure/client_config.h"
+#include "configure/storage.h"
 #include "configure/user_session.h"
 #include "avatar_image_loader.h"
 #include "login.h"
@@ -204,6 +214,73 @@ void on_terminate() {
 
 }  // namespace
 
+/**
+ * @brief 迁移旧版用户数据目录
+ *
+ * 旧版本没有设置应用名，数据落在 %LOCALAPPDATA%\CloudMeeting；
+ * 现在固定为 %LOCALAPPDATA%\CCMeeting。检测到旧目录且新目录不存在时整体搬迁，
+ * 失败则退化为复制（旧目录保留），避免用户丢会议记录/缓存。
+ */
+static void migrate_legacy_data_dir() {
+    const QString local =
+        QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+    if (local.isEmpty()) {
+        return;
+    }
+    const QDir parent = QFileInfo(local).absoluteDir();
+    const QString legacy = parent.filePath(QStringLiteral("CloudMeeting"));
+    if (!QFileInfo::exists(legacy)) {
+        return;
+    }
+    // 一次性标记：迁移过就不再补拷，否则已被改名/入库的旧文件会被反复拷回来
+    const QString marker =
+        QDir(local).filePath(QStringLiteral(".legacy_migrated"));
+    if (QFileInfo::exists(marker)) {
+        return;
+    }
+
+    QDir dir;
+    if (!QFileInfo::exists(local)) {
+        if (dir.rename(legacy, local)) {
+            spdlog::info("[main] 用户数据目录已整体迁移 {} -> {}",
+                         legacy.toUtf8().constData(),
+                         local.toUtf8().constData());
+            QFile markerFile(QDir(local).filePath(
+                QStringLiteral(".legacy_migrated")));
+            if (markerFile.open(QIODevice::WriteOnly)) {
+                markerFile.write(QDateTime::currentDateTimeUtc()
+                                     .toString(Qt::ISODate)
+                                     .toUtf8());
+            }
+            return;
+        }
+    }
+
+    // 新目录已存在（或整体搬迁失败）：只补缺失的文件，不覆盖已有数据
+    int copied = 0;
+    const QDir src(legacy);
+    QDir().mkpath(local);
+    for (const QFileInfo &info :
+         src.entryInfoList(QDir::Files | QDir::NoDotAndDotDot)) {
+        const QString target = QDir(local).filePath(info.fileName());
+        if (QFileInfo::exists(target)) {
+            continue;
+        }
+        if (QFile::copy(info.absoluteFilePath(), target)) {
+            ++copied;
+        }
+    }
+    if (copied > 0) {
+        spdlog::info("[main] 从旧目录补齐 {} 个数据文件（旧目录保留）", copied);
+    }
+    // 写标记：下次启动不再扫描旧目录
+    QFile markerFile(marker);
+    if (markerFile.open(QIODevice::WriteOnly)) {
+        markerFile.write(QDateTime::currentDateTimeUtc()
+                             .toString(Qt::ISODate)
+                             .toUtf8());
+    }
+}
 int main(int argc, char *argv[]) {
     //在程序因为未捕获的异常而即将崩溃（调用 std::terminate）时，
     //拦截这个异常，提取出有用的错误信息并记录到日志中，最后再安全地终止程序
@@ -214,7 +291,17 @@ int main(int argc, char *argv[]) {
 #endif
 
     QApplication app(argc, argv);
+
+    // 固定应用名：否则 %LOCALAPPDATA% 下的目录会跟随 exe 文件名变化，
+    // 改名后会议记录/缓存会"丢失"（其实还在旧目录）。必须在任何
+    // QStandardPaths / QSettings 调用之前设置。
+    QCoreApplication::setApplicationName(QStringLiteral("CCMeeting"));
+    QCoreApplication::setApplicationVersion(QStringLiteral("1.0"));
+    // 注意：不要把 organizationName 也设成 CCMeeting —— QStandardPaths 的
+    // AppLocalDataLocation 规则是 <AppData>/<org>/<app>，会多出一层目录。
+
     qInstallMessageHandler(qt_message_handler);
+    migrate_legacy_data_dir();
 
     // applicationDirPath 在部分启动方式下可能为空，用 argv[0] 兜底
     QString app_dir = QCoreApplication::applicationDirPath();
@@ -224,7 +311,12 @@ int main(int argc, char *argv[]) {
     if (app_dir.isEmpty()) {
         app_dir = QDir::currentPath();
     }
-    const QString log_path = QDir(app_dir).filePath(QStringLiteral("log.txt"));
+    // 日志改到用户数据目录（exe 目录在 Program Files 下通常不可写），并做大小轮转
+    QString log_dir =
+        QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) +
+        QStringLiteral("/logs");
+    QDir().mkpath(log_dir);
+    const QString log_path = QDir(log_dir).filePath(QStringLiteral("ccmeeting.log"));
     try {
         // GUI 子系统下不要挂 stdout_color_sink：Windows 控制台写 UTF-8 中文
         // 易触发 0xC0000005，表现为登录成功后闪退。
@@ -234,11 +326,11 @@ int main(int argc, char *argv[]) {
         //basic_file_sink_mt：mt 代表 Multi-Thread。它内部使用了互斥锁（std::mutex），确保在多线程环境下写入日志是安全的
         //第二个参数 true：表示截断模式（Truncate）。每次程序启动时，会清空旧的日志文件从头写入。如果改为 false，则是追加模式（Append），日志会保留在文件末尾
 
-        auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
+        auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
             //QByteArray 可能包含 \0 字符，或者为了绝对安全，直接使用 constData() 配合显式的 size() 来构造 std::string
             std::string(log_path_local.constData(),
                         static_cast<std::size_t>(log_path_local.size())),
-            true);
+            5 * 1024 * 1024, 3);  // 5MB × 3 个文件
         auto logger = std::make_shared<spdlog::logger>("CloudMeeting", file_sink);
         logger->set_level(spdlog::level::debug);
         //只要遇到 debug 或更高级别的日志，就立即将内存缓冲区的数据刷入磁盘。这保证了程序崩溃时日志不丢失，但在高频日志输出时会有一定的 I/O 性能损耗
@@ -255,6 +347,15 @@ int main(int argc, char *argv[]) {
     spdlog::info("[main] exe dir={}", qutf8(app_dir));
     spdlog::info("[main] log file={}", qutf8(log_path));
     spdlog::info("[main] cwd={}", qutf8(QDir::currentPath()));
+
+    // 统一存储：SQLite（失败自动降级到注册表）
+    {
+        Storage &storage = Storage::instance();
+        storage.open();
+        spdlog::info("[main] storage db={} open={} fallback={}",
+                     qutf8(storage.databasePath()), storage.isOpen() ? 1 : 0,
+                     storage.usingFallback() ? 1 : 0);
+    }
     spdlog::info("[main] quitOnLastWindowClosed(initial)={}",
                  app.quitOnLastWindowClosed());
     flush_log();
@@ -298,6 +399,19 @@ int main(int argc, char *argv[]) {
     spdlog::info("[main] show login dialog");
     flush_log();
     login loginDialog;
+
+    // 空闲预热 Qt Multimedia 设备枚举：首次 videoInputs() 冷启动 500ms+，
+    // 若拖到用户第一次打开设置页才做，会表现为"点设置卡一下"。
+    QTimer::singleShot(1500, &loginDialog, [&loginDialog]() {
+        QElapsedTimer timer;
+        timer.start();
+        const auto cameras = QMediaDevices::videoInputs();
+        const auto mics = QMediaDevices::audioInputs();
+        spdlog::info("[main] devices warmed in {}ms (cameras={} mics={})",
+                     static_cast<long long>(timer.elapsed()), cameras.size(),
+                     mics.size());
+        Q_UNUSED(loginDialog);
+    });
     const int login_result = loginDialog.exec();
     spdlog::info("[main] login.exec returned={} (Accepted={})", login_result,
                  static_cast<int>(QDialog::Accepted));
@@ -338,6 +452,17 @@ int main(int argc, char *argv[]) {
     main_windowDialog->show();
     main_windowDialog->raise();
     main_windowDialog->activateWindow();
+    // 退出登录：凭据已在按钮里清除，重启进程回到登录界面（保证状态干净）
+    QObject::connect(main_windowDialog.get(), &main_window::logoutRequested,
+                     []() {
+                         spdlog::info("[main] logout: restart into login");
+                         if (!QProcess::startDetached(
+                                 QCoreApplication::applicationFilePath(), {})) {
+                             spdlog::warn("[main] restart failed, quitting");
+                         }
+                         QCoreApplication::quit();
+                     });
+
     spdlog::info("[main] main_window.show() done visible={} topLevel={}",
                  main_windowDialog->isVisible(),
                  main_windowDialog->isTopLevel());

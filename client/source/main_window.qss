@@ -698,3 +698,44 @@ QPushButton#recordDirBtn:hover {
     background-color: #252D3A;
     border-color: #3A4557;
 }
+
+/* ---------- 侧栏底部：退出登录 ---------- */
+
+QPushButton#sideLogoutBtn {
+    background-color: transparent;
+    border: 1px solid #2A3341;
+    border-radius: 8px;
+    color: #98A2B3;
+    font-size: 12px;
+    min-height: 30px;
+    margin: 6px 4px 4px 4px;
+}
+
+QPushButton#sideLogoutBtn:hover {
+    background-color: rgba(229, 72, 77, 0.12);
+    border-color: rgba(229, 72, 77, 0.34);
+    color: #F05C60;
+}
+
+/* ---------- 会议记录页：顶部统计条 ---------- */
+
+QFrame#statCard {
+    background-color: #101319;
+    border: 1px solid #1C2230;
+    border-radius: 12px;
+}
+
+QLabel#statValue {
+    color: #E9EDF4;
+    font-size: 20px;
+    font-weight: 600;
+    background: transparent;
+    border: none;
+}
+
+QLabel#statCaption {
+    color: #6A7383;
+    font-size: 11px;
+    background: transparent;
+    border: none;
+}

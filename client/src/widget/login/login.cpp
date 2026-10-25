@@ -1,5 +1,7 @@
 #include "login.h"
 
+#include "login_store.h"
+
 #include "configure/client_config.h"
 #include "configure/user_session.h"
 #include "style_loader.h"
@@ -11,6 +13,7 @@
 #include <QJsonObject>
 #include <QMessageBox>
 #include <QNetworkReply>
+#include <QTimer>
 #include <QNetworkRequest>
 #include <QStackedWidget>
 #include <QUrl>
@@ -65,6 +68,19 @@ login::login(QWidget *parent)
             [this](const QString &) { showRegisterPage(); });
     connect(ui.backToLoginLink, &QLabel::linkActivated, this,
             [this](const QString &) { showLoginPage(); });
+    // 上次登录成功过就预填账号并自动登录；失败时停留在此界面让用户改
+    if (const LoginStore::Credentials creds = LoginStore::load();
+        creds.autoLogin) {
+        ui.account_line->setText(creds.username);
+        ui.password_line->setText(creds.password);
+        if (ui.hintLabel) {
+            ui.hintLabel->setText(tr("正在自动登录…"));
+        }
+        QTimer::singleShot(40, this, &login::Login);
+    } else if (!creds.username.isEmpty()) {
+        ui.account_line->setText(creds.username);
+    }
+
     connect(&m_nam, &QNetworkAccessManager::finished, this,
             [this](QNetworkReply *reply) {
                 if (m_pendingRequest == PendingRequest::Register) {
@@ -228,6 +244,10 @@ void login::onLoginFinished(QNetworkReply *reply) {
         name, avatar, info, extras);
     spdlog::info("[login] success id={} name_bytes={}", userId,
                  name.toUtf8().size());
+
+    // 记住本机：下次启动直接自动登录（「退出登录」会清除）
+    LoginStore::save(ui.account_line->text().trimmed(),
+                     ui.password_line->text());
     spdlog::info("[login] calling accept()");
     flush_log();
     accept();

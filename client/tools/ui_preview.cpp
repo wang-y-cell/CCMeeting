@@ -5,6 +5,10 @@
 
 #include "configure/client_config.h"
 #include "configure/meeting_history.h"
+#include "configure/login_store.h"
+#include "configure/storage.h"
+
+#include <QSqlQuery>
 #include "configure/user_session.h"
 #include "avatar_image_loader.h"
 #include "edit_profile_dialog.h"
@@ -18,11 +22,16 @@
 #include "recording_playback_dialog.h"
 #include "stack_meeting_history.h"
 #include "stack_recordings.h"
+#include "stack_setting.h"
 #include "messagecodec.h"
 #include "videoglwidget.h"
 #include "stack_user_profile.h"
 
 #include <QApplication>
+#include <QAudioDevice>
+#include <QCameraDevice>
+#include <QElapsedTimer>
+#include <QMediaDevices>
 #include <QEventLoop>
 #include <QFileInfo>
 #include <QMediaPlayer>
@@ -76,6 +85,9 @@ void capture(QWidget *widget, const QString &name, int width, int height) {
     widget->setAttribute(Qt::WA_DontShowOnScreen, true);
     widget->resize(width, height);
     widget->show();
+    QApplication::processEvents();
+    // 有些页面（设置页）把设备枚举延后到首帧之后，这里等它跑完再截图
+    QThread::msleep(90);
     QApplication::processEvents();
     QApplication::processEvents();
 
@@ -600,7 +612,7 @@ qint64 record_for_seconds(int seconds) {
 }
 
 int run_general_settings_selftest() {
-    QSettings settings(QStringLiteral("CCMeeting"), QStringLiteral("Client"));
+    Storage &settings = Storage::instance();
     const QVariant oldDir = settings.value(QStringLiteral("record/saveDir"));
     const QVariant oldFps = settings.value(QStringLiteral("record/fps"));
 
@@ -648,10 +660,313 @@ int run_general_settings_selftest() {
 }
 
 }  // namespace
+
+// ---------------------------------------------------------------------------
+// 设置页首开延迟测量
+// 用法：UiPreview.exe --settings-latency-test
+// ---------------------------------------------------------------------------
+namespace {
+
+int run_settings_latency_test() {
+    QStandardPaths::setTestModeEnabled(true);
+
+    // 1) 冷启动的 Qt Multimedia 设备枚举耗时
+    QElapsedTimer timer;
+    timer.start();
+    const auto cameras = QMediaDevices::videoInputs();
+    const qint64 cam_ms = timer.elapsed();
+    timer.restart();
+    const auto mics = QMediaDevices::audioInputs();
+    const qint64 mic_ms = timer.elapsed();
+    std::printf("[latency] 首次 videoInputs=%lldms (%d 个)  audioInputs=%lldms (%d 个)\n",
+                static_cast<long long>(cam_ms), static_cast<int>(cameras.size()),
+                static_cast<long long>(mic_ms), static_cast<int>(mics.size()));
+
+    timer.restart();
+    QMediaDevices::videoInputs();
+    QMediaDevices::audioInputs();
+    std::printf("[latency] 二次枚举耗时=%lldms（缓存后应接近 0）\n",
+                static_cast<long long>(timer.elapsed()));
+
+    // 2) 设置页构造 + 首次显示耗时
+    timer.restart();
+    stack_setting setting;
+    const qint64 ctor_ms = timer.elapsed();
+    timer.restart();
+    setting.resize(900, 620);
+    setting.show();
+    QCoreApplication::processEvents();
+    QCoreApplication::processEvents();
+    const qint64 show_ms = timer.elapsed();
+    std::printf("[latency] stack_setting 构造=%lldms  首次 show+processEvents=%lldms\n",
+                static_cast<long long>(ctor_ms),
+                static_cast<long long>(show_ms));
+
+    // 3) 第二次显示（区分一次性打磨成本与每次都要付的成本）
+    setting.hide();
+    QCoreApplication::processEvents();
+    timer.restart();
+    setting.show();
+    QCoreApplication::processEvents();
+    QCoreApplication::processEvents();
+    std::printf("[latency] 第二次 show+processEvents=%lldms\n",
+                static_cast<long long>(timer.elapsed()));
+
+    // 4) 让 50ms 延迟枚举真正执行，测它的阻塞时长
+    timer.restart();
+    QThread::msleep(60);
+    QCoreApplication::processEvents();
+    std::printf("[latency] 延迟枚举执行耗时=%lldms（已在首帧之后）\n",
+                static_cast<long long>(timer.elapsed()));
+
+    const qint64 total = cam_ms + mic_ms + ctor_ms + show_ms;
+    std::printf("[latency] 合计约 %lldms\n", static_cast<long long>(total));
+    return 0;
+}
+
+}  // namespace
+
+// ---------------------------------------------------------------------------
+// 会议时长自检：格式化 + 计时器每秒走秒
+// 用法：UiPreview.exe --duration-selftest
+// ---------------------------------------------------------------------------
+namespace {
+
+int run_duration_selftest() {
+    bool ok = true;
+    struct Case {
+        qint64 seconds;
+        const char *expected;
+    };
+    const Case cases[] = {{0, "00:00:00"},   {9, "00:00:09"},
+                          {65, "00:01:05"},  {3599, "00:59:59"},
+                          {3661, "01:01:01"}, {360000, "100:00:00"}};
+    for (const Case &c : cases) {
+        const QString got = MeetingWidget::format_duration_hms(c.seconds);
+        const bool pass = got == QString::fromLatin1(c.expected);
+        ok = ok && pass;
+        std::printf("[duration] %llds -> %s %s\n",
+                    static_cast<long long>(c.seconds), got.toUtf8().constData(),
+                    pass ? "" : "(期望不匹配)");
+    }
+    std::printf("[duration] 结论: %s\n", ok ? "PASS" : "FAIL");
+    return ok ? 0 : 1;
+}
+
+}  // namespace
+
+// ---------------------------------------------------------------------------
+// 登录凭据自检：DPAPI 加密保存 → 读回 → 清除
+// 用法：UiPreview.exe --login-store-selftest
+// ---------------------------------------------------------------------------
+namespace {
+
+int run_login_store_selftest() {
+    const QString user = QStringLiteral("selftest_user");
+    const QString pass = QStringLiteral("Pass@2026!");
+
+    LoginStore::clear();
+    const bool empty_before = !LoginStore::has_credentials();
+
+    const bool saved = LoginStore::save(user, pass);
+    const bool has_after = LoginStore::has_credentials();
+    const LoginStore::Credentials creds = LoginStore::load();
+
+    // 直接看注册表里存的是不是密文
+    Storage &settings = Storage::instance();
+    const QString stored =
+        settings.value(QStringLiteral("login/password")).toString();
+
+    const bool roundtrip = creds.username == user && creds.password == pass;
+    const bool encrypted = !stored.isEmpty() && !stored.contains(pass) &&
+                           stored != pass;
+
+    std::printf("[login-store] 清空后无凭据=%d\n", empty_before ? 1 : 0);
+    std::printf("[login-store] 保存成功=%d 存在凭据=%d 回调一致=%d\n",
+                saved ? 1 : 0, has_after ? 1 : 0, roundtrip ? 1 : 0);
+    std::printf("[login-store] 存储的密文长度=%d（明文长度=%d，未明文保存=%d）\n",
+                static_cast<int>(stored.size()), static_cast<int>(pass.size()),
+                encrypted ? 1 : 0);
+
+    LoginStore::clear();
+    const bool cleared = !LoginStore::has_credentials();
+    std::printf("[login-store] 清除后无凭据=%d\n", cleared ? 1 : 0);
+
+    const bool ok = empty_before && saved && has_after && roundtrip &&
+                    encrypted && cleared;
+    std::printf("[login-store] 结论: %s\n", ok ? "PASS" : "FAIL");
+    return ok ? 0 : 1;
+}
+
+}  // namespace
+
+// ---------------------------------------------------------------------------
+// 统一存储自检：SQLite 建库、类型往返、凭据读写、注册表迁移
+// 用法：UiPreview.exe --storage-selftest
+// ---------------------------------------------------------------------------
+namespace {
+
+int run_storage_selftest() {
+    Storage &storage = Storage::instance();
+    const bool opened = storage.open();
+    std::printf("[storage] db=%s open=%d fallback=%d\n",
+                storage.databasePath().toUtf8().constData(),
+                storage.isOpen() ? 1 : 0, storage.usingFallback() ? 1 : 0);
+
+    // 备份用户现有凭据，测完还原
+    Storage::Credentials backup;
+    const bool hadCreds = storage.loadCredentials(backup);
+
+    bool ok = opened && storage.isOpen();
+
+    storage.setValue(QStringLiteral("__test/int"), 42);
+    storage.setValue(QStringLiteral("__test/bool"), true);
+    storage.setValue(QStringLiteral("__test/str"), QStringLiteral("abc"));
+    storage.setValue(QStringLiteral("__test/double"), 3.5);
+    const bool typed =
+        storage.value(QStringLiteral("__test/int")).toInt() == 42 &&
+        storage.value(QStringLiteral("__test/bool")).toBool() == true &&
+        storage.value(QStringLiteral("__test/str")).toString() ==
+            QStringLiteral("abc") &&
+        qFuzzyCompare(storage.value(QStringLiteral("__test/double")).toDouble(),
+                      3.5);
+    const bool def = storage.value(QStringLiteral("__test/missing"), 7).toInt() == 7;
+    std::printf("[storage] 类型往返=%d 默认值=%d\n", typed ? 1 : 0, def ? 1 : 0);
+    ok = ok && typed && def;
+
+    for (const char *key :
+         {"__test/int", "__test/bool", "__test/str", "__test/double"}) {
+        storage.remove(QString::fromLatin1(key));
+    }
+    ok = ok && !storage.value(QStringLiteral("__test/int")).isValid();
+
+    // 凭据往返
+    storage.saveCredentials(QStringLiteral("__selftest_user"),
+                            QStringLiteral("ciphertext-blob"));
+    Storage::Credentials creds;
+    const bool credsOk = storage.hasCredentials() &&
+                         storage.loadCredentials(creds) &&
+                         creds.username == QStringLiteral("__selftest_user") &&
+                         creds.secret == QStringLiteral("ciphertext-blob");
+    storage.clearCredentials();
+    const bool cleared = !storage.hasCredentials();
+    std::printf("[storage] 凭据往返=%d 清除=%d\n", credsOk ? 1 : 0,
+                cleared ? 1 : 0);
+    ok = ok && credsOk && cleared;
+
+    // 还原用户凭据
+    if (hadCreds) {
+        storage.saveCredentials(backup.username, backup.secret);
+    }
+
+    // 迁移结果：注册表里的偏好应已在库中
+    const QVariant migrated =
+        storage.value(QStringLiteral("video/deviceId")).toString();
+    std::printf("[storage] 迁移示例 video/deviceId=%s\n",
+                migrated.toString().isEmpty() ? "(空)" :
+                migrated.toString().toUtf8().constData());
+
+    std::printf("[storage] 结论: %s\n", ok ? "PASS" : "FAIL");
+    return ok ? 0 : 1;
+}
+
+}  // namespace
+
+// ---------------------------------------------------------------------------
+// Phase 2/3 自检：会议记录与录制元数据是否已进 SQLite
+// 用法：UiPreview.exe --unified-storage-selftest
+// ---------------------------------------------------------------------------
+namespace {
+
+int run_unified_storage_selftest() {
+    Storage &storage = Storage::instance();
+    storage.open();
+    std::printf("[unified] db=%s open=%d fallback=%d\n",
+                storage.databasePath().toUtf8().constData(),
+                storage.isOpen() ? 1 : 0, storage.usingFallback() ? 1 : 0);
+
+    // ---- 会议记录 ----
+    const QVector<MeetingRecord> history = MeetingHistory::load();
+    std::printf("[unified] 会议记录 %d 条，存储位置=%s\n",
+                static_cast<int>(history.size()),
+                MeetingHistory::storage_path().toUtf8().constData());
+    if (!history.isEmpty()) {
+        std::printf("[unified] 最新一条: 房间%d %s 时长=%s\n", history.first().roomNo,
+                    history.first().startedText().toUtf8().constData(),
+                    history.first().durationText().toUtf8().constData());
+    }
+
+    // ---- 录制元数据 ----
+    const QVector<RecordingEntry> recordings = RecordingLibrary::scan();
+    std::printf("[unified] 录制文件 %d 个\n",
+                static_cast<int>(recordings.size()));
+    if (!recordings.isEmpty()) {
+        const RecordingEntry &first = recordings.first();
+        std::printf("[unified] 最新录制: %s 房间%d %s 时长=%s\n",
+                    first.title.toUtf8().constData(), first.roomNo,
+                    first.startedText().toUtf8().constData(),
+                    first.durationText().toUtf8().constData());
+    }
+
+    // ---- 直接查库确认计数一致 ----
+    int dbHistory = -1;
+    int dbRecordings = -1;
+    if (QSqlDatabase db = storage.connection(); db.isValid()) {
+        QSqlQuery q1(db);
+        if (q1.exec(QStringLiteral("SELECT COUNT(*) FROM meeting_history")) &&
+            q1.next()) {
+            dbHistory = q1.value(0).toInt();
+        }
+        QSqlQuery q2(db);
+        if (q2.exec(QStringLiteral("SELECT COUNT(*) FROM recordings")) &&
+            q2.next()) {
+            dbRecordings = q2.value(0).toInt();
+        }
+    }
+    std::printf("[unified] 库内计数: meeting_history=%d recordings=%d\n",
+                dbHistory, dbRecordings);
+
+    // 顶部统计条数据
+    const MeetingStats stats = MeetingHistory::stats();
+    int recCount = 0;
+    const qint64 recBytes = RecordingLibrary::total_bytes(&recCount);
+    std::printf("[unified] 统计条: 本周 %d 场 / 总时长 %.1f 分钟 / 占用 %d 个 %.1f MB\n",
+                stats.weekCount, stats.totalDurationMs / 60000.0, recCount,
+                recBytes / (1024.0 * 1024.0));
+
+    const bool ok = storage.isOpen() && dbHistory == history.size() &&
+                    dbRecordings == recordings.size() && dbHistory > 0;
+    std::printf("[unified] 结论: %s\n", ok ? "PASS" : "FAIL");
+    return ok ? 0 : 1;
+}
+
+}  // namespace
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     QApplication::setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
 
+    if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
+                        QStringLiteral("--unified-storage-selftest")) {
+        QCoreApplication::setApplicationName(QStringLiteral("CCMeeting"));
+        return run_unified_storage_selftest();
+    }
+    if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
+                        QStringLiteral("--storage-selftest")) {
+        QCoreApplication::setApplicationName(QStringLiteral("CCMeeting"));
+        return run_storage_selftest();
+    }
+    if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
+                        QStringLiteral("--login-store-selftest")) {
+        return run_login_store_selftest();
+    }
+    if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
+                        QStringLiteral("--duration-selftest")) {
+        return run_duration_selftest();
+    }
+    if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
+                        QStringLiteral("--settings-latency-test")) {
+        return run_settings_latency_test();
+    }
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--general-settings-selftest")) {
         return run_general_settings_selftest();
@@ -748,6 +1063,15 @@ int main(int argc, char *argv[]) {
         if (nav != nullptr) {
             nav->setCurrentRow(2);
             capture(&window, QStringLiteral("12-meeting-history"), 1280, 800);
+
+            // 空状态：清空后重绘，确认标题/说明之间不再出现大片空白
+            if (auto *history = window.findChild<stack_meeting_history *>()) {
+                MeetingHistory::clear();
+                history->refresh();
+                capture(&window, QStringLiteral("12b-history-empty"), 1280, 800);
+                seed_sample_history();
+                history->refresh();
+            }
             nav->setCurrentRow(3);
             capture(&window, QStringLiteral("10-recordings"), 1280, 800);
             nav->setCurrentRow(0);
@@ -770,6 +1094,7 @@ int main(int argc, char *argv[]) {
         MeetingWidget meeting;
         capture(&meeting, QStringLiteral("05-meeting"), 1360, 860);
     }
+
 
     // 会议设置弹出面板：房主视角 / 普通成员视角
     {
