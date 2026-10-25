@@ -30,6 +30,7 @@ enum class MessageKind {
     CloseCamera,
     SendText,
     SendUserProfile,
+    RoomSettings,
 
     CreateMeetingResponse,
     JoinMeetingResponse,
@@ -39,6 +40,7 @@ enum class MessageKind {
     PartnerJoin2,
     CloseCameraNotify,
     UserProfileNotify,
+    RoomSettingsNotify,
     RemoteHostClosedError,
     OtherNetError,
 };
@@ -188,6 +190,24 @@ private:
     std::string avatar_url_;
 };
 
+/** @brief 房主修改房间开关（上行）。payload 为 4 字节大端 flags */
+class RoomSettingsMessage : public Message {
+public:
+    explicit RoomSettingsMessage(std::uint32_t flags = 0) : flags_(flags) {}
+
+    MessageKind kind() const override { return MessageKind::RoomSettings; }
+    MessagePriority send_priority() const override {
+        return MessagePriority::Control;
+    }
+
+    /** @brief 房间开关位掩码 */
+    std::uint32_t flags() const { return flags_; }
+    void set_flags(std::uint32_t flags) { flags_ = flags; }
+
+private:
+    std::uint32_t flags_ = 0;
+};
+
 /** @brief 发送文本消息 */
 class SendTextMessage : public Message {
 public:
@@ -312,6 +332,19 @@ public:
 private:
     std::string display_name_;
     std::string avatar_url_;
+};
+
+/** @brief 房间开关通知（下行）。服务器校验房主后广播，并在新人入会时补发 */
+class RoomSettingsNotifyMessage : public Message {
+public:
+    MessageKind kind() const override { return MessageKind::RoomSettingsNotify; }
+
+    /** @brief 房间开关位掩码 */
+    std::uint32_t flags() const { return flags_; }
+    void set_flags(std::uint32_t flags) { flags_ = flags; }
+
+private:
+    std::uint32_t flags_ = 0;
 };
 
 /** @brief 远程主机关闭错误消息 */

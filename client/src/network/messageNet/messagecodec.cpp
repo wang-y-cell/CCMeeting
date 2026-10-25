@@ -15,7 +15,8 @@ QByteArray decode_text_wire_payload(const QByteArray &wire_body) {
 
 bool wire_frame_needs_length_field(MSG_TYPE type) {
     return type == CREATE_MEETING || type == CLOSE_CAMERA ||
-           type == TEXT_SEND || type == JOIN_MEETING || type == USER_PROFILE;
+           type == TEXT_SEND || type == JOIN_MEETING || type == USER_PROFILE ||
+           type == ROOM_SETTINGS;
 }
 
 qint64 read_wire_user_id(const std::uint8_t *frame) {
@@ -36,8 +37,10 @@ MessagePtr decode_join_meeting_response(const std::uint8_t *body,
                                         std::uint32_t n_body) {
     auto msg = std::make_shared<JoinMeetingResponseMessage>();
     if (n_body >= sizeof(std::int32_t)) {
-        std::int32_t code = 0;
-        memcpy(&code, body, sizeof(std::int32_t));
+        // 服务端用 htonl 发送：成功时是房间号，失败时是 0 / -1。
+        // 必须按大端解析，否则房间号低位 >= 0x80 时会被读成负数（随机房间号高发）。
+        const std::int32_t code = qFromBigEndian<std::int32_t>(
+            reinterpret_cast<const char *>(body));
         msg->set_response_code(code);
     }
     return msg;
@@ -182,6 +185,10 @@ MSG_TYPE MessageCodec::to_wire_type(MessageKind kind) {
         return USER_PROFILE;
     case MessageKind::UserProfileNotify:
         return USER_PROFILE;
+    case MessageKind::RoomSettings:
+        return ROOM_SETTINGS;
+    case MessageKind::RoomSettingsNotify:
+        return ROOM_SETTINGS_NOTIFY;
     case MessageKind::CloseCameraNotify:
         return CLOSE_CAMERA;
     case MessageKind::RemoteHostClosedError:
@@ -223,6 +230,10 @@ MessageKind MessageCodec::from_wire_type(MSG_TYPE type) {
         return MessageKind::PartnerJoin2;
     case USER_PROFILE:
         return MessageKind::UserProfileNotify;
+    case ROOM_SETTINGS:
+        return MessageKind::RoomSettings;
+    case ROOM_SETTINGS_NOTIFY:
+        return MessageKind::RoomSettingsNotify;
     case RemoteHostClosedError:
         return MessageKind::RemoteHostClosedError;
     case OtherNetError:
@@ -257,6 +268,13 @@ QByteArray MessageCodec::encode_wire_frame(const Message &msg,
         const auto *text_msg = dynamic_cast<const SendTextMessage *>(&msg);
         if (text_msg)
             body = compress_text_payload(text_msg->text());
+        break;
+    }
+    case MessageKind::RoomSettings: {
+        const auto *settings = dynamic_cast<const RoomSettingsMessage *>(&msg);
+        char buf[4] = {};
+        qToBigEndian(settings ? settings->flags() : 0u, buf);
+        body.append(buf, 4);
         break;
     }
     case MessageKind::SendUserProfile: {
@@ -324,6 +342,13 @@ MessagePtr MessageCodec::decode_wire_packet(const std::uint8_t *frame,
     case USER_PROFILE: {
         const qint64 user_id = read_wire_user_id(frame);
         return decode_user_profile(body, n_body, user_id);
+    }
+    case ROOM_SETTINGS_NOTIFY: {
+        auto msg = std::make_shared<RoomSettingsNotifyMessage>();
+        if (n_body >= sizeof(std::uint32_t))
+            msg->set_flags(qFromBigEndian<std::uint32_t>(
+                reinterpret_cast<const char *>(body)));
+        return msg;
     }
     case PARTNER_JOIN:
     case PARTNER_EXIT:

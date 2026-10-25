@@ -3,6 +3,7 @@
 
 #include "stack_create_meet_ui.h"
 
+#include <QShowEvent>
 #include <QWidget>
 #include <cstdint>
 
@@ -44,6 +45,10 @@ signals:
 private slots:
     /** @brief 校验输入并发送创建信号 */
     void on_create_clicked();
+
+protected:
+    /** @brief 每次显示时刷新「最近创建的会议」 */
+    void showEvent(QShowEvent *event) override;
 
 private:
     Ui_stack_create_meet ui;

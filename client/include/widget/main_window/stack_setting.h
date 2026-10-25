@@ -47,6 +47,12 @@ private slots:
     void onVideoResolutionChanged(int index);
     void onVideoFpsChanged(int index);
     void onMicTestClicked();
+    /** @brief 手动开启/关闭摄像头预览（默认关闭） */
+    void onVideoPreviewToggleClicked();
+    /** @brief 打开录制保存目录 */
+    void onOpenRecordDirClicked();
+    /** @brief 录制目录恢复默认 */
+    void onResetRecordDirClicked();
     void onVideoFrame(const QVideoFrame &frame);
     void onMicTimer();
     void beginVideoPreviewAsync();
@@ -75,6 +81,10 @@ private:
     void startMicTest();
     void stopMicTest();
     void syncPreviewForCategory(int row);
+    /** @brief 按当前状态刷新预览按钮文字/样式与占位提示 */
+    void update_preview_toggle_ui();
+    /** @brief 刷新「录制保存位置」显示 */
+    void refreshRecordDirLabel();
 
     QString currentVideoDeviceId() const;
     QString currentAudioDeviceId() const;
@@ -92,6 +102,8 @@ private:
     QIODevice *audio_io_ = nullptr;
     QTimer *mic_timer_ = nullptr;
     bool mic_testing_ = false;
+    /** 用户是否手动开启了摄像头预览（默认 false：进设置页不碰摄像头） */
+    bool video_preview_enabled_ = false;
     bool block_video_signals_ = false;
     std::atomic<int> preview_generation_{0};
     qint64 last_preview_paint_ms_ = 0;

@@ -12,6 +12,7 @@ class Ui_login {
 public:
     QStackedWidget *stackedWidget = nullptr;
     QWidget *loginPage = nullptr;
+    QLabel *logoLabel = nullptr;
     QLabel *brandLabel = nullptr;
     QLabel *subtitleLabel = nullptr;
     QLineEdit *account_line = nullptr;

@@ -226,6 +226,35 @@ void Room::handle_packet(std::shared_ptr<network::Connection> from,
             broadcast(outbound, from->id());
             break;
         }
+        case protocol::MessageType::RoomSettings: {
+            // 只有房主能改房间开关；其余成员忽略并记日志
+            if (!participant_it->second.is_owner) {
+                spdlog::warn(
+                    "room {} rejected RoomSettings from non-owner connection {}",
+                    _room_id, from->id());
+                break;
+            }
+            uint32_t flags = _settings;
+            if (packet.payload.size() >= sizeof(uint32_t)) {
+                uint32_t net_flags = 0;
+                std::memcpy(&net_flags, packet.payload.data(),
+                            sizeof(net_flags));
+                flags = ntohl(net_flags);
+            }
+            _settings = flags;
+            spdlog::info("room {} settings updated by owner: 0x{:x}", _room_id,
+                         flags);
+
+            protocol::Packet outbound;
+            outbound.type = protocol::MessageType::RoomSettingsNotify;
+            outbound.user_id = sender_user_id;
+            const uint32_t net_flags = htonl(_settings);
+            outbound.payload.resize(sizeof(net_flags));
+            std::memcpy(outbound.payload.data(), &net_flags,
+                        sizeof(net_flags));
+            broadcast(outbound);  // 含发起者，保证全员视图一致
+            break;
+        }
         case protocol::MessageType::ImgSend:
         case protocol::MessageType::ImgRecv:
         case protocol::MessageType::AudioSend:
@@ -268,6 +297,15 @@ protocol::Packet make_user_profile_packet(const Participant& p) {
     return packet;
 }
 
+protocol::Packet make_room_settings_packet(uint32_t flags) {
+    protocol::Packet packet;
+    packet.type = protocol::MessageType::RoomSettingsNotify;
+    const uint32_t net_flags = htonl(flags);
+    packet.payload.resize(sizeof(net_flags));
+    std::memcpy(packet.payload.data(), &net_flags, sizeof(net_flags));
+    return packet;
+}
+
 }  // namespace
 
 void Room::notify_user_joined(std::shared_ptr<network::Connection> newcomer) {
@@ -298,6 +336,9 @@ void Room::notify_user_joined(std::shared_ptr<network::Connection> newcomer) {
                                     id_wire + sizeof(id_wire));
     }
     send_to(newcomer, partner_list);
+
+    // 房间开关：新人入会先同步当前策略，避免界面默认值与房间实际不一致
+    send_to(newcomer, make_room_settings_packet(_settings));
 
     // PartnerJoin2 只有 userId；把房内已缓存的资料补发给新人，否则新人看不到对方名称
     for (const auto& item : _participants) {

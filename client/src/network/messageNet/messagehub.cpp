@@ -42,6 +42,7 @@ void MessageHub::emit_incoming(MessagePtr msg) {
     case MessageKind::PartnerJoin2:
     case MessageKind::CloseCameraNotify:
     case MessageKind::UserProfileNotify:
+    case MessageKind::RoomSettingsNotify:
         emit user_info_message_ready(msg);
         break;
     case MessageKind::RecvText:

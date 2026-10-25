@@ -24,6 +24,8 @@ public:
     QComboBox *videoDeviceCombo = nullptr;
     QComboBox *videoResolution = nullptr;
     QComboBox *videoFps = nullptr;
+    QPushButton *videoPreviewToggleBtn = nullptr;
+    QLabel *videoPreviewTip = nullptr;
     QLabel *videoPreview = nullptr;
     QLabel *videoPreviewHint = nullptr;
 
@@ -35,12 +37,13 @@ public:
     QProgressBar *micLevelBar = nullptr;
     QLabel *micLevelLabel = nullptr;
 
-    // 通用
-    QLineEdit *meetingHostEdit = nullptr;
-    QLineEdit *meetingPortEdit = nullptr;
-    QLineEdit *authHostEdit = nullptr;
-    QLineEdit *authPortEdit = nullptr;
-    QLineEdit *janusUrlEdit = nullptr;
+    // 通用（不暴露服务器/Janus 等连接参数）
+    QLabel *recordDirLabel = nullptr;
+    QPushButton *recordOpenBtn = nullptr;
+    QPushButton *recordResetBtn = nullptr;
+    QComboBox *recordFps = nullptr;
+    QCheckBox *soundEnabled = nullptr;
+    QCheckBox *videoAutoPreview = nullptr;
 
     // 界面
     QComboBox *uiStartPage = nullptr;

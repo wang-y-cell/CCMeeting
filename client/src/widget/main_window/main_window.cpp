@@ -1,6 +1,8 @@
 #include "main_window.h"
 #include "avatar_image_loader.h"
 #include "configure/client_config.h"
+#include "configure/meeting_history.h"
+#include "recent_meeting_list.h"
 #include "configure/user_session.h"
 #include "style_loader.h"
 
@@ -77,6 +79,10 @@ MeetingWidget *main_window::ensureMeetingWidget() {
     widget->hide();
     connect(widget, &MeetingWidget::connect_server_finished_signal, this,
             &main_window::onConnectServerFinished);
+    connect(widget, &MeetingWidget::meeting_confirmed_signal, this,
+            &main_window::onMeetingConfirmed);
+    connect(widget, &MeetingWidget::meeting_closed_signal, this,
+            &main_window::onMeetingClosed);
     spdlog::info("[main_window] MeetingWidget ready");
     spdlog::default_logger()->flush();
     return widget;
@@ -97,12 +103,26 @@ void main_window::refreshUserCard() {
     }
 
     const auto &session = UserSession::instance();
-    ui.nameLabel->setText(session.isLoggedIn() ? session.name() : tr("未登录"));
+    const QString displayName =
+        session.isLoggedIn() ? session.name() : tr("未登录");
+    ui.nameLabel->setText(displayName);
+
+    // 头像未就绪时显示姓名首字，避免侧栏出现一个空白圆圈
+    const QString monogram =
+        displayName.isEmpty() ? QStringLiteral("?") : displayName.left(1);
+    ui.avatarLabel->setText(monogram);
 
     AvatarImageLoader::instance().load(
         session.avatar(), ui.avatarLabel->size(), this,
-        [this](const QPixmap &pixmap) {
-            if (ui.avatarLabel) {
+        [this, monogram](const QPixmap &pixmap) {
+            if (!ui.avatarLabel) {
+                return;
+            }
+            if (pixmap.isNull()) {
+                ui.avatarLabel->setPixmap(QPixmap());
+                ui.avatarLabel->setText(monogram);
+            } else {
+                ui.avatarLabel->setText(QString());
                 ui.avatarLabel->setPixmap(pixmap);
             }
         });
@@ -153,6 +173,19 @@ void main_window::init_ui() {
     join_meeting_widget = new stack_join_meet(this);
     ui.contentStack->addWidget(join_meeting_widget);
 
+    history_widget = new stack_meeting_history(this);
+    ui.contentStack->addWidget(history_widget);
+
+    recordings_widget = new stack_recordings(this);
+    ui.contentStack->addWidget(recordings_widget);
+    connect(recordings_widget, &stack_recordings::playRequested, this,
+            [this](const RecordingEntry &entry) {
+                auto *dialog = new RecordingPlaybackDialog(entry, this);
+                dialog->setAttribute(Qt::WA_DeleteOnClose);
+                dialog->show();
+                dialog->play();
+            });
+
     setting_widget = new stack_setting(this);
     ui.contentStack->addWidget(setting_widget);
 
@@ -169,7 +202,13 @@ void main_window::init_ui() {
                     ui.contentStack->setCurrentWidget(create_meeting_widget);
                 } else if (row == 1 && join_meeting_widget) {
                     ui.contentStack->setCurrentWidget(join_meeting_widget);
-                } else if (row == 2 && setting_widget) {
+                } else if (row == 2 && history_widget) {
+                    history_widget->refresh();
+                    ui.contentStack->setCurrentWidget(history_widget);
+                } else if (row == 3 && recordings_widget) {
+                    recordings_widget->refresh();
+                    ui.contentStack->setCurrentWidget(recordings_widget);
+                } else if (row == 4 && setting_widget) {
                     ui.contentStack->setCurrentWidget(setting_widget);
                 }
             });
@@ -243,5 +282,34 @@ void main_window::onConnectServerFinished(bool ok, QString ip, QString port,
             widget->hide();
         QMessageBox::warning(this, "Connection error", "连接服务器失败",
                              QMessageBox::Yes, QMessageBox::Yes);
+    }
+}
+
+void main_window::onMeetingConfirmed(bool created, int roomNo) {
+    MeetingHistory::append(created ? MeetingRecordKind::Created
+                                   : MeetingRecordKind::Joined,
+                           roomNo);
+    // 首页的「最近 N 个会议」与记录页都刷新一份
+    if (history_widget) {
+        history_widget->refresh();
+    }
+    if (create_meeting_widget && create_meeting_widget->findChild<RecentMeetingList *>()) {
+        create_meeting_widget->findChild<RecentMeetingList *>()->refresh();
+    }
+    if (join_meeting_widget && join_meeting_widget->findChild<RecentMeetingList *>()) {
+        join_meeting_widget->findChild<RecentMeetingList *>()->refresh();
+    }
+}
+
+void main_window::onMeetingClosed(qint64 durationMs) {
+    MeetingHistory::finish_open_session(durationMs);
+    if (history_widget) {
+        history_widget->refresh();
+    }
+    if (create_meeting_widget && create_meeting_widget->findChild<RecentMeetingList *>()) {
+        create_meeting_widget->findChild<RecentMeetingList *>()->refresh();
+    }
+    if (join_meeting_widget && join_meeting_widget->findChild<RecentMeetingList *>()) {
+        join_meeting_widget->findChild<RecentMeetingList *>()->refresh();
     }
 }

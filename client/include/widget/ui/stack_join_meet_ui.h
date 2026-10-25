@@ -5,6 +5,7 @@ class QLabel;
 class QLineEdit;
 class QPushButton;
 class QWidget;
+class RecentMeetingList;
 
 /** 加入会议页纯 UI，不含业务逻辑 */
 class Ui_stack_join_meet {
@@ -14,6 +15,7 @@ public:
     QLabel *fieldLabel = nullptr;
     QLineEdit *roomN = nullptr;
     QPushButton *joinMeeting_btn = nullptr;
+    RecentMeetingList *recent = nullptr;
 
     void setupUi(QWidget *parent);
 };

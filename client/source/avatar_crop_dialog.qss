@@ -1,114 +1,130 @@
+/* ============================================================
+ * avatar_crop_dialog.qss — 头像裁剪对话框
+ * 令牌取值见 style.qss 顶部注释
+ * ============================================================ */
+
 QDialog#avatarCropDialog {
-    background-color: #17191f;
-    border: 1px solid #404040;
+    background-color: #0B0D11;
+    border: 1px solid #232A35;
 }
 
 QLabel#cropHint {
-    color: #9aa3b5;
-    font-size: 13px;
+    color: #98A2B3;
+    font-size: 12px;
     padding: 2px 0 4px 0;
     background: transparent;
     border: none;
 }
 
 QWidget#avatarCropCanvas {
-    background-color: #16181e;
-    border: 1px solid #2e3442;
+    background-color: #07080B;
+    border: 1px solid #1E2530;
     border-radius: 12px;
 }
 
+/* 缩放 / 旋转工具按钮 */
+
 QPushButton#cropToolBtn {
-    background-color: #2a303c;
-    color: #e8ebf2;
-    border: 1px solid #3a4152;
-    border-radius: 10px;
-    min-height: 40px;
-    min-width: 40px;
-    font-size: 18px;
-    font-weight: 600;
+    background-color: #1B2029;
+    color: #E9EDF4;
+    border: 1px solid #232A35;
+    border-radius: 8px;
+    min-height: 36px;
+    min-width: 36px;
+    font-size: 16px;
+    font-weight: 500;
     padding: 0;
 }
 
 QPushButton#cropToolBtn:hover {
-    background-color: #353c4c;
-    border-color: #4b5468;
+    background-color: #1E242E;
+    border-color: #2E3846;
 }
 
 QPushButton#cropToolBtn:pressed {
-    background-color: #222833;
+    background-color: #161A21;
+    border-color: #4C8DFF;
 }
 
 QPushButton#cropResetBtn {
-    background-color: #2a303c;
-    color: #d7dce8;
-    border: 1px solid #3a4152;
-    border-radius: 10px;
-    min-height: 40px;
+    background-color: transparent;
+    color: #98A2B3;
+    border: 1px solid #2A3341;
+    border-radius: 8px;
+    min-height: 36px;
     padding: 0 18px;
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: 500;
 }
 
 QPushButton#cropResetBtn:hover {
-    background-color: #353c4c;
-    border-color: #4b5468;
+    background-color: #1E242E;
+    border-color: #3A4557;
+    color: #E9EDF4;
 }
 
 QPushButton#cropCancelBtn {
-    background-color: #2a303c;
-    color: #d7dce8;
-    border: 1px solid #3a4152;
-    border-radius: 10px;
-    min-height: 44px;
-    font-weight: 600;
+    background-color: transparent;
+    color: #98A2B3;
+    border: 1px solid #2A3341;
+    border-radius: 8px;
+    min-height: 36px;
+    padding: 0 20px;
+    font-size: 13px;
+    font-weight: 500;
 }
 
 QPushButton#cropCancelBtn:hover {
-    background-color: #353c4c;
+    background-color: #1E242E;
+    border-color: #3A4557;
+    color: #E9EDF4;
 }
 
 QPushButton#cropOkBtn {
-    background-color: #2f6fed;
-    color: #ffffff;
-    border: none;
-    border-radius: 10px;
-    min-height: 44px;
+    background-color: #4C8DFF;
+    color: #FFFFFF;
+    border: 1px solid #4C8DFF;
+    border-radius: 8px;
+    min-height: 36px;
+    padding: 0 22px;
+    font-size: 13px;
     font-weight: 600;
 }
 
 QPushButton#cropOkBtn:hover {
-    background-color: #3b7fff;
+    background-color: #5E9BFF;
+    border-color: #5E9BFF;
 }
 
 QPushButton#cropOkBtn:pressed {
-    background-color: #255fd4;
+    background-color: #3B7AE8;
+    border-color: #3B7AE8;
 }
 
-QPushButton#framelessCloseBtn {
+QPushButton#cropOkBtn:disabled {
+    background-color: #1B2029;
+    border-color: #232A35;
+    color: #6A7383;
+}
+
+/* ---------- 无边框窗口标题栏按钮 ---------- */
+
+QPushButton#framelessCloseBtn,
+QPushButton#framelessMaxBtn {
     background-color: transparent;
     border: none;
-    color: #8b93a7;
-    font-size: 16px;
-    font-weight: bold;
-    padding: 0;
+    color: #6A7383;
+    font-size: 15px;
+    font-weight: 500;
     border-radius: 6px;
 }
 
 QPushButton#framelessCloseBtn:hover {
-    background-color: #e81123;
-    color: #ffffff;
-}
-
-QPushButton#framelessMaxBtn {
-    background-color: transparent;
-    border: none;
-    color: #8b93a7;
-    font-size: 14px;
-    font-weight: bold;
-    padding: 0;
-    border-radius: 6px;
+    background-color: #E5484D;
+    color: #FFFFFF;
 }
 
 QPushButton#framelessMaxBtn:hover {
-    background-color: #2a3040;
-    color: #ffffff;
+    background-color: #212836;
+    color: #E9EDF4;
 }

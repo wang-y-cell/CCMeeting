@@ -11,6 +11,9 @@
         <file>source/login.qss</file>
         <file>source/main_window.qss</file>
         <file>source/meeting_widget.qss</file>
+        <file>source/meeting_settings_popup.qss</file>
+        <file>source/stack_recordings.qss</file>
+        <file>source/recording_playback_dialog.qss</file>
         <file>source/edit_profile_dialog.qss</file>
         <file>source/avatar_crop_dialog.qss</file>
     </qresource>

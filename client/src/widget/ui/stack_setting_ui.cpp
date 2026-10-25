@@ -49,7 +49,7 @@ void Ui_stack_setting::setupUi(QWidget *parent) {
     root->addWidget(pageTitle);
 
     pageDesc = new QLabel(
-        QObject::tr("调整音视频、服务器与界面相关选项"), parent);
+        QObject::tr("调整音视频、录制与界面相关选项"), parent);
     pageDesc->setObjectName(QStringLiteral("pageDesc"));
     root->addWidget(pageDesc);
 
@@ -74,7 +74,7 @@ void Ui_stack_setting::setupUi(QWidget *parent) {
     for (const QString &name : categories) {
         auto *item = new QListWidgetItem(name);
         item->setSizeHint(QSize(0, 40));
-        item->setTextAlignment(Qt::AlignCenter);
+        item->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
         categoryList->addItem(item);
     }
     bodyLayout->addWidget(categoryList);
@@ -116,17 +116,30 @@ void Ui_stack_setting::setupUi(QWidget *parent) {
     videoPreviewHint->setFixedHeight(36);
     videoLayout->addWidget(videoPreviewHint);
 
+    // 摄像头预览改为手动开启：进设置页不再自动占用摄像头，
+    // 避免每次切到设置都要开关一次硬件造成的点击延迟。
+    auto *previewRow = new QHBoxLayout();
+    previewRow->setSpacing(10);
+    videoPreviewToggleBtn = new QPushButton(QObject::tr("开启摄像头预览"), videoPage);
+    videoPreviewToggleBtn->setObjectName(QStringLiteral("videoPreviewToggleBtn"));
+    videoPreviewToggleBtn->setMinimumHeight(32);
+    videoPreviewToggleBtn->setFixedWidth(150);
+    videoPreviewToggleBtn->setCursor(Qt::PointingHandCursor);
+    previewRow->addWidget(videoPreviewToggleBtn);
+
+    videoPreviewTip = new QLabel(
+        QObject::tr("默认关闭：开启后会占用摄像头，可与会议内视频冲突"), videoPage);
+    videoPreviewTip->setObjectName(QStringLiteral("fieldLabel"));
+    previewRow->addWidget(videoPreviewTip, 1);
+    videoLayout->addLayout(previewRow);
+
     // 勿用 QOpenGLWidget：嵌入主窗口会触发整窗 OpenGL 合成，部分环境下一点开设置即崩
     videoPreview = new QLabel(videoPage);
     videoPreview->setObjectName(QStringLiteral("settingsVideoPreview"));
     videoPreview->setFixedHeight(200);
     videoPreview->setAlignment(Qt::AlignCenter);
     videoPreview->setScaledContents(false);
-    videoPreview->setStyleSheet(
-        QStringLiteral("QLabel#settingsVideoPreview {"
-                       "background-color: #12141a; color: #8a90a0;"
-                       "border-radius: 8px;}"));
-    videoPreview->setText(QObject::tr("预览未启动"));
+    videoPreview->setText(QObject::tr("摄像头预览已关闭"));
     videoLayout->addWidget(videoPreview, 1);
     videoLayout->addStretch();
 
@@ -197,35 +210,60 @@ void Ui_stack_setting::setupUi(QWidget *parent) {
     generalForm->setHorizontalSpacing(16);
     generalForm->setVerticalSpacing(14);
 
-    meetingHostEdit = new QLineEdit(generalPage);
-    meetingHostEdit->setObjectName(QStringLiteral("meetingHostEdit"));
-    meetingHostEdit->setPlaceholderText(QObject::tr("会议服务器地址"));
-    generalForm->addRow(makeFieldLabel(QObject::tr("会议服务器"), generalPage),
-                        meetingHostEdit);
+    // 录制保存位置：只读展示路径 + 打开 / 恢复默认
+    auto *dirRow = new QWidget(generalPage);
+    auto *dirLayout = new QHBoxLayout(dirRow);
+    dirLayout->setContentsMargins(0, 0, 0, 0);
+    dirLayout->setSpacing(8);
 
-    meetingPortEdit = new QLineEdit(generalPage);
-    meetingPortEdit->setObjectName(QStringLiteral("meetingPortEdit"));
-    meetingPortEdit->setPlaceholderText(QObject::tr("端口"));
-    generalForm->addRow(makeFieldLabel(QObject::tr("会议端口"), generalPage),
-                        meetingPortEdit);
+    recordDirLabel = new QLabel(dirRow);
+    recordDirLabel->setObjectName(QStringLiteral("recordDirLabel"));
+    recordDirLabel->setMinimumHeight(32);
+    recordDirLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    dirLayout->addWidget(recordDirLabel, 1);
 
-    authHostEdit = new QLineEdit(generalPage);
-    authHostEdit->setObjectName(QStringLiteral("authHostEdit"));
-    authHostEdit->setPlaceholderText(QObject::tr("认证服务器地址"));
-    generalForm->addRow(makeFieldLabel(QObject::tr("认证服务器"), generalPage),
-                        authHostEdit);
+    recordOpenBtn = new QPushButton(QObject::tr("打开"), dirRow);
+    recordOpenBtn->setObjectName(QStringLiteral("recordDirBtn"));
+    recordOpenBtn->setFixedWidth(64);
+    recordOpenBtn->setCursor(Qt::PointingHandCursor);
+    dirLayout->addWidget(recordOpenBtn);
 
-    authPortEdit = new QLineEdit(generalPage);
-    authPortEdit->setObjectName(QStringLiteral("authPortEdit"));
-    authPortEdit->setPlaceholderText(QObject::tr("端口"));
-    generalForm->addRow(makeFieldLabel(QObject::tr("认证端口"), generalPage),
-                        authPortEdit);
+    recordResetBtn = new QPushButton(QObject::tr("默认"), dirRow);
+    recordResetBtn->setObjectName(QStringLiteral("recordDirBtn"));
+    recordResetBtn->setFixedWidth(64);
+    recordResetBtn->setCursor(Qt::PointingHandCursor);
+    dirLayout->addWidget(recordResetBtn);
 
-    janusUrlEdit = new QLineEdit(generalPage);
-    janusUrlEdit->setObjectName(QStringLiteral("janusUrlEdit"));
-    janusUrlEdit->setPlaceholderText(QObject::tr("ws://host:8188/"));
-    generalForm->addRow(makeFieldLabel(QObject::tr("Janus WebSocket"), generalPage),
-                        janusUrlEdit);
+    generalForm->addRow(makeFieldLabel(QObject::tr("录制保存位置"), generalPage),
+                        dirRow);
+
+    // 录制帧率
+    recordFps = new QComboBox(generalPage);
+    recordFps->setObjectName(QStringLiteral("recordFps"));
+    recordFps->setMinimumHeight(36);
+    recordFps->setMaximumWidth(200);
+    recordFps->addItem(QObject::tr("15 fps（省空间）"), 15);
+    recordFps->addItem(QObject::tr("25 fps（较流畅）"), 25);
+    recordFps->addItem(QObject::tr("30 fps（最流畅）"), 30);
+    generalForm->addRow(makeFieldLabel(QObject::tr("录制帧率"), generalPage),
+                        recordFps);
+
+    // 提示音 / 预览默认行为
+    soundEnabled = new QCheckBox(QObject::tr("收到 @我的消息时播放提示音"), generalPage);
+    soundEnabled->setObjectName(QStringLiteral("soundEnabled"));
+    generalForm->addRow(QString(), soundEnabled);
+
+    videoAutoPreview = new QCheckBox(
+        QObject::tr("进入设置页时自动开启摄像头预览（默认关闭）"), generalPage);
+    videoAutoPreview->setObjectName(QStringLiteral("videoAutoPreview"));
+    generalForm->addRow(QString(), videoAutoPreview);
+
+    auto *serverHint = new QLabel(
+        QObject::tr("服务器地址、端口与 Janus 信令地址由管理员统一配置，不在此处修改。"),
+        generalPage);
+    serverHint->setObjectName(QStringLiteral("fieldLabel"));
+    serverHint->setWordWrap(true);
+    generalForm->addRow(QString(), serverHint);
 
     pageStack->addWidget(makeScrollPage(body, generalPage));
 
@@ -241,7 +279,9 @@ void Ui_stack_setting::setupUi(QWidget *parent) {
     uiStartPage->setMinimumHeight(36);
     uiStartPage->addItem(QObject::tr("创建会议"), 0);
     uiStartPage->addItem(QObject::tr("加入会议"), 1);
-    uiStartPage->addItem(QObject::tr("设置"), 2);
+    uiStartPage->addItem(QObject::tr("会议记录"), 2);
+    uiStartPage->addItem(QObject::tr("录制"), 3);
+    uiStartPage->addItem(QObject::tr("设置"), 4);
     uiForm->addRow(makeFieldLabel(QObject::tr("启动默认页"), uiPage), uiStartPage);
 
     uiShowPageDesc = new QCheckBox(QObject::tr("显示页面说明文字"), uiPage);

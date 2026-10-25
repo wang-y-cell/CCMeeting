@@ -58,6 +58,11 @@ public:
     void send_close_camera();
     void send_user_profile(qint64 user_id, const std::string &display_name,
                            const std::string &avatar_url);
+    /**
+     * @brief 房主修改房间开关（服务端会校验身份）
+     * @param flags 房间开关位掩码
+     */
+    void send_room_settings(std::uint32_t flags);
 
     void stop();
 
@@ -106,6 +111,7 @@ public:
                          const std::string &avatar_url) {
         send_user_profile(user_id, display_name, avatar_url);
     }
+    void sendRoomSettings(std::uint32_t flags) { send_room_settings(flags); }
 
 signals:
     void request_message_ready(MessagePtr msg);

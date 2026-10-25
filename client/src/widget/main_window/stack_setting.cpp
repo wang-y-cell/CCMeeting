@@ -1,5 +1,7 @@
 #include "stack_setting.h"
 
+#include "recording_library.h"
+
 #include "configure/client_config.h"
 #include "ui/stack_setting_ui.h"
 
@@ -7,6 +9,9 @@
 #include <QAudioFormat>
 #include <QAudioSource>
 #include <QCamera>
+#include <QDesktopServices>
+#include <QDir>
+#include <QUrl>
 #include <QCameraDevice>
 #include <QCameraFormat>
 #include <QCheckBox>
@@ -23,6 +28,7 @@
 #include <QPixmap>
 #include <QProgressBar>
 #include <QPushButton>
+#include <QStyle>
 #include <QSettings>
 #include <QSize>
 #include <QStackedWidget>
@@ -125,6 +131,28 @@ stack_setting::stack_setting(QWidget *parent) : QWidget(parent) {
     connect(ui->micTestBtn, &QPushButton::clicked, this,
             &stack_setting::onMicTestClicked);
 
+    if (ui->videoPreviewToggleBtn) {
+        connect(ui->videoPreviewToggleBtn, &QPushButton::clicked, this,
+                &stack_setting::onVideoPreviewToggleClicked);
+    }
+    if (ui->recordOpenBtn) {
+        connect(ui->recordOpenBtn, &QPushButton::clicked, this,
+                &stack_setting::onOpenRecordDirClicked);
+    }
+    if (ui->recordResetBtn) {
+        connect(ui->recordResetBtn, &QPushButton::clicked, this,
+                &stack_setting::onResetRecordDirClicked);
+    }
+
+    // 预览默认值来自「通用」里的开关（默认关闭）
+    {
+        QSettings s(QString::fromLatin1(kSettingsOrg),
+                    QString::fromLatin1(kSettingsApp));
+        video_preview_enabled_ =
+            s.value(QStringLiteral("video/autoPreview"), false).toBool();
+    }
+    update_preview_toggle_ui();
+
     reloadFromConfig();
 }
 
@@ -176,7 +204,12 @@ void stack_setting::onCategoryChanged(int row) {
 void stack_setting::syncPreviewForCategory(int row) {
     if (row == 0) {
         stopMicTest();
-        scheduleVideoPreview();
+        if (video_preview_enabled_) {
+            scheduleVideoPreview();
+        } else {
+            stopVideoPreview();
+            update_preview_toggle_ui();
+        }
     } else if (row == 1) {
         stopVideoPreview();
     } else {
@@ -386,6 +419,10 @@ int stack_setting::currentFps() const {
 }
 
 void stack_setting::scheduleVideoPreview() {
+    if (!video_preview_enabled_) {
+        // 默认不占用摄像头：进入设置页立刻返回，避免开关硬件造成的点击延迟
+        return;
+    }
     preview_generation_.fetch_add(1);
     if (preview_start_timer_) {
         preview_start_timer_->stop();
@@ -536,6 +573,59 @@ void stack_setting::releasePreviewHardware(bool deferHardware) {
     }
 }
 
+void stack_setting::onVideoPreviewToggleClicked() {
+    video_preview_enabled_ = !video_preview_enabled_;
+    spdlog::info("[stack_setting] 摄像头预览 {}",
+                 video_preview_enabled_ ? "开启" : "关闭");
+    update_preview_toggle_ui();
+
+    if (video_preview_enabled_) {
+        scheduleVideoPreview();
+    } else {
+        stopVideoPreview();
+    }
+}
+
+void stack_setting::refreshRecordDirLabel() {
+    if (!ui || !ui->recordDirLabel) {
+        return;
+    }
+    const QString dir = RecordingLibrary::recordingsDir();
+    ui->recordDirLabel->setText(QDir::toNativeSeparators(dir));
+    ui->recordDirLabel->setToolTip(dir);
+}
+
+void stack_setting::onOpenRecordDirClicked() {
+    QDesktopServices::openUrl(
+        QUrl::fromLocalFile(RecordingLibrary::recordingsDir()));
+}
+
+void stack_setting::onResetRecordDirClicked() {
+    QSettings settings(QString::fromLatin1(kSettingsOrg),
+                       QString::fromLatin1(kSettingsApp));
+    settings.remove(QStringLiteral("record/saveDir"));
+    refreshRecordDirLabel();
+}
+
+void stack_setting::update_preview_toggle_ui() {
+    if (!ui) {
+        return;
+    }
+    if (ui->videoPreviewToggleBtn) {
+        ui->videoPreviewToggleBtn->setText(video_preview_enabled_
+                                              ? tr("关闭摄像头预览")
+                                              : tr("开启摄像头预览"));
+        ui->videoPreviewToggleBtn->setProperty("previewOn",
+                                              video_preview_enabled_);
+        ui->videoPreviewToggleBtn->style()->unpolish(ui->videoPreviewToggleBtn);
+        ui->videoPreviewToggleBtn->style()->polish(ui->videoPreviewToggleBtn);
+    }
+    if (ui->videoPreview && !video_preview_enabled_) {
+        clearPreviewLabel(ui->videoPreview);
+        ui->videoPreview->setText(tr("摄像头预览已关闭"));
+    }
+}
+
 void stack_setting::stopVideoPreview(bool deferHardware) {
     preview_generation_.fetch_add(1);
     if (preview_start_timer_) {
@@ -544,6 +634,9 @@ void stack_setting::stopVideoPreview(bool deferHardware) {
     releasePreviewHardware(deferHardware);
     if (ui && ui->videoPreview) {
         clearPreviewLabel(ui->videoPreview);
+        if (!video_preview_enabled_) {
+            ui->videoPreview->setText(tr("摄像头预览已关闭"));
+        }
     }
 }
 
@@ -682,13 +775,17 @@ void stack_setting::onMicTestClicked() {
 }
 
 void stack_setting::reloadFromConfig() {
-    const auto &cfg = ClientConfig::instance();
-
-    ui->meetingHostEdit->setText(cfg.meeting_server().host);
-    ui->meetingPortEdit->setText(QString::number(cfg.meeting_server().port));
-    ui->authHostEdit->setText(cfg.auth().host);
-    ui->authPortEdit->setText(QString::number(cfg.auth().port));
-    ui->janusUrlEdit->setText(cfg.webrtc().janus_ws_url);
+    // 通用页：录制目录 / 帧率 / 提示音 / 预览默认值（不涉及服务器连接参数）
+    QSettings s(QString::fromLatin1(kSettingsOrg),
+                QString::fromLatin1(kSettingsApp));
+    refreshRecordDirLabel();
+    const int fps = s.value(QStringLiteral("record/fps"), 15).toInt();
+    const int fpsIndex = ui->recordFps->findData(fps);
+    ui->recordFps->setCurrentIndex(fpsIndex >= 0 ? fpsIndex : 0);
+    ui->soundEnabled->setChecked(
+        s.value(QStringLiteral("ui/soundEnabled"), true).toBool());
+    ui->videoAutoPreview->setChecked(
+        s.value(QStringLiteral("video/autoPreview"), false).toBool());
 
     loadUiPrefs();
     applyUiPrefs();
@@ -720,6 +817,10 @@ void stack_setting::saveUiPrefs() const {
                ui->uiStartPage->currentData().toInt());
     s.setValue(QStringLiteral("ui/showPageDesc"),
                ui->uiShowPageDesc->isChecked());
+    s.setValue(QStringLiteral("record/fps"), ui->recordFps->currentData().toInt());
+    s.setValue(QStringLiteral("ui/soundEnabled"), ui->soundEnabled->isChecked());
+    s.setValue(QStringLiteral("video/autoPreview"),
+               ui->videoAutoPreview->isChecked());
 
     if (ui->videoDeviceCombo && ui->videoDeviceCombo->isEnabled()) {
         s.setValue(QStringLiteral("video/deviceId"),
@@ -749,18 +850,7 @@ void stack_setting::onSaveClicked() {
     cfg.webrtc().video.height = res.height();
     cfg.webrtc().video.fps = currentFps();
 
-    cfg.meeting_server().host = ui->meetingHostEdit->text().trimmed();
-    cfg.meeting_server().port = ui->meetingPortEdit->text().trimmed().toInt();
-    cfg.auth().host = ui->authHostEdit->text().trimmed();
-    cfg.auth().port = ui->authPortEdit->text().trimmed().toInt();
-    cfg.webrtc().janus_ws_url = ui->janusUrlEdit->text().trimmed();
-
-    if (cfg.meeting_server().host.isEmpty() || cfg.meeting_server().port <= 0 ||
-        cfg.auth().host.isEmpty() || cfg.auth().port <= 0) {
-        QMessageBox::warning(this, tr("设置"),
-                             tr("服务器地址或端口无效，请检查后重试。"));
-        return;
-    }
+    // 服务器地址 / Janus 地址不在界面暴露，保持 client.json 里的现值不变
 
     saveUiPrefs();
     applyUiPrefs();
@@ -771,7 +861,7 @@ void stack_setting::onSaveClicked() {
     if (ok) {
         QMessageBox::information(
             this, tr("设置"),
-            tr("已保存。服务器变更将在下次进会时生效。"));
+            tr("设置已保存。"));
     } else {
         QMessageBox::warning(
             this, tr("设置"),
@@ -791,13 +881,13 @@ void stack_setting::onResetClicked() {
     stopVideoPreview();
     ui->audioMuteOnJoin->setChecked(false);
     ui->audioEchoCancel->setChecked(true);
-    ui->meetingHostEdit->setText(QStringLiteral("127.0.0.1"));
-    ui->meetingPortEdit->setText(QStringLiteral("8888"));
-    ui->authHostEdit->setText(QStringLiteral("127.0.0.1"));
-    ui->authPortEdit->setText(QStringLiteral("9000"));
-    ui->janusUrlEdit->setText(QStringLiteral("ws://127.0.0.1:8188/"));
     ui->uiStartPage->setCurrentIndex(0);
     ui->uiShowPageDesc->setChecked(true);
+    ui->recordFps->setCurrentIndex(0);  // 15 fps
+    ui->soundEnabled->setChecked(true);
+    ui->videoAutoPreview->setChecked(false);
+    QSettings().remove(QStringLiteral("record/saveDir"));
+    refreshRecordDirLabel();
 
     QSettings s(QString::fromLatin1(kSettingsOrg),
                 QString::fromLatin1(kSettingsApp));

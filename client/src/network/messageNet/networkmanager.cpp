@@ -88,6 +88,10 @@ void NetworkManager::send_user_profile(qint64 user_id,
         user_id, display_name, avatar_url));
 }
 
+void NetworkManager::send_room_settings(std::uint32_t flags) {
+    hub_->enqueue_send(std::make_shared<RoomSettingsMessage>(flags));
+}
+
 void NetworkManager::stop() {
     if (hub_)
         hub_->stop();

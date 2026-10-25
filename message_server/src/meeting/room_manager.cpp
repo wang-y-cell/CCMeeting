@@ -2,7 +2,26 @@
 
 #include <spdlog/spdlog.h>
 
+#include <random>
+
 namespace meeting {
+
+namespace {
+
+/// 随机房间号范围：6 位数字，便于口头/短信分享，且远离 0（0 表示无房间）
+constexpr uint32_t kRoomIdMin = 100000;
+constexpr uint32_t kRoomIdMax = 999999;
+/// 冲突重试次数；用尽后回退到自增兜底，保证一定能建出房间
+constexpr int kRoomIdAttempts = 32;
+
+uint32_t random_room_id() {
+    // random_device 负责播种；mt19937 保证同一进程内分布均匀
+    static std::mt19937 engine{std::random_device{}()};
+    std::uniform_int_distribution<uint32_t> dist(kRoomIdMin, kRoomIdMax);
+    return dist(engine);
+}
+
+}  // namespace
 
 RoomManager::RoomManager(config::ServerConfig config,
                          boost::asio::io_context& io_ctx)
@@ -20,7 +39,27 @@ std::optional<uint32_t> RoomManager::create_room(
         return std::nullopt;
     }
 
-    const uint32_t room_id = _next_room_id++;
+    // 随机房间号：避免每次都是 1、2、3…；与现有房间冲突则重试
+    uint32_t room_id = 0;
+    for (int attempt = 0; attempt < kRoomIdAttempts; ++attempt) {
+        const uint32_t candidate = random_room_id();
+        if (_rooms.find(candidate) == _rooms.end()) {
+            room_id = candidate;
+            break;
+        }
+        spdlog::debug("room id {} already in use, retrying", candidate);
+    }
+
+    if (room_id == 0) {
+        // 极端兜底：随机段被占满时退回自增，保证创建不会失败
+        room_id = _next_room_id++;
+        while (_rooms.find(room_id) != _rooms.end()) {
+            room_id = _next_room_id++;
+        }
+        spdlog::warn("random room id exhausted, fallback to sequential {}",
+                     room_id);
+    }
+
     auto room = std::make_shared<Room>(room_id, owner, _config, _io_ctx, options,
                                        owner_user_id);
     room->start_expire_timer();

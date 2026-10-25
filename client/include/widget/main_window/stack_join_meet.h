@@ -3,6 +3,7 @@
 
 #include "stack_join_meet_ui.h"
 
+#include <QShowEvent>
 #include <QWidget>
 #include <QString>
 
@@ -27,6 +28,10 @@ signals:
      * @param roomNo 房间号
      */
     void joinMeetingClicked(const QString &roomNo);
+
+protected:
+    /** @brief 每次显示时刷新「最近加入的会议」 */
+    void showEvent(QShowEvent *event) override;
 
 private:
     Ui_stack_join_meet ui;
