@@ -1,10 +1,13 @@
 #include "stack_meeting_history.h"
 
+#include "recording_library.h"
+
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSizePolicy>
 #include <QVBoxLayout>
 
 #include <spdlog/spdlog.h>
@@ -55,7 +58,17 @@ void stack_meeting_history::build_ui() {
     auto *desc = new QLabel(tr("这里记录你创建过和加入过的会议，最多保留最近 100 条"),
                             this);
     desc->setObjectName(QStringLiteral("pageDesc"));
+    desc->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     root->addWidget(desc);
+
+    // ---- 统计条：本周会议 / 总时长 / 录制占用 ----
+    auto *statRow = new QHBoxLayout();
+    statRow->setSpacing(12);
+    statRow->addWidget(make_stat_card(tr("本周会议"), &_statWeekValue));
+    statRow->addWidget(make_stat_card(tr("总时长（全部）"), &_statDurationValue));
+    statRow->addWidget(make_stat_card(tr("录制占用"), &_statRecordValue));
+    statRow->addStretch(1);
+    root->addLayout(statRow);
 
     // ---- 筛选 ----
     auto *filterRow = new QHBoxLayout();
@@ -88,7 +101,9 @@ void stack_meeting_history::build_ui() {
     _emptyHint = new QLabel(tr("还没有会议记录"), this);
     _emptyHint->setObjectName(QStringLiteral("historyEmpty"));
     _emptyHint->setAlignment(Qt::AlignCenter);
-    root->addWidget(_emptyHint);
+    // 列表为空时由它吸收剩余高度；否则布局会把余量平摊到标题/说明上，
+    // 表现为标题与说明之间出现大片空白。
+    root->addWidget(_emptyHint, 1);
 
     connect(_filterAll, &QPushButton::clicked, this, [this]() {
         _filter = -1;
@@ -106,6 +121,58 @@ void stack_meeting_history::build_ui() {
         MeetingHistory::clear();
         refresh();
     });
+}
+
+QWidget *stack_meeting_history::make_stat_card(const QString &caption,
+                                               QLabel **valueOut) {
+    auto *card = new QFrame(this);
+    card->setObjectName(QStringLiteral("statCard"));
+    card->setFrameShape(QFrame::NoFrame);
+    card->setMinimumWidth(150);
+
+    auto *layout = new QVBoxLayout(card);
+    layout->setContentsMargins(16, 10, 16, 12);
+    layout->setSpacing(2);
+
+    auto *value = new QLabel(QStringLiteral("—"), card);
+    value->setObjectName(QStringLiteral("statValue"));
+    layout->addWidget(value);
+
+    auto *captionLabel = new QLabel(caption, card);
+    captionLabel->setObjectName(QStringLiteral("statCaption"));
+    layout->addWidget(captionLabel);
+
+    if (valueOut != nullptr) {
+        *valueOut = value;
+    }
+    return card;
+}
+
+void stack_meeting_history::refresh_stats() {
+    if (!_statWeekValue) {
+        return;
+    }
+    const MeetingStats stats = MeetingHistory::stats();
+    _statWeekValue->setText(tr("%1 场").arg(stats.weekCount));
+
+    const qint64 seconds = stats.totalDurationMs / 1000;
+    _statDurationValue->setText(
+        stats.totalDurationMs <= 0
+            ? QStringLiteral("0 分钟")
+            : seconds < 3600
+                  ? tr("%1 分钟").arg(seconds / 60)
+                  : tr("%1 小时").arg(
+                        QString::number(seconds / 3600.0, 'f', 1)));
+
+    int files = 0;
+    const qint64 bytes = RecordingLibrary::total_bytes(&files);
+    const double mb = static_cast<double>(bytes) / (1024.0 * 1024.0);
+    _statRecordValue->setText(
+        mb < 1024.0 ? tr("%1 MB").arg(QString::number(mb, 'f', 1))
+                    : tr("%1 GB").arg(QString::number(mb / 1024.0, 'f', 2)));
+    if (_statRecordValue) {
+        _statRecordValue->setToolTip(tr("%1 个录制文件").arg(files));
+    }
 }
 
 void stack_meeting_history::clear_rows() {
@@ -136,6 +203,7 @@ void stack_meeting_history::refresh() {
     _summaryLabel->setText(
         tr("共 %1 条（创建 %2 · 加入 %3）").arg(_records.size()).arg(created).arg(joined));
 
+    refresh_stats();
     apply_filter();
     spdlog::info("[stack_meeting_history] 记录数 {}（创建 {} / 加入 {}）",
                  _records.size(), created, joined);

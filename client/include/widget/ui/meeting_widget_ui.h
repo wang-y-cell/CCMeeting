@@ -16,6 +16,7 @@ class Ui_meeting_widget {
 public:
     QVBoxLayout *verticalLayout = nullptr;
     QWidget *topStatusBar = nullptr;
+    QLabel *topDurationChip = nullptr;
     QLabel *topMainTitle = nullptr;
     QLabel *topRoomChip = nullptr;
     QLabel *topMemberChip = nullptr;

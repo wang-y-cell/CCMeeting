@@ -2,7 +2,9 @@
 #define MEETING_WIDGET_H
 
 #include "frameless_window.h"
+#include "chat_controller.h"
 #include "meeting_recorder.h"
+#include "room_settings_controller.h"
 #include "meeting_settings_popup.h"
 #include "room_settings_flags.h"
 #include "meeting_controller.h"
@@ -13,6 +15,10 @@
 #include "chatmessage.h"
 #include "cameravideo.h"
 
+#include "meeting_media_controller.h"
+#include "meeting_protocol_dispatcher.h"
+#include "participants_controller.h"
+#include "meeting_rtc_observer.h"
 #include <xrtc/ixrtc_engine.h>
 #include <xrtc/xrtc_defines.h>
 
@@ -51,25 +57,39 @@ struct state {
     bool _hasPendingConnect = false; //是否有未处理的连接请求
 };
 
-class MeetingWidget : public FramelessWindow<QWidget>,
-                      public xrtc::XRtcEngineObserver {
+class MeetingWidget : public FramelessWindow<QWidget> {
+public:
+    /**
+     * @brief 会议时长格式化（纯函数，方便单测）
+     * @param seconds 已进行的秒数
+     * @return HH:MM:SS，超过 99 小时按实际位数显示
+     */
+    static QString format_duration_hms(qint64 seconds);
     Q_OBJECT
 private:
     static QRect pos;
     state _state; //维护会议状态
     qint64 main_user_id_ = 0;
     /** 房间开关位掩码（房主修改，服务端广播） */
-    std::uint32_t _roomSettings = ROOM_SETTINGS_DEFAULT;
-    MeetingSettingsPopup *_settingsPopup = nullptr;
+    ///房间开关 + 录制控制（原 MeetingWidget 内实现）
+    RoomSettingsController *_roomSettings = nullptr;
+    ///xrtc 回调与帧合并（原 MeetingWidget 内实现）
+    MeetingRtcObserver *_rtcObserver = nullptr;
+    ///媒体引擎生命周期 / 本端音视频 / 屏幕共享 / 设备切换
+    MeetingMediaController *_media = nullptr;
     /** 本地录制器（录制当前主画面） */
-    MeetingRecorder *_recorder = nullptr;
+
     /** 仅用于首次记录本地预览分辨率（诊断用） */
-    bool _previewSizeLogged = false;
     /** 本次会议开始时刻（用于统计时长），0 表示未开始 */
     qint64 _sessionStartMs = 0;
-    std::string _selectedVideoDeviceId;
-    std::string _selectedAudioDeviceId;
-    std::string _selectedPlayoutDeviceId;
+    /** 会议启动计时：起点（点创建/加入的时刻），0 表示未开始计时 */
+    qint64 _startupBeginMs = 0;
+    /** 到 xrtc 进房成功的耗时（毫秒），0 表示未到 */
+    qint64 _startupJoinedMs = 0;
+    /** 到首帧画面的耗时（毫秒），0 表示还没出画面 */
+    qint64 _startupFirstFrameMs = 0;
+    /** 会议时长每秒刷新（未入会时停止） */
+    QTimer *_durationTimer = nullptr;
     QString _pendingConnectIp;
     QString _pendingConnectPort;
     ConnectAction _pendingConnectAction = ConnectAction::CreateMeeting;
@@ -81,82 +101,62 @@ private:
     std::shared_ptr<NetworkManager> _network;
     std::unique_ptr<MeetingController> _controller;
     std::unique_ptr<QThread> _controller_thread;
-    std::unordered_map<qint64, Partner *> partner;
-    std::unordered_map<std::uint64_t, qint64> _feed_to_user;
-    std::vector<QString> iplist;
-    QSoundEffect *_soundEffect = nullptr;
-    int m_lastChatListWidth = -1;
-    bool m_inChatRelayout = false;
-    QPointer<ChatMessage> _pendingChatSend;
+    ///成员卡片与主画面选择（原 MeetingWidget 内实现）
+    ParticipantsController *_participants = nullptr;
+    ///网络消息分发（原 MeetingWidget 内实现）
+    MeetingProtocolDispatcher *_protocol = nullptr;
+    ///聊天面板渲染与输入（原 MeetingWidget 内实现）
+    ChatController *_chat = nullptr;
     CameraVideo *_cameraVideo = nullptr;
     int _roomNo = 0;
     QString _serverAddr;
 
     /// WebRTC 引擎
-    xrtc::IXRtcEngine *_rtc = nullptr;
-    std::mutex preview_mutex_;
-    xrtc::XRTCVideoFrame pending_preview_;
     bool preview_scheduled_ = false;
-    std::mutex remote_mutex_;
-    std::unordered_map<qint64, xrtc::XRTCVideoFrame> pending_remote_;
     bool remote_scheduled_ = false;
 
 private:
     void init_ui();
     void init_connect();
-    void init_partner_connect(Partner *p);
-    /** @brief 创建会议设置弹出面板并连接其信号 */
+    /** @brief 创建房间设置面板与录制控制器 */
     void init_settings_popup();
     void init_permanent_workers();
     void end_meeting_session();
     /** 结束会议会话并隐藏会议窗口（加入失败 / 断线 / 超时等） */
     void close_meeting_window();
     void reset_meeting_ui();
-void update_meeting_info();
-    /** @brief 本端是否房主（创建会议者为房主） */
-    bool is_room_host() const;
-    /** @brief 当前是否允许本端共享屏幕（房主恒允许，成员看房间开关） */
-    bool can_share_screen() const;
-    /** @brief 应用服务端下发的房间开关并刷新界面 */
+    void update_meeting_info();
+    /** @brief 刷新顶栏「会议时长」chip（每秒调用） */
+    void refresh_duration_chip();
+    /** @brief 首帧到达时结算启动耗时（只结算一次） */
+    void mark_startup_first_frame();
+
+
+    /** @brief 应用服务端下发的房间开关（转交 RoomSettingsController） */
     void apply_room_settings(std::uint32_t flags);
-    /** @brief 本场是否允许录制（看房间开关） */
-    bool can_record_meeting() const;
-    /** @brief 开始录制主画面 */
-    bool start_recording();
-    /** @brief 停止录制 */
-    void stop_recording();
     void update_speaker_label();
     void shutdown_all_workers();
 
-    Partner *add_partner(qint64 userId);
-    void remove_partner(qint64 userId);
-    void clear_partner();
-    void close_video_for_user(qint64 userId);
 
-    void deal_message(ChatMessage *messageW, QListWidgetItem *item, QString text,
-                      QString time, QString senderName,
-                      ChatMessage::User_Type type,
-                      const QString &avatarUrl = QString());
-    //判断当前消息是否需要显示时间段,并显示时间消息
-    void deal_message_time(QString curMsgTime);
-    void relayout_chat_messages();
 
-    void handle_create_meeting_response(const MessagePtr &msg);
-    void handle_join_meeting_response(const MessagePtr &msg);
-    void handle_text_recv(const MessagePtr &msg);
-    void handle_partner_join(const MessagePtr &msg);
-    void handle_partner_exit(const MessagePtr &msg);
-    void handle_close_camera(const MessagePtr &msg);
-    void handle_partner_join2(const MessagePtr &msg);
-    void handle_user_profile(const MessagePtr &msg);
-    void handle_remote_host_closed_error();
-    void handle_other_net_error();
+
+    // ---- 协议语义事件（由 MeetingProtocolDispatcher 投递）----
+    void on_create_meeting_result(int roomno);
+    void on_join_meeting_result(int code);
+    void on_text_received(qint64 user_id, const QString &str);
+    void on_partner_joined(qint64 user_id);
+    void on_partner_exited(qint64 user_id);
+    void on_camera_closed(qint64 user_id);
+    void on_partners_snapshot(const QList<qint64> &user_ids);
+    void on_user_profile(qint64 user_id, const QString &display_name,
+                         const QString &avatar_url);
+    void on_remote_host_closed();
+    void on_other_net_error();
 
     /// 连接janus服务器
     void start_meeting_media();
     void stop_meeting_media();
     /** 入会成功后按产品策略开启本地音视频采集 */
-    void start_local_av_after_join();
     void set_local_video_on(bool on);
     void set_local_audio_on(bool on);
     /**
@@ -166,43 +166,16 @@ void update_meeting_info();
      */
     void set_local_screen_on(bool on, const std::string &screen_id = std::string());
     /** @brief 解析本次要共享的显示器：已选且仍存在 > 主屏 > 第一个 */
-    std::string preferred_screen_id() const;
     void sync_av_button_ui();
     /** WebRTC 会话异常结束（ICE failed / leave）时复位并关会 */
     void handle_rtc_session_lost(const QString &reason);
     void send_local_user_profile();
-    void apply_partner_profile(qint64 userId, const QString &displayName,
-                               const QString &avatarUrl);
-    QString partner_display_name(qint64 userId) const;
-    QString partner_avatar_url(qint64 userId) const;
     void update_main_screen_title(qint64 userId);
-    xrtc::XRTCJoinConfig build_join_config() const;
     void show_audio_device_menu();
     void show_video_device_menu();
-    void apply_selected_playout_device(const std::string &device_id);
-    void apply_selected_audio_device(const std::string &device_id);
-    void apply_selected_video_device(const std::string &device_id);
     void show_side_panel_tab(int index);
-    void schedule_preview_render();
-    void schedule_remote_render(qint64 userId);
-    void render_preview_frame();
-    void render_remote_frame();
     qint64 local_user_id() const;
 
-    void video_source_start_event(xrtc::IXRtcMediaSource *video_source,
-                                  xrtc::XRtcError error) override;
-    void video_source_stop_event(xrtc::IXRtcMediaSource *video_source,
-                                 xrtc::XRtcError error) override;
-    void on_video_frame(xrtc::IXRtcMediaSource *video_source,
-                        const xrtc::XRTCVideoFrame &frame) override;
-    void on_join_result(xrtc::XRtcError error,
-                        const std::string &message) override;
-    void on_leave(xrtc::XRtcError error) override;
-    void on_connection_state(xrtc::XRTCConnectionState state) override;
-    void on_remote_user_joined(const xrtc::XRTCRemoteUser &user) override;
-    void on_remote_user_left(const xrtc::XRTCRemoteUser &user) override;
-    void on_remote_video_frame(uint64_t feed_id,
-                               const xrtc::XRTCVideoFrame &frame) override;
 
 public:
     explicit MeetingWidget(QWidget *parent = nullptr);
@@ -210,7 +183,6 @@ public:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
-    bool eventFilter(QObject *watched, QEvent *event) override;
 
 public slots:
     void on_create_meet_btn_clicked_slot();
@@ -219,8 +191,9 @@ public slots:
     void on_audio_device_btn_clicked_slot();
     void on_video_device_btn_clicked_slot();
     void on_share_screen_clicked_slot();
-    /** @brief 顶栏「会议设置」按钮：弹出房间设置面板 */
+    /** @brief 顶栏「会议设置」：弹出房间设置面板 */
     void on_meeting_settings_clicked_slot();
+    /** @brief 顶栏「会议设置」按钮：弹出房间设置面板 */
     void on_leave_meeting_clicked_slot();
     void on_side_members_clicked_slot();
     void on_side_chat_clicked_slot();
@@ -234,6 +207,20 @@ public slots:
     void on_join_meet_btn_slot(QString room_no);
 
 private slots:
+    /** @brief 本地预览帧（已合并）：渲染 + 录制推帧 */
+    void on_preview_frame(xrtc::XRTCVideoFrame frame);
+    /** @brief 远端某人一帧：渲染 + 录制推帧 */
+    void on_remote_frame(qint64 user_id, xrtc::XRTCVideoFrame frame);
+    /** @brief xrtc 进房成功 */
+    void on_rtc_joined();
+    /** @brief xrtc 进房失败 */
+    void on_rtc_join_failed(const QString &message);
+    /** @brief 信令异常 */
+    void on_rtc_signaling_error(int error_code);
+    /** @brief 媒体连接失败/关闭 */
+    void on_rtc_connection_lost(int state);
+    /** @brief 远端用户离开（已解析 userId） */
+    void on_rtc_remote_user_left(qint64 user_id);
     ///连接上服务器后的处理
     void on_connect_finished_slot(bool ok, QString ip, QString port,
                                 ConnectAction action, QString room_no);

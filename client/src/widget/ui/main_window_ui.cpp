@@ -3,6 +3,7 @@
 #include <QFont>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QPushButton>
 #include <QListWidget>
 #include <QListWidgetItem>
 #include <QStackedWidget>
@@ -75,6 +76,13 @@ void Ui_main_window::setupUi(QWidget *parent) {
     sideBarStatus->setObjectName(QStringLiteral("sideBarStatus"));
     sideBarStatus->setContentsMargins(4, 0, 4, 0);
     leftColumn->addWidget(sideBarStatus);
+
+    // 退出登录：清掉本机凭据并回到登录界面
+    btnLogout = new QPushButton(QObject::tr("退出登录"), parent);
+    btnLogout->setObjectName(QStringLiteral("sideLogoutBtn"));
+    btnLogout->setCursor(Qt::PointingHandCursor);
+    btnLogout->setToolTip(QObject::tr("清除本机保存的账号，返回登录界面"));
+    leftColumn->addWidget(btnLogout);
 
     sideBarVersion = new QLabel(QStringLiteral("CloudMeeting 1.0"), parent);
     sideBarVersion->setObjectName(QStringLiteral("sideBarVersion"));

@@ -31,8 +31,16 @@ struct MeetingRecord {
     QString durationText() const;
 };
 
+/** @brief 会议记录统计（「会议记录」页顶部统计条用） */
+struct MeetingStats {
+    int weekCount = 0;            ///< 本周（周一起）会议数
+    int totalCount = 0;           ///< 全部记录数
+    qint64 weekDurationMs = 0;    ///< 本周总时长
+    qint64 totalDurationMs = 0;   ///< 全部总时长
+};
+
 /**
- * @brief 会议历史（本地 JSON 持久化）
+ * @brief 会议历史（本地持久化：优先 SQLite，失败回退 JSON）
  *
  * 文件位置：%LOCALAPPDATA%/CCMeeting/meeting_history.json
  * 同一时刻只允许一个会议，因此「结束当前会议」按 open 标记更新最后一条。
@@ -53,6 +61,9 @@ public:
 
     /** @brief 取最近若干条指定类型记录（用于首页「最近 5 个会议」） */
     static QVector<MeetingRecord> recent(MeetingRecordKind kind, int limit);
+
+    /** @brief 统计：本周会议数 / 总时长等 */
+    static MeetingStats stats();
 
     /** @brief 按 load() 的顺序索引删除一条 */
     static bool remove_at(int index);

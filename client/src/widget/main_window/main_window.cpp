@@ -1,6 +1,7 @@
 #include "main_window.h"
 #include "avatar_image_loader.h"
 #include "configure/client_config.h"
+#include "configure/login_store.h"
 #include "configure/meeting_history.h"
 #include "recent_meeting_list.h"
 #include "configure/user_session.h"
@@ -9,9 +10,14 @@
 #include <QEvent>
 #include <QLabel>
 #include <QListWidget>
+#include <QAudioDevice>
+#include <QCameraDevice>
+#include <QElapsedTimer>
+#include <QMediaDevices>
 #include <QMessageBox>
+#include <QTimer>
 #include <QMouseEvent>
-#include <QSettings>
+#include "storage.h"
 #include <QStackedWidget>
 #include <spdlog/spdlog.h>
 
@@ -47,10 +53,27 @@ main_window::main_window(QWidget *parent) : FramelessWindow<QWidget>(parent) {
             this, &main_window::CreateMeeting_button_clicked);
     connect(join_meeting_widget, &stack_join_meet::joinMeetingClicked, this,
             &main_window::JoinMeeting_button_clicked);
+    if (ui.btnLogout) {
+        connect(ui.btnLogout, &QPushButton::clicked, this,
+                &main_window::onLogoutClicked);
+    }
     connect(user_profile_widget, &stack_user_profile::backHomeRequested, this,
             &main_window::onProfileBackHome);
     connect(user_profile_widget, &stack_user_profile::avatarUpdated, this,
             &main_window::onProfileAvatarUpdated);
+
+    // 预热 Qt Multimedia 设备枚举：首次 videoInputs() 冷启动 500ms+，
+    // 放到主界面显示后的空闲时刻做完，之后打开设置页就不会再卡。
+    QTimer::singleShot(5000, this, [this]() {
+        QElapsedTimer timer;
+        timer.start();
+        const auto cameras = QMediaDevices::videoInputs();
+        const auto mics = QMediaDevices::audioInputs();
+        spdlog::info("[main_window] media devices warmed in {}ms (cameras={} "
+                     "mics={})",
+                     static_cast<long long>(timer.elapsed()), cameras.size(),
+                     mics.size());
+    });
 
     spdlog::info("[main_window] ctor done");
     spdlog::default_logger()->flush();
@@ -219,7 +242,7 @@ void main_window::init_ui() {
     });
 
     {
-        QSettings s(QStringLiteral("CCMeeting"), QStringLiteral("Client"));
+        Storage &s = Storage::instance();
         const int startPage = s.value(QStringLiteral("ui/startPage"), 0).toInt();
         if (startPage >= 0 && startPage < ui.sideNav->count()) {
             ui.sideNav->setCurrentRow(startPage);
@@ -312,4 +335,11 @@ void main_window::onMeetingClosed(qint64 durationMs) {
     if (join_meeting_widget && join_meeting_widget->findChild<RecentMeetingList *>()) {
         join_meeting_widget->findChild<RecentMeetingList *>()->refresh();
     }
+}
+
+void main_window::onLogoutClicked() {
+    // 先清凭据：下次启动不再自动登录
+    LoginStore::clear();
+    spdlog::info("[main_window] logout requested");
+    emit logoutRequested();
 }

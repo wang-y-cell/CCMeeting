@@ -92,6 +92,7 @@ void Ui_meeting_widget::setupUi(QWidget *parent) {
     topStatusLayout->setSpacing(12);
     topStatusLayout->setContentsMargins(16, 4, 16, 4);
 
+
     topMainTitle =
         makeLabel(QStringLiteral("topMainTitle"), QObject::tr("主屏幕"),
                   topStatusBar);
@@ -99,6 +100,10 @@ void Ui_meeting_widget::setupUi(QWidget *parent) {
                             QObject::tr("房间 -"), topStatusBar);
     topMemberChip = makeLabel(QStringLiteral("topMemberChip"),
                               QObject::tr("0 人"), topStatusBar);
+    // 会议时长：人数右边，每秒走动（未入会显示占位）
+    topDurationChip = makeLabel(QStringLiteral("topDurationChip"),
+                               QObject::tr("--:--:--"), topStatusBar);
+    topDurationChip->setToolTip(QObject::tr("本次会议已进行时长"));
     topSpeakerLabel =
         makeLabel(QStringLiteral("topSpeakerLabel"),
                   QObject::tr("正在讲话: -"), topStatusBar);
@@ -116,6 +121,7 @@ void Ui_meeting_widget::setupUi(QWidget *parent) {
     topStatusLayout->addWidget(topMainTitle);
     topStatusLayout->addWidget(topRoomChip);
     topStatusLayout->addWidget(topMemberChip);
+    topStatusLayout->addWidget(topDurationChip);
     topStatusLayout->addItem(
         new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum));
     topStatusLayout->addWidget(topSpeakerLabel);

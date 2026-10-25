@@ -27,7 +27,7 @@ endif()
 message(STATUS "[client] QT_INSTALL_PATH=${QT_INSTALL_PATH}")
 list(PREPEND CMAKE_PREFIX_PATH "${QT_INSTALL_PATH}")
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets Network Multimedia OpenGLWidgets OpenGL)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Network Multimedia OpenGLWidgets OpenGL Sql)
 find_package(Threads REQUIRED)
 
 # ---------- xrtc（third_party/webrtcSDK，自包含 WebRTC/json/Boost）----------
@@ -83,6 +83,7 @@ target_include_directories(CloudMeetingClient PRIVATE
 
 target_link_libraries(CloudMeetingClient
     PRIVATE
+        Qt6::Sql
         Qt6::Widgets
         Qt6::Network
         Qt6::Multimedia
@@ -109,6 +110,8 @@ endif()
 
 # 崩溃栈记录（main.cpp 的 SEH 过滤器用 DbgHelp 走栈）
 if(WIN32)
+    # LoginStore 用 DPAPI 加密本地保存的登录密码
+    target_link_libraries(CloudMeetingClient PRIVATE crypt32)
     target_link_libraries(CloudMeetingClient PRIVATE dbghelp)
 endif()
 
@@ -178,6 +181,7 @@ if(BUILD_UI_PREVIEW)
     target_link_libraries(UiPreview
         PRIVATE
             Qt6::Widgets
+            Qt6::Sql
             Qt6::Network
             Qt6::Multimedia
             Qt6::OpenGLWidgets
