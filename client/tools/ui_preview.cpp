@@ -36,6 +36,8 @@
 #include <QFileInfo>
 #include <QMediaPlayer>
 #include <QPainter>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QPushButton>
 #include <QSettings>
 #include <QThread>
@@ -510,49 +512,118 @@ int run_avatar_alpha_selftest() {
 namespace {
 
 int run_join_codec_selftest() {
-    const std::uint32_t rooms[] = {906870u, 906880u, 123456u, 999999u, 524288u};
+    // 线上格式已从自定义 TCP 字节流改为 WebSocket + JSON，这里做协议矩阵自检：
+    // 每种消息 encode → JSON → decode 回来，字段必须一致。
     bool all_ok = true;
-
-    for (std::uint32_t room : rooms) {
-        // 组一个完整帧：$ | type(2) | uid(8) | size(4) | body(4) | #
-        std::uint8_t frame[20] = {};
-        frame[0] = '$';
-        qToBigEndian<std::uint16_t>(JOIN_MEETING_RESPONSE,
-                                    reinterpret_cast<char *>(frame + 1));
-        qToBigEndian<std::uint32_t>(4u, reinterpret_cast<char *>(frame + 11));
-        qToBigEndian<std::uint32_t>(room, reinterpret_cast<char *>(frame + 15));
-        frame[19] = '#';
-
-        MessagePtr msg = MessageCodec::decode_wire_packet(
-            frame, 4, static_cast<MSG_TYPE>(JOIN_MEETING_RESPONSE));
-        auto *resp = dynamic_cast<JoinMeetingResponseMessage *>(msg.get());
-        const int decoded = resp ? resp->response_code() : -12345;
-        const bool ok = decoded == static_cast<int>(room);
+    auto check = [&](const char *name, bool ok) {
         all_ok = all_ok && ok;
-        std::printf("[join-codec] room=%u -> decoded=%d %s\n", room, decoded,
-                    ok ? "OK" : "MISMATCH");
+        std::printf("[proto] %-28s %s\n", name, ok ? "OK" : "MISMATCH");
+    };
+
+    // 1) 创建会议响应（房间号）
+    {
+        CreateMeetingResponseMessage msg;
+        msg.set_room_no(906870u);
+        const QByteArray json = MessageCodec::encode_wire_frame(msg, 1);
+        auto decoded = MessageCodec::decode_json_frame(json);
+        auto *resp = dynamic_cast<CreateMeetingResponseMessage *>(decoded.get());
+        check("create_meeting_response", resp && resp->room_no() == 906870u);
     }
 
-    // 失败码也要区分：-1 成员已满、0 房间不存在
-    for (const int fail_code : {-1, 0}) {
-        std::uint8_t frame[20] = {};
-        frame[0] = '$';
-        qToBigEndian<std::uint16_t>(JOIN_MEETING_RESPONSE,
-                                    reinterpret_cast<char *>(frame + 1));
-        qToBigEndian<std::uint32_t>(4u, reinterpret_cast<char *>(frame + 11));
-        qToBigEndian<std::int32_t>(fail_code,
-                                   reinterpret_cast<char *>(frame + 15));
-        frame[19] = '#';
-        MessagePtr msg = MessageCodec::decode_wire_packet(
-            frame, 4, static_cast<MSG_TYPE>(JOIN_MEETING_RESPONSE));
-        auto *resp = dynamic_cast<JoinMeetingResponseMessage *>(msg.get());
-        const int decoded = resp ? resp->response_code() : -12345;
-        std::printf("[join-codec] 失败码 %d -> decoded=%d %s\n", fail_code,
-                    decoded, decoded == fail_code ? "OK" : "MISMATCH");
-        all_ok = all_ok && decoded == fail_code;
+    // 2) 加入响应：低位 >= 0x80 的随机房间号不能被读成负数
+    for (const std::uint32_t room : {906870u, 906880u, 524288u, 999999u}) {
+        JoinMeetingResponseMessage msg;
+        msg.set_response_code(static_cast<std::int32_t>(room));
+        const QByteArray json = MessageCodec::encode_wire_frame(msg, 1);
+        auto decoded = MessageCodec::decode_json_frame(json);
+        auto *resp = dynamic_cast<JoinMeetingResponseMessage *>(decoded.get());
+        const bool ok = resp && resp->response_code() == static_cast<int>(room);
+        all_ok = all_ok && ok;
+        std::printf("[proto] join room=%-8u decoded=%-8d %s\n", room,
+                    resp ? resp->response_code() : -1, ok ? "OK" : "MISMATCH");
     }
 
-    std::printf("[join-codec] 结论: %s\n", all_ok ? "PASS" : "FAIL");
+    // 3) 成员快照（PartnerJoin2）
+    {
+        PartnerJoin2Message msg;
+        msg.add_partner_user_id(11);
+        msg.add_partner_user_id(22);
+        const QByteArray json = MessageCodec::encode_wire_frame(msg, 1);
+        auto decoded = MessageCodec::decode_json_frame(json);
+        auto *snapshot = dynamic_cast<PartnerJoin2Message *>(decoded.get());
+        check("partner_join2",
+              snapshot && snapshot->partner_user_ids().size() == 2 &&
+                  snapshot->partner_user_ids()[1] == 22);
+    }
+
+    // 4) 房间开关广播
+    {
+        RoomSettingsNotifyMessage msg;
+        msg.set_flags(ROOM_SETTINGS_ALLOW_RECORD);
+        const QByteArray json = MessageCodec::encode_wire_frame(msg, 1);
+        auto decoded = MessageCodec::decode_json_frame(json);
+        auto *notify = dynamic_cast<RoomSettingsNotifyMessage *>(decoded.get());
+        check("room_settings_notify",
+              notify && notify->flags() == ROOM_SETTINGS_ALLOW_RECORD);
+    }
+
+    // 5) 文本消息：必须是明文 s 字段，且不再出现旧帧头
+    {
+        SendTextMessage msg;
+        msg.set_user_id(1);
+        const QByteArray text_utf8 = QStringLiteral("你好 WebSocket").toUtf8();
+        msg.set_text(std::string(text_utf8.constData(),
+                                 static_cast<std::size_t>(text_utf8.size())));
+        const QByteArray json = MessageCodec::encode_wire_frame(msg, 1);
+        const QString text = QString::fromUtf8(json);
+        const bool readable = text.contains(QStringLiteral("\"t\":\"text_send\"")) &&
+                              text.contains(QStringLiteral("你好 WebSocket"));
+        const bool no_legacy_header =
+            !json.startsWith('$') && !json.endsWith('#');
+        check("text_send 明文 + 无旧帧头", readable && no_legacy_header);
+
+        // 服务端下行的 text_recv 走同一条解析路径
+        const QByteArray server_json =
+            QByteArray(R"({"t":"text_recv","u":7,"s":"server says hi"})");
+        auto decoded = MessageCodec::decode_json_frame(server_json);
+        auto *recv = dynamic_cast<RecvTextMessage *>(decoded.get());
+        check("text_recv", recv && recv->user_id() == 7 &&
+                               recv->text() == "server says hi");
+    }
+
+    // 6) 创建会议：payload 保持二进制布局（8 字节大端），经 base64 传输
+    {
+        CreateMeetingMessage msg;
+        msg.set_max_participants(8);
+        msg.set_duration_minutes(60);
+        const QByteArray json = MessageCodec::encode_wire_frame(msg, 42);
+        const QJsonObject object =
+            QJsonDocument::fromJson(json).object();
+        const QByteArray payload = QByteArray::fromBase64(
+            object.value(QStringLiteral("p")).toString().toLatin1());
+        const bool ok = object.value(QStringLiteral("t")).toString() ==
+                            QStringLiteral("create_meeting") &&
+                        object.value(QStringLiteral("u")).toInt() == 42 &&
+                        payload.size() == 8;
+        check("create_meeting payload", ok);
+    }
+
+    // 7) 类型名双向映射
+    {
+        bool ok = true;
+        for (const MSG_TYPE type :
+             {TEXT_SEND, TEXT_RECV, CREATE_MEETING, JOIN_MEETING,
+              ROOM_SETTINGS, ROOM_SETTINGS_NOTIFY, PARTNER_JOIN, PARTNER_EXIT,
+              USER_PROFILE, RemoteHostClosedError}) {
+            const auto back =
+                MessageCodec::type_from_name(
+                    QString::fromLatin1(MessageCodec::type_name(type)));
+            ok = ok && back.has_value() && *back == type;
+        }
+        check("type_name 双向映射", ok);
+    }
+
+    std::printf("[proto] 结论: %s\n", all_ok ? "PASS" : "FAIL");
     return all_ok ? 0 : 1;
 }
 
@@ -762,6 +833,9 @@ int run_duration_selftest() {
 namespace {
 
 int run_login_store_selftest() {
+    // 隔离到 qttest 目录，避免清掉真实用户在用的自动登录凭据
+    QStandardPaths::setTestModeEnabled(true);
+    QCoreApplication::setApplicationName(QStringLiteral("CCMeeting"));
     const QString user = QStringLiteral("selftest_user");
     const QString pass = QStringLiteral("Pass@2026!");
 
@@ -807,6 +881,9 @@ int run_login_store_selftest() {
 namespace {
 
 int run_storage_selftest() {
+    // 同上：自检不得触碰真实数据库
+    QStandardPaths::setTestModeEnabled(true);
+    QCoreApplication::setApplicationName(QStringLiteral("CCMeeting"));
     Storage &storage = Storage::instance();
     const bool opened = storage.open();
     std::printf("[storage] db=%s open=%d fallback=%d\n",
@@ -934,10 +1011,75 @@ int run_unified_storage_selftest() {
                 stats.weekCount, stats.totalDurationMs / 60000.0, recCount,
                 recBytes / (1024.0 * 1024.0));
 
-    const bool ok = storage.isOpen() && dbHistory == history.size() &&
-                    dbRecordings == recordings.size() && dbHistory > 0;
+    // 只校验"库可用 + 两层计数一致"，不假设一定有数据（用户可能清空过）
+    const bool ok = storage.isOpen() && !storage.usingFallback() &&
+                    dbHistory == history.size() &&
+                    dbRecordings == recordings.size();
     std::printf("[unified] 结论: %s\n", ok ? "PASS" : "FAIL");
     return ok ? 0 : 1;
+}
+
+}  // namespace
+
+// ---------------------------------------------------------------------------
+// 存储结构导出：库路径、表、行数、偏好键值（凭据脱敏）
+// 用法：UiPreview.exe --storage-dump
+// ---------------------------------------------------------------------------
+namespace {
+
+int run_storage_dump() {
+    Storage &storage = Storage::instance();
+    storage.open();
+    std::printf("[dump] db=%s open=%d fallback=%d\n",
+                storage.databasePath().toUtf8().constData(),
+                storage.isOpen() ? 1 : 0, storage.usingFallback() ? 1 : 0);
+    QSqlDatabase db = storage.connection();
+    if (!db.isValid()) {
+        std::printf("[dump] 数据库不可用\n");
+        return 1;
+    }
+
+    QSqlQuery pragma(db);
+    if (pragma.exec(QStringLiteral("PRAGMA journal_mode")) && pragma.next()) {
+        std::printf("[dump] journal_mode=%s\n",
+                    pragma.value(0).toString().toUtf8().constData());
+    }
+
+    QSqlQuery tables(db);
+    tables.exec(QStringLiteral(
+        "SELECT name FROM sqlite_master WHERE type='table' "
+        "AND name NOT LIKE 'sqlite_%' ORDER BY name"));
+    std::printf("[dump] 表:\n");
+    while (tables.next()) {
+        const QString name = tables.value(0).toString();
+        QSqlQuery count(db);
+        count.exec(QStringLiteral("SELECT COUNT(*) FROM %1").arg(name));
+        const int rows = (count.next() ? count.value(0).toInt() : -1);
+        std::printf("[dump]   %-18s %d 行\n", name.toUtf8().constData(), rows);
+    }
+
+    QSqlQuery settings(db);
+    settings.exec(QStringLiteral(
+        "SELECT key, value, type FROM app_settings ORDER BY key"));
+    std::printf("[dump] app_settings:\n");
+    while (settings.next()) {
+        std::printf("[dump]   %-20s = %s (%s)\n",
+                    settings.value(0).toString().toUtf8().constData(),
+                    settings.value(1).toString().toUtf8().constData(),
+                    settings.value(2).toString().toUtf8().constData());
+    }
+
+    QSqlQuery creds(db);
+    creds.exec(QStringLiteral(
+        "SELECT username, LENGTH(secret), updated_at FROM credentials"));
+    std::printf("[dump] credentials:\n");
+    while (creds.next()) {
+        std::printf("[dump]   user=%s secret_len=%d updated=%s\n",
+                    creds.value(0).toString().toUtf8().constData(),
+                    creds.value(1).toInt(),
+                    creds.value(2).toString().toUtf8().constData());
+    }
+    return 0;
 }
 
 }  // namespace
@@ -945,6 +1087,11 @@ int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     QApplication::setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
 
+    if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
+                        QStringLiteral("--storage-dump")) {
+        QCoreApplication::setApplicationName(QStringLiteral("CCMeeting"));
+        return run_storage_dump();
+    }
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--unified-storage-selftest")) {
         QCoreApplication::setApplicationName(QStringLiteral("CCMeeting"));

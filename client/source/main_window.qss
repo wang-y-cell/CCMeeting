@@ -717,25 +717,3 @@ QPushButton#sideLogoutBtn:hover {
     color: #F05C60;
 }
 
-/* ---------- 会议记录页：顶部统计条 ---------- */
-
-QFrame#statCard {
-    background-color: #101319;
-    border: 1px solid #1C2230;
-    border-radius: 12px;
-}
-
-QLabel#statValue {
-    color: #E9EDF4;
-    font-size: 20px;
-    font-weight: 600;
-    background: transparent;
-    border: none;
-}
-
-QLabel#statCaption {
-    color: #6A7383;
-    font-size: 11px;
-    background: transparent;
-    border: none;
-}

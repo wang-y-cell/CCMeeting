@@ -1,6 +1,6 @@
 #include "stack_meeting_history.h"
 
-#include "recording_library.h"
+
 
 #include <QFrame>
 #include <QHBoxLayout>
@@ -61,14 +61,7 @@ void stack_meeting_history::build_ui() {
     desc->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     root->addWidget(desc);
 
-    // ---- 统计条：本周会议 / 总时长 / 录制占用 ----
-    auto *statRow = new QHBoxLayout();
-    statRow->setSpacing(12);
-    statRow->addWidget(make_stat_card(tr("本周会议"), &_statWeekValue));
-    statRow->addWidget(make_stat_card(tr("总时长（全部）"), &_statDurationValue));
-    statRow->addWidget(make_stat_card(tr("录制占用"), &_statRecordValue));
-    statRow->addStretch(1);
-    root->addLayout(statRow);
+
 
     // ---- 筛选 ----
     auto *filterRow = new QHBoxLayout();
@@ -123,58 +116,6 @@ void stack_meeting_history::build_ui() {
     });
 }
 
-QWidget *stack_meeting_history::make_stat_card(const QString &caption,
-                                               QLabel **valueOut) {
-    auto *card = new QFrame(this);
-    card->setObjectName(QStringLiteral("statCard"));
-    card->setFrameShape(QFrame::NoFrame);
-    card->setMinimumWidth(150);
-
-    auto *layout = new QVBoxLayout(card);
-    layout->setContentsMargins(16, 10, 16, 12);
-    layout->setSpacing(2);
-
-    auto *value = new QLabel(QStringLiteral("—"), card);
-    value->setObjectName(QStringLiteral("statValue"));
-    layout->addWidget(value);
-
-    auto *captionLabel = new QLabel(caption, card);
-    captionLabel->setObjectName(QStringLiteral("statCaption"));
-    layout->addWidget(captionLabel);
-
-    if (valueOut != nullptr) {
-        *valueOut = value;
-    }
-    return card;
-}
-
-void stack_meeting_history::refresh_stats() {
-    if (!_statWeekValue) {
-        return;
-    }
-    const MeetingStats stats = MeetingHistory::stats();
-    _statWeekValue->setText(tr("%1 场").arg(stats.weekCount));
-
-    const qint64 seconds = stats.totalDurationMs / 1000;
-    _statDurationValue->setText(
-        stats.totalDurationMs <= 0
-            ? QStringLiteral("0 分钟")
-            : seconds < 3600
-                  ? tr("%1 分钟").arg(seconds / 60)
-                  : tr("%1 小时").arg(
-                        QString::number(seconds / 3600.0, 'f', 1)));
-
-    int files = 0;
-    const qint64 bytes = RecordingLibrary::total_bytes(&files);
-    const double mb = static_cast<double>(bytes) / (1024.0 * 1024.0);
-    _statRecordValue->setText(
-        mb < 1024.0 ? tr("%1 MB").arg(QString::number(mb, 'f', 1))
-                    : tr("%1 GB").arg(QString::number(mb / 1024.0, 'f', 2)));
-    if (_statRecordValue) {
-        _statRecordValue->setToolTip(tr("%1 个录制文件").arg(files));
-    }
-}
-
 void stack_meeting_history::clear_rows() {
     while (_rowLayout->count() > 1) {  // 保留末尾 stretch
         QLayoutItem *item = _rowLayout->takeAt(0);
@@ -203,7 +144,6 @@ void stack_meeting_history::refresh() {
     _summaryLabel->setText(
         tr("共 %1 条（创建 %2 · 加入 %3）").arg(_records.size()).arg(created).arg(joined));
 
-    refresh_stats();
     apply_filter();
     spdlog::info("[stack_meeting_history] 记录数 {}（创建 {} / 加入 {}）",
                  _records.size(), created, joined);
