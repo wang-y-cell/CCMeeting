@@ -26,6 +26,8 @@ add_executable(CloudMeetingServer ${SERVER_SOURCES})
 
 target_include_directories(CloudMeetingServer PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    # nlohmann/json：WebSocket 消息的 JSON 编解码（随 xrtc 的 third_party 提供）
+    "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/webrtcSDK/third_party/json/include"
 )
 
 target_link_libraries(CloudMeetingServer

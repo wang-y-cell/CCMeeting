@@ -1,30 +1,37 @@
 #include "connection.h"
+
 #include "messagehub.h"
+
+#include <QAbstractSocket>
+#include <QEventLoop>
 #include <QHostAddress>
 #include <QMessageBox>
 #include <QMetaObject>
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
+#include <QTimer>
+#include <QUrl>
+#include <QWebSocket>
 #include <climits>
 #include <memory>
 #include <spdlog/spdlog.h>
 
 Connection::Connection(QObject *parent) : QObject(parent) {
-    qRegisterMetaType<QAbstractSocket::SocketError>(); // 注册SocketError类型
-    moveToThread(&m_ioThread); // 将当前构建的对象移动到IO线程
-    m_ioThread.start();        // 启动IO线程
+    qRegisterMetaType<QAbstractSocket::SocketError>(); // 信号参数需要 metatype
+    moveToThread(&m_ioThread);                         // 网络 IO 放到独立线程
+    m_ioThread.start();
 }
 
 Connection::~Connection() {
-    stopImmediately(); // 立即停止连接
+    stopImmediately();
     m_ioThread.quit();
-    m_ioThread.wait(3000); // 等待IO线程退出
+    m_ioThread.wait(3000);
 }
 
 void Connection::setMessageHub(MessageHub *hub) { m_hub = hub; }
 
 bool Connection::connectToServer(const QString &ip, const QString &port) {
-    spdlog::info("[Connection] connectToServer {}:{}", ip.toUtf8().constData(),
+    spdlog::info("[Connection] connectToServer ws://{}:{}", ip.toUtf8().constData(),
                  port.toUtf8().constData());
 
     bool ok = false;
@@ -45,8 +52,8 @@ bool Connection::connectToServer(const QString &ip, const QString &port) {
 }
 
 bool Connection::connectOnIoThread(const QString &ip, const QString &port) {
-    spdlog::info("[Connection] IO connect {}:{} tid={}", ip.toUtf8().constData(),
-                 port.toUtf8().constData(),
+    spdlog::info("[Connection] IO connect ws://{}:{} tid={}",
+                 ip.toUtf8().constData(), port.toUtf8().constData(),
                  reinterpret_cast<quintptr>(QThread::currentThreadId()));
 
     destroySocket();
@@ -55,22 +62,48 @@ bool Connection::connectOnIoThread(const QString &ip, const QString &port) {
     if (m_hub)
         m_hub->clear_all();
 
-    m_socket = new QTcpSocket();
-    connect(m_socket, &QTcpSocket::readyRead, this, &Connection::onReadyRead);
-    connect(m_socket, &QTcpSocket::errorOccurred, this,
-            &Connection::onSocketError);
+    m_socket = new QWebSocket(QString(), QWebSocketProtocol::VersionLatest);
 
-    m_socket->connectToHost(ip, port.toUShort());
-    if (!m_socket->waitForConnected(5000)) {
-        m_lastError = m_socket->errorString();
-        spdlog::error("[Connection] connect failed err={}",
+    bool handshake_ok = false;
+    QEventLoop loop;
+    QTimer timeout;
+    timeout.setSingleShot(true);
+
+    connect(m_socket, &QWebSocket::connected, &loop, [&]() {
+        handshake_ok = true;
+        loop.quit();
+    });
+    connect(m_socket, &QWebSocket::errorOccurred, &loop,
+            [&](QAbstractSocket::SocketError error) {
+                Q_UNUSED(error);
+                m_lastError = m_socket ? m_socket->errorString()
+                                       : QStringLiteral("websocket error");
+                loop.quit();
+            });
+    connect(&timeout, &QTimer::timeout, &loop, [&]() {
+        m_lastError = QStringLiteral("websocket handshake timeout");
+        loop.quit();
+    });
+
+    m_socket->open(QUrl(QStringLiteral("ws://%1:%2").arg(ip).arg(port)));
+    timeout.start(5000);
+    loop.exec();
+
+    if (!handshake_ok) {
+        spdlog::error("[Connection] handshake failed: {}",
                       m_lastError.toUtf8().constData());
         destroySocket();
         return false;
     }
 
+    // 握手成功后挂常驻处理
+    connect(m_socket, &QWebSocket::textMessageReceived, this,
+            &Connection::onTextMessage);
+    connect(m_socket, &QWebSocket::errorOccurred, this,
+            &Connection::onSocketError);
+
     m_lastError.clear();
-    spdlog::info("[Connection] connected");
+    spdlog::info("[Connection] websocket connected");
     return true;
 }
 
@@ -83,44 +116,29 @@ bool Connection::sendWireData(const QByteArray &frame) {
     }
 
     if (m_socket == nullptr ||
-        m_socket->state() == QAbstractSocket::UnconnectedState) {
-        spdlog::info("[Connection] socket 未连接, 发送失败");
+        m_socket->state() != QAbstractSocket::ConnectedState) {
+        spdlog::info("[Connection] websocket 未连接, 发送失败");
         return false;
     }
 
-    std::int64_t remaining = frame.size();
-    std::int64_t written = 0;
-
-    while (written < remaining) {
-        const std::int64_t ret =
-            m_socket->write(frame.constData() + written, remaining - written);
-        if (ret < 0) {
-            if (m_socket->error() == QAbstractSocket::TemporaryError)
-                continue;
-            spdlog::error("[Connection] 网络写入失败");
-            return false;
-        }
-        if (ret == 0)
-            break;
-        written += ret;
+    // 一条业务消息 = 一条 WS 文本帧（JSON）
+    const QString text = QString::fromUtf8(frame);
+    const qint64 queued = m_socket->sendTextMessage(text);
+    if (queued < 0) {
+        spdlog::error("[Connection] 网络写入失败");
+        return false;
     }
-
-    m_socket->flush();
     return true;
 }
 
-void Connection::onReadyRead() {
-    if (m_socket == nullptr || m_hub == nullptr)
+void Connection::onTextMessage(const QString &message) {
+    if (m_hub == nullptr)
         return;
 
-    const QByteArray chunk = m_socket->readAll(); // 读取所有数据
-    if (chunk.isEmpty())                          // 如果数据为空，则返回
-        return;
-
-    spdlog::info("[Connection] 收到服务端数据 bytes={}", chunk.size());
-    const auto packets =
-        m_parser.feed(reinterpret_cast<const std::uint8_t *>(chunk.constData()),
-                      static_cast<std::size_t>(chunk.size()));
+    const QByteArray utf8 = message.toUtf8();
+    spdlog::debug("[Connection] ws message bytes={}", utf8.size());
+    const auto packets = m_parser.feed(utf8.constData(),
+                                       static_cast<std::size_t>(utf8.size()));
     for (auto &packet : packets)
         m_hub->route_incoming(std::move(packet));
 }

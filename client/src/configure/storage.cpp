@@ -21,8 +21,7 @@ const char *const kLegacyKeys[] = {
     "video/fps",        "video/autoPreview","audio/deviceId",
     "audio/muteOnJoin", "audio/echoCancel", "ui/startPage",
     "ui/showPageDesc",  "ui/soundEnabled",  "record/fps",
-    "record/saveDir",   "login/username",   "login/password",
-    "login/auto",
+    "record/saveDir",
 };
 
 QString type_name(const QVariant &value) {
@@ -183,6 +182,44 @@ void Storage::migrate_from_registry() {
         insert.addBindValue(type_name(value));
         if (insert.exec()) {
             ++migrated;
+        }
+    }
+
+    // 旧版把凭据存在 app_settings 的 login/* 里，搬到 credentials 表后清掉，
+    // 避免同一份 DPAPI 密文在库里存两份。
+    {
+        QSqlQuery hasCreds(db);
+        bool needCreds = true;
+        if (hasCreds.exec(QStringLiteral(
+                "SELECT COUNT(*) FROM credentials WHERE id = 1")) &&
+            hasCreds.next()) {
+            needCreds = hasCreds.value(0).toInt() == 0;
+        }
+        QSqlQuery legacyUser(db);
+        legacyUser.prepare(QStringLiteral(
+            "SELECT value FROM app_settings WHERE key='login/username'"));
+        QSqlQuery legacyPass(db);
+        legacyPass.prepare(QStringLiteral(
+            "SELECT value FROM app_settings WHERE key='login/password'"));
+        const bool hasUser = legacyUser.exec() && legacyUser.next();
+        const bool hasPass = legacyPass.exec() && legacyPass.next();
+        if (needCreds && hasUser && hasPass) {
+            QSqlQuery insert(db);
+            insert.prepare(QStringLiteral(
+                "INSERT OR REPLACE INTO credentials(id, username, secret, "
+                "updated_at) VALUES(1, ?, ?, ?)"));
+            insert.addBindValue(legacyUser.value(0).toString());
+            insert.addBindValue(legacyPass.value(0).toString());
+            insert.addBindValue(
+                QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
+            insert.exec();
+            spdlog::info("[Storage] 旧凭据已搬入 credentials 表");
+        }
+        QSqlQuery drop(db);
+        if (drop.exec(QStringLiteral(
+                "DELETE FROM app_settings WHERE key LIKE 'login/%'"))) {
+            spdlog::info("[Storage] 已清理 app_settings 中的 {} 条 login/* 残留",
+                         drop.numRowsAffected());
         }
     }
 

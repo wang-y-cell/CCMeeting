@@ -5,9 +5,7 @@
 #include <QMetaType>
 #include <cstdint>
 
-#ifndef MSG_HEADER
-#define MSG_HEADER 15
-#endif
+
 
 #ifndef OPENVIDEO
 #define OPENVIDEO "打开视频"
@@ -26,8 +24,11 @@
 #endif
 
 /**
- * @brief 线上协议消息类型（与对端约定的 MSG_TYPE）
- * @note 0–3 为旧 TCP JPEG/PCM 媒体槽位，数值保留勿改；媒体面已改走 WebRTC。
+ * @brief 线上消息类型
+ *
+ * 传输已改为 WebSocket，线上用 JSON 的 `t` 字段表示类型
+ * （见 MessageCodec::type_name），这里的枚举值只用于程序内部。
+ * 0–3 为旧 TCP JPEG/PCM 媒体槽位，保留但不再使用；媒体面走 WebRTC。
  */
 enum MSG_TYPE : std::uint8_t {
     IMG_SEND = 0,  // reserved legacy

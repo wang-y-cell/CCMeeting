@@ -3,58 +3,82 @@
 
 #include "message.h"
 #include "netheader.h"
+
 #include <QByteArray>
 #include <cstdint>
 #include <optional>
 #include <vector>
 
 /**
- * @brief 业务 Message 与网络帧之间的编解码,解析网络帧中的业务 Message
+ * @brief 业务 Message 与 WebSocket 帧之间的编解码
+ *
+ * 传输层已从自定义 TCP 字节流改为 WebSocket，因此不再有
+ * `$ | type | uid | len | payload | #` 这种二进制帧头。
+ *
+ * 线上格式（UTF-8 JSON，一条 WS 消息 = 一条业务消息）：
+ * @code
+ *   {"t":"text_send", "u":123, "s":"hello"}            // 文本类：明文 s 字段
+ *   {"t":"create_meeting", "u":123, "p":"AAAAAgAA..."}  // 其它：p 为 payload 的 Base64
+ * @endcode
+ *
+ * - `t` 消息类型名（见 type_name()）
+ * - `u` 发送者 user_id（下行成员事件靠它区分是谁）
+ * - `s` 文本内容（仅 TEXT_SEND / TEXT_RECV），不再压缩
+ * - `p` 二进制 payload 的 Base64（旗帜位、房间号、资料结构等保持原二进制布局，
+ *      因此服务端 room/service 的业务代码无需改动）
  */
 class MessageCodec {
 public:
     /**
-     * @brief 将业务 Message 编码为网络帧
+     * @brief 将业务 Message 编码为 JSON 文本帧
      * @param msg 业务 Message
      * @param local_user_id 本地用户 ID
-     * @return 网络帧
-    */
+     * @return UTF-8 JSON 字节
+     */
     static QByteArray encode_wire_frame(const Message &msg, qint64 local_user_id);
 
     /**
-     * @brief 解析网络帧,封装成业务 Message
-     * @param frame 网络帧
-     * @param n_body 网络帧长度
-     * @param msgtype 网络帧类型
-     * @return 业务 Message
-    */
-    static MessagePtr decode_wire_packet(const std::uint8_t *frame,
-                                         std::uint32_t n_body,
-                                         MSG_TYPE msgtype);
+     * @brief 解析单条 JSON 文本帧为业务 Message
+     * @param json_frame JSON 字节
+     * @return 业务 Message（无法识别返回 nullptr）
+     */
+    static MessagePtr decode_json_frame(const QByteArray &json_frame);
 
-    /** @brief 流式解帧器 */
+    /**
+     * @brief 解析已解出的 payload（保留此入口供自检使用）
+     * @param payload payload 字节（文本类为明文 UTF-8）
+     * @param user_id 发送者 user_id
+     * @param msgtype 消息类型
+     */
+    static MessagePtr decode_payload(const QByteArray &payload, qint64 user_id,
+                                     MSG_TYPE msgtype);
+
+    /** @brief 消息类型名（线上 `t` 字段），如 text_send */
+    static const char *type_name(MSG_TYPE type);
+    /** @brief 由线上类型名反查枚举，未知返回 std::nullopt */
+    static std::optional<MSG_TYPE> type_from_name(const QString &name);
+
+    /**
+     * @brief 流式解帧器
+     *
+     * WebSocket 按消息投递，正常每次 feed 就是一条完整 JSON；
+     * 仍保留缓冲以防御半包/粘包。
+     */
     class WireStreamParser {
     public:
-        /** @brief 重置流式解帧器,清空缓冲区 */
+        /** @brief 清空缓冲 */
         void reset();
-        /** @brief 喂入数据,将数据添加到缓冲区,并尽可能解析里面完整的数据包 */
-        std::vector<MessagePtr> feed(const std::uint8_t *data, std::size_t len);
+        /** @brief 喂入一段字节，返回本次解出的全部消息 */
+        std::vector<MessagePtr> feed(const char *data, std::size_t len);
 
     private:
-        /// @brief 尽可能解析缓冲区中的完整的包,如果缓冲区没有完整的包也没事,留着下次解析
-        /// 连头部都不够 break，返回空 vector，半数据留在 buffer_
-        /// 头够了但整包不够 break，返回空（或前面已解出的包），半包留下
-        /// 正好一包或多包 解出来放进返回值，已消费部分从 buffer_ 删掉
-        /// 多包 + 后面半包 完整的都解出，半包留到下次
-        std::vector<MessagePtr> extract_all(); ///< 提取所有消息
-
-        QByteArray buffer_; ///< 缓冲区
-        static constexpr std::size_t k_max_buffer = 4 * 1024 * 1024; ///< 最大缓冲区大小 4mb
+        QByteArray buffer_;
+        static constexpr std::size_t k_max_buffer = 4 * 1024 * 1024;
     };
 
 private:
-    static MSG_TYPE to_wire_type(MessageKind kind); ///< 将消息类型MessageKind转换为网络帧类型MSG_TYPE
-    static MessageKind from_wire_type(MSG_TYPE type); ///< 将网络帧类型MSG_TYPE转换为消息类型MessageKind
+    static MSG_TYPE to_wire_type(MessageKind kind);
+    static MessageKind from_wire_type(MSG_TYPE type);
 };
 
 #endif // MESSAGECODEC_H
