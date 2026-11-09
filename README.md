@@ -15,12 +15,14 @@
 **消息服务器（message_server）**
 
 - 会议室创建与成员进出管理
-- 基于 TCP 的控制面消息转发（请求、文本、成员状态等；音视频走 WebRTC）
+- 基于 **WebSocket + JSON** 的控制面消息转发（房间、成员事件、文本、房间开关；音视频走 WebRTC）
 
-**认证服务器（data_server）**
+**认证服务器（data_server_py）**
 
-- HTTP 用户注册 / 登录 / 资料与头像
-- SQLite 用户数据持久化，OpenSSL 密码哈希
+- Python / FastAPI 实现（原 C++ 版 `data_server/` 已迁移并移除）
+- HTTP 用户注册 / 登录 / 资料与头像；接口契约与原 C++ 版逐字段一致，客户端无需改动
+- SQLite 用户数据持久化（同一份表结构），密码使用 **Argon2id**；旧的单轮 SHA-256 仍可验证并在登录后自动升级
+- 详见 [`data_server_py/README.md`](data_server_py/README.md)
 
 ## 技术栈与第三方库
 
@@ -65,7 +67,7 @@ $vcvars = Join-Path $vs "VC\Auxiliary\Build\vcvars64.bat"
 
 Remove-Item -Recurse -Force build\client -ErrorAction SilentlyContinue
 
-cmd /c "`"$vcvars`" && cmake -S . -B build/client -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=F:/ninja/ninja.exe -DBUILD_CLIENT=ON -DBUILD_SERVER=OFF -DBUILD_SERVER2=OFF -DQT_INSTALL_PATH=F:/Qt/6.8.3/msvc2022_64 && cmake --build build/client -j"
+cmd /c "`"$vcvars`" && cmake -S . -B build/client -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=F:/ninja/ninja.exe -DBUILD_CLIENT=ON -DBUILD_SERVER=OFF -DQT_INSTALL_PATH=F:/Qt/6.8.3/msvc2022_64 && cmake --build build/client -j"
 ```
 
 可选：已有 Boost 头文件时加 `-DBoost_ROOT=F:/wy/boost_install`，跳过 xrtc 内下载。
@@ -79,7 +81,7 @@ Release：把 `Debug` 换成 `Release`，并改 `-DCMAKE_BUILD_TYPE=Release`。
 ```bash
 cmake -S . -B build/message_server -G Ninja \
   -DCMAKE_BUILD_TYPE=Debug \
-  -DBUILD_CLIENT=OFF -DBUILD_SERVER=ON -DBUILD_SERVER2=OFF
+  -DBUILD_CLIENT=OFF -DBUILD_SERVER=ON
 cmake --build build/message_server -j
 ```
 
@@ -87,24 +89,24 @@ cmake --build build/message_server -j
 
 输出：`build/message_server/message_server/CloudMeetingServer`（Windows 下为 `.exe`）。
 
-### 认证服务器
+### 认证服务器（Python）
 
-```bash
-cmake -S . -B build/data_server -G Ninja \
-  -DCMAKE_BUILD_TYPE=Debug \
-  -DBUILD_CLIENT=OFF -DBUILD_SERVER=OFF -DBUILD_SERVER2=ON
-cmake --build build/data_server -j
+不再由 CMake 构建，改用虚拟环境直接运行：
+
+```powershell
+cd data_server_py
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m app        # 默认 0.0.0.0:9000
 ```
 
-Boost 处理同上；另需本机 OpenSSL、SQLite3。
-
-输出：`build/data_server/data_server/CloudMeetingAuthServer`。
+测试与一致性对照见 [`data_server_py/README.md`](data_server_py/README.md)。
 
 ### 常用 -D 选项
 
 | 变量 | 含义 |
 |------|------|
-| `BUILD_CLIENT` / `BUILD_SERVER` / `BUILD_SERVER2` | 开关各目标（默认只开客户端） |
+| `BUILD_CLIENT` / `BUILD_SERVER` | 开关各目标（默认只开客户端） |
 | `QT_INSTALL_PATH` | Qt6 根目录（仅客户端） |
 | `Boost_ROOT` | Boost 根目录（可选；有则跳过自动下载） |
 | `CCMEETING_BOOST_URL` | 服务端 Boost 源码包 URL（可选覆盖） |
@@ -113,8 +115,8 @@ Boost 处理同上；另需本机 OpenSSL、SQLite3。
 
 ## 运行说明
 
-1. （可选）启动 **CloudMeetingAuthServer**
-2. 启动 **CloudMeetingServer**
+1. 启动认证服务：`cd data_server_py && .venv\Scripts\python.exe -m app`（或服务器上的 `systemctl start ccmeeting-auth`）
+2. 启动 **CloudMeetingServer**（信令，WebSocket 8888）
 3. 启动 **CloudMeeting** 客户端并连接（可将 Qt `bin` 加入 PATH，或用 `windeployqt` 部署依赖）
 
 ## 文档（可选）
