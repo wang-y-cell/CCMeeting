@@ -1,0 +1,12 @@
+# 虚拟环境
+.venv/
+
+# 运行时数据（数据库 / 上传的头像 / 日志）
+data/
+uploads/
+*.log
+
+# Python 缓存
+__pycache__/
+*.pyc
+.pytest_cache/

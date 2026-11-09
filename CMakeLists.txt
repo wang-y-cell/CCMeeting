@@ -11,8 +11,9 @@ endif()
 #
 #-------------------------------------------------
 option(BUILD_CLIENT "Build CloudMeeting Qt client (MSVC + xrtc)" ON)
-option(BUILD_SERVER "Build message_server (TCP meeting)" OFF)
-option(BUILD_SERVER2 "Build data_server (HTTP auth)" OFF)
+option(BUILD_SERVER "Build message_server (WebSocket meeting signaling)" OFF)
+# 注意：原 C++ 认证服务 data_server 已迁到 data_server_py/（Python/FastAPI），
+# 不再由 CMake 构建。BUILD_SERVER2 选项随之移除。
 
 # 客户端依赖 xrtc/webrtc 预编译库，Windows 上必须用 MSVC x64（与 webrtcSDK 一致）
 if(BUILD_CLIENT AND WIN32 AND NOT MSVC)
@@ -25,10 +26,10 @@ if(BUILD_CLIENT AND WIN32 AND NOT MSVC)
         "-DQT_INSTALL_PATH=F:/Qt/6.8.3/msvc2022_64")
 endif()
 
-if(NOT BUILD_CLIENT AND NOT BUILD_SERVER AND NOT BUILD_SERVER2)
+if(NOT BUILD_CLIENT AND NOT BUILD_SERVER)
     message(FATAL_ERROR
         "[CCMeeting] 请至少打开一项: "
-        "-DBUILD_CLIENT=ON / -DBUILD_SERVER=ON / -DBUILD_SERVER2=ON")
+        "-DBUILD_CLIENT=ON / -DBUILD_SERVER=ON")
 endif()
 
 #-------------------------------------------------
@@ -245,35 +246,9 @@ if(BUILD_CLIENT)
 endif()
 
 # 服务端 Boost：本机 find_package → third_party 已有头文件 → 自动下载源码包
-if(BUILD_SERVER OR BUILD_SERVER2)
-    ccmeeting_ensure_boost_for_servers()
-endif()
-
 if(BUILD_SERVER)
+    ccmeeting_ensure_boost_for_servers()
     add_subdirectory(message_server)
-endif()
-
-#-------------------------------------------------
-#
-# third_party: nlohmann/json（仅 data_server；优先复用 xrtc 已创建的目标）
-#
-#-------------------------------------------------
-if(BUILD_SERVER2)
-    if(NOT TARGET nlohmann_json AND NOT TARGET nlohmann_json::nlohmann_json)
-        if(NOT EXISTS "${CCMEETING_THIRD_PARTY}/json/CMakeLists.txt")
-            message(FATAL_ERROR
-                "nlohmann/json submodule missing: ${CCMEETING_THIRD_PARTY}/json\n"
-                "Run: git submodule update --init --recursive")
-        endif()
-        set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
-        set(JSON_Install OFF CACHE BOOL "" FORCE)
-        message(STATUS "[CCMeeting] nlohmann/json: ${CCMEETING_THIRD_PARTY}/json")
-        add_subdirectory("${CCMEETING_THIRD_PARTY}/json" EXCLUDE_FROM_ALL)
-    endif()
-    if(TARGET nlohmann_json AND NOT TARGET nlohmann_json::nlohmann_json)
-        add_library(nlohmann_json::nlohmann_json ALIAS nlohmann_json)
-    endif()
-    add_subdirectory(data_server)
 endif()
 
 #-------------------------------------------------
@@ -282,7 +257,7 @@ endif()
 #
 #-------------------------------------------------
 message(STATUS "[CCMeeting] BUILD_CLIENT=${BUILD_CLIENT} "
-               "BUILD_SERVER=${BUILD_SERVER} BUILD_SERVER2=${BUILD_SERVER2}")
+               "BUILD_SERVER=${BUILD_SERVER}")
 if(Boost_ROOT)
     message(STATUS "[CCMeeting] Boost_ROOT=${Boost_ROOT}")
 endif()
