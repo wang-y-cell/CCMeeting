@@ -1962,6 +1962,29 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    // 成员卡片开启视频：帧要铺满卡片（不是头像大小）
+    {
+        QWidget panel;
+        panel.setObjectName(QStringLiteral("tab_5"));
+        panel.resize(300, 330);
+        ui::ThemeManager::instance().apply_to(
+            &panel, QStringLiteral(":/Style/source/meeting_widget.qss"));
+        auto *partner = new Partner(1002, &panel);
+        auto *tile = new PartnerTile(partner, &panel);
+        tile->setGeometry(8, 8, 284, 302);
+        QImage frame(640, 360, QImage::Format_ARGB32_Premultiplied);
+        for (int y = 0; y < frame.height(); ++y) {
+            for (int x = 0; x < frame.width(); ++x) {
+                frame.setPixelColor(x, y, QColor((x * 255) / frame.width(),
+                                                 (y * 255) / frame.height(), 160));
+            }
+        }
+        // 模拟 ImgDisplay 的行为：收到视频帧时切到 FitWidgetSmooth
+        tile->displayWidget()->setDrawMode(VideoGLWidget::DrawMode::FitWidgetSmooth);
+        tile->displayWidget()->setFrame(frame);
+        tile->updateProfile(QStringLiteral("李雷"), QString());
+        capture(&panel, QStringLiteral("00b-member-tile-video"), 300, 330);
+    }
     // 单个成员卡片：验证头像为 72 方形、名字常驻显示
     {
         QWidget panel;
