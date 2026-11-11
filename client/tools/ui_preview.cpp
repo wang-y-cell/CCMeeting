@@ -14,6 +14,7 @@
 #include "ui/dialogs/edit_profile_dialog.h"
 #include "ui/pages/login_window.h"
 #include "main_window.h"
+#include "ui/foundation/font_registry.h"
 #include "ui/foundation/theme_manager.h"
 #include "features/meeting/meeting_recorder.h"
 #include "ui/pages/meeting_settings_popup.h"
@@ -1380,6 +1381,7 @@ int main(int argc, char *argv[]) {
     ensure_style_available();
 
     // 加载全局样式（与 main.cpp 一致：走 ThemeManager，支持深/浅主题）
+    ui::FontRegistry::load_bundled();
     ui::ThemeManager::instance().apply_global(
         QStringLiteral(":/Style/source/style.qss"));
     std::printf("[preview] theme = %s\n",
