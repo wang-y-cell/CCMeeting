@@ -1705,6 +1705,43 @@ int run_resize_cost_selftest() {
 }
 
 }  // namespace
+// ---------------------------------------------------------------------------
+// 标题栏按钮诊断：确认最大化/关闭按钮是否停在窗口右上角
+// 用法：UiPreview.exe --title-button-selftest
+// ---------------------------------------------------------------------------
+namespace {
+
+int run_title_button_selftest() {
+    ui::MeetingWindow window;
+    window.setAttribute(Qt::WA_DontShowOnScreen, true);
+    window.resize(1200, 800);
+    window.show();
+    QCoreApplication::processEvents();
+    QThread::msleep(80);
+    QCoreApplication::processEvents();
+
+    bool all_ok = true;
+    auto check = [&](const char *name, const QRect &rect, int window_width) {
+        const bool at_right = rect.left() > window_width / 2;
+        const bool visible = rect.isValid() && rect.left() >= 0;
+        all_ok = all_ok && at_right && visible;
+        std::printf("[title-btn] %-18s rect=(%d,%d %dx%d) 宽度=%d %s\n", name,
+                    rect.x(), rect.y(), rect.width(), rect.height(), window_width,
+                    (at_right && visible) ? "OK" : "FAIL(不在右上角)");
+    };
+
+    if (auto *max_btn = window.maximizeButton()) {
+        check("最大化", max_btn->geometry(), window.width());
+    }
+    if (auto *close_btn = window.closeButton()) {
+        check("关闭", close_btn->geometry(), window.width());
+    }
+    window.hide();
+    std::printf("[title-btn] 结论: %s\n", all_ok ? "PASS" : "FAIL");
+    return all_ok ? 0 : 1;
+}
+
+}  // namespace
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     QApplication::setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
@@ -1787,6 +1824,10 @@ int main(int argc, char *argv[]) {
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--resize-cost-selftest")) {
         return run_resize_cost_selftest();
+    }
+    if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
+                        QStringLiteral("--title-button-selftest")) {
+        return run_title_button_selftest();
     }
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--avatar-alpha-selftest")) {

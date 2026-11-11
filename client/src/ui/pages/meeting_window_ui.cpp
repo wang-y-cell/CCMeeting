@@ -181,16 +181,17 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
         ui::ThemeManager::instance().color(QStringLiteral("textMuted")), 14));
     topStatusLayout->addWidget(btnMeetingInfo);
 
-    topStatusLayout->addWidget(topMainTitle);
-    // 房间号/人数不再占用顶栏（统一进"会议详情"弹窗），控件保留但隐藏
+    // 顶栏只保留：会议详情 + 会议时长（房间号/人数/状态/发言人都收进弹窗或被移除）
+    topMainTitle->hide();
     topRoomChip->hide();
     topMemberChip->hide();
+    topSpeakerLabel->hide();
+    topMeetStatus->hide();
     topStatusLayout->addWidget(topMemberChip);
     topStatusLayout->addWidget(topDurationChip);
     topStatusLayout->addItem(
         new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum));
-    topStatusLayout->addWidget(topSpeakerLabel);
-    topStatusLayout->addWidget(topMeetStatus);
+
     topStatusLayout->addWidget(btnMeetingSettings);
     verticalLayout->addWidget(topStatusBar);
 
@@ -378,7 +379,8 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
     verticalLayout_meetInfo->addLayout(formLayout_meetInfo);
     verticalLayout_meetInfo->addItem(
         new QSpacerItem(20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding));
-    tabWidget->addTab(tab_meetInfo, QObject::tr("信息"));
+    // 需求：不再提供"信息"标签页（内容已移到顶栏的"会议详情"弹窗）
+    tab_meetInfo->hide();
     tabWidget->setCurrentIndex(0);
 
     main_box_layout->addWidget(tabWidget);
@@ -409,9 +411,11 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
     btnSideChat =
         makeToolButton(QStringLiteral("btnSideChat"), QObject::tr("聊天"),
                        QSize(64, 48), controlPill, QObject::tr("打开聊天"));
+    // "信息"页已并入左上角「会议详情」弹窗，工具栏不再保留该按钮
     btnSideInfo =
         makeToolButton(QStringLiteral("btnSideInfo"), QObject::tr("信息"),
                        QSize(64, 48), controlPill, QObject::tr("会议信息"));
+    btnSideInfo->hide();
 
     openAudio =
         makeToolButton(QStringLiteral("openAudio"), QObject::tr("开启音频"),
@@ -447,7 +451,6 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
 
     controlPillLayout->addWidget(btnSideMembers);
     controlPillLayout->addWidget(btnSideChat);
-    controlPillLayout->addWidget(btnSideInfo);
     controlPillLayout->addWidget(makePillSep(QStringLiteral("pillSep1"),
                                              controlPill));
     controlPillLayout->addWidget(openAudio);

@@ -125,6 +125,13 @@ QTabBar::tab:hover:!selected {
     color: @textMuted;
 }
 
+/* ---------- 成员卡片：与会议背景区分的小方窗 ---------- */
+
+QWidget#partnerTile {
+    background-color: @surface;
+    border: 1px solid @borderSoft;
+    border-radius: 12px;
+}
 /* ---------- 聊天 / 成员列表 ---------- */
 
 QListWidget,

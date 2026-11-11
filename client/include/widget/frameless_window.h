@@ -96,6 +96,7 @@ public:
         m_maximizable = enabled;
         if (m_maxBtn) {
             m_maxBtn->setVisible(enabled);
+            m_last_title_geometry_width = -1;   // 可见性变了：强制重新摆放
             updateTitleButtonsGeometry();
         }
     }
@@ -267,6 +268,7 @@ protected:
         Base::changeEvent(event);
         if (event->type() == QEvent::WindowStateChange) {
             updateMaximizeButtonIcon();
+            m_last_title_geometry_width = -1;   // 最大化/还原后强制重新摆放
             updateTitleButtonsGeometry();
         }
     }
@@ -369,7 +371,9 @@ private:
         const int closeX = Base::width() - m_closeBtn->width() - kBtnMargin;
         m_closeBtn->move(closeX, kBtnMargin);
 
-        if (m_maxBtn && m_maxBtn->isVisible()) {
+        // 注意：不能加 isVisible() 判断——按钮可能先隐藏后显示，
+        // 若只摆放可见按钮，隐藏期间尺寸变化后它会永远停在 (0,0)
+        if (m_maxBtn) {
             const int maxX = closeX - m_maxBtn->width() - kBtnGap;
             m_maxBtn->move(maxX, kBtnMargin);
             m_maxBtn->raise();   ///< 先抬起最大化
