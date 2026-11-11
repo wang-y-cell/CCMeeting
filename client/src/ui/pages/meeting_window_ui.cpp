@@ -1,5 +1,8 @@
 #include "ui/pages/meeting_window_ui.h"
 
+#include "ui/foundation/icon_provider.h"
+#include "ui/foundation/theme_manager.h"
+
 #include "ui/foundation/theme_manager.h"
 
 #include "text/mytextedit.h"
@@ -37,6 +40,23 @@ QPushButton *makeToolButton(const QString &objectName, const QString &text,
     btn->setMinimumSize(minSize);
     if (!toolTip.isEmpty())
         btn->setToolTip(toolTip);
+
+    // 工具栏图标：按 objectName 映射到 SVG 名字（主题色）
+    static const QHash<QString, QString> kIconByName = {
+        {QStringLiteral("btnSideMembers"), QStringLiteral("users")},
+        {QStringLiteral("btnSideChat"), QStringLiteral("send")},
+        {QStringLiteral("btnSideInfo"), QStringLiteral("user")},
+        {QStringLiteral("openAudio"), QStringLiteral("mic")},
+        {QStringLiteral("openVedio"), QStringLiteral("camera")},
+        {QStringLiteral("shareScreenBtn"), QStringLiteral("screen-share")},
+        {QStringLiteral("leaveMeetingBtn"), QStringLiteral("hangup")},
+    };
+    if (const auto it = kIconByName.constFind(objectName); it != kIconByName.constEnd()) {
+        const QColor icon_color =
+            ui::ThemeManager::instance().color(QStringLiteral("textMuted"));
+        btn->setIcon(ui::IconProvider::instance().icon(it.value(), icon_color, 20));
+        btn->setIconSize(QSize(20, 20));
+    }
     return btn;
 }
 
@@ -119,6 +139,9 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
     btnMeetingSettings->setCursor(Qt::PointingHandCursor);
     btnMeetingSettings->setToolTip(QObject::tr("房间权限与会议快捷操作"));
     btnMeetingSettings->setFixedHeight(26);
+    btnMeetingSettings->setIcon(ui::IconProvider::instance().icon(
+        QStringLiteral("settings"),
+        ui::ThemeManager::instance().color(QStringLiteral("textMuted")), 14));
 
     topStatusLayout->addWidget(topMainTitle);
     topStatusLayout->addWidget(topRoomChip);
@@ -248,6 +271,9 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
 
     sendmsg = new QPushButton(QObject::tr("发送"), tab_6);
     sendmsg->setObjectName(QStringLiteral("sendmsg"));
+    sendmsg->setIcon(ui::IconProvider::instance().icon(
+        QStringLiteral("send"),
+        ui::ThemeManager::instance().color(QStringLiteral("onPrimary")), 16));
     sendmsg->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     verticalLayout_6->addWidget(sendmsg);
     tabWidget->addTab(tab_6, QObject::tr("聊天"));

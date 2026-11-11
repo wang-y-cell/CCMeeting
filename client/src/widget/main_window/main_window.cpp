@@ -1,4 +1,5 @@
 #include "main_window.h"
+#include "ui/foundation/icon_provider.h"
 #include "ui/foundation/theme_manager.h"
 #include "avatar_image_loader.h"
 #include "configure/client_config.h"
@@ -257,6 +258,11 @@ void main_window::build_pages() {
     const QList<ui::PageMeta> nav_metas = m_pages.nav();
     for (const ui::PageMeta &meta : nav_metas) {
         auto *item = new QListWidgetItem(meta.title, ui.sideNav);
+        // 图标跟随主题色（单色 SVG + tint）
+        if (!meta.icon.isEmpty()) {
+            item->setIcon(ui::IconProvider::instance().icon(
+                meta.icon, ui::ThemeManager::instance().color(QStringLiteral("textMuted")), 18));
+        }
         item->setSizeHint(QSize(0, 48));
         item->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
         item->setData(Qt::UserRole, meta.id);
@@ -266,6 +272,22 @@ void main_window::build_pages() {
         item->setFont(font);
         ui.sideNav->addItem(item);
     }
+
+    // 3b) 主题切换后刷新侧栏图标颜色
+    connect(&ui::ThemeManager::instance(), &ui::ThemeManager::theme_changed, this,
+            [this, nav_metas]() {
+                const QColor color =
+                    ui::ThemeManager::instance().color(QStringLiteral("textMuted"));
+                for (int i = 0; i < ui.sideNav->count() && i < nav_metas.size(); ++i) {
+                    const QString icon_name = nav_metas.at(i).icon;
+                    if (icon_name.isEmpty()) {
+                        continue;
+                    }
+                    if (auto *item = ui.sideNav->item(i)) {
+                        item->setIcon(ui::IconProvider::instance().icon(icon_name, color, 18));
+                    }
+                }
+            });
 
     // 4) 侧栏切换：按"页"统一处理，新页面只要实现 ui::Page::on_show 就能懒刷新
     ui.sideNav->setCurrentRow(0);
