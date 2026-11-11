@@ -21,6 +21,12 @@ public:
 
     void updateProfile(const QString &displayName, const QString &avatarUrl);
     void setSelected(bool selected);
+
+    /**
+     * @brief 切换显示区大小：视频帧铺满卡片、头像固定 72×72 居中
+     * @param video true=正在显示视频帧
+     */
+    void set_video_mode(bool video);
     void resetBorder();
 
 signals:
@@ -44,6 +50,7 @@ private:
     QLabel *m_nameLabel = nullptr;
     // 小格子的大小
     int m_side = 40;
+    class QVBoxLayout *m_layout = nullptr;
 };
 
 #endif // PARTNER_TILE_H

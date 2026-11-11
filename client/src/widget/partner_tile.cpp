@@ -22,6 +22,7 @@ PartnerTile::PartnerTile(Partner *partner, QWidget *parent)
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(2, 2, 2, 4);
     layout->setSpacing(2);
+    m_layout = layout;
 
     // 点击成员可选中：只用手型光标提示，不画描边
     setCursor(Qt::PointingHandCursor);
@@ -34,7 +35,8 @@ PartnerTile::PartnerTile(Partner *partner, QWidget *parent)
     // 头像透明角落要和卡片底色一致，否则会出现异色方块
     m_displayWidget->setClearColor(ui::ThemeManager::instance().color(QStringLiteral("surface")));
     m_displayWidget->setAlignment(Qt::AlignCenter);
-    m_displayWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    m_displayWidget->setFixedSize(kAvatarSide, kAvatarSide);
+    m_displayWidget->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 
     m_nameLabel = new QLabel(this);
     m_nameLabel->setAlignment(Qt::AlignCenter);
@@ -44,8 +46,15 @@ PartnerTile::PartnerTile(Partner *partner, QWidget *parent)
                                     .arg(ui::ThemeManager::instance().color(QStringLiteral("icon")).name()));
     m_nameLabel->setText(m_partner->fallbackLabel());
 
-    layout->addWidget(m_displayWidget, 1);
+    // 上下留弹性：头像/视频 + 名字始终整组居中，名字不会被挤出卡片
+    layout->addStretch(1);
+    layout->addWidget(m_displayWidget, 0, Qt::AlignCenter);
     layout->addWidget(m_nameLabel, 0);
+    layout->addStretch(1);
+
+    // 视频帧到达时铺满卡片，头像回到 72×72 居中
+    connect(m_displayWidget, &VideoGLWidget::content_kind_changed, this,
+            [this](bool video) { set_video_mode(video); });
 
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     // 卡片本身与会议背景区分（QSS: QWidget#partnerTile）
@@ -112,11 +121,33 @@ void PartnerTile::resizeEvent(QResizeEvent *event) {
     updateLabelGeometry();
 }
 
-void PartnerTile::updateLabelGeometry() {
-    if (m_displayWidget) {
-        // 方形卡片：显示区高度 = 卡片宽度 - 名字行高度
-        m_displayWidget->setFixedHeight(qMax(m_side - 22, kAvatarSide));
+void PartnerTile::set_video_mode(bool video) {
+    if (!m_displayWidget) {
+        return;
     }
+    if (video) {
+        // 视频：显示区铺满卡片宽度
+        // 注意：布局里有上下 stretch，item 的 stretch 为 0，
+        // 所以必须用 minimumWidth 把宽撑开，否则只会拿到 sizeHint。
+        m_displayWidget->setMinimumSize(0, 0);
+        m_displayWidget->setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
+        m_displayWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        m_displayWidget->setMinimumWidth(qMax(m_side - 8, kAvatarSide));
+        m_displayWidget->setFixedHeight(qMax(m_side - 22, kAvatarSide));
+        if (m_layout) {
+            m_layout->setAlignment(m_displayWidget, Qt::Alignment());
+        }
+    } else {
+        // 头像：固定 72×72 并居中
+        m_displayWidget->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+        m_displayWidget->setFixedSize(kAvatarSide, kAvatarSide);
+        if (m_layout) {
+            m_layout->setAlignment(m_displayWidget, Qt::AlignCenter);
+        }
+    }
+}
+
+void PartnerTile::updateLabelGeometry() {
     if (m_nameLabel) {
         m_nameLabel->setAlignment(Qt::AlignCenter);
     }
