@@ -4,12 +4,12 @@
  * ============================================================ */
 
 QDialog#editProfileDialog {
-    background-color: #0B0D11;
-    border: 1px solid #232A35;
+    background-color: @canvas;
+    border: 1px solid @border;
 }
 
 QLabel#pageTitle {
-    color: #E9EDF4;
+    color: @text;
     font-size: 18px;
     font-weight: 600;
     background: transparent;
@@ -20,7 +20,7 @@ QLabel#profileAvatarLarge {
     background-color: rgba(76, 141, 255, 0.16);
     border: 1px solid rgba(76, 141, 255, 0.24);
     border-radius: 64px;
-    color: #4C8DFF;
+    color: @primary;
     font-size: 34px;
     font-weight: 600;
 }
@@ -35,7 +35,7 @@ QLabel#fieldLabelAddress,
 QLabel#fieldLabelPhone,
 QLabel#fieldLabelEmail,
 QLabel#fieldLabelInfo {
-    color: #98A2B3;
+    color: @textMuted;
     font-size: 12px;
     font-weight: 500;
     background: transparent;
@@ -53,7 +53,7 @@ QLabel#valueEmail,
 QLabel#valueNickname,
 QLabel#valueInfo,
 QLabel#ageValue {
-    color: #E9EDF4;
+    color: @text;
     font-size: 13px;
     background: transparent;
     border: none;
@@ -66,27 +66,27 @@ QLineEdit#addressEdit,
 QLineEdit#phoneEdit,
 QLineEdit#emailEdit,
 QDateEdit#birthdayEdit {
-    background-color: #1B2029;
-    color: #E9EDF4;
-    border: 1px solid #232A35;
+    background-color: @surface2;
+    color: @text;
+    border: 1px solid @border;
     border-radius: 8px;
     padding: 0 12px;
     min-height: 38px;
     font-size: 13px;
-    selection-background-color: #4C8DFF;
-    selection-color: #FFFFFF;
+    selection-background-color: @primary;
+    selection-color: @onPrimary;
 }
 
 QLineEdit#emailEdit:hover,
 QDateEdit#birthdayEdit:hover {
-    border-color: #2E3846;
-    background-color: #1E242E;
+    border-color: @borderStrong;
+    background-color: @surface3;
 }
 
 QLineEdit#emailEdit:focus,
 QDateEdit#birthdayEdit:focus {
-    border: 1px solid #4C8DFF;
-    background-color: #1E242E;
+    border: 1px solid @primary;
+    background-color: @surface3;
 }
 
 QDateEdit#birthdayEdit::drop-down,
@@ -96,9 +96,9 @@ QComboBox#genderCombo::drop-down {
 }
 
 QComboBox#genderCombo {
-    background-color: #1B2029;
-    color: #E9EDF4;
-    border: 1px solid #232A35;
+    background-color: @surface2;
+    color: @text;
+    border: 1px solid @border;
     border-radius: 8px;
     padding: 0 12px;
     min-height: 38px;
@@ -106,38 +106,38 @@ QComboBox#genderCombo {
 }
 
 QComboBox#genderCombo:hover {
-    border-color: #2E3846;
-    background-color: #1E242E;
+    border-color: @borderStrong;
+    background-color: @surface3;
 }
 
 QComboBox#genderCombo QAbstractItemView {
-    background-color: #161A21;
-    border: 1px solid #2E3846;
+    background-color: @surface;
+    border: 1px solid @borderStrong;
     border-radius: 8px;
     padding: 4px;
-    color: #E9EDF4;
+    color: @text;
     selection-background-color: rgba(76, 141, 255, 0.16);
-    selection-color: #E9EDF4;
+    selection-color: @text;
     outline: none;
 }
 
 QTextEdit#infoEdit {
-    background-color: #1B2029;
-    color: #E9EDF4;
-    border: 1px solid #232A35;
+    background-color: @surface2;
+    color: @text;
+    border: 1px solid @border;
     border-radius: 8px;
     padding: 8px 10px;
     font-size: 13px;
-    selection-background-color: #4C8DFF;
-    selection-color: #FFFFFF;
+    selection-background-color: @primary;
+    selection-color: @onPrimary;
 }
 
 QTextEdit#infoEdit:hover {
-    border-color: #2E3846;
+    border-color: @borderStrong;
 }
 
 QTextEdit#infoEdit:focus {
-    border: 1px solid #4C8DFF;
+    border: 1px solid @primary;
 }
 
 QScrollArea#editProfileScroll {
@@ -152,9 +152,9 @@ QWidget#editProfileScrollContent {
 /* ---------- 按钮 ---------- */
 
 QPushButton#changeAvatarBtn {
-    background-color: #1E242E;
-    color: #E9EDF4;
-    border: 1px solid #2A3341;
+    background-color: @surface3;
+    color: @text;
+    border: 1px solid @overlay;
     border-radius: 8px;
     min-height: 32px;
     padding: 0 14px;
@@ -163,14 +163,14 @@ QPushButton#changeAvatarBtn {
 }
 
 QPushButton#changeAvatarBtn:hover {
-    background-color: #252D3A;
-    border-color: #3A4557;
+    background-color: @raisedAlt;
+    border-color: @hover;
 }
 
 QPushButton#editSaveBtn {
-    background-color: #4C8DFF;
-    color: #FFFFFF;
-    border: 1px solid #4C8DFF;
+    background-color: @primary;
+    color: @onPrimary;
+    border: 1px solid @primary;
     border-radius: 8px;
     min-height: 38px;
     padding: 0 22px;
@@ -179,25 +179,25 @@ QPushButton#editSaveBtn {
 }
 
 QPushButton#editSaveBtn:hover {
-    background-color: #5E9BFF;
-    border-color: #5E9BFF;
+    background-color: @primaryHover;
+    border-color: @primaryHover;
 }
 
 QPushButton#editSaveBtn:pressed {
-    background-color: #3B7AE8;
-    border-color: #3B7AE8;
+    background-color: @primaryPressed;
+    border-color: @primaryPressed;
 }
 
 QPushButton#editSaveBtn:disabled {
-    background-color: #1B2029;
-    border-color: #232A35;
-    color: #6A7383;
+    background-color: @surface2;
+    border-color: @border;
+    color: @textFaint;
 }
 
 QPushButton#editCancelBtn {
     background-color: transparent;
-    color: #98A2B3;
-    border: 1px solid #2A3341;
+    color: @textMuted;
+    border: 1px solid @overlay;
     border-radius: 8px;
     min-height: 38px;
     padding: 0 22px;
@@ -206,9 +206,9 @@ QPushButton#editCancelBtn {
 }
 
 QPushButton#editCancelBtn:hover {
-    background-color: #1E242E;
-    border-color: #3A4557;
-    color: #E9EDF4;
+    background-color: @surface3;
+    border-color: @hover;
+    color: @text;
 }
 
 /* ---------- 无边框窗口标题栏按钮 ---------- */
@@ -217,18 +217,18 @@ QPushButton#framelessCloseBtn,
 QPushButton#framelessMaxBtn {
     background-color: transparent;
     border: none;
-    color: #6A7383;
+    color: @textFaint;
     font-size: 15px;
     font-weight: 500;
     border-radius: 6px;
 }
 
 QPushButton#framelessCloseBtn:hover {
-    background-color: #E5484D;
-    color: #FFFFFF;
+    background-color: @danger;
+    color: @onPrimary;
 }
 
 QPushButton#framelessMaxBtn:hover {
-    background-color: #212836;
-    color: #E9EDF4;
+    background-color: @raised;
+    color: @text;
 }

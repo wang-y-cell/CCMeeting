@@ -4,12 +4,12 @@
  * ============================================================ */
 
 QDialog#recordingPlayback {
-    background-color: #0B0D11;
-    border: 1px solid #232A35;
+    background-color: @canvas;
+    border: 1px solid @border;
 }
 
 QLabel#playbackTitle {
-    color: #E9EDF4;
+    color: @text;
     font-size: 16px;
     font-weight: 600;
     background: transparent;
@@ -17,23 +17,23 @@ QLabel#playbackTitle {
 }
 
 QLabel#playbackMeta {
-    color: #6A7383;
+    color: @textFaint;
     font-size: 12px;
     background: transparent;
     border: none;
 }
 
 VideoGLWidget#playbackVideo {
-    background-color: #07080B;
-    border: 1px solid #1C2230;
+    background-color: @canvasDeep;
+    border: 1px solid @borderSoft;
     border-radius: 12px;
 }
 
 QPushButton#playbackPlayBtn {
-    background-color: #4C8DFF;
-    border: 1px solid #4C8DFF;
+    background-color: @primary;
+    border: 1px solid @primary;
     border-radius: 8px;
-    color: #FFFFFF;
+    color: @onPrimary;
     font-size: 12px;
     font-weight: 600;
     min-height: 32px;
@@ -41,12 +41,12 @@ QPushButton#playbackPlayBtn {
 }
 
 QPushButton#playbackPlayBtn:hover {
-    background-color: #5E9BFF;
-    border-color: #5E9BFF;
+    background-color: @primaryHover;
+    border-color: @primaryHover;
 }
 
 QLabel#playbackTime {
-    color: #98A2B3;
+    color: @textMuted;
     font-size: 12px;
     min-width: 96px;
     background: transparent;
@@ -55,17 +55,17 @@ QLabel#playbackTime {
 
 QSlider#playbackSlider::groove:horizontal {
     height: 4px;
-    background: #232A35;
+    background: @border;
     border-radius: 2px;
 }
 
 QSlider#playbackSlider::sub-page:horizontal {
-    background: #4C8DFF;
+    background: @primary;
     border-radius: 2px;
 }
 
 QSlider#playbackSlider::handle:horizontal {
-    background: #E9EDF4;
+    background: @text;
     width: 12px;
     height: 12px;
     margin: -4px 0;
@@ -73,7 +73,7 @@ QSlider#playbackSlider::handle:horizontal {
 }
 
 QSlider#playbackSlider::handle:horizontal:hover {
-    background: #FFFFFF;
+    background: @onPrimary;
 }
 
 /* ---------- 无边框窗口标题栏按钮 ---------- */
@@ -82,18 +82,18 @@ QPushButton#framelessCloseBtn,
 QPushButton#framelessMaxBtn {
     background-color: transparent;
     border: none;
-    color: #6A7383;
+    color: @textFaint;
     font-size: 15px;
     font-weight: 500;
     border-radius: 6px;
 }
 
 QPushButton#framelessCloseBtn:hover {
-    background-color: #E5484D;
-    color: #FFFFFF;
+    background-color: @danger;
+    color: @onPrimary;
 }
 
 QPushButton#framelessMaxBtn:hover {
-    background-color: #212836;
-    color: #E9EDF4;
+    background-color: @raised;
+    color: @text;
 }

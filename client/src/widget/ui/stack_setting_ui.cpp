@@ -11,6 +11,7 @@
 #include <QListWidgetItem>
 #include <QProgressBar>
 #include <QPushButton>
+#include <QRadioButton>
 #include <QScrollArea>
 #include <QStackedWidget>
 #include <QVBoxLayout>
@@ -257,6 +258,27 @@ void Ui_stack_setting::setupUi(QWidget *parent) {
         QObject::tr("进入设置页时自动开启摄像头预览（默认关闭）"), generalPage);
     videoAutoPreview->setObjectName(QStringLiteral("videoAutoPreview"));
     generalForm->addRow(QString(), videoAutoPreview);
+
+    // 主题：跟随系统 / 浅色 / 深色（立即生效并持久化到 Storage 的 ui/theme）
+    auto *themeRow = new QWidget(generalPage);
+    themeRow->setObjectName(QStringLiteral("themeRow"));
+    auto *themeLayout = new QHBoxLayout(themeRow);
+    themeLayout->setContentsMargins(0, 0, 0, 0);
+    themeLayout->setSpacing(16);
+
+    themeSystem = new QRadioButton(QObject::tr("跟随系统"), themeRow);
+    themeSystem->setObjectName(QStringLiteral("themeSystem"));
+    themeLight = new QRadioButton(QObject::tr("浅色"), themeRow);
+    themeLight->setObjectName(QStringLiteral("themeLight"));
+    themeDark = new QRadioButton(QObject::tr("深色"), themeRow);
+    themeDark->setObjectName(QStringLiteral("themeDark"));
+    themeSystem->setChecked(true);
+
+    themeLayout->addWidget(themeSystem);
+    themeLayout->addWidget(themeLight);
+    themeLayout->addWidget(themeDark);
+    themeLayout->addStretch(1);
+    generalForm->addRow(makeFieldLabel(QObject::tr("主题"), generalPage), themeRow);
 
     auto *serverHint = new QLabel(
         QObject::tr("服务器地址、端口与 Janus 信令地址由管理员统一配置，不在此处修改。"),

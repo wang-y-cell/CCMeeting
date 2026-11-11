@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QStyleHints>
 #include <QElapsedTimer>
 #include <QCameraDevice>
 #include <QAudioDevice>
@@ -29,6 +30,7 @@
 #include "login.h"
 #include "main_window.h"
 #include "screen.h"
+#include "ui/foundation/theme_manager.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -360,14 +362,53 @@ int main(int argc, char *argv[]) {
                  app.quitOnLastWindowClosed());
     flush_log();
 
-    QFile style_file(":/Style/source/style.qss");
-    if (style_file.open(QFile::ReadOnly)) {
-        spdlog::info("[main] style.qss loaded");
-        QString style_sheet = QLatin1String(style_file.readAll());
-        app.setStyleSheet(style_sheet);
-        style_file.close();
-    } else {
-        spdlog::warn("[main] style.qss not found");
+    // 主题：读取持久化选项（system / light / dark），先定主题再套全局样式，
+    // 这样所有窗口创建时就是正确配色，不会闪一下深浅切换。
+    {
+        auto &theme = ui::ThemeManager::instance();
+        const QString mode = Storage::instance()
+                                 .value(QStringLiteral("ui/theme"),
+                                        QStringLiteral("system"))
+                                 .toString();
+        const auto resolve_mode = [](const QString &m) {
+            if (m == QLatin1String("light")) {
+                return ui::Theme::Light;
+            }
+            if (m == QLatin1String("dark")) {
+                return ui::Theme::Dark;
+            }
+            // system：按系统配色决定
+            const auto scheme = QGuiApplication::styleHints()->colorScheme();
+            return scheme == Qt::ColorScheme::Light ? ui::Theme::Light
+                                                    : ui::Theme::Dark;
+        };
+        theme.set_theme(resolve_mode(mode));
+
+        if (theme.apply_global(QStringLiteral(":/Style/source/style.qss"))) {
+            spdlog::info("[main] style.qss applied (theme={})",
+                         ui::ThemeManager::name_of(theme.theme()).toStdString());
+        } else {
+            spdlog::warn("[main] style.qss not found");
+        }
+
+        // 跟随系统：系统切换深浅色时自动跟随（仅 mode=system 时生效）
+        QObject::connect(QGuiApplication::styleHints(),
+                         &QStyleHints::colorSchemeChanged, &app,
+                         [&theme](Qt::ColorScheme) {
+                             const QString current =
+                                 Storage::instance()
+                                     .value(QStringLiteral("ui/theme"),
+                                            QStringLiteral("system"))
+                                     .toString();
+                             if (current != QLatin1String("system")) {
+                                 return;
+                             }
+                             const auto scheme =
+                                 QGuiApplication::styleHints()->colorScheme();
+                             theme.set_theme(scheme == Qt::ColorScheme::Light
+                                                 ? ui::Theme::Light
+                                                 : ui::Theme::Dark);
+                         });
     }
     flush_log();
 

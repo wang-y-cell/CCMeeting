@@ -14,6 +14,7 @@
 #include "edit_profile_dialog.h"
 #include "login.h"
 #include "main_window.h"
+#include "ui/foundation/theme_manager.h"
 #include "meeting_recorder.h"
 #include "meeting_settings_popup.h"
 #include "meeting_widget.h"
@@ -28,6 +29,8 @@
 #include "stack_user_profile.h"
 
 #include <QApplication>
+#include <QRegularExpression>
+#include <QLabel>
 #include "configure.h"
 #include <QMovie>
 #include <QAudioDevice>
@@ -1157,9 +1160,127 @@ int run_resource_selftest() {
 }
 
 }  // namespace
+// ---------------------------------------------------------------------------
+// 主题自检：令牌替换、两套主题差异、QSS 无硬编码色
+// 用法：UiPreview.exe --theme-selftest
+// ---------------------------------------------------------------------------
+namespace {
+
+int run_theme_selftest() {
+    bool all_ok = true;
+    auto check = [&](const char *name, bool ok) {
+        all_ok = all_ok && ok;
+        std::printf("[theme] %-44s %s\n", name, ok ? "OK" : "FAIL");
+    };
+
+    auto &theme = ui::ThemeManager::instance();
+
+    // 1) 令牌能被替换，且两套主题值不同
+    theme.set_theme(ui::Theme::Dark);
+    const QString dark_primary = theme.resolve(QStringLiteral("@primary"));
+    const QString dark_canvas = theme.resolve(QStringLiteral("@canvas"));
+    const QColor dark_text = theme.color(QStringLiteral("text"));
+    theme.set_theme(ui::Theme::Light);
+    const QString light_primary = theme.resolve(QStringLiteral("@primary"));
+    const QString light_canvas = theme.resolve(QStringLiteral("@canvas"));
+    const QColor light_text = theme.color(QStringLiteral("text"));
+
+    check("dark/light primary 不同", dark_primary != light_primary);
+    check("dark/light canvas 不同", dark_canvas != light_canvas);
+    check("dark 文字为浅色", dark_text.lightnessF() > 0.6);
+    check("light 文字为深色", light_text.lightnessF() < 0.4);
+
+    // 2) QSS 里所有 @token 都能解析（防止拼错令牌名）
+    const QStringList qss_paths = {
+        QStringLiteral(":/Style/source/style.qss"),
+        QStringLiteral(":/Style/source/login.qss"),
+        QStringLiteral(":/Style/source/main_window.qss"),
+        QStringLiteral(":/Style/source/meeting_widget.qss"),
+        QStringLiteral(":/Style/source/meeting_settings_popup.qss"),
+        QStringLiteral(":/Style/source/stack_recordings.qss"),
+        QStringLiteral(":/Style/source/recording_playback_dialog.qss"),
+        QStringLiteral(":/Style/source/edit_profile_dialog.qss"),
+        QStringLiteral(":/Style/source/avatar_crop_dialog.qss"),
+    };
+
+    static const QRegularExpression token_re(QStringLiteral("@([A-Za-z][A-Za-z0-9]*)"));
+    static const QRegularExpression hex_re(QStringLiteral("#[0-9a-fA-F]{6}\\b"));
+
+    QStringList unknown_tokens;
+    int hex_literals = 0;
+    int token_count = 0;
+    for (const QString &path : qss_paths) {
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly)) {
+            std::printf("[theme] 缺失 QSS: %s\n", path.toUtf8().constData());
+            all_ok = false;
+            continue;
+        }
+        const QString text = QString::fromUtf8(file.readAll());
+        auto it = token_re.globalMatch(text);
+        while (it.hasNext()) {
+            const QString name = it.next().captured(1);
+            ++token_count;
+            // 解析不出来时 resolve 会原样返回 "@name"
+            if (theme.resolve(QStringLiteral("@") + name) ==
+                QStringLiteral("@") + name) {
+                unknown_tokens.append(name + QStringLiteral(" in ") + path);
+            }
+        }
+        auto hex_it = hex_re.globalMatch(text);
+        while (hex_it.hasNext()) {
+            hex_it.next();
+            ++hex_literals;
+        }
+    }
+    std::printf("[theme] @token 引用 %d 处，未知 %d 处\n", token_count,
+                static_cast<int>(unknown_tokens.size()));
+    for (const QString &bad : unknown_tokens) {
+        std::printf("        未知令牌: %s\n", bad.toUtf8().constData());
+    }
+    check("QSS 里所有 @token 均可解析", unknown_tokens.isEmpty());
+    check("QSS 无硬编码 hex 颜色", hex_literals == 0);
+    if (hex_literals != 0) {
+        std::printf("[theme] 仍有 %d 处 hex 字面量\n", hex_literals);
+    }
+
+    // 3) 切换主题会重刷已登记控件
+    {
+        QLabel probe;
+        probe.setObjectName(QStringLiteral("themeProbe"));
+        probe.show();
+        theme.apply_to(&probe, QStringLiteral(":/Style/source/main_window.qss"));
+        theme.set_theme(ui::Theme::Dark);
+        const QString dark_sheet = probe.styleSheet();
+        theme.set_theme(ui::Theme::Light);
+        const QString light_sheet = probe.styleSheet();
+        check("切换主题后控件样式被重刷", !dark_sheet.isEmpty() &&
+                                            dark_sheet != light_sheet);
+        std::printf("[theme] 已登记窗口数（含探针）= %d\n",
+                    theme.registered_count());
+        theme.set_theme(ui::Theme::Dark);
+    }
+
+    std::printf("[theme] 结论: %s\n", all_ok ? "PASS" : "FAIL");
+    return all_ok ? 0 : 1;
+}
+
+}  // namespace
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     QApplication::setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
+
+    // 支持 --theme light|dark，便于浅色主题截图回归
+    for (int i = 1; i + 1 < argc; ++i) {
+        if (QString::fromLocal8Bit(argv[i]) == QStringLiteral("--theme")) {
+            const QString mode = QString::fromLocal8Bit(argv[i + 1]).toLower();
+            if (mode == QLatin1String("light")) {
+                ui::ThemeManager::instance().set_theme(ui::Theme::Light);
+            } else if (mode == QLatin1String("dark")) {
+                ui::ThemeManager::instance().set_theme(ui::Theme::Dark);
+            }
+        }
+    }
 
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--storage-dump")) {
@@ -1201,6 +1322,10 @@ int main(int argc, char *argv[]) {
         return run_resource_selftest();
     }
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
+                        QStringLiteral("--theme-selftest")) {
+        return run_theme_selftest();
+    }
+    if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--avatar-alpha-selftest")) {
         return run_avatar_alpha_selftest();
     }
@@ -1225,8 +1350,22 @@ int main(int argc, char *argv[]) {
     QStandardPaths::setTestModeEnabled(true);
     seed_sample_history();
 
-    g_outDir = (argc > 1) ? QString::fromLocal8Bit(argv[1])
-                          : QStringLiteral("ui-preview");
+    // 输出目录：跳过 --theme <mode> 之类的选项，取第一个非选项参数
+    {
+        QString dir;
+        for (int i = 1; i < argc; ++i) {
+            const QString arg = QString::fromLocal8Bit(argv[i]);
+            if (arg == QLatin1String("--theme")) {
+                ++i;  // 跳过它的值
+                continue;
+            }
+            if (!arg.startsWith(QLatin1String("--"))) {
+                dir = arg;
+                break;
+            }
+        }
+        g_outDir = dir.isEmpty() ? QStringLiteral("ui-preview") : dir;
+    }
     QDir().mkpath(g_outDir);
 
     Screen::init();
@@ -1240,11 +1379,13 @@ int main(int argc, char *argv[]) {
 
     ensure_style_available();
 
-    // 加载全局样式（main.cpp 里是 app.setStyleSheet）
-    QFile global(QStringLiteral(":/Style/source/style.qss"));
-    if (global.open(QFile::ReadOnly)) {
-        app.setStyleSheet(QString::fromUtf8(global.readAll()));
-    }
+    // 加载全局样式（与 main.cpp 一致：走 ThemeManager，支持深/浅主题）
+    ui::ThemeManager::instance().apply_global(
+        QStringLiteral(":/Style/source/style.qss"));
+    std::printf("[preview] theme = %s\n",
+                ui::ThemeManager::name_of(ui::ThemeManager::instance().theme())
+                    .toUtf8()
+                    .constData());
 
     {
         login loginDialog;

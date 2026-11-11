@@ -8,7 +8,7 @@ QWidget#stack_recordings {
 }
 
 QLabel#pageTitle {
-    color: #E9EDF4;
+    color: @text;
     font-size: 20px;
     font-weight: 600;
     letter-spacing: 0.2px;
@@ -17,18 +17,18 @@ QLabel#pageTitle {
 }
 
 QLabel#pageDesc {
-    color: #98A2B3;
+    color: @textMuted;
     font-size: 13px;
     background: transparent;
     border: none;
 }
 
 QLabel#recEmpty {
-    color: #4E5666;
+    color: @textDisabled;
     font-size: 13px;
     padding: 40px 0;
     background: transparent;
-    border: 1px dashed #232A35;
+    border: 1px dashed @border;
     border-radius: 12px;
 }
 
@@ -44,18 +44,18 @@ QWidget#recScrollContent {
 /* ---------- 单条录制 ---------- */
 
 QFrame#recRow {
-    background-color: #161A21;
-    border: 1px solid #1E2530;
+    background-color: @surface;
+    border: 1px solid @borderSoft;
     border-radius: 12px;
 }
 
 QFrame#recRow:hover {
-    background-color: #1B2029;
-    border-color: #2E3846;
+    background-color: @surface2;
+    border-color: @borderStrong;
 }
 
 QLabel#recTitle {
-    color: #E9EDF4;
+    color: @text;
     font-size: 13px;
     font-weight: 600;
     background: transparent;
@@ -63,7 +63,7 @@ QLabel#recTitle {
 }
 
 QLabel#recMeta {
-    color: #6A7383;
+    color: @textFaint;
     font-size: 12px;
     background: transparent;
     border: none;
@@ -75,7 +75,7 @@ QPushButton#recPlayBtn {
     background-color: rgba(76, 141, 255, 0.16);
     border: 1px solid rgba(76, 141, 255, 0.32);
     border-radius: 8px;
-    color: #E9EDF4;
+    color: @text;
     font-size: 12px;
     font-weight: 500;
     min-height: 30px;
@@ -89,9 +89,9 @@ QPushButton#recPlayBtn:hover {
 
 QPushButton#recDeleteBtn {
     background-color: transparent;
-    border: 1px solid #2A3341;
+    border: 1px solid @overlay;
     border-radius: 8px;
-    color: #98A2B3;
+    color: @textMuted;
     font-size: 12px;
     min-height: 30px;
     padding: 0 14px;
@@ -100,23 +100,23 @@ QPushButton#recDeleteBtn {
 QPushButton#recDeleteBtn:hover {
     background-color: rgba(229, 72, 77, 0.14);
     border-color: rgba(229, 72, 77, 0.36);
-    color: #F05C60;
+    color: @dangerHover;
 }
 
 QPushButton#recGhostBtn {
     background-color: transparent;
-    border: 1px solid #2A3341;
+    border: 1px solid @overlay;
     border-radius: 8px;
-    color: #98A2B3;
+    color: @textMuted;
     font-size: 12px;
     min-height: 30px;
     padding: 0 14px;
 }
 
 QPushButton#recGhostBtn:hover {
-    background-color: #1E242E;
-    border-color: #3A4557;
-    color: #E9EDF4;
+    background-color: @surface3;
+    border-color: @hover;
+    color: @text;
 }
 
 /* ---------- 滚动条 ---------- */
@@ -128,13 +128,13 @@ QScrollBar:vertical {
 }
 
 QScrollBar::handle:vertical {
-    background: #2A3341;
+    background: @overlay;
     border-radius: 4px;
     min-height: 32px;
 }
 
 QScrollBar::handle:vertical:hover {
-    background: #3A4557;
+    background: @hover;
 }
 
 QScrollBar::add-line:vertical,
