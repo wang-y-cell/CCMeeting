@@ -1327,7 +1327,8 @@ int run_icon_selftest() {
     // 1) 图标资源都在
     for (const char *name : {"video", "users", "calendar", "record", "settings",
                              "user", "mic", "mic-off", "camera", "camera-off",
-                             "screen-share", "hangup", "send"}) {
+                             "screen-share", "hangup", "send", "chat", "info",
+                             "panel", "chevron-down"}) {
         check((QStringLiteral("存在图标 ") + QLatin1String(name)).toUtf8().constData(),
               ui::IconProvider::exists(QString::fromLatin1(name)), {});
     }
