@@ -74,15 +74,15 @@ inline constexpr Palette kDark{
 
 /** 浅色（新增） */
 inline constexpr Palette kLight{
-    // 背景（整体偏灰：画布最灰 → 卡片近白 → 侧栏灰白 → 视频底色更深一档）
-    "#E8EAEE", "#DFE3E9", "#F0F2F5", "#F7F8FA", "#EDF0F4", "#E7EAEF",
-    "#EBEEF2", "#E4E8ED", "#F7F8FA", "#DDE2E9",
+    // 背景（再灰一档：画布 #E2E5EA → 卡片 #F1F3F6 → 侧栏 #EAEDF1）
+    "#E2E5EA", "#D9DEE5", "#EAEDF1", "#F1F3F6", "#E8EBEF", "#E2E6EB",
+    "#E4E8ED", "#DDE1E7", "#F3F5F8", "#D6DBE2",
     // 交互
-    "#E4E8EE", "#DCE1E8", "#D5DBE3", "#D2D9E3",
+    "#DDE2E8", "#D5DBE3", "#CBD2DB", "#C9D1DC",
     // 描边
-    "#D3D9E1", "#DFE4EA", "#B6BFCC",
+    "#C9D0D9", "#D8DEE5", "#A9B3C1",
     // 文字
-    "#1E242E", "#49525F", "#6E7887", "#9AA3B1", "#7A8494", "#525C6B",
+    "#1E242E", "#434C59", "#67707E", "#94A0AF", "#707A88", "#4B5563",
     "#FFFFFF",
     // 强调
     "#2F6BFF", "#4C8DFF", "#245BDB",

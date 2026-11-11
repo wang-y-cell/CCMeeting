@@ -1,4 +1,6 @@
 #include "chatmessage.h"
+
+#include "ui/foundation/theme_manager.h"
 #include "avatar_image_loader.h"
 #include "configure/configure.h"
 #include <QDateTime>
@@ -216,19 +218,20 @@ void ChatMessage::paintEvent(QPaintEvent *event) {
         painter.drawPixmap(m_iconLeftRect, m_leftPixmap);
 
         //绘制气泡边框
-        QColor col_KuangB(234, 234, 234);
+        const auto &theme = ui::ThemeManager::instance();
+        QColor col_KuangB = theme.color(QStringLiteral("borderSoft"));
         painter.setBrush(QBrush(col_KuangB));
         painter.drawRoundedRect( //绘制圆角矩形
             m_kuangLeftRect.adjusted(-borderPad, -borderPad, borderPad,
                                      borderPad), radius, radius);
         //绘制气泡填充
-        QColor col_Kuang(255, 255, 255);
+        QColor col_Kuang = theme.color(QStringLiteral("surface"));
         painter.setBrush(QBrush(col_Kuang));
         painter.drawRoundedRect(m_kuangLeftRect, radius, radius);
 
         //绘制对方昵称
         QPen penIp;
-        penIp.setColor(Qt::darkGray);
+        penIp.setColor(theme.color(QStringLiteral("textFaint")));
         painter.setPen(penIp);
         QFont f = this->font();
         f.setPointSize(m_metrics.s(m_metrics.ipFontPointSize));
@@ -238,7 +241,7 @@ void ChatMessage::paintEvent(QPaintEvent *event) {
 
         //绘制正文
         QPen penText;
-        penText.setColor(QColor(51, 51, 51));
+        penText.setColor(theme.color(QStringLiteral("text")));
         painter.setPen(penText);
         QTextOption option(Qt::AlignLeft | Qt::AlignVCenter);
         option.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
@@ -249,13 +252,13 @@ void ChatMessage::paintEvent(QPaintEvent *event) {
         painter.drawPixmap(m_iconRightRect, m_rightPixmap);
 
         //绘制气泡边框
-        QColor col_Kuang(75, 164, 242);
+        QColor col_Kuang = ui::ThemeManager::instance().color(QStringLiteral("primary"));
         painter.setBrush(QBrush(col_Kuang));
         painter.drawRoundedRect(m_kuangRightRect, radius, radius);
 
         //绘制正文
         QPen penText;
-        penText.setColor(Qt::white);
+        penText.setColor(ui::ThemeManager::instance().color(QStringLiteral("onPrimary")));
         painter.setPen(penText);
         QTextOption option(Qt::AlignLeft | Qt::AlignVCenter);
         option.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
@@ -263,7 +266,7 @@ void ChatMessage::paintEvent(QPaintEvent *event) {
         painter.drawText(m_textRightRect, m_msg, option);
     } else if (m_userType == User_Type::User_Time) {
         QPen penText;
-        penText.setColor(QColor(153, 153, 153));
+        penText.setColor(ui::ThemeManager::instance().color(QStringLiteral("textDisabled")));
         painter.setPen(penText);
         QTextOption option(Qt::AlignCenter);
         option.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);

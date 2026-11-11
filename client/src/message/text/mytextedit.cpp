@@ -1,4 +1,6 @@
 #include "mytextedit.h"
+
+#include "ui/foundation/theme_manager.h"
 #include <QAbstractItemView>
 #include <QDebug>
 #include <QScrollBar>
@@ -99,7 +101,7 @@ void MyTextEdit::changeCompletion(const QString &text) {
     QTextCharFormat fmt = tc.charFormat();
     QTextCharFormat fmt_back = fmt;
     fmt.setForeground(QBrush(Qt::white));
-    fmt.setBackground(QBrush(QColor(0, 160, 233)));
+    fmt.setBackground(QBrush(ui::ThemeManager::instance().color(QStringLiteral("primary"))));
     tc.setCharFormat(fmt);
     tc.clearSelection();
     tc.setCharFormat(fmt_back);
