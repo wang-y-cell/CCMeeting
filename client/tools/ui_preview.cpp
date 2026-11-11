@@ -30,6 +30,8 @@
 #include "ui/pages/user_profile_page.h"
 
 #include <QApplication>
+#include <QImage>
+#include "ui/foundation/icon_provider.h"
 #include <QRegularExpression>
 #include <QLabel>
 #include "configure.h"
@@ -1271,6 +1273,88 @@ int run_theme_selftest() {
 }
 
 }  // namespace
+// ---------------------------------------------------------------------------
+// 图标自检：验证 SVG 渲染没有被裁切（看透明边距是否对称）
+// 用法：UiPreview.exe --icon-selftest
+// 背景：QSvgRenderer::render(painter) 不传矩形时会按 24×24 默认尺寸绘制，
+//       16×16 画布上会裁掉右侧/下方 —— 圆形的 record 图标左右/上下边距
+//       不对称即可检测到。
+// ---------------------------------------------------------------------------
+namespace {
+
+/// 计算非透明像素的包围盒；全透明返回无效矩形
+QRect alpha_bbox(const QPixmap &pixmap) {
+    const QImage image = pixmap.toImage().convertToFormat(QImage::Format_ARGB32);
+    int min_x = image.width();
+    int min_y = image.height();
+    int max_x = -1;
+    int max_y = -1;
+    for (int y = 0; y < image.height(); ++y) {
+        for (int x = 0; x < image.width(); ++x) {
+            if (qAlpha(image.pixel(x, y)) > 8) {
+                min_x = qMin(min_x, x);
+                min_y = qMin(min_y, y);
+                max_x = qMax(max_x, x);
+                max_y = qMax(max_y, y);
+            }
+        }
+    }
+    if (max_x < 0) {
+        return {};
+    }
+    return QRect(QPoint(min_x, min_y), QPoint(max_x, max_y));
+}
+
+int run_icon_selftest() {
+    bool all_ok = true;
+    auto check = [&](const char *name, bool ok, const QString &detail) {
+        all_ok = all_ok && ok;
+        std::printf("[icon] %-40s %s  %s\n", name, ok ? "OK" : "FAIL",
+                    detail.toUtf8().constData());
+    };
+
+    auto &icons = ui::IconProvider::instance();
+    const QColor white(QStringLiteral("#FFFFFF"));
+
+    // 1) 图标资源都在
+    for (const char *name : {"video", "users", "calendar", "record", "settings",
+                             "user", "mic", "mic-off", "camera", "camera-off",
+                             "screen-share", "hangup", "send"}) {
+        check((QStringLiteral("存在图标 ") + QLatin1String(name)).toUtf8().constData(),
+              ui::IconProvider::exists(QString::fromLatin1(name)), {});
+    }
+
+    // 2) 圆形图标（record）在 16/20/24 下透明边距必须左右、上下对称
+    for (int size : {16, 20, 24}) {
+        const QPixmap pm = icons.pixmap(QStringLiteral("record"), white, size);
+        const QRect bbox = alpha_bbox(pm);
+        const int w = pm.width();
+        const int h = pm.height();
+        const int left = bbox.x();
+        const int top = bbox.y();
+        const int right = w - 1 - bbox.x() - bbox.width() + 1;
+        const int bottom = h - 1 - bbox.y() - bbox.height() + 1;
+        const bool symmetric =
+            std::abs(left - right) <= 2 && std::abs(top - bottom) <= 2;
+        const bool filled = bbox.isValid() && bbox.width() >= size / 2;
+        check((QStringLiteral("record@%1px 未被裁切").arg(size)).toUtf8().constData(),
+              symmetric && filled,
+              QStringLiteral("bbox=%1,%2 %3x%4 边距 L%5 R%6 T%7 B%8")
+                  .arg(bbox.x())
+                  .arg(bbox.y())
+                  .arg(bbox.width())
+                  .arg(bbox.height())
+                  .arg(left)
+                  .arg(right)
+                  .arg(top)
+                  .arg(bottom));
+    }
+
+    std::printf("[icon] 结论: %s\n", all_ok ? "PASS" : "FAIL");
+    return all_ok ? 0 : 1;
+}
+
+}  // namespace
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     QApplication::setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
@@ -1329,6 +1413,10 @@ int main(int argc, char *argv[]) {
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--theme-selftest")) {
         return run_theme_selftest();
+    }
+    if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
+                        QStringLiteral("--icon-selftest")) {
+        return run_icon_selftest();
     }
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--avatar-alpha-selftest")) {
