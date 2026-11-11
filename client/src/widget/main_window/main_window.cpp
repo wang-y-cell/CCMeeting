@@ -254,6 +254,7 @@ void main_window::build_pages() {
     }
 
     // 3) 侧栏由注册表生成：新增页面只需 register_pages() 里加一行
+    ui.sideNav->setIconSize(QSize(16, 16));
     ui.sideNav->clear();
     const QList<ui::PageMeta> nav_metas = m_pages.nav();
     for (const ui::PageMeta &meta : nav_metas) {
@@ -261,7 +262,7 @@ void main_window::build_pages() {
         // 图标跟随主题色（单色 SVG + tint）
         if (!meta.icon.isEmpty()) {
             item->setIcon(ui::IconProvider::instance().icon(
-                meta.icon, ui::ThemeManager::instance().color(QStringLiteral("textMuted")), 18));
+                meta.icon, ui::ThemeManager::instance().color(QStringLiteral("textMuted")), 16));
         }
         item->setSizeHint(QSize(0, 48));
         item->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
@@ -284,7 +285,7 @@ void main_window::build_pages() {
                         continue;
                     }
                     if (auto *item = ui.sideNav->item(i)) {
-                        item->setIcon(ui::IconProvider::instance().icon(icon_name, color, 18));
+                        item->setIcon(ui::IconProvider::instance().icon(icon_name, color, 16));
                     }
                 }
             });

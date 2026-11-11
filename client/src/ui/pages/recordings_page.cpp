@@ -16,7 +16,7 @@
 ui::RecordingsPage::RecordingsPage(QWidget *parent) : Page(parent) {
     setObjectName(QStringLiteral("RecordingsPage"));
     build_ui();
-    loadWidgetStyleSheet(this, QStringLiteral(":/Style/source/RecordingsPage.qss"));
+    loadWidgetStyleSheet(this, QStringLiteral(":/Style/source/stack_recordings.qss"));
     refresh();
 }
 

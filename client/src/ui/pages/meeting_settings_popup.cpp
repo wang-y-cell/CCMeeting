@@ -35,7 +35,7 @@ ui::MeetingSettingsPopup::MeetingSettingsPopup(QWidget *parent)
     setObjectName(QStringLiteral("meetingSettingsPopup"));
     setAttribute(Qt::WA_StyledBackground, true);
     setFixedWidth(304);
-    loadWidgetStyleSheet(this, QStringLiteral(":/Style/source/MeetingSettingsPopup.qss"));
+    loadWidgetStyleSheet(this, QStringLiteral(":/Style/source/meeting_settings_popup.qss"));
 
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(16, 14, 16, 14);

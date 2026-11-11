@@ -103,7 +103,7 @@ Theme ThemeManager::parse(const QString &name, Theme fallback) {
 bool ThemeManager::load_raw(const QString &resourcePath, QString *out) const {
     QFile file(resourcePath);
     if (!file.open(QFile::ReadOnly)) {
-        spdlog::warn("[Theme] stylesheet not found: {}",
+        spdlog::error("[Theme] stylesheet not found（检查大小写/文件名）: {}",
                      resourcePath.toUtf8().constData());
         return false;
     }
