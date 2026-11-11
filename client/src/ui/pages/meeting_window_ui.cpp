@@ -256,9 +256,8 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
     listWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     listWidget->setSizeAdjustPolicy(QAbstractScrollArea::AdjustIgnored);
     listWidget->setAutoScrollMargin(0);
-    listWidget->viewport()->setAutoFillBackground(true);
-    listWidget->viewport()->setStyleSheet(
-        QStringLiteral("background-color: #141820; border: none; outline: none;"));
+    // 背景交给 QSS 的 @inset（配合主题切换自动重绘）；这里只关闭自动填充
+    listWidget->viewport()->setAutoFillBackground(false);
     setupStableVerticalScrollBar(listWidget);
     verticalLayout_6->addWidget(listWidget);
 

@@ -132,7 +132,7 @@ QTabBar::tab:hover:!selected {
 
 QListWidget,
 QListWidget#listWidget {
-    background-color: @canvasDeep;
+    background-color: @inset;
     border: none;
     border-radius: 8px;
     outline: none;

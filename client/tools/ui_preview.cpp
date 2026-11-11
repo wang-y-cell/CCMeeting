@@ -30,6 +30,7 @@
 #include "ui/pages/user_profile_page.h"
 
 #include <QApplication>
+#include "mytextedit.h"
 #include <QImage>
 #include "ui/foundation/icon_provider.h"
 #include <QRegularExpression>
@@ -1675,6 +1676,35 @@ int main(int argc, char *argv[]) {
     {
         ui::MeetingWindow meeting;
         capture(&meeting, QStringLiteral("05-meeting"), 1360, 860);
+
+        // 聊天页：验证消息区背景与气泡颜色都跟随主题（浅色主题下不应是黑底）
+        meeting.setAttribute(Qt::WA_DontShowOnScreen, true);
+        meeting.resize(1360, 860);
+        meeting.show();
+        QCoreApplication::processEvents();
+        if (auto *tabs = meeting.findChild<QTabWidget *>(QStringLiteral("tabWidget"));
+            tabs != nullptr) {
+            for (int i = 0; i < tabs->count(); ++i) {
+                if (tabs->tabText(i).contains(QStringLiteral("聊天"))) {
+                    tabs->setCurrentIndex(i);
+                    break;
+                }
+            }
+        }
+        if (auto *list = meeting.findChild<QListWidget *>(QStringLiteral("listWidget"));
+            list != nullptr) {
+            auto *input =
+                meeting.findChild<MyTextEdit *>(QStringLiteral("plainTextEdit"));
+            ChatController chat(list, input, &meeting);
+            chat.append_remote(QStringLiteral("你好，会议链接我发群里了"),
+                               QStringLiteral("王宇"), QString(), false);
+            chat.append_local(QStringLiteral("收到，我马上进来"),
+                              QStringLiteral("王宇"), QString());
+            chat.append_remote(QStringLiteral("摄像头和麦克风都已就绪"),
+                               QStringLiteral("王宇"), QString(), false);
+        }
+        QCoreApplication::processEvents();
+        capture(&meeting, QStringLiteral("05b-meeting-chat"), 1360, 860);
     }
 
 
