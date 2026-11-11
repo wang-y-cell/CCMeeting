@@ -1979,9 +1979,11 @@ int main(int argc, char *argv[]) {
                                                  (y * 255) / frame.height(), 160));
             }
         }
-        // 模拟 ImgDisplay 的行为：收到视频帧时切到 FitWidgetSmooth
-        tile->displayWidget()->setDrawMode(VideoGLWidget::DrawMode::FitWidgetSmooth);
+        // 注意顺序：setFrame 是 RGBA 内容（会被当作头像→缩回 72），
+        // 所以先送帧，再显式切到"视频模式"，等价于 I420 帧到达的效果
         tile->displayWidget()->setFrame(frame);
+        tile->set_video_mode(true);
+        tile->displayWidget()->setDrawMode(VideoGLWidget::DrawMode::FitWidgetSmooth);
         tile->updateProfile(QStringLiteral("李雷"), QString());
         capture(&panel, QStringLiteral("00b-member-tile-video"), 300, 330);
     }

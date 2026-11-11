@@ -109,6 +109,7 @@ void VideoGLWidget::setI420Frame(xrtc::XRTCVideoFrame frame) {
         m_clearRequested = false;
     }
     update();
+    emit content_kind_changed(true);
 }
 
 void VideoGLWidget::setFrame(QImage image) {
@@ -124,6 +125,7 @@ void VideoGLWidget::setFrame(QImage image) {
         m_clearRequested = false;
     }
     update(); // 更新头像图,图片绘制再paintGL中
+    emit content_kind_changed(false);
 }
 
 void VideoGLWidget::clearFrame() {

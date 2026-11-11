@@ -23,6 +23,13 @@
  */
 class VideoGLWidget : public QOpenGLWidget, protected QOpenGLExtraFunctions {
     Q_OBJECT
+signals:
+    /**
+     * @brief 内容类型变化：true=视频帧(I420)，false=头像/静态图(RGBA)或清空
+     * @details 成员卡片用它决定显示区域大小：头像 72×72 居中、视频铺满卡片
+     */
+    void content_kind_changed(bool video);
+
 public:
     /**
      * @brief 画面相对控件的缩放与适配策略（与 ImgDisplay::DrawMode 对应）
