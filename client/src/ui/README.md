@@ -96,11 +96,26 @@ QPushButton#joinMeeting_btn {
 
 ## 已完成 / 待迁
 
-| 页面 | 状态 |
+**页面（全部完成）**：`src/ui/pages/` 下 6 个页面全部继承 `ui::Page`，由
+`PageRegistry` 登记，外壳只通过 `on_show()` 驱动刷新。
+
+| 页面 | 类 | on_show 行为 |
+|---|---|---|
+| 创建会议 | `ui::CreateMeetingPage` | 刷新「最近创建的会议」 |
+| 加入会议 | `ui::JoinMeetingPage` | 刷新「最近加入的会议」 |
+| 会议记录 | `ui::MeetingHistoryPage` | `refresh()` |
+| 录制 | `ui::RecordingsPage` | `refresh()` |
+| 设置 | `ui::SettingsPage` | 设备枚举（延后 50ms）+ 预览同步 |
+| 个人资料 | `ui::UserProfilePage` | 无（数据在刷新时拉取） |
+
+**下一批（尚未迁移）**：
+
+| 对象 | 现状 |
 |---|---|
-| 加入会议 | ✅ `ui/pages/join_meeting_page.*`（注册表 + `on_show` 懒刷新） |
-| 创建会议 / 会议记录 / 录制 / 设置 / 个人资料 | ⏳ 仍走旧类，注册表已登记，只需替换工厂 |
-| 外壳（侧栏/栈） | ⏳ 侧栏仍由 `main_window_ui.cpp` 手工构建；已改为按注册表建内容栈 |
+| 外壳 | `main_window` + `main_window_ui.*`（侧栏仍是手写按钮，未按注册表生成） |
+| 登录窗口 | `login` + `login_ui.*` |
+| 会议页 | `meeting_widget` + `meeting_widget_ui.*`（+ 6 个 controller 待移到 `src/features/`） |
+| 对话框 | `edit_profile_dialog_ui.*`、`avatar_crop_dialog`、`recording_playback_dialog` |
 ## 主题（深色 / 浅色）
 
 三件事配合工作，缺一不可：

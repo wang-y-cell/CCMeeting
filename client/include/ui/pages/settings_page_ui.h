@@ -1,5 +1,5 @@
-#ifndef STACK_SETTING_UI_H
-#define STACK_SETTING_UI_H
+#ifndef SETTINGS_PAGE_UI_H
+#define SETTINGS_PAGE_UI_H
 
 class QCheckBox;
 class QRadioButton;
@@ -12,7 +12,9 @@ class QPushButton;
 class QStackedWidget;
 class QWidget;
 
-class Ui_stack_setting {
+namespace ui {
+
+class SettingsPageUi {
 public:
     void setupUi(QWidget *parent);
 
@@ -59,4 +61,6 @@ public:
     QPushButton *resetBtn = nullptr;
 };
 
-#endif // STACK_SETTING_UI_H
+}  // namespace ui
+
+#endif // SETTINGS_PAGE_UI_H

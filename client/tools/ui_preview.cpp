@@ -21,12 +21,12 @@
 #include "screen.h"
 #include "recording_library.h"
 #include "recording_playback_dialog.h"
-#include "stack_meeting_history.h"
-#include "stack_recordings.h"
-#include "stack_setting.h"
+#include "ui/pages/meeting_history_page.h"
+#include "ui/pages/recordings_page.h"
+#include "ui/pages/settings_page.h"
 #include "messagecodec.h"
 #include "videoglwidget.h"
-#include "stack_user_profile.h"
+#include "ui/pages/user_profile_page.h"
 
 #include <QApplication>
 #include <QRegularExpression>
@@ -766,7 +766,7 @@ int run_settings_latency_test() {
 
     // 2) 设置页构造 + 首次显示耗时
     timer.restart();
-    stack_setting setting;
+    ui::SettingsPage setting;
     const qint64 ctor_ms = timer.elapsed();
     timer.restart();
     setting.resize(900, 620);
@@ -774,7 +774,7 @@ int run_settings_latency_test() {
     QCoreApplication::processEvents();
     QCoreApplication::processEvents();
     const qint64 show_ms = timer.elapsed();
-    std::printf("[latency] stack_setting 构造=%lldms  首次 show+processEvents=%lldms\n",
+    std::printf("[latency] ui::SettingsPage 构造=%lldms  首次 show+processEvents=%lldms\n",
                 static_cast<long long>(ctor_ms),
                 static_cast<long long>(show_ms));
 
@@ -1431,7 +1431,7 @@ int main(int argc, char *argv[]) {
             capture(&window, QStringLiteral("12-meeting-history"), 1280, 800);
 
             // 空状态：清空后重绘，确认标题/说明之间不再出现大片空白
-            if (auto *history = window.findChild<stack_meeting_history *>()) {
+            if (auto *history = window.findChild<ui::MeetingHistoryPage *>()) {
                 MeetingHistory::clear();
                 history->refresh();
                 capture(&window, QStringLiteral("12b-history-empty"), 1280, 800);
@@ -1447,7 +1447,7 @@ int main(int argc, char *argv[]) {
         auto *stack = window.findChild<QStackedWidget *>(
             QStringLiteral("contentStack"));
         auto *profile =
-            window.findChild<stack_user_profile *>();
+            window.findChild<ui::UserProfilePage *>();
         if (stack != nullptr && profile != nullptr) {
             stack->setCurrentWidget(profile);
             profile->refreshFromSession();

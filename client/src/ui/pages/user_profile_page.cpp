@@ -1,4 +1,4 @@
-#include "stack_user_profile.h"
+#include "ui/pages/user_profile_page.h"
 
 #include "avatar_image_loader.h"
 #include "configure/user_session.h"
@@ -16,15 +16,15 @@ QString dashIfEmpty(const QString &value) {
 
 }  // namespace
 
-stack_user_profile::stack_user_profile(QWidget *parent) : QWidget(parent) {
+ui::UserProfilePage::UserProfilePage(QWidget *parent) : Page(parent) {
     ui.setupUi(this);
     connect(ui.editProfileBtn, &QPushButton::clicked, this,
-            &stack_user_profile::onEditProfileClicked);
+            &ui::UserProfilePage::onEditProfileClicked);
     connect(ui.backHomeBtn, &QPushButton::clicked, this,
-            &stack_user_profile::backHomeRequested);
+            &ui::UserProfilePage::backHomeRequested);
 }
 
-void stack_user_profile::refreshFromSession() {
+void ui::UserProfilePage::refreshFromSession() {
     const auto &session = UserSession::instance();
     ui.valueNickname->setText(dashIfEmpty(session.name()));
     ui.valueUsername->setText(dashIfEmpty(session.username()));
@@ -59,7 +59,7 @@ void stack_user_profile::refreshFromSession() {
         });
 }
 
-void stack_user_profile::onEditProfileClicked() {
+void ui::UserProfilePage::onEditProfileClicked() {
     if (!UserSession::instance().isLoggedIn()) {
         QMessageBox::warning(this, tr("修改资料"), tr("请先登录"));
         return;
@@ -68,11 +68,11 @@ void stack_user_profile::onEditProfileClicked() {
     auto *dialog = new EditProfileDialog(this);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     connect(dialog, &EditProfileDialog::profileSaved, this,
-            &stack_user_profile::onProfileSaved);
+            &ui::UserProfilePage::onProfileSaved);
     dialog->open();
 }
 
-void stack_user_profile::onProfileSaved() {
+void ui::UserProfilePage::onProfileSaved() {
     refreshFromSession();
     emit avatarUpdated();
 }

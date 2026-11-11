@@ -1,5 +1,5 @@
-#ifndef STACK_CREATE_MEET_UI_H
-#define STACK_CREATE_MEET_UI_H
+#ifndef CREATEMEETING_PAGE_UI_H
+#define CREATEMEETING_PAGE_UI_H
 
 class QLabel;
 class QLineEdit;
@@ -8,7 +8,9 @@ class QWidget;
 class RecentMeetingList;
 
 /** 创建会议页纯 UI，不含业务逻辑 */
-class Ui_stack_create_meet {
+namespace ui {
+
+class CreateMeetingPageUi {
 public:
     QLabel *pageTitle = nullptr;
     QLabel *pageDesc = nullptr;
@@ -22,4 +24,6 @@ public:
     void setupUi(QWidget *parent);
 };
 
-#endif // STACK_CREATE_MEET_UI_H
+}  // namespace ui
+
+#endif // CREATEMEETING_PAGE_UI_H

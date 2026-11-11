@@ -1,5 +1,5 @@
-#ifndef STACK_USER_PROFILE_UI_H
-#define STACK_USER_PROFILE_UI_H
+#ifndef USERPROFILE_PAGE_UI_H
+#define USERPROFILE_PAGE_UI_H
 
 class QLabel;
 class QPushButton;
@@ -7,7 +7,9 @@ class QScrollArea;
 class QWidget;
 
 /** 个人资料页纯 UI，不含业务逻辑 */
-class Ui_stack_user_profile {
+namespace ui {
+
+class UserProfilePageUi {
 public:
     QLabel *pageTitle = nullptr;
     QLabel *pageDesc = nullptr;
@@ -29,4 +31,6 @@ public:
     void setupUi(QWidget *parent);
 };
 
-#endif // STACK_USER_PROFILE_UI_H
+}  // namespace ui
+
+#endif // USERPROFILE_PAGE_UI_H

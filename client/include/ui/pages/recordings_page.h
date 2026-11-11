@@ -1,5 +1,7 @@
-#ifndef STACK_RECORDINGS_H
-#define STACK_RECORDINGS_H
+#ifndef RECORDINGS_PAGE_H
+#define RECORDINGS_PAGE_H
+
+#include "ui/pages/page.h"
 
 #include "recording_library.h"
 
@@ -15,10 +17,20 @@ class QScrollArea;
  *
  * 每次显示时重新扫描录制目录（RecordingLibrary::scan）。
  */
-class stack_recordings : public QWidget {
+namespace ui {
+
+class RecordingsPage : public Page {
     Q_OBJECT
+
 public:
-    explicit stack_recordings(QWidget *parent = nullptr);
+    QString page_id() const override { return QStringLiteral("recordings"); }
+    QString title() const override { return tr("录制"); }
+    QString icon_name() const override { return QStringLiteral("record"); }
+    void on_show() override;
+
+    int nav_order() const override { return 30; }
+public:
+    explicit RecordingsPage(QWidget *parent = nullptr);
 
     /** @brief 重新扫描并刷新列表 */
     void refresh();
@@ -43,4 +55,6 @@ private:
     QVector<RecordingEntry> _entries;
 };
 
-#endif // STACK_RECORDINGS_H
+}  // namespace ui
+
+#endif // RECORDINGS_PAGE_H

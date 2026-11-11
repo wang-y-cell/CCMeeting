@@ -4,12 +4,12 @@
 #include "frameless_window.h"
 #include "main_window_ui.h"
 #include "meeting_widget.h"
-#include "stack_create_meet.h"
-#include "stack_user_profile.h"
+#include "ui/pages/create_meeting_page.h"
+#include "ui/pages/user_profile_page.h"
 #include "recording_playback_dialog.h"
-#include "stack_meeting_history.h"
-#include "stack_recordings.h"
-#include "stack_setting.h"
+#include "ui/pages/meeting_history_page.h"
+#include "ui/pages/recordings_page.h"
+#include "ui/pages/settings_page.h"
 
 #include "ui/pages/join_meeting_page.h"
 #include "ui/shell/page_registry.h"
@@ -70,12 +70,12 @@ private:
     /** 侧栏顺序对应的页面（与 m_pages.nav() 同序） */
     QVector<QWidget *> m_nav_pages;
 
-    stack_create_meet *create_meeting_widget = nullptr;
+    ui::CreateMeetingPage *create_meeting_widget = nullptr;
     ui::JoinMeetingPage *join_meeting_widget = nullptr;
-    stack_user_profile *user_profile_widget = nullptr;
-    stack_meeting_history *history_widget = nullptr;
-    stack_recordings *recordings_widget = nullptr;
-    stack_setting *setting_widget = nullptr;
+    ui::UserProfilePage *user_profile_widget = nullptr;
+    ui::MeetingHistoryPage *history_widget = nullptr;
+    ui::RecordingsPage *recordings_widget = nullptr;
+    ui::SettingsPage *setting_widget = nullptr;
 };
 
 #endif // MAIN_WINDOW_H
