@@ -43,13 +43,16 @@ PartnerTile::PartnerTile(Partner *partner, QWidget *parent)
                                     .arg(ui::ThemeManager::instance().color(QStringLiteral("icon")).name()));
     m_nameLabel->setText(m_partner->fallbackLabel());
 
-    layout->addWidget(m_displayWidget, 1);
+    layout->addWidget(m_displayWidget, 1, Qt::AlignCenter);
     layout->addWidget(m_nameLabel, 0);
 
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    // 头像尺寸与主窗口侧栏头像保持一致（72），不再随面板宽度放大
-    m_side = kAvatarSide;
-    setFixedHeight(kAvatarSide + 18);
+    // 卡片本身与会议背景区分（QSS: QWidget#partnerTile）
+    setObjectName(QStringLiteral("partnerTile"));
+    setAttribute(Qt::WA_StyledBackground, true);
+    // 卡片是"正方形"小窗（宽度跟随面板），头像固定 72 居中
+    m_side = parent ? qMax(parent->width(), 40) : 40;
+    setFixedHeight(m_side + 18);
     updateLabelGeometry();
     resetBorder();
     setToolTip(m_partner->fallbackLabel());
@@ -98,7 +101,12 @@ void PartnerTile::applyBorder(bool selected) {
 
 void PartnerTile::resizeEvent(QResizeEvent *event) {
     QWidget::resizeEvent(event);
-    // 高度固定为 头像 + 名字，宽度变化不再影响头像大小
+    // 宽度跟随面板，卡片保持"宽=高"的方形；头像内部固定 72 不变
+    const int newW = event->size().width();
+    if (newW > 10 && newW != m_side) {
+        m_side = newW;
+        setFixedHeight(m_side + 18);
+    }
     updateLabelGeometry();
 }
 
