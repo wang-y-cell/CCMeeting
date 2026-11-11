@@ -20,31 +20,36 @@ PartnerTile::PartnerTile(Partner *partner, QWidget *parent)
     Q_ASSERT(m_partner);
 
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(2, 2, 2, 2);
-    layout->setSpacing(2);
+    layout->setContentsMargins(2, 8, 2, 8);
+    layout->setSpacing(6);
 
     // 点击成员可选中：只用手型光标提示，不画描边
     setCursor(Qt::PointingHandCursor);
 
     m_displayWidget = new VideoGLWidget(this);
-    m_displayWidget->setFixedHeight(kAvatarSide);
+    // 头像固定 72x72 的方形区域（之前只固定高度 + FitWidgetSmooth，
+    // 会被面板宽度拉成椭圆——这就是"头像被压缩"的原因）
+    m_displayWidget->setFixedSize(kAvatarSide, kAvatarSide);
     m_displayWidget->setDrawMode(VideoGLWidget::DrawMode::FixedSize);
     m_displayWidget->setFixedOutputSize(QSize(kAvatarSide, kAvatarSide));
     // 头像透明角落要和成员面板底色一致，否则会出现异色方块
-    m_displayWidget->setClearColor(ui::ThemeManager::instance().color(QStringLiteral("sidebar")));
-    m_displayWidget->setDrawMode(VideoGLWidget::DrawMode::FitWidgetSmooth);
+    m_displayWidget->setClearColor(ui::ThemeManager::instance().color(QStringLiteral("surface")));
     m_displayWidget->setAlignment(Qt::AlignCenter);
-    m_displayWidget->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
+    m_displayWidget->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 
     m_nameLabel = new QLabel(this);
     m_nameLabel->setAlignment(Qt::AlignCenter);
-    m_nameLabel->setWordWrap(true);
+    m_nameLabel->setWordWrap(false);
+    m_nameLabel->setFixedHeight(18);
     m_nameLabel->setStyleSheet(QStringLiteral("color:%1;font-size:11px;")
                                     .arg(ui::ThemeManager::instance().color(QStringLiteral("icon")).name()));
     m_nameLabel->setText(m_partner->fallbackLabel());
 
-    layout->addWidget(m_displayWidget, 1, Qt::AlignCenter);
+    // 方形卡片里把"头像 + 名字"整组垂直居中，名字始终可见（不需要点击）
+    layout->addStretch(1);
+    layout->addWidget(m_displayWidget, 0, Qt::AlignHCenter);
     layout->addWidget(m_nameLabel, 0);
+    layout->addStretch(1);
 
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     // 卡片本身与会议背景区分（QSS: QWidget#partnerTile）
@@ -112,7 +117,7 @@ void PartnerTile::resizeEvent(QResizeEvent *event) {
 
 void PartnerTile::updateLabelGeometry() {
     if (m_displayWidget) {
-        m_displayWidget->setFixedHeight(kAvatarSide);
+        m_displayWidget->setFixedSize(kAvatarSide, kAvatarSide);
     }
     if (m_nameLabel) {
         m_nameLabel->setAlignment(Qt::AlignCenter);
