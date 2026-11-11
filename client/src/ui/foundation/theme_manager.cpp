@@ -33,6 +33,7 @@ QHash<QString, QString> build_tokens(const tokens::Palette &p) {
         {QStringLiteral("inset"), s(p.inset)},
         {QStringLiteral("surfaceDeep"), s(p.surfaceDeep)},
         {QStringLiteral("popup"), s(p.popup)},
+        {QStringLiteral("videoBackdrop"), s(p.videoBackdrop)},
         // 交互
         {QStringLiteral("raised"), s(p.raised)},
         {QStringLiteral("raisedAlt"), s(p.raisedAlt)},

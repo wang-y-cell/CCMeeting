@@ -101,9 +101,11 @@ void capture(QWidget *widget, const QString &name, int width, int height) {
     QApplication::processEvents();
     QApplication::processEvents();
 
-    // 透明背景的页面单独截图会显示为白色，这里先铺窗口底色再渲染
+    // 透明背景的页面单独截图会显示为白色，这里先铺"当前主题的画布色"再渲染
+    // （QOpenGLWidget 无法被 render() 渲染，视频区在截图里仍会是纯底色，
+    //   真实画面用 --video-backdrop-selftest 验证）
     QPixmap shot(widget->size());
-    shot.fill(QColor(QStringLiteral("#0B0D11")));
+    shot.fill(ui::ThemeManager::instance().color(QStringLiteral("canvas")));
     widget->render(&shot);
     const QString path = g_outDir + QLatin1Char('/') + name + QStringLiteral(".png");
     if (shot.save(path)) {
@@ -1355,6 +1357,60 @@ int run_icon_selftest() {
 }
 
 }  // namespace
+// ---------------------------------------------------------------------------
+// 视频底色自检：主画面未出画面时，GL 清屏色必须跟随主题（不再是死黑）
+// 用法：UiPreview.exe --video-backdrop-selftest
+// 说明：QWidget::render() 无法渲染 QOpenGLWidget，截图里永远是黑的，
+//       所以必须用 grabFramebuffer() 读回真实 GL 内容来验证。
+// ---------------------------------------------------------------------------
+namespace {
+
+int run_video_backdrop_selftest() {
+    bool all_ok = true;
+    auto &theme = ui::ThemeManager::instance();
+
+    const auto probe = [&](ui::Theme theme_kind, const QString &label) {
+        theme.set_theme(theme_kind);
+        const QColor expected = theme.color(QStringLiteral("videoBackdrop"));
+
+        VideoGLWidget widget;
+        widget.setAttribute(Qt::WA_DontShowOnScreen, true);
+        widget.resize(120, 80);
+        widget.show();
+        QCoreApplication::processEvents();
+        widget.setClearColor(expected);
+        QCoreApplication::processEvents();
+        widget.repaint();
+        QCoreApplication::processEvents();
+
+        const QImage image = widget.grabFramebuffer();
+        if (image.isNull()) {
+            std::printf("[video-bg] %-6s grabFramebuffer 为空 -> 无法验证\n",
+                        label.toUtf8().constData());
+            all_ok = false;
+            return;
+        }
+        const QColor actual = image.pixelColor(image.width() / 2, image.height() / 2);
+        const int delta = std::abs(actual.red() - expected.red()) +
+                          std::abs(actual.green() - expected.green()) +
+                          std::abs(actual.blue() - expected.blue());
+        const bool ok = delta <= 12;  // GL 清屏可能有极小的舍入
+        all_ok = all_ok && ok;
+        std::printf("[video-bg] %-6s 期望 rgb(%3d,%3d,%3d) 实际 rgb(%3d,%3d,%3d) %s\n",
+                    label.toUtf8().constData(), expected.red(), expected.green(),
+                    expected.blue(), actual.red(), actual.green(), actual.blue(),
+                    ok ? "OK" : "FAIL");
+    };
+
+    probe(ui::Theme::Dark, QStringLiteral("dark"));
+    probe(ui::Theme::Light, QStringLiteral("light"));
+    theme.set_theme(ui::Theme::Dark);
+
+    std::printf("[video-bg] 结论: %s\n", all_ok ? "PASS" : "FAIL");
+    return all_ok ? 0 : 1;
+}
+
+}  // namespace
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     QApplication::setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
@@ -1417,6 +1473,10 @@ int main(int argc, char *argv[]) {
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--icon-selftest")) {
         return run_icon_selftest();
+    }
+    if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
+                        QStringLiteral("--video-backdrop-selftest")) {
+        return run_video_backdrop_selftest();
     }
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--avatar-alpha-selftest")) {

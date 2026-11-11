@@ -62,7 +62,7 @@ QLabel#topMeetStatus[joined="true"] {
 /* ---------- 主画面 ---------- */
 
 QGroupBox#groupBox_2 {
-    background-color: @canvasDeep;
+    background-color: @videoBackdrop;
     border: 1px solid @borderSoft;
     border-radius: 12px;
     margin-top: 0;
@@ -76,7 +76,7 @@ QGroupBox#groupBox_2::title {
 }
 
 VideoGLWidget#mainshow_label {
-    background-color: @canvasDeep;
+    background-color: @videoBackdrop;
     border: none;
     border-radius: 12px;
 }

@@ -25,6 +25,7 @@ struct Palette {
     const char *inset;         ///< 输入框/凹陷区
     const char *surfaceDeep;   ///< 更深的凹陷区
     const char *popup;         ///< 弹层
+    const char *videoBackdrop; ///< 视频画面底色（未出画面时的背景）
     // ---- 交互层 ----
     const char *raised;        ///< 悬浮/工具按钮底
     const char *raisedAlt;     ///< 次级按钮底
@@ -57,7 +58,7 @@ struct Palette {
 inline constexpr Palette kDark{
     // 背景
     "#0B0D11", "#07080B", "#101319", "#161A21", "#1B2029", "#1E242E",
-    "#14181F", "#171C24", "#12161D",
+    "#14181F", "#171C24", "#12161D", "#07080B",
     // 交互
     "#212836", "#252D3A", "#2A3341", "#3A4557",
     // 描边
@@ -73,15 +74,15 @@ inline constexpr Palette kDark{
 
 /** 浅色（新增） */
 inline constexpr Palette kLight{
-    // 背景
-    "#F6F7F9", "#ECEEF2", "#FFFFFF", "#FFFFFF", "#F1F3F6", "#E9EDF2",
-    "#F3F5F8", "#EEF1F5", "#FFFFFF",
+    // 背景（整体偏灰：画布最灰 → 卡片近白 → 侧栏灰白 → 视频底色更深一档）
+    "#E8EAEE", "#DFE3E9", "#F0F2F5", "#F7F8FA", "#EDF0F4", "#E7EAEF",
+    "#EBEEF2", "#E4E8ED", "#F7F8FA", "#DDE2E9",
     // 交互
-    "#E6EBF2", "#DDE3EC", "#D6DCE6", "#CBD3DF",
+    "#E4E8EE", "#DCE1E8", "#D5DBE3", "#D2D9E3",
     // 描边
-    "#DCE1E8", "#E7EBF1", "#B9C2CF",
+    "#D3D9E1", "#DFE4EA", "#B6BFCC",
     // 文字
-    "#1A1F27", "#4A5565", "#8A94A3", "#A7B0BE", "#6E7A8A", "#5A6473",
+    "#1E242E", "#49525F", "#6E7887", "#9AA3B1", "#7A8494", "#525C6B",
     "#FFFFFF",
     // 强调
     "#2F6BFF", "#4C8DFF", "#245BDB",

@@ -1,4 +1,6 @@
 #include "ui/pages/meeting_window.h"
+
+#include "ui/foundation/theme_manager.h"
 #include "features/meeting/meeting_recorder.h"
 #include "ui/pages/meeting_settings_popup.h"
 #include "recording_library.h"
@@ -87,6 +89,7 @@ ui::MeetingWindow::MeetingWindow(QWidget *parent)
             [this](qint64 userId) {
                 main_user_id_ = userId;
                 ui.groupBox_2->setTitle(QString());
+
                 ui.topMainTitle->setText(_participants->display_name(userId));
             });
     connect(_participants, &ParticipantsController::mention_added, this,
@@ -345,6 +348,19 @@ void ui::MeetingWindow::init_settings_popup() {
 }
 void ui::MeetingWindow::init_ui() {
     ui.setupUi(this);
+
+    // 视频画面底色跟随主题（未出画面时不再是死黑），切换主题时同步刷新
+    {
+        const auto apply_backdrop = [this]() {
+            ui.mainshow_label->setClearColor(
+                ui::ThemeManager::instance().color(QStringLiteral("videoBackdrop")));
+            ui.mainshow_label->update();
+        };
+        apply_backdrop();
+        connect(&ui::ThemeManager::instance(), &ui::ThemeManager::theme_changed,
+                this, apply_backdrop);
+    }
+
     setAttribute(Qt::WA_StyledBackground, true);
 
     // 聊天渲染 / @补全 / 提示音交给 ChatController
@@ -458,6 +474,7 @@ void ui::MeetingWindow::reset_meeting_ui() {
     ui.leaveMeetingBtn->setEnabled(false);
     ui.sendmsg->setDisabled(true);
     ui.groupBox_2->setTitle(QString());
+
     ui.topMainTitle->setText(QStringLiteral("主屏幕"));
     _roomNo = 0;
     _serverAddr.clear();
@@ -852,6 +869,7 @@ void ui::MeetingWindow::send_local_user_profile() {
 
 void ui::MeetingWindow::update_main_screen_title(qint64 userId) {
     ui.groupBox_2->setTitle(QString());
+
     ui.topMainTitle->setText(_participants->display_name(userId));
 }
 
