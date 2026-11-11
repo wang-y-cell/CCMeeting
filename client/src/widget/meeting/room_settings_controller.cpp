@@ -1,7 +1,7 @@
 #include "room_settings_controller.h"
 
 #include "meeting_recorder.h"
-#include "meeting_settings_popup.h"
+#include "ui/pages/meeting_settings_popup.h"
 #include "room_settings_flags.h"
 
 #include <QMessageBox>
@@ -19,18 +19,18 @@ void RoomSettingsController::init_popup(QPushButton *anchor_button) {
     if (_popup) {
         return;
     }
-    _popup = new MeetingSettingsPopup(_owner);
+    _popup = new ui::MeetingSettingsPopup(_owner);
 
-    connect(_popup, &MeetingSettingsPopup::settingsChanged, this,
+    connect(_popup, &ui::MeetingSettingsPopup::settingsChanged, this,
             [this](std::uint32_t flags) {
                 _flags = flags;
                 emit settings_edited(flags);
             });
-    connect(_popup, &MeetingSettingsPopup::copyRoomNoRequested, this,
+    connect(_popup, &ui::MeetingSettingsPopup::copyRoomNoRequested, this,
             &RoomSettingsController::copy_room_no_requested);
-    connect(_popup, &MeetingSettingsPopup::resendProfileRequested, this,
+    connect(_popup, &ui::MeetingSettingsPopup::resendProfileRequested, this,
             &RoomSettingsController::resend_profile_requested);
-    connect(_popup, &MeetingSettingsPopup::recordToggled, this,
+    connect(_popup, &ui::MeetingSettingsPopup::recordToggled, this,
             [this](bool start) {
                 if (start) {
                     start_recording();

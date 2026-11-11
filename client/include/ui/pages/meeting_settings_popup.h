@@ -17,6 +17,8 @@ class QFrame;
  *
  * 面板内的「房间权限」只有房主可改；非房主只看只读状态。
  */
+namespace ui {
+
 class MeetingSettingsPopup : public QWidget {
     Q_OBJECT
 public:
@@ -63,5 +65,7 @@ private:
     bool _canRecord = true;
     bool _recording = false;
 };
+
+}  // namespace ui
 
 #endif // MEETING_SETTINGS_POPUP_H

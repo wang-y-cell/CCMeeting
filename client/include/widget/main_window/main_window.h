@@ -3,7 +3,7 @@
 
 #include "frameless_window.h"
 #include "ui/shell/main_window_ui.h"
-#include "meeting_widget.h"
+#include "ui/pages/meeting_window.h"
 #include "ui/pages/create_meeting_page.h"
 #include "ui/pages/user_profile_page.h"
 #include "ui/dialogs/recording_playback_dialog.h"
@@ -54,8 +54,8 @@ protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
-    void destroyMeetingWidget();
-    MeetingWidget *ensureMeetingWidget();
+    void destroyMeetingWindow();
+    ui::MeetingWindow *ensureMeetingWindow();
 
     /** @brief 注册所有页面（新增页面只改这里一行） */
     void register_pages();
@@ -63,7 +63,7 @@ private:
     void build_pages();
 
     Ui_main_window ui;
-    MeetingWidget *widget = nullptr;
+    ui::MeetingWindow *widget = nullptr;
 
     /** 页面注册表：外壳只依赖它，不再硬编码具体页面类 */
     ui::PageRegistry m_pages;

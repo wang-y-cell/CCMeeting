@@ -12,7 +12,9 @@ class QVBoxLayout;
 class QWidget;
 
 /** 会议窗口纯 UI，不含业务逻辑 */
-class Ui_meeting_widget {
+namespace ui {
+
+class MeetingWindowUi {
 public:
     QVBoxLayout *verticalLayout = nullptr;
     QWidget *topStatusBar = nullptr;
@@ -53,5 +55,7 @@ public:
 
     void setupUi(QWidget *parent);
 };
+
+}  // namespace ui
 
 #endif // MEETING_WIDGET_UI_H
