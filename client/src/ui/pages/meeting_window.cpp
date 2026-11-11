@@ -29,6 +29,7 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QMenu>
+#include <QPointer>
 #include <QCursor>
 #include <QMessageBox>
 #include <QPainter>
@@ -97,31 +98,63 @@ void apply_toggle_icon(QToolButton *button, const QString &icon_on,
 namespace {
 
 /**
+ * @brief 设备菜单打开期间，吞掉落在锚点按钮上的鼠标事件
+ *
+ * 目的：菜单开着时再点小箭头，既不关闭菜单、也不重复弹出（没有闪烁），
+ * 只有点击空白处（或别的控件）才关闭菜单。
+ */
+class AnchorClickGuard : public QObject {
+public:
+    AnchorClickGuard(QWidget *anchor, QObject *parent)
+        : QObject(parent), m_anchor(anchor) {}
+
+    bool eventFilter(QObject *watched, QEvent *event) override {
+        Q_UNUSED(watched);
+        if (event->type() != QEvent::MouseButtonPress &&
+            event->type() != QEvent::MouseButtonRelease) {
+            return false;
+        }
+        if (m_anchor.isNull()) {
+            return false;
+        }
+        auto *mouse = static_cast<QMouseEvent *>(event);
+        const QRect anchor_rect(m_anchor->mapToGlobal(QPoint(0, 0)), m_anchor->size());
+        if (anchor_rect.contains(mouse->globalPosition().toPoint())) {
+            return true;   // 吞掉：菜单保持打开，按钮也不响应
+        }
+        return false;
+    }
+
+private:
+    QPointer<QWidget> m_anchor;
+};
+
+/**
  * @brief 弹出设备选择菜单
  *
  * 两个细节：
  * 1) 箭头方向：默认朝上（表示"点开"），菜单打开期间朝下；
- * 2) 再次点击按钮：QMenu 的鼠标抓取会先关掉菜单，此时判断鼠标是否
- *    仍停在按钮上，是则重新弹出 —— 表现为"再点一次是重新打开，而不是关掉"。
+ * 2) 菜单打开后再点小箭头：不关闭、也不闪烁重开——直接在应用级
+ *    过滤掉落在按钮上的鼠标事件，只有点击空白处才关闭。
  */
-void popup_device_menu(QMenu *menu, QToolButton *button, QWidget *owner,
-                       const std::function<void()> &reopen) {
+void popup_device_menu(QMenu *menu, QToolButton *button, QWidget *owner) {
     if (menu == nullptr || button == nullptr) {
         return;
     }
-    auto &icons = ui::IconProvider::instance();
     auto &theme = ui::ThemeManager::instance();
     const QColor color = theme.color(QStringLiteral("textMuted"));
+    ui::IconProvider &icons = ui::IconProvider::instance();
 
     button->setIcon(icons.icon(QStringLiteral("chevron-down"), color, 12));
-    QObject::connect(menu, &QMenu::aboutToHide, owner, [button, reopen, color]() {
+
+    auto *guard = new AnchorClickGuard(button, menu);
+    qApp->installEventFilter(guard);
+
+    QObject::connect(menu, &QMenu::aboutToHide, owner, [button, guard, color]() {
         button->setIcon(ui::IconProvider::instance().icon(
             QStringLiteral("chevron-up"), color, 12));
-        const QRect button_rect(button->mapToGlobal(QPoint(0, 0)), button->size());
-        if (button_rect.contains(QCursor::pos())) {
-            // 菜单已关掉，稍后再弹一次，避免在 aboutToHide 里重入
-            QTimer::singleShot(0, button, [reopen]() { reopen(); });
-        }
+        qApp->removeEventFilter(guard);
+        guard->deleteLater();
     });
     menu->popup(menu->pos().isNull() ? QCursor::pos() : menu->pos());
 }
@@ -1170,8 +1203,7 @@ void ui::MeetingWindow::show_audio_device_menu() {
     const QPoint pos = ui.audioDeviceBtn->mapToGlobal(
         QPoint(0, -menu->sizeHint().height()));
     menu->move(pos);
-    popup_device_menu(menu, ui.audioDeviceBtn, this,
-                      [this]() { show_audio_device_menu(); });
+    popup_device_menu(menu, ui.audioDeviceBtn, this);
 }
 
 void ui::MeetingWindow::show_video_device_menu() {
@@ -1210,8 +1242,7 @@ void ui::MeetingWindow::show_video_device_menu() {
     const QPoint pos = ui.videoDeviceBtn->mapToGlobal(
         QPoint(0, -menu->sizeHint().height()));
     menu->move(pos);
-    popup_device_menu(menu, ui.videoDeviceBtn, this,
-                      [this]() { show_video_device_menu(); });
+    popup_device_menu(menu, ui.videoDeviceBtn, this);
 }
 
 void ui::MeetingWindow::on_create_meeting_result(int roomno) {

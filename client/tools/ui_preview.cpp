@@ -33,6 +33,8 @@
 
 #include <QApplication>
 #include <QMenu>
+#include <QMouseEvent>
+#include <QToolButton>
 #include "frameless_window.h"
 #include <functional>
 #include "mytextedit.h"
@@ -1742,6 +1744,69 @@ int run_title_button_selftest() {
 }
 
 }  // namespace
+// ---------------------------------------------------------------------------
+// 设备菜单交互自检：菜单打开后再点小箭头，不应关闭（也不应闪烁重开）
+// 用法：UiPreview.exe --device-menu-selftest
+// ---------------------------------------------------------------------------
+namespace {
+
+int run_device_menu_selftest() {
+    QStandardPaths::setTestModeEnabled(true);
+    bool all_ok = true;
+    auto check = [&](const char *name, bool ok, const QString &detail) {
+        all_ok = all_ok && ok;
+        std::printf("[device-menu] %-30s %s  %s\n", name, ok ? "OK" : "FAIL",
+                    detail.toUtf8().constData());
+    };
+
+    ui::MeetingWindow window;
+    window.setAttribute(Qt::WA_DontShowOnScreen, true);
+    window.resize(1200, 800);
+    window.show();
+    QCoreApplication::processEvents();
+    QThread::msleep(60);
+    QCoreApplication::processEvents();
+
+    const bool opened = QMetaObject::invokeMethod(
+        &window, "show_audio_device_menu", Qt::DirectConnection);
+    QCoreApplication::processEvents();
+    QThread::msleep(60);
+    QCoreApplication::processEvents();
+
+    QWidget *popup = QApplication::activePopupWidget();
+    check("设备菜单已弹出", opened && popup != nullptr && popup->isVisible(),
+          QStringLiteral("popup=%1").arg(popup != nullptr));
+
+    auto *button = window.findChild<QToolButton *>(QStringLiteral("audioDeviceBtn"));
+    if (button != nullptr && popup != nullptr) {
+        const QPoint center = button->mapToGlobal(button->rect().center());
+        QMouseEvent press(QEvent::MouseButtonPress, QPointF(center),
+                          QPointF(center), Qt::LeftButton, Qt::LeftButton,
+                          Qt::NoModifier);
+        QMouseEvent release(QEvent::MouseButtonRelease, QPointF(center),
+                            QPointF(center), Qt::LeftButton, Qt::NoButton,
+                            Qt::NoModifier);
+        QCoreApplication::sendEvent(&window, &press);
+        QCoreApplication::sendEvent(&window, &release);
+        QCoreApplication::processEvents();
+        QThread::msleep(40);
+        QCoreApplication::processEvents();
+        check("点小箭头后菜单仍打开", popup->isVisible(),
+              QStringLiteral("visible=%1").arg(popup->isVisible()));
+    }
+
+    if (popup != nullptr) {
+        popup->close();
+    }
+    QCoreApplication::processEvents();
+    check("关闭后箭头恢复向上",
+          button != nullptr && !button->icon().isNull(), {});
+    window.hide();
+    std::printf("[device-menu] 结论: %s\n", all_ok ? "PASS" : "FAIL");
+    return all_ok ? 0 : 1;
+}
+
+}  // namespace
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     QApplication::setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
@@ -1828,6 +1893,10 @@ int main(int argc, char *argv[]) {
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--title-button-selftest")) {
         return run_title_button_selftest();
+    }
+    if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
+                        QStringLiteral("--device-menu-selftest")) {
+        return run_device_menu_selftest();
     }
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--avatar-alpha-selftest")) {
