@@ -20,22 +20,21 @@ PartnerTile::PartnerTile(Partner *partner, QWidget *parent)
     Q_ASSERT(m_partner);
 
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(2, 8, 2, 8);
-    layout->setSpacing(6);
+    layout->setContentsMargins(2, 2, 2, 4);
+    layout->setSpacing(2);
 
     // 点击成员可选中：只用手型光标提示，不画描边
     setCursor(Qt::PointingHandCursor);
 
     m_displayWidget = new VideoGLWidget(this);
-    // 头像固定 72x72 的方形区域（之前只固定高度 + FitWidgetSmooth，
-    // 会被面板宽度拉成椭圆——这就是"头像被压缩"的原因）
-    m_displayWidget->setFixedSize(kAvatarSide, kAvatarSide);
+    // 控件本身铺满卡片：头像用 FixedSize(72) 居中绘制，视频帧由
+    // ImgDisplay 切回 FitWidgetSmooth 后铺满整个卡片
     m_displayWidget->setDrawMode(VideoGLWidget::DrawMode::FixedSize);
     m_displayWidget->setFixedOutputSize(QSize(kAvatarSide, kAvatarSide));
-    // 头像透明角落要和成员面板底色一致，否则会出现异色方块
+    // 头像透明角落要和卡片底色一致，否则会出现异色方块
     m_displayWidget->setClearColor(ui::ThemeManager::instance().color(QStringLiteral("surface")));
     m_displayWidget->setAlignment(Qt::AlignCenter);
-    m_displayWidget->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    m_displayWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
     m_nameLabel = new QLabel(this);
     m_nameLabel->setAlignment(Qt::AlignCenter);
@@ -45,11 +44,8 @@ PartnerTile::PartnerTile(Partner *partner, QWidget *parent)
                                     .arg(ui::ThemeManager::instance().color(QStringLiteral("icon")).name()));
     m_nameLabel->setText(m_partner->fallbackLabel());
 
-    // 方形卡片里把"头像 + 名字"整组垂直居中，名字始终可见（不需要点击）
-    layout->addStretch(1);
-    layout->addWidget(m_displayWidget, 0, Qt::AlignHCenter);
+    layout->addWidget(m_displayWidget, 1);
     layout->addWidget(m_nameLabel, 0);
-    layout->addStretch(1);
 
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     // 卡片本身与会议背景区分（QSS: QWidget#partnerTile）
@@ -99,9 +95,10 @@ void PartnerTile::setSelected(bool selected) { applyBorder(selected); }
 void PartnerTile::resetBorder() { applyBorder(false); }
 
 void PartnerTile::applyBorder(bool selected) {
-    // 需求：点击成员不要再出现描边（原来的红/蓝边框已移除）
+    // 需求：点击成员不要再出现描边。
+    // 注意：这里连 setStyleSheet(QString()) 都不能调——它会触发
+    // unpolish/polish 与重排，表现为"点一下头像跳一下"。
     Q_UNUSED(selected);
-    setStyleSheet(QString());
 }
 
 void PartnerTile::resizeEvent(QResizeEvent *event) {
@@ -117,7 +114,8 @@ void PartnerTile::resizeEvent(QResizeEvent *event) {
 
 void PartnerTile::updateLabelGeometry() {
     if (m_displayWidget) {
-        m_displayWidget->setFixedSize(kAvatarSide, kAvatarSide);
+        // 方形卡片：显示区高度 = 卡片宽度 - 名字行高度
+        m_displayWidget->setFixedHeight(qMax(m_side - 22, kAvatarSide));
     }
     if (m_nameLabel) {
         m_nameLabel->setAlignment(Qt::AlignCenter);
