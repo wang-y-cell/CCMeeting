@@ -1,5 +1,6 @@
 #include "ui/pages/meeting_window.h"
 
+#include "ui/foundation/icon_provider.h"
 #include "ui/foundation/theme_manager.h"
 #include "features/meeting/meeting_recorder.h"
 #include "ui/pages/meeting_settings_popup.h"
@@ -31,6 +32,8 @@
 #include <QPainter>
 #include <QPoint>
 #include <QPushButton>
+#include <QToolButton>
+#include <QAbstractButton>
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
 #include <QScrollBar>
@@ -63,6 +66,28 @@ QString deviceName(const xrtc::XRTCDeviceInfo &info) {
 
 QRect ui::MeetingWindow::pos = QRect(-1, -1, -1, -1);
 
+namespace {
+
+/**
+ * @brief 按开关状态切换工具栏图标
+ *
+ * 约定：off 时用带红色斜杠的图标（mic-off / camera-off），
+ * 这是主流会议软件表达"静音/关摄像头"的通用语义；on 时用中性色。
+ */
+void apply_toggle_icon(QToolButton *button, const QString &icon_on,
+                       const QString &icon_off, bool on, int size = 22) {
+    if (button == nullptr) {
+        return;
+    }
+    auto &theme = ui::ThemeManager::instance();
+    const QColor color = on ? theme.color(QStringLiteral("icon"))
+                            : theme.color(QStringLiteral("danger"));
+    const QString name = on ? icon_on : icon_off;
+    button->setIcon(ui::IconProvider::instance().icon(name, color, size));
+    button->setIconSize(QSize(size, size));
+}
+
+}  // namespace
 ui::MeetingWindow::MeetingWindow(QWidget *parent)
     : FramelessWindow<QWidget>(parent) {
     qRegisterMetaType<MessagePtr>("MessagePtr");
@@ -207,27 +232,27 @@ void ui::MeetingWindow::init_connect() {
             _controller.get(), &MeetingController::join_meeting_slot,
             Qt::QueuedConnection);
 
-    connect(ui.openVedio, &QPushButton::clicked, this,
+    connect(ui.openVedio, &QAbstractButton::clicked, this,
             &ui::MeetingWindow::on_open_vedio_clicked_slot);
-    connect(ui.openAudio, &QPushButton::clicked, this,
+    connect(ui.openAudio, &QAbstractButton::clicked, this,
             &ui::MeetingWindow::on_open_audio_clicked_slot);
-    connect(ui.audioDeviceBtn, &QPushButton::clicked, this,
+    connect(ui.audioDeviceBtn, &QAbstractButton::clicked, this,
             &ui::MeetingWindow::on_audio_device_btn_clicked_slot);
-    connect(ui.videoDeviceBtn, &QPushButton::clicked, this,
+    connect(ui.videoDeviceBtn, &QAbstractButton::clicked, this,
             &ui::MeetingWindow::on_video_device_btn_clicked_slot);
-    connect(ui.shareScreenBtn, &QPushButton::clicked, this,
+    connect(ui.shareScreenBtn, &QAbstractButton::clicked, this,
             &ui::MeetingWindow::on_share_screen_clicked_slot);
     connect(ui.btnMeetingSettings, &QPushButton::clicked, this,
             &ui::MeetingWindow::on_meeting_settings_clicked_slot);
-    connect(ui.leaveMeetingBtn, &QPushButton::clicked, this,
+    connect(ui.leaveMeetingBtn, &QAbstractButton::clicked, this,
             &ui::MeetingWindow::on_leave_meeting_clicked_slot);
-    connect(ui.btnSideMembers, &QPushButton::clicked, this,
+    connect(ui.btnSideMembers, &QAbstractButton::clicked, this,
             &ui::MeetingWindow::on_side_members_clicked_slot);
-    connect(ui.btnSideChat, &QPushButton::clicked, this,
+    connect(ui.btnSideChat, &QAbstractButton::clicked, this,
             &ui::MeetingWindow::on_side_chat_clicked_slot);
-    connect(ui.btnSideInfo, &QPushButton::clicked, this,
+    connect(ui.btnSideInfo, &QAbstractButton::clicked, this,
             &ui::MeetingWindow::on_side_info_clicked_slot);
-    connect(ui.btnTogglePanel, &QPushButton::toggled, this,
+    connect(ui.btnTogglePanel, &QAbstractButton::toggled, this,
             &ui::MeetingWindow::on_toggle_panel_clicked_slot);
     connect(ui.sendmsg, &QPushButton::clicked, this,
             &ui::MeetingWindow::on_send_msg_clicked_slot);
@@ -393,8 +418,10 @@ void ui::MeetingWindow::init_ui() {
                 0.8 * Screen::width, 0.8 * Screen::height);
     ui.openAudio->setText(QString(OPENAUDIO).toUtf8());
     ui.openVedio->setText(QString(OPENVIDEO).toUtf8());
-    ui.openAudio->setProperty("avOn", false);
-    ui.openVedio->setProperty("avOn", false);
+    apply_toggle_icon(ui.openAudio, QStringLiteral("mic"),
+                      QStringLiteral("mic-off"), false);
+    apply_toggle_icon(ui.openVedio, QStringLiteral("camera"),
+                      QStringLiteral("camera-off"), false);
 
     const QRect size(pos.x(), pos.y(), pos.width() * 0.5, pos.height() * 0.5);
     setGeometry(size);
@@ -695,15 +722,11 @@ void ui::MeetingWindow::sync_av_button_ui() {
                                          : QString(OPENAUDIO).toUtf8());
     ui.shareScreenBtn->setText(_state._localScreenOn ? tr("停止共享")
                                                      : tr("共享屏幕"));
-    ui.openVedio->setProperty("avOn", _state._localVideoOn);
-    ui.openAudio->setProperty("avOn", _state._localAudioOn);
-    ui.shareScreenBtn->setProperty("avOn", _state._localScreenOn);
-    ui.openVedio->style()->unpolish(ui.openVedio);
-    ui.openVedio->style()->polish(ui.openVedio);
-    ui.openAudio->style()->unpolish(ui.openAudio);
-    ui.openAudio->style()->polish(ui.openAudio);
-    ui.shareScreenBtn->style()->unpolish(ui.shareScreenBtn);
-    ui.shareScreenBtn->style()->polish(ui.shareScreenBtn);
+    // 关闭状态用红色斜杠图标；共享屏幕不改变图标，只改文字
+    apply_toggle_icon(ui.openAudio, QStringLiteral("mic"),
+                      QStringLiteral("mic-off"), _state._localAudioOn);
+    apply_toggle_icon(ui.openVedio, QStringLiteral("camera"),
+                      QStringLiteral("camera-off"), _state._localVideoOn);
     update_speaker_label();
 }
 

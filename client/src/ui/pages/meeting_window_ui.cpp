@@ -17,6 +17,7 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QPushButton>
+#include <QToolButton>
 #include <QScrollArea>
 #include <QScrollBar>
 #include <QSpacerItem>
@@ -32,34 +33,57 @@ QLabel *makeLabel(const QString &objectName, const QString &text,
     return label;
 }
 
-QPushButton *makeToolButton(const QString &objectName, const QString &text,
+QToolButton *makeToolButton(const QString &objectName, const QString &text,
                             const QSize &minSize, QWidget *parent,
                             const QString &toolTip = QString()) {
-    auto *btn = new QPushButton(text, parent);
+    auto *btn = new QToolButton(parent);
     btn->setObjectName(objectName);
-    btn->setMinimumSize(minSize);
-    if (!toolTip.isEmpty())
+    btn->setText(text);
+    // 图标在上、文字在下，与主流会议软件一致
+    btn->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+    // 与背景融为一体：默认无边框、无底色，悬停才出现淡底色
+    btn->setAutoRaise(true);
+    btn->setCursor(Qt::PointingHandCursor);
+    btn->setMinimumSize(QSize(minSize.width(), qMax(minSize.height(), 56)));
+    btn->setIconSize(QSize(22, 22));
+    if (!toolTip.isEmpty()) {
         btn->setToolTip(toolTip);
+    }
 
-    // 工具栏图标：按 objectName 映射到 SVG 名字（主题色）
+    // 图标：按 objectName 映射到 SVG 名字（中性色，不使用强调色）
     static const QHash<QString, QString> kIconByName = {
         {QStringLiteral("btnSideMembers"), QStringLiteral("users")},
-        {QStringLiteral("btnSideChat"), QStringLiteral("send")},
-        {QStringLiteral("btnSideInfo"), QStringLiteral("user")},
+        {QStringLiteral("btnSideChat"), QStringLiteral("chat")},
+        {QStringLiteral("btnSideInfo"), QStringLiteral("info")},
         {QStringLiteral("openAudio"), QStringLiteral("mic")},
         {QStringLiteral("openVedio"), QStringLiteral("camera")},
         {QStringLiteral("shareScreenBtn"), QStringLiteral("screen-share")},
+        {QStringLiteral("btnTogglePanel"), QStringLiteral("panel")},
         {QStringLiteral("leaveMeetingBtn"), QStringLiteral("hangup")},
+        {QStringLiteral("audioDeviceBtn"), QStringLiteral("chevron-down")},
+        {QStringLiteral("videoDeviceBtn"), QStringLiteral("chevron-down")},
     };
     if (const auto it = kIconByName.constFind(objectName); it != kIconByName.constEnd()) {
-        const QColor icon_color =
-            ui::ThemeManager::instance().color(QStringLiteral("textMuted"));
-        btn->setIcon(ui::IconProvider::instance().icon(it.value(), icon_color, 16));
-        btn->setIconSize(QSize(16, 16));
+        const bool is_device = objectName == QStringLiteral("audioDeviceBtn") ||
+                               objectName == QStringLiteral("videoDeviceBtn");
+        // 设备下拉箭头小一号；结束会议用语义红，其余中性
+        int icon_size = is_device ? 12 : 22;
+        QColor icon_color = ui::ThemeManager::instance().color(QStringLiteral("icon"));
+        if (objectName == QStringLiteral("leaveMeetingBtn")) {
+            icon_color = ui::ThemeManager::instance().color(QStringLiteral("danger"));
+        }
+        btn->setIcon(ui::IconProvider::instance().icon(it.value(), icon_color, icon_size));
+        btn->setIconSize(QSize(icon_size, icon_size));
+        if (is_device) {
+            // 设备箭头：只显示图标、固定小尺寸，避免和主按钮的文字基线错位
+            btn->setToolButtonStyle(Qt::ToolButtonIconOnly);
+            btn->setFixedSize(QSize(22, 22));
+            btn->setMinimumSize(QSize(22, 22));
+        }
     }
+
     return btn;
 }
-
 QFrame *makePillSep(const QString &objectName, QWidget *parent) {
     auto *sep = new QFrame(parent);
     sep->setObjectName(objectName);

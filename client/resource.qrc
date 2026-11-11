@@ -30,6 +30,10 @@
         <file alias="user.svg">resources/icons/user.svg</file>
         <file alias="users.svg">resources/icons/users.svg</file>
         <file alias="video.svg">resources/icons/video.svg</file>
+        <file alias="panel.svg">resources/icons/panel.svg</file>
+        <file alias="info.svg">resources/icons/info.svg</file>
+        <file alias="chat.svg">resources/icons/chat.svg</file>
+        <file alias="chevron-down.svg">resources/icons/chevron-down.svg</file>
     </qresource>
 
     <qresource prefix="/ui/audio">
