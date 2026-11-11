@@ -310,6 +310,11 @@ void ui::SettingsPageUi::setupUi(QWidget *parent) {
     uiShowPageDesc->setObjectName(QStringLiteral("uiShowPageDesc"));
     uiForm->addRow(QString(), uiShowPageDesc);
 
+    meetingShowTabs =
+        new QCheckBox(QObject::tr("会议窗口显示右侧标签栏（成员 / 聊天 / 信息）"), uiPage);
+    meetingShowTabs->setObjectName(QStringLiteral("meetingShowTabs"));
+    uiForm->addRow(QString(), meetingShowTabs);
+
     pageStack->addWidget(makeScrollPage(body, uiPage));
 
     bodyLayout->addWidget(pageStack, 1);

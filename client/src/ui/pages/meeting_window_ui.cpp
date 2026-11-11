@@ -60,8 +60,8 @@ QToolButton *makeToolButton(const QString &objectName, const QString &text,
         {QStringLiteral("shareScreenBtn"), QStringLiteral("screen-share")},
         {QStringLiteral("btnTogglePanel"), QStringLiteral("panel")},
         {QStringLiteral("leaveMeetingBtn"), QStringLiteral("hangup")},
-        {QStringLiteral("audioDeviceBtn"), QStringLiteral("chevron-down")},
-        {QStringLiteral("videoDeviceBtn"), QStringLiteral("chevron-down")},
+        {QStringLiteral("audioDeviceBtn"), QStringLiteral("chevron-up")},
+        {QStringLiteral("videoDeviceBtn"), QStringLiteral("chevron-up")},
     };
     if (const auto it = kIconByName.constFind(objectName); it != kIconByName.constEnd()) {
         const bool is_device = objectName == QStringLiteral("audioDeviceBtn") ||
@@ -79,6 +79,9 @@ QToolButton *makeToolButton(const QString &objectName, const QString &text,
             btn->setToolButtonStyle(Qt::ToolButtonIconOnly);
             btn->setFixedSize(QSize(22, 22));
             btn->setMinimumSize(QSize(22, 22));
+        } else {
+            // 所有工具按钮统一宽度：文字长短不同也不该宽窄不一
+            btn->setFixedWidth(76);
         }
     }
 
@@ -167,8 +170,21 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
         QStringLiteral("settings"),
         ui::ThemeManager::instance().color(QStringLiteral("textMuted")), 12));
 
+    // 左上角：会议详情（点开显示房间号/发起人/我的名称/时长）
+    btnMeetingInfo = new QPushButton(QObject::tr("会议详情"), topStatusBar);
+    btnMeetingInfo->setObjectName(QStringLiteral("btnMeetingInfo"));
+    btnMeetingInfo->setCursor(Qt::PointingHandCursor);
+    btnMeetingInfo->setToolTip(QObject::tr("查看会议主题、房间号、发起人与时长"));
+    btnMeetingInfo->setFixedHeight(26);
+    btnMeetingInfo->setIcon(ui::IconProvider::instance().icon(
+        QStringLiteral("info"),
+        ui::ThemeManager::instance().color(QStringLiteral("textMuted")), 14));
+    topStatusLayout->addWidget(btnMeetingInfo);
+
     topStatusLayout->addWidget(topMainTitle);
-    topStatusLayout->addWidget(topRoomChip);
+    // 房间号/人数不再占用顶栏（统一进"会议详情"弹窗），控件保留但隐藏
+    topRoomChip->hide();
+    topMemberChip->hide();
     topStatusLayout->addWidget(topMemberChip);
     topStatusLayout->addWidget(topDurationChip);
     topStatusLayout->addItem(

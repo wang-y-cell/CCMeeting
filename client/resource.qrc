@@ -34,6 +34,8 @@
         <file alias="info.svg">resources/icons/info.svg</file>
         <file alias="chat.svg">resources/icons/chat.svg</file>
         <file alias="chevron-down.svg">resources/icons/chevron-down.svg</file>
+        <file alias="slash.svg">resources/icons/slash.svg</file>
+        <file alias="chevron-up.svg">resources/icons/chevron-up.svg</file>
     </qresource>
 
     <qresource prefix="/ui/audio">

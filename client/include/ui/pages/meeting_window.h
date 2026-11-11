@@ -92,6 +92,8 @@ private:
     qint64 _startupFirstFrameMs = 0;
     /** 会议时长每秒刷新（未入会时停止） */
     QTimer *_durationTimer = nullptr;
+    /** 会议详情弹窗（懒创建） */
+    QWidget *_infoPopup = nullptr;
     QString _pendingConnectIp;
     QString _pendingConnectPort;
     ConnectAction _pendingConnectAction = ConnectAction::CreateMeeting;
@@ -130,6 +132,11 @@ private:
     void update_meeting_info();
     /** @brief 刷新顶栏「会议时长」chip（每秒调用） */
     void refresh_duration_chip();
+
+    /** @brief 弹出"会议详情"面板（主题/房间号/发起人/我的名称/时长） */
+    void show_meeting_info_popup();
+    /** @brief 打开会议窗口时按设置决定是否显示右侧标签栏 */
+    void apply_tab_bar_visibility();
     /** @brief 首帧到达时结算启动耗时（只结算一次） */
     void mark_startup_first_frame();
 
