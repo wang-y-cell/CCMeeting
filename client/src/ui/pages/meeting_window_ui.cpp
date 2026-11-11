@@ -75,10 +75,10 @@ QToolButton *makeToolButton(const QString &objectName, const QString &text,
         btn->setIcon(ui::IconProvider::instance().icon(it.value(), icon_color, icon_size));
         btn->setIconSize(QSize(icon_size, icon_size));
         if (is_device) {
-            // 设备箭头：只显示图标、固定小尺寸，避免和主按钮的文字基线错位
+            // 设备箭头：宽度保持窄条，高度与其它工具按钮一致（56）
             btn->setToolButtonStyle(Qt::ToolButtonIconOnly);
-            btn->setFixedSize(QSize(22, 22));
-            btn->setMinimumSize(QSize(22, 22));
+            btn->setFixedWidth(22);
+            btn->setFixedHeight(56);
         } else {
             // 所有工具按钮统一宽度：文字长短不同也不该宽窄不一
             btn->setFixedWidth(76);
