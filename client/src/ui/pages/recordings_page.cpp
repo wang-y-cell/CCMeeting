@@ -1,4 +1,4 @@
-#include "stack_recordings.h"
+#include "ui/pages/recordings_page.h"
 
 #include "style_loader.h"
 
@@ -13,14 +13,14 @@
 
 #include <spdlog/spdlog.h>
 
-stack_recordings::stack_recordings(QWidget *parent) : QWidget(parent) {
-    setObjectName(QStringLiteral("stack_recordings"));
+ui::RecordingsPage::RecordingsPage(QWidget *parent) : Page(parent) {
+    setObjectName(QStringLiteral("RecordingsPage"));
     build_ui();
-    loadWidgetStyleSheet(this, QStringLiteral(":/Style/source/stack_recordings.qss"));
+    loadWidgetStyleSheet(this, QStringLiteral(":/Style/source/RecordingsPage.qss"));
     refresh();
 }
 
-void stack_recordings::build_ui() {
+void ui::RecordingsPage::build_ui() {
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(10);
@@ -74,17 +74,17 @@ void stack_recordings::build_ui() {
     // 空状态由它吸收剩余高度，否则布局会把余量平摊到标题与说明上
     root->addWidget(_emptyHint, 1);
 
-    connect(_refreshBtn, &QPushButton::clicked, this, &stack_recordings::refresh);
+    connect(_refreshBtn, &QPushButton::clicked, this, &ui::RecordingsPage::refresh);
     connect(_folderBtn, &QPushButton::clicked, this,
-            &stack_recordings::open_folder);
+            &ui::RecordingsPage::open_folder);
 }
 
-void stack_recordings::open_folder() {
+void ui::RecordingsPage::open_folder() {
     QDesktopServices::openUrl(
         QUrl::fromLocalFile(RecordingLibrary::recordingsDir()));
 }
 
-void stack_recordings::clear_rows() {
+void ui::RecordingsPage::clear_rows() {
     while (_rowLayout->count() > 1) {  // 保留末尾的 stretch
         QLayoutItem *item = _rowLayout->takeAt(0);
         if (item == nullptr) {
@@ -97,7 +97,7 @@ void stack_recordings::clear_rows() {
     }
 }
 
-void stack_recordings::refresh() {
+void ui::RecordingsPage::refresh() {
     _entries = RecordingLibrary::scan();
     clear_rows();
 
@@ -115,10 +115,10 @@ void stack_recordings::refresh() {
     for (int i = 0; i < _entries.size(); ++i) {
         add_row(_entries.at(i), i);
     }
-    spdlog::info("[stack_recordings] 扫描到 {} 个录制", _entries.size());
+    spdlog::info("[RecordingsPage] 扫描到 {} 个录制", _entries.size());
 }
 
-void stack_recordings::add_row(const RecordingEntry &entry, int index) {
+void ui::RecordingsPage::add_row(const RecordingEntry &entry, int index) {
     auto *row = new QFrame();
     row->setObjectName(QStringLiteral("recRow"));
     row->setFrameShape(QFrame::NoFrame);
@@ -176,4 +176,8 @@ void stack_recordings::add_row(const RecordingEntry &entry, int index) {
     });
 
     _rowLayout->insertWidget(_rowLayout->count() - 1, row);
+}
+
+void ui::RecordingsPage::on_show() {
+    refresh();
 }

@@ -1,4 +1,4 @@
-#include "stack_meeting_history.h"
+#include "ui/pages/meeting_history_page.h"
 
 
 
@@ -25,13 +25,13 @@ QPushButton *make_chip(const QString &text, QWidget *parent) {
 
 }  // namespace
 
-stack_meeting_history::stack_meeting_history(QWidget *parent) : QWidget(parent) {
-    setObjectName(QStringLiteral("stack_meeting_history"));
+ui::MeetingHistoryPage::MeetingHistoryPage(QWidget *parent) : Page(parent) {
+    setObjectName(QStringLiteral("MeetingHistoryPage"));
     build_ui();
     refresh();
 }
 
-void stack_meeting_history::build_ui() {
+void ui::MeetingHistoryPage::build_ui() {
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(10);
@@ -116,7 +116,7 @@ void stack_meeting_history::build_ui() {
     });
 }
 
-void stack_meeting_history::clear_rows() {
+void ui::MeetingHistoryPage::clear_rows() {
     while (_rowLayout->count() > 1) {  // 保留末尾 stretch
         QLayoutItem *item = _rowLayout->takeAt(0);
         if (item == nullptr) {
@@ -129,7 +129,7 @@ void stack_meeting_history::clear_rows() {
     }
 }
 
-void stack_meeting_history::refresh() {
+void ui::MeetingHistoryPage::refresh() {
     _records = MeetingHistory::load();
 
     int created = 0;
@@ -145,11 +145,11 @@ void stack_meeting_history::refresh() {
         tr("共 %1 条（创建 %2 · 加入 %3）").arg(_records.size()).arg(created).arg(joined));
 
     apply_filter();
-    spdlog::info("[stack_meeting_history] 记录数 {}（创建 {} / 加入 {}）",
+    spdlog::info("[MeetingHistoryPage] 记录数 {}（创建 {} / 加入 {}）",
                  _records.size(), created, joined);
 }
 
-void stack_meeting_history::apply_filter() {
+void ui::MeetingHistoryPage::apply_filter() {
     clear_rows();
 
     int shown = 0;
@@ -172,7 +172,7 @@ void stack_meeting_history::apply_filter() {
     }
 }
 
-void stack_meeting_history::add_row(const MeetingRecord &record, int load_index) {
+void ui::MeetingHistoryPage::add_row(const MeetingRecord &record, int load_index) {
     auto *row = new QFrame();
     row->setObjectName(QStringLiteral("historyRow"));
     row->setFrameShape(QFrame::NoFrame);
@@ -217,4 +217,8 @@ void stack_meeting_history::add_row(const MeetingRecord &record, int load_index)
     });
 
     _rowLayout->insertWidget(_rowLayout->count() - 1, row);
+}
+
+void ui::MeetingHistoryPage::on_show() {
+    refresh();
 }

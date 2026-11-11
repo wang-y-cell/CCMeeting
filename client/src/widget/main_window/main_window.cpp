@@ -50,7 +50,7 @@ main_window::main_window(QWidget *parent) : FramelessWindow<QWidget>(parent) {
 
     // 延迟创建 MeetingWidget：其 QSoundEffect 会加载 Qt Multimedia(FFmpeg)，
     // 过早加载后 WebRTC 摄像头枚举（设置页）在部分环境会直接崩溃。
-    connect(create_meeting_widget, &stack_create_meet::createMeetingClicked,
+    connect(create_meeting_widget, &ui::CreateMeetingPage::createMeetingClicked,
             this, &main_window::CreateMeeting_button_clicked);
     if (join_meeting_widget != nullptr) {
         connect(join_meeting_widget, &ui::JoinMeetingPage::join_requested, this,
@@ -60,9 +60,9 @@ main_window::main_window(QWidget *parent) : FramelessWindow<QWidget>(parent) {
         connect(ui.btnLogout, &QPushButton::clicked, this,
                 &main_window::onLogoutClicked);
     }
-    connect(user_profile_widget, &stack_user_profile::backHomeRequested, this,
+    connect(user_profile_widget, &ui::UserProfilePage::backHomeRequested, this,
             &main_window::onProfileBackHome);
-    connect(user_profile_widget, &stack_user_profile::avatarUpdated, this,
+    connect(user_profile_widget, &ui::UserProfilePage::avatarUpdated, this,
             &main_window::onProfileAvatarUpdated);
 
     // 预热 Qt Multimedia 设备枚举：首次 videoInputs() 冷启动 500ms+，
@@ -195,24 +195,24 @@ void main_window::register_pages() {
     // 历史遗留页面暂时仍用具体类型；迁移到 ui/pages/ 时只改工厂这一行。
     m_pages.add({QStringLiteral("create"), tr("创建会议"),
                  QStringLiteral("video"), 0, true},
-                [this](QWidget *) { return new stack_create_meet(this); });
+                [this](QWidget *) { return new ui::CreateMeetingPage(this); });
     m_pages.add({QStringLiteral("join"), tr("加入会议"),
                  QStringLiteral("users"), 10, true},
                 [this](QWidget *) { return new ui::JoinMeetingPage(this); });
     m_pages.add({QStringLiteral("history"), tr("会议记录"),
                  QStringLiteral("calendar"), 20, true},
-                [this](QWidget *) { return new stack_meeting_history(this); });
+                [this](QWidget *) { return new ui::MeetingHistoryPage(this); });
     m_pages.add({QStringLiteral("recordings"), tr("录制"),
                  QStringLiteral("record"), 30, true},
-                [this](QWidget *) { return new stack_recordings(this); });
+                [this](QWidget *) { return new ui::RecordingsPage(this); });
     m_pages.add({QStringLiteral("settings"), tr("设置"),
                  QStringLiteral("settings"), 40, true},
-                [this](QWidget *) { return new stack_setting(this); });
+                [this](QWidget *) { return new ui::SettingsPage(this); });
 
     // 不进侧栏、由用户卡片进入的页面
     m_pages.add({QStringLiteral("profile"), tr("个人资料"),
                  QStringLiteral("user"), 100, false},
-                [this](QWidget *) { return new stack_user_profile(this); });
+                [this](QWidget *) { return new ui::UserProfilePage(this); });
 }
 
 void main_window::build_pages() {
@@ -230,20 +230,20 @@ void main_window::build_pages() {
 
     // 2) 取出需要业务装配的具体类型（其余页面外壳不需要知道）
     create_meeting_widget =
-        qobject_cast<stack_create_meet *>(m_pages.find(QStringLiteral("create")));
+        qobject_cast<ui::CreateMeetingPage *>(m_pages.find(QStringLiteral("create")));
     join_meeting_widget = qobject_cast<ui::JoinMeetingPage *>(
         m_pages.find(QStringLiteral("join")));
-    history_widget = qobject_cast<stack_meeting_history *>(
+    history_widget = qobject_cast<ui::MeetingHistoryPage *>(
         m_pages.find(QStringLiteral("history")));
-    recordings_widget = qobject_cast<stack_recordings *>(
+    recordings_widget = qobject_cast<ui::RecordingsPage *>(
         m_pages.find(QStringLiteral("recordings")));
-    setting_widget = qobject_cast<stack_setting *>(
+    setting_widget = qobject_cast<ui::SettingsPage *>(
         m_pages.find(QStringLiteral("settings")));
-    user_profile_widget = qobject_cast<stack_user_profile *>(
+    user_profile_widget = qobject_cast<ui::UserProfilePage *>(
         m_pages.find(QStringLiteral("profile")));
 
     if (recordings_widget != nullptr) {
-        connect(recordings_widget, &stack_recordings::playRequested, this,
+        connect(recordings_widget, &ui::RecordingsPage::playRequested, this,
                 [this](const RecordingEntry &entry) {
                     auto *dialog = new RecordingPlaybackDialog(entry, this);
                     dialog->setAttribute(Qt::WA_DeleteOnClose);
@@ -264,15 +264,9 @@ void main_window::build_pages() {
                 if (page == nullptr) {
                     return;
                 }
-                // 新页面：统一走 ui::Page 钩子
+                // 所有页面都实现了 ui::Page：进入页面即触发懒刷新
                 if (auto *ui_page = qobject_cast<ui::Page *>(page)) {
                     ui_page->on_show();
-                } else if (auto *history =
-                               qobject_cast<stack_meeting_history *>(page)) {
-                    history->refresh();  // 历史遗留页面（迁移后删除此分支）
-                } else if (auto *recordings =
-                               qobject_cast<stack_recordings *>(page)) {
-                    recordings->refresh();  // 同上
                 }
                 ui.contentStack->setCurrentWidget(page);
             });
@@ -287,7 +281,7 @@ void main_window::init_ui() {
     register_pages();
     build_pages();
 
-    connect(setting_widget, &stack_setting::uiPrefsChanged, this, [this]() {
+    connect(setting_widget, &ui::SettingsPage::uiPrefsChanged, this, [this]() {
         // 预留：主题等后续可在此刷新
         Q_UNUSED(this);
     });

@@ -83,8 +83,11 @@ private:
         QString qss_path;
     };
 
+    /** @brief 将resourcePath路径的文件的内容输出到out字符串中 */
     bool load_raw(const QString &resourcePath, QString *out) const;
+    /** @brief 根据选择的主题将entry窗口改为响应的主题 */
     void apply_entry(Entry &entry);
+    /** @brief 清理已经销毁的窗口 */
     void prune();
 
     Theme m_theme = Theme::Dark;

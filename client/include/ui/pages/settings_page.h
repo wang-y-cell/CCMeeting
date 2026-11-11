@@ -1,5 +1,8 @@
-#ifndef STACK_SETTING_H
-#define STACK_SETTING_H
+#ifndef SETTINGS_PAGE_H
+#define SETTINGS_PAGE_H
+
+#include "ui/pages/page.h"
+#include "ui/pages/settings_page_ui.h"
 
 #include <QCameraDevice>
 #include <QCameraFormat>
@@ -18,17 +21,24 @@ class QIODevice;
 class QMediaCaptureSession;
 class QTimer;
 class QVideoSink;
-class Ui_stack_setting;
 
 /**
  * 设置页：设备枚举 / 摄像头预览 / 麦克风电平全部走 Qt Multimedia。
  * 摄像头开启在后台线程选格式，再排队回 UI 线程 start，避免切页卡顿。
  */
-class stack_setting : public QWidget {
+namespace ui {
+
+class SettingsPage : public Page {
     Q_OBJECT
+
 public:
-    explicit stack_setting(QWidget *parent = nullptr);
-    ~stack_setting() override;
+    QString page_id() const override { return QStringLiteral("settings"); }
+    QString title() const override { return tr("设置"); }
+    QString icon_name() const override { return QStringLiteral("settings"); }
+    int nav_order() const override { return 40; }
+public:
+    explicit SettingsPage(QWidget *parent = nullptr);
+    ~SettingsPage() override;
 
     void reloadFromConfig();
 
@@ -36,8 +46,8 @@ signals:
     void uiPrefsChanged();
 
 protected:
-    void showEvent(QShowEvent *event) override;
-    void hideEvent(QHideEvent *event) override;
+    void on_show() override;
+    void on_hide() override;
 
 private slots:
     void onCategoryChanged(int row);
@@ -91,7 +101,7 @@ private:
     int currentFps() const;
     QSize currentResolution() const;
 
-    std::unique_ptr<Ui_stack_setting> ui;
+    std::unique_ptr<SettingsPageUi> ui;
 
     QCamera *camera_ = nullptr;
     QMediaCaptureSession *capture_session_ = nullptr;
@@ -110,4 +120,6 @@ private:
     std::vector<VideoCap> video_caps_;
 };
 
-#endif // STACK_SETTING_H
+}  // namespace ui
+
+#endif // SETTINGS_PAGE_H

@@ -1,4 +1,4 @@
-#include "stack_setting_ui.h"
+#include "ui/pages/settings_page_ui.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -37,8 +37,8 @@ QLabel *makeFieldLabel(const QString &text, QWidget *parent, int height = 36) {
 
 }  // namespace
 
-void Ui_stack_setting::setupUi(QWidget *parent) {
-    parent->setObjectName(QStringLiteral("stack_setting"));
+void ui::SettingsPageUi::setupUi(QWidget *parent) {
+    parent->setObjectName(QStringLiteral("SettingsPage"));
     parent->resize(720, 560);
 
     auto *root = new QVBoxLayout(parent);

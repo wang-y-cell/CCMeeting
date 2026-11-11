@@ -1,4 +1,4 @@
-#include "stack_create_meet_ui.h"
+#include "ui/pages/create_meeting_page_ui.h"
 
 #include <QFrame>
 #include <QHBoxLayout>
@@ -11,8 +11,8 @@
 
 #include "recent_meeting_list.h"
 
-void Ui_stack_create_meet::setupUi(QWidget *parent) {
-    parent->setObjectName(QStringLiteral("stack_create_meet"));
+void ui::CreateMeetingPageUi::setupUi(QWidget *parent) {
+    parent->setObjectName(QStringLiteral("CreateMeetingPage"));
     parent->resize(680, 520);
 
     auto *root = new QVBoxLayout(parent);

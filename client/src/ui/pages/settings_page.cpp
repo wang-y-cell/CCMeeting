@@ -1,9 +1,9 @@
-#include "stack_setting.h"
+#include "ui/pages/settings_page.h"
 
 #include "recording_library.h"
 
 #include "configure/client_config.h"
-#include "ui/stack_setting_ui.h"
+#include "ui/pages/settings_page_ui.h"
 
 #include <QAudioDevice>
 #include <QAudioFormat>
@@ -113,43 +113,43 @@ int pcmLevelPercent(const QByteArray &raw, const QAudioFormat &fmt) {
 
 }  // namespace
 
-stack_setting::stack_setting(QWidget *parent) : QWidget(parent) {
-    ui = std::make_unique<Ui_stack_setting>();
+ui::SettingsPage::SettingsPage(QWidget *parent) : Page(parent) {
+    ui = std::make_unique<SettingsPageUi>();
     ui->setupUi(this);
 
     preview_start_timer_ = new QTimer(this);
     preview_start_timer_->setSingleShot(true);
     connect(preview_start_timer_, &QTimer::timeout, this,
-            &stack_setting::beginVideoPreviewAsync);
+            &ui::SettingsPage::beginVideoPreviewAsync);
 
     connect(ui->categoryList, &QListWidget::currentRowChanged, this,
-            &stack_setting::onCategoryChanged);
+            &ui::SettingsPage::onCategoryChanged);
     connect(ui->saveBtn, &QPushButton::clicked, this,
-            &stack_setting::onSaveClicked);
+            &ui::SettingsPage::onSaveClicked);
     connect(ui->resetBtn, &QPushButton::clicked, this,
-            &stack_setting::onResetClicked);
+            &ui::SettingsPage::onResetClicked);
     connect(ui->videoDeviceCombo,
             QOverload<int>::of(&QComboBox::currentIndexChanged), this,
-            &stack_setting::onVideoDeviceChanged);
+            &ui::SettingsPage::onVideoDeviceChanged);
     connect(ui->videoResolution,
             QOverload<int>::of(&QComboBox::currentIndexChanged), this,
-            &stack_setting::onVideoResolutionChanged);
+            &ui::SettingsPage::onVideoResolutionChanged);
     connect(ui->videoFps, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            this, &stack_setting::onVideoFpsChanged);
+            this, &ui::SettingsPage::onVideoFpsChanged);
     connect(ui->micTestBtn, &QPushButton::clicked, this,
-            &stack_setting::onMicTestClicked);
+            &ui::SettingsPage::onMicTestClicked);
 
     if (ui->videoPreviewToggleBtn) {
         connect(ui->videoPreviewToggleBtn, &QPushButton::clicked, this,
-                &stack_setting::onVideoPreviewToggleClicked);
+                &ui::SettingsPage::onVideoPreviewToggleClicked);
     }
     if (ui->recordOpenBtn) {
         connect(ui->recordOpenBtn, &QPushButton::clicked, this,
-                &stack_setting::onOpenRecordDirClicked);
+                &ui::SettingsPage::onOpenRecordDirClicked);
     }
     if (ui->recordResetBtn) {
         connect(ui->recordResetBtn, &QPushButton::clicked, this,
-                &stack_setting::onResetRecordDirClicked);
+                &ui::SettingsPage::onResetRecordDirClicked);
     }
 
     // 预览默认值来自「通用」里的开关（默认关闭）
@@ -174,7 +174,7 @@ stack_setting::stack_setting(QWidget *parent) : QWidget(parent) {
                 theme.set_theme(scheme == Qt::ColorScheme::Light ? ui::Theme::Light
                                                                  : ui::Theme::Dark);
             }
-            spdlog::info("[stack_setting] theme mode={} applied={}",
+            spdlog::info("[SettingsPage] theme mode={} applied={}",
                          mode.toStdString(),
                          ui::ThemeManager::name_of(theme.theme()).toStdString());
         };
@@ -198,7 +198,7 @@ stack_setting::stack_setting(QWidget *parent) : QWidget(parent) {
     reloadFromConfig();
 }
 
-stack_setting::~stack_setting() {
+ui::SettingsPage::~SettingsPage() {
     preview_generation_.fetch_add(1);
     if (preview_start_timer_) {
         preview_start_timer_->stop();
@@ -207,8 +207,7 @@ stack_setting::~stack_setting() {
     stopVideoPreview(false);  // 析构必须同步释放
 }
 
-void stack_setting::showEvent(QShowEvent *event) {
-    QWidget::showEvent(event);
+void ui::SettingsPage::on_show() {
 
     // 设备枚举冷启动要 500ms+（Qt Multimedia 首次加载插件 + 枚举 WMF 设备）。
     // 若放在 0ms 定时器里，执行会排到首帧绘制之前，表现为"点设置卡一下"。
@@ -231,12 +230,12 @@ void stack_setting::showEvent(QShowEvent *event) {
         refreshVideoDevices();
         refreshAudioDevices();
         syncPreviewForCategory(ui->categoryList->currentRow());
-        spdlog::info("[stack_setting] show: devices refreshed in {}ms",
+        spdlog::info("[SettingsPage] show: devices refreshed in {}ms",
                      static_cast<long long>(timer.elapsed()));
     });
 }
 
-void stack_setting::hideEvent(QHideEvent *event) {
+void ui::SettingsPage::on_hide() {
     preview_generation_.fetch_add(1);
     if (preview_start_timer_) {
         preview_start_timer_->stop();
@@ -244,10 +243,9 @@ void stack_setting::hideEvent(QHideEvent *event) {
     stopMicTest();
     // 先返回让侧栏切页画完，摄像头 stop 放到下一拍
     stopVideoPreview(true);
-    QWidget::hideEvent(event);
 }
 
-void stack_setting::onCategoryChanged(int row) {
+void ui::SettingsPage::onCategoryChanged(int row) {
     if (!ui->pageStack) {
         return;
     }
@@ -258,7 +256,7 @@ void stack_setting::onCategoryChanged(int row) {
     syncPreviewForCategory(row);
 }
 
-void stack_setting::syncPreviewForCategory(int row) {
+void ui::SettingsPage::syncPreviewForCategory(int row) {
     if (row == 0) {
         stopMicTest();
         if (video_preview_enabled_) {
@@ -275,7 +273,7 @@ void stack_setting::syncPreviewForCategory(int row) {
     }
 }
 
-void stack_setting::refreshVideoDevices() {
+void ui::SettingsPage::refreshVideoDevices() {
     if (!ui->videoDeviceCombo) {
         return;
     }
@@ -288,7 +286,7 @@ void stack_setting::refreshVideoDevices() {
     ui->videoDeviceCombo->clear();
 
     const auto cameras = QMediaDevices::videoInputs();
-    spdlog::info("[stack_setting] Qt cameras={}", cameras.size());
+    spdlog::info("[SettingsPage] Qt cameras={}", cameras.size());
     int select = 0;
     for (int i = 0; i < cameras.size(); ++i) {
         const QCameraDevice &cam = cameras[i];
@@ -313,7 +311,7 @@ void stack_setting::refreshVideoDevices() {
     rebuildResolutionList();
 }
 
-void stack_setting::refreshAudioDevices() {
+void ui::SettingsPage::refreshAudioDevices() {
     if (!ui->audioDeviceCombo) {
         return;
     }
@@ -324,7 +322,7 @@ void stack_setting::refreshAudioDevices() {
 
     ui->audioDeviceCombo->clear();
     const auto mics = QMediaDevices::audioInputs();
-    spdlog::info("[stack_setting] Qt mics={}", mics.size());
+    spdlog::info("[SettingsPage] Qt mics={}", mics.size());
     int select = 0;
     for (int i = 0; i < mics.size(); ++i) {
         const QAudioDevice &mic = mics[i];
@@ -348,7 +346,7 @@ void stack_setting::refreshAudioDevices() {
     }
 }
 
-void stack_setting::rebuildResolutionList() {
+void ui::SettingsPage::rebuildResolutionList() {
     if (!ui->videoResolution) {
         return;
     }
@@ -404,7 +402,7 @@ void stack_setting::rebuildResolutionList() {
     rebuildFpsList();
 }
 
-void stack_setting::rebuildFpsList() {
+void ui::SettingsPage::rebuildFpsList() {
     if (!ui->videoFps) {
         return;
     }
@@ -442,21 +440,21 @@ void stack_setting::rebuildFpsList() {
     block_video_signals_ = false;
 }
 
-QString stack_setting::currentVideoDeviceId() const {
+QString ui::SettingsPage::currentVideoDeviceId() const {
     if (!ui->videoDeviceCombo || !ui->videoDeviceCombo->isEnabled()) {
         return {};
     }
     return ui->videoDeviceCombo->currentData().toString();
 }
 
-QString stack_setting::currentAudioDeviceId() const {
+QString ui::SettingsPage::currentAudioDeviceId() const {
     if (!ui->audioDeviceCombo || !ui->audioDeviceCombo->isEnabled()) {
         return {};
     }
     return ui->audioDeviceCombo->currentData().toString();
 }
 
-QSize stack_setting::currentResolution() const {
+QSize ui::SettingsPage::currentResolution() const {
     if (!ui->videoResolution) {
         return {640, 480};
     }
@@ -464,14 +462,14 @@ QSize stack_setting::currentResolution() const {
     return size.isValid() ? size : QSize(640, 480);
 }
 
-int stack_setting::currentFps() const {
+int ui::SettingsPage::currentFps() const {
     if (!ui->videoFps || ui->videoFps->count() == 0) {
         return 30;
     }
     return ui->videoFps->currentData().toInt();
 }
 
-void stack_setting::scheduleVideoPreview() {
+void ui::SettingsPage::scheduleVideoPreview() {
     if (!video_preview_enabled_) {
         // 默认不占用摄像头：进入设置页立刻返回，避免开关硬件造成的点击延迟
         return;
@@ -489,7 +487,7 @@ void stack_setting::scheduleVideoPreview() {
     preview_start_timer_->start(16);
 }
 
-void stack_setting::beginVideoPreviewAsync() {
+void ui::SettingsPage::beginVideoPreviewAsync() {
     if (!isVisible() || !ui->categoryList ||
         ui->categoryList->currentRow() != 0) {
         return;
@@ -504,7 +502,7 @@ void stack_setting::beginVideoPreviewAsync() {
         return;
     }
 
-    spdlog::info("[stack_setting] async prepare preview cam={} {}x{}@{}",
+    spdlog::info("[SettingsPage] async prepare preview cam={} {}x{}@{}",
                  deviceId.toStdString(), res.width(), res.height(), fps);
 
     QThreadPool::globalInstance()->start(
@@ -543,7 +541,7 @@ void stack_setting::beginVideoPreviewAsync() {
         });
 }
 
-void stack_setting::applyVideoPreview(const QCameraDevice &device,
+void ui::SettingsPage::applyVideoPreview(const QCameraDevice &device,
                                       const QCameraFormat &format) {
     releasePreviewHardware(true);
 
@@ -562,10 +560,10 @@ void stack_setting::applyVideoPreview(const QCameraDevice &device,
     }
 
     connect(video_sink_, &QVideoSink::videoFrameChanged, this,
-            &stack_setting::onVideoFrame);
+            &ui::SettingsPage::onVideoFrame);
     connect(camera_, &QCamera::errorOccurred, this,
             [this](QCamera::Error, const QString &errorString) {
-                spdlog::warn("[stack_setting] camera error: {}",
+                spdlog::warn("[SettingsPage] camera error: {}",
                              errorString.toStdString());
                 QMessageBox::warning(
                     this, tr("摄像头"),
@@ -577,7 +575,7 @@ void stack_setting::applyVideoPreview(const QCameraDevice &device,
     camera_->start();
 }
 
-void stack_setting::releasePreviewHardware(bool deferHardware) {
+void ui::SettingsPage::releasePreviewHardware(bool deferHardware) {
     QCamera *cam = camera_;
     QMediaCaptureSession *session = capture_session_;
     QVideoSink *sink = video_sink_;
@@ -626,9 +624,9 @@ void stack_setting::releasePreviewHardware(bool deferHardware) {
     }
 }
 
-void stack_setting::onVideoPreviewToggleClicked() {
+void ui::SettingsPage::onVideoPreviewToggleClicked() {
     video_preview_enabled_ = !video_preview_enabled_;
-    spdlog::info("[stack_setting] 摄像头预览 {}",
+    spdlog::info("[SettingsPage] 摄像头预览 {}",
                  video_preview_enabled_ ? "开启" : "关闭");
     update_preview_toggle_ui();
 
@@ -639,7 +637,7 @@ void stack_setting::onVideoPreviewToggleClicked() {
     }
 }
 
-void stack_setting::refreshRecordDirLabel() {
+void ui::SettingsPage::refreshRecordDirLabel() {
     if (!ui || !ui->recordDirLabel) {
         return;
     }
@@ -648,18 +646,18 @@ void stack_setting::refreshRecordDirLabel() {
     ui->recordDirLabel->setToolTip(dir);
 }
 
-void stack_setting::onOpenRecordDirClicked() {
+void ui::SettingsPage::onOpenRecordDirClicked() {
     QDesktopServices::openUrl(
         QUrl::fromLocalFile(RecordingLibrary::recordingsDir()));
 }
 
-void stack_setting::onResetRecordDirClicked() {
+void ui::SettingsPage::onResetRecordDirClicked() {
     Storage &settings = Storage::instance();
     settings.remove(QStringLiteral("record/saveDir"));
     refreshRecordDirLabel();
 }
 
-void stack_setting::update_preview_toggle_ui() {
+void ui::SettingsPage::update_preview_toggle_ui() {
     if (!ui) {
         return;
     }
@@ -678,7 +676,7 @@ void stack_setting::update_preview_toggle_ui() {
     }
 }
 
-void stack_setting::stopVideoPreview(bool deferHardware) {
+void ui::SettingsPage::stopVideoPreview(bool deferHardware) {
     preview_generation_.fetch_add(1);
     if (preview_start_timer_) {
         preview_start_timer_->stop();
@@ -692,7 +690,7 @@ void stack_setting::stopVideoPreview(bool deferHardware) {
     }
 }
 
-void stack_setting::startMicTest() {
+void ui::SettingsPage::startMicTest() {
     stopMicTest();
     const QAudioDevice device = findMicById(currentAudioDeviceId());
     if (device.isNull()) {
@@ -719,7 +717,7 @@ void stack_setting::startMicTest() {
 
     mic_timer_ = new QTimer(this);
     mic_timer_->setInterval(50);
-    connect(mic_timer_, &QTimer::timeout, this, &stack_setting::onMicTimer);
+    connect(mic_timer_, &QTimer::timeout, this, &ui::SettingsPage::onMicTimer);
     mic_timer_->start();
 
     mic_testing_ = true;
@@ -729,7 +727,7 @@ void stack_setting::startMicTest() {
     }
 }
 
-void stack_setting::stopMicTest() {
+void ui::SettingsPage::stopMicTest() {
     if (mic_timer_) {
         mic_timer_->stop();
         mic_timer_->deleteLater();
@@ -750,7 +748,7 @@ void stack_setting::stopMicTest() {
     }
 }
 
-void stack_setting::onVideoFrame(const QVideoFrame &frame) {
+void ui::SettingsPage::onVideoFrame(const QVideoFrame &frame) {
     if (!ui || !ui->videoPreview || !frame.isValid()) {
         return;
     }
@@ -777,7 +775,7 @@ void stack_setting::onVideoFrame(const QVideoFrame &frame) {
     ui->videoPreview->setPixmap(pix);
 }
 
-void stack_setting::onMicTimer() {
+void ui::SettingsPage::onMicTimer() {
     if (!audio_io_ || !audio_source_ || !ui->micLevelBar) {
         return;
     }
@@ -789,7 +787,7 @@ void stack_setting::onMicTimer() {
         pcmLevelPercent(data, audio_source_->format()));
 }
 
-void stack_setting::onVideoDeviceChanged(int) {
+void ui::SettingsPage::onVideoDeviceChanged(int) {
     if (block_video_signals_) {
         return;
     }
@@ -799,7 +797,7 @@ void stack_setting::onVideoDeviceChanged(int) {
     }
 }
 
-void stack_setting::onVideoResolutionChanged(int) {
+void ui::SettingsPage::onVideoResolutionChanged(int) {
     if (block_video_signals_) {
         return;
     }
@@ -809,7 +807,7 @@ void stack_setting::onVideoResolutionChanged(int) {
     }
 }
 
-void stack_setting::onVideoFpsChanged(int) {
+void ui::SettingsPage::onVideoFpsChanged(int) {
     if (block_video_signals_) {
         return;
     }
@@ -818,7 +816,7 @@ void stack_setting::onVideoFpsChanged(int) {
     }
 }
 
-void stack_setting::onMicTestClicked() {
+void ui::SettingsPage::onMicTestClicked() {
     if (mic_testing_) {
         stopMicTest();
     } else {
@@ -826,7 +824,7 @@ void stack_setting::onMicTestClicked() {
     }
 }
 
-void stack_setting::reloadFromConfig() {
+void ui::SettingsPage::reloadFromConfig() {
     // 通用页：录制目录 / 帧率 / 提示音 / 预览默认值（不涉及服务器连接参数）
     Storage &s = Storage::instance();
     refreshRecordDirLabel();
@@ -859,7 +857,7 @@ void stack_setting::reloadFromConfig() {
     applyUiPrefs();
 }
 
-void stack_setting::loadUiPrefs() {
+void ui::SettingsPage::loadUiPrefs() {
     Storage &s = Storage::instance();
     ui->audioMuteOnJoin->setChecked(
         s.value(QStringLiteral("audio/muteOnJoin"), false).toBool());
@@ -873,7 +871,7 @@ void stack_setting::loadUiPrefs() {
         s.value(QStringLiteral("ui/showPageDesc"), true).toBool());
 }
 
-void stack_setting::saveUiPrefs() const {
+void ui::SettingsPage::saveUiPrefs() const {
     Storage &s = Storage::instance();
     s.setValue(QStringLiteral("audio/muteOnJoin"),
                ui->audioMuteOnJoin->isChecked());
@@ -902,13 +900,13 @@ void stack_setting::saveUiPrefs() const {
     s.setValue(QStringLiteral("video/fps"), currentFps());
 }
 
-void stack_setting::applyUiPrefs() {
+void ui::SettingsPage::applyUiPrefs() {
     if (ui->pageDesc) {
         ui->pageDesc->setVisible(ui->uiShowPageDesc->isChecked());
     }
 }
 
-void stack_setting::onSaveClicked() {
+void ui::SettingsPage::onSaveClicked() {
     auto &cfg = ClientConfig::instance();
 
     const QSize res = currentResolution();
@@ -935,7 +933,7 @@ void stack_setting::onSaveClicked() {
     }
 }
 
-void stack_setting::onResetClicked() {
+void ui::SettingsPage::onResetClicked() {
     const auto reply = QMessageBox::question(
         this, tr("设置"),
         tr("恢复为当前程序内置默认值？（不会自动写回磁盘，需再点保存）"));

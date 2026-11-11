@@ -1,7 +1,9 @@
-#ifndef STACK_CREATE_MEET_H
-#define STACK_CREATE_MEET_H
+#ifndef CREATEMEETING_PAGE_H
+#define CREATEMEETING_PAGE_H
 
-#include "stack_create_meet_ui.h"
+#include "ui/pages/page.h"
+
+#include "ui/pages/create_meeting_page_ui.h"
 
 #include <QShowEvent>
 #include <QWidget>
@@ -10,8 +12,16 @@
 /**
  * @brief 创建会议入口页
  */
-class stack_create_meet : public QWidget {
+namespace ui {
+
+class CreateMeetingPage : public Page {
     Q_OBJECT
+
+public:
+    QString page_id() const override { return QStringLiteral("create"); }
+    QString title() const override { return tr("创建会议"); }
+    QString icon_name() const override { return QStringLiteral("video"); }
+    int nav_order() const override { return 0; }
 
 public:
     ///设置默认最大参加人数
@@ -31,8 +41,8 @@ public:
      * @brief 构造创建会议页
      * @param parent 父控件
      */
-    explicit stack_create_meet(QWidget *parent = nullptr);
-    ~stack_create_meet() override = default;
+    explicit CreateMeetingPage(QWidget *parent = nullptr);
+    ~CreateMeetingPage() override = default;
 
 signals:
     /**
@@ -48,10 +58,12 @@ private slots:
 
 protected:
     /** @brief 每次显示时刷新「最近创建的会议」 */
-    void showEvent(QShowEvent *event) override;
+    void on_show() override;
 
 private:
-    Ui_stack_create_meet ui;
+    CreateMeetingPageUi ui;
 };
 
-#endif // STACK_CREATE_MEET_H
+}  // namespace ui
+
+#endif // CREATEMEETING_PAGE_H

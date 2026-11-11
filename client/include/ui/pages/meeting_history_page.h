@@ -1,5 +1,7 @@
-#ifndef STACK_MEETING_HISTORY_H
-#define STACK_MEETING_HISTORY_H
+#ifndef MEETINGHISTORY_PAGE_H
+#define MEETINGHISTORY_PAGE_H
+
+#include "ui/pages/page.h"
 
 #include "meeting_history.h"
 
@@ -15,10 +17,20 @@ class QScrollArea;
  *
  * 支持按类型筛选（全部 / 我创建 / 我加入）、单条删除、清空。
  */
-class stack_meeting_history : public QWidget {
+namespace ui {
+
+class MeetingHistoryPage : public Page {
     Q_OBJECT
+
 public:
-    explicit stack_meeting_history(QWidget *parent = nullptr);
+    QString page_id() const override { return QStringLiteral("history"); }
+    QString title() const override { return tr("会议记录"); }
+    QString icon_name() const override { return QStringLiteral("calendar"); }
+    void on_show() override;
+
+    int nav_order() const override { return 20; }
+public:
+    explicit MeetingHistoryPage(QWidget *parent = nullptr);
 
     /** @brief 重新读取历史并刷新 */
     void refresh();
@@ -45,4 +57,6 @@ private:
     QVector<MeetingRecord> _records;
 };
 
-#endif // STACK_MEETING_HISTORY_H
+}  // namespace ui
+
+#endif // MEETINGHISTORY_PAGE_H

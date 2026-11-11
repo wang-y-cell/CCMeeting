@@ -1,4 +1,4 @@
-#include "stack_create_meet.h"
+#include "ui/pages/create_meeting_page.h"
 
 #include "recent_meeting_list.h"
 
@@ -6,16 +6,16 @@
 #include <QMessageBox>
 #include <QPushButton>
 
-stack_create_meet::stack_create_meet(QWidget *parent)
-    : QWidget(parent) {
+ui::CreateMeetingPage::CreateMeetingPage(QWidget *parent)
+    : Page(parent) {
     ui.setupUi(this);
     ui.lineEdit->setText(QString::number(kDefaultMaxParticipants));
     ui.lineEdit_2->setText(QString::number(kDefaultDurationMinutes));
     connect(ui.create_meeting_btn, &QPushButton::clicked, this,
-            &stack_create_meet::on_create_clicked);
+            &ui::CreateMeetingPage::on_create_clicked);
 }
 
-void stack_create_meet::on_create_clicked() {
+void ui::CreateMeetingPage::on_create_clicked() {
     bool people_ok = false;
     bool duration_ok = false;
     const quint32 max_participants =
@@ -47,8 +47,7 @@ void stack_create_meet::on_create_clicked() {
     emit createMeetingClicked(max_participants, duration_minutes);
 }
 
-void stack_create_meet::showEvent(QShowEvent *event) {
-    QWidget::showEvent(event);
+void ui::CreateMeetingPage::on_show() {
     if (ui.recent) {
         ui.recent->refresh();
     }

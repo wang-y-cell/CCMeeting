@@ -1,4 +1,4 @@
-#include "stack_user_profile_ui.h"
+#include "ui/pages/user_profile_page_ui.h"
 
 #include <QFormLayout>
 #include <QFrame>
@@ -29,8 +29,8 @@ QLabel *makeValueLabel(const QString &objectName, QWidget *parent,
 
 }  // namespace
 
-void Ui_stack_user_profile::setupUi(QWidget *parent) {
-    parent->setObjectName(QStringLiteral("stack_user_profile"));
+void ui::UserProfilePageUi::setupUi(QWidget *parent) {
+    parent->setObjectName(QStringLiteral("UserProfilePage"));
 
     auto *root = new QVBoxLayout(parent);
     root->setSpacing(12);
