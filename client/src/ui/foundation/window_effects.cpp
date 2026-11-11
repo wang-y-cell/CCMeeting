@@ -2,6 +2,9 @@
 
 #include <QPainterPath>
 #include <QRegion>
+#include <QApplication>
+#include <QComboBox>
+#include <QMenu>
 #include <QResizeEvent>
 
 #include <spdlog/spdlog.h>
@@ -71,6 +74,63 @@ bool enable_rounded_corners(QWidget *window, int fallback_radius) {
     Q_UNUSED(fallback_radius);
     return false;
 #endif
+}
+
+namespace {
+
+/**
+ * @brief 弹出窗口圆角过滤器
+ *
+ * QMenu / QComboBox 弹层是 Qt::Popup 窗口，Win11 不会自动圆角，
+ * 表现在界面上就是"其它窗口都圆角了，菜单还是直角"。
+ */
+class PopupRoundingFilter : public QObject {
+public:
+    using QObject::QObject;
+
+    bool eventFilter(QObject *watched, QEvent *event) override {
+        if (event->type() == QEvent::Show) {
+            if (auto *widget = qobject_cast<QWidget *>(watched);
+                widget != nullptr && widget->isWindow()) {
+                const bool is_popup =
+                    qobject_cast<QMenu *>(widget) != nullptr ||
+                    (widget->windowFlags() & Qt::WindowType_Mask) == Qt::Popup ||
+                    (widget->windowFlags() & Qt::WindowType_Mask) == Qt::ToolTip;
+                if (is_popup) {
+                    enable_rounded_corners(widget, 10);
+                }
+            }
+        }
+        return QObject::eventFilter(watched, event);
+    }
+};
+
+}  // namespace
+
+bool query_rounded_corners(QWidget *window) {
+#ifdef Q_OS_WIN
+    if (window == nullptr) {
+        return false;
+    }
+    int preference = 0;
+    const HWND hwnd = reinterpret_cast<HWND>(window->winId());
+    const HRESULT result = ::DwmGetWindowAttribute(
+        hwnd, kDwmWindowCornerPreference, &preference, sizeof(preference));
+    return SUCCEEDED(result) && preference == kDwmRound;
+#else
+    Q_UNUSED(window);
+    return false;
+#endif
+}
+
+void install_popup_rounding() {
+    static bool installed = false;
+    if (installed || qApp == nullptr) {
+        return;
+    }
+    installed = true;
+    qApp->installEventFilter(new PopupRoundingFilter(qApp));
+    spdlog::info("[WindowEffects] 弹出窗口圆角过滤器已安装");
 }
 
 }  // namespace ui

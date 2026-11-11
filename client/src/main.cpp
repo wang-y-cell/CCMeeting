@@ -31,6 +31,7 @@
 #include "main_window.h"
 #include "screen.h"
 #include "ui/foundation/font_registry.h"
+#include "ui/foundation/window_effects.h"
 #include "ui/foundation/theme_manager.h"
 
 #ifdef _WIN32
@@ -365,6 +366,7 @@ int main(int argc, char *argv[]) {
 
     // 内置字体（resources/fonts 为空时是 no-op）
     ui::FontRegistry::load_bundled();
+    ui::install_popup_rounding();
 
     // 主题：读取持久化选项（system / light / dark），先定主题再套全局样式，
     // 这样所有窗口创建时就是正确配色，不会闪一下深浅切换。

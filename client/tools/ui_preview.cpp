@@ -16,6 +16,7 @@
 #include "ui/pages/login_window.h"
 #include "main_window.h"
 #include "ui/foundation/font_registry.h"
+#include "ui/foundation/window_effects.h"
 #include "ui/foundation/theme_manager.h"
 #include "features/meeting/meeting_recorder.h"
 #include "ui/pages/meeting_settings_popup.h"
@@ -31,6 +32,7 @@
 #include "ui/pages/user_profile_page.h"
 
 #include <QApplication>
+#include <QMenu>
 #include "frameless_window.h"
 #include <functional>
 #include "mytextedit.h"
@@ -1558,6 +1560,61 @@ int run_window_theme_selftest() {
 }
 
 }  // namespace
+// ---------------------------------------------------------------------------
+// 弹出窗口圆角自检：QMenu / 弹窗在显示后必须处于 DWM 圆角状态
+// 用法：UiPreview.exe --popup-rounding-selftest
+// ---------------------------------------------------------------------------
+namespace {
+
+int run_popup_rounding_selftest() {
+    bool all_ok = true;
+    auto check = [&](const char *name, bool ok) {
+        all_ok = all_ok && ok;
+        std::printf("[popup-round] %-28s %s\n", name, ok ? "OK" : "FAIL");
+    };
+
+    ui::install_popup_rounding();
+
+    {
+        QMenu menu;
+        menu.setObjectName(QStringLiteral("deviceSelectMenu"));
+        menu.addAction(QStringLiteral("选择扬声器"));
+        menu.addAction(QStringLiteral("扬声器 (Realtek(R) Audio)"));
+        menu.addSeparator();
+        menu.addAction(QStringLiteral("选择麦克风"));
+        menu.popup(QPoint(200, 200));
+        QCoreApplication::processEvents();
+        QThread::msleep(120);
+        QCoreApplication::processEvents();
+        check("QMenu 圆角", ui::query_rounded_corners(&menu));
+        menu.close();
+    }
+
+    {
+        ui::MeetingSettingsPopup popup;
+        popup.set_room_no(1);
+        popup.set_host(true);
+        popup.show();
+        QCoreApplication::processEvents();
+        QThread::msleep(80);
+        check("会议设置弹窗圆角", ui::query_rounded_corners(&popup));
+        popup.hide();
+    }
+
+    {
+        ui::LoginWindow window;
+        window.show();
+        QCoreApplication::processEvents();
+        QThread::msleep(80);
+        check("登录窗口圆角", ui::query_rounded_corners(&window));
+        window.hide();
+    }
+
+    std::printf("[popup-round] 结论: %s\n", all_ok ? "PASS" : "FAIL");
+    return all_ok ? 0 : 1;
+}
+
+}  // namespace
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     QApplication::setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
@@ -1634,6 +1691,10 @@ int main(int argc, char *argv[]) {
         return run_window_theme_selftest();
     }
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
+                        QStringLiteral("--popup-rounding-selftest")) {
+        return run_popup_rounding_selftest();
+    }
+    if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--avatar-alpha-selftest")) {
         return run_avatar_alpha_selftest();
     }
@@ -1689,6 +1750,7 @@ int main(int argc, char *argv[]) {
 
     // 加载全局样式（与 main.cpp 一致：走 ThemeManager，支持深/浅主题）
     ui::FontRegistry::load_bundled();
+    ui::install_popup_rounding();
     ui::ThemeManager::instance().apply_global(
         QStringLiteral(":/Style/source/style.qss"));
     std::printf("[preview] theme = %s\n",
