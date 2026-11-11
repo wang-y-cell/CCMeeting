@@ -3,7 +3,7 @@
  * 令牌取值见 style.qss 顶部注释
  * ============================================================ */
 
-QDialog#recordingPlayback {
+QWidget#recordingPlayback {
     background-color: @canvas;
     border: 1px solid @border;
 }

@@ -91,6 +91,7 @@ target_link_libraries(CloudMeetingClient
         Threads::Threads
         spdlog::spdlog
         xrtc
+    dwmapi
 )
 
 # 添加编译期宏

@@ -37,6 +37,8 @@ ui::RecordingPlaybackDialog::RecordingPlaybackDialog(const RecordingEntry &entry
     // 否则会被当成子控件嵌进父窗口（QDialog 不会，它自带 Dialog 窗口类型）。
     setWindowFlags(windowFlags() | Qt::Window);
     setWindowTitle(tr("录制回放"));
+    // 根对象名供 QSS 根选择器匹配（原来缺失导致根样式不生效）
+    setObjectName(QStringLiteral("recordingPlayback"));
     setTitleBarHeight(40);
     setResizable(true);
     setMaximizable(true);
