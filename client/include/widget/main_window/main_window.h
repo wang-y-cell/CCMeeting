@@ -5,15 +5,18 @@
 #include "main_window_ui.h"
 #include "meeting_widget.h"
 #include "stack_create_meet.h"
-#include "stack_join_meet.h"
 #include "stack_user_profile.h"
 #include "recording_playback_dialog.h"
 #include "stack_meeting_history.h"
 #include "stack_recordings.h"
 #include "stack_setting.h"
 
+#include "ui/pages/join_meeting_page.h"
+#include "ui/shell/page_registry.h"
+
 #include <QCloseEvent>
 #include <QWidget>
+#include <QVector>
 
 class main_window : public FramelessWindow<QWidget> {
     Q_OBJECT
@@ -54,11 +57,21 @@ private:
     void destroyMeetingWidget();
     MeetingWidget *ensureMeetingWidget();
 
+    /** @brief 注册所有页面（新增页面只改这里一行） */
+    void register_pages();
+    /** @brief 按注册表创建页面并装配内容栈 */
+    void build_pages();
+
     Ui_main_window ui;
     MeetingWidget *widget = nullptr;
 
+    /** 页面注册表：外壳只依赖它，不再硬编码具体页面类 */
+    ui::PageRegistry m_pages;
+    /** 侧栏顺序对应的页面（与 m_pages.nav() 同序） */
+    QVector<QWidget *> m_nav_pages;
+
     stack_create_meet *create_meeting_widget = nullptr;
-    stack_join_meet *join_meeting_widget = nullptr;
+    ui::JoinMeetingPage *join_meeting_widget = nullptr;
     stack_user_profile *user_profile_widget = nullptr;
     stack_meeting_history *history_widget = nullptr;
     stack_recordings *recordings_widget = nullptr;

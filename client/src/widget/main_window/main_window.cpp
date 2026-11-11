@@ -1,4 +1,5 @@
 #include "main_window.h"
+#include "ui/foundation/theme_manager.h"
 #include "avatar_image_loader.h"
 #include "configure/client_config.h"
 #include "configure/login_store.h"
@@ -51,8 +52,10 @@ main_window::main_window(QWidget *parent) : FramelessWindow<QWidget>(parent) {
     // 过早加载后 WebRTC 摄像头枚举（设置页）在部分环境会直接崩溃。
     connect(create_meeting_widget, &stack_create_meet::createMeetingClicked,
             this, &main_window::CreateMeeting_button_clicked);
-    connect(join_meeting_widget, &stack_join_meet::joinMeetingClicked, this,
-            &main_window::JoinMeeting_button_clicked);
+    if (join_meeting_widget != nullptr) {
+        connect(join_meeting_widget, &ui::JoinMeetingPage::join_requested, this,
+                &main_window::JoinMeeting_button_clicked);
+    }
     if (ui.btnLogout) {
         connect(ui.btnLogout, &QPushButton::clicked, this,
                 &main_window::onLogoutClicked);
@@ -80,7 +83,9 @@ main_window::main_window(QWidget *parent) : FramelessWindow<QWidget>(parent) {
 }
 
 void main_window::set_style() {
-    loadWidgetStyleSheet(this, QStringLiteral(":/Style/source/main_window.qss"));
+    // 统一走令牌替换：QSS 里可以写 @primary / @canvas 等占位符（见 ui/foundation/design_tokens.h）
+    ui::ThemeManager::instance().apply_to(
+        this, QStringLiteral(":/Style/source/main_window.qss"));
 }
 
 void main_window::destroyMeetingWidget() {
@@ -184,57 +189,103 @@ void main_window::onProfileAvatarUpdated() {
     refreshUserCard();
 }
 
+void main_window::register_pages() {
+    // 侧栏顺序 = order 顺序，必须是 create(0) join(1) history(2)
+    // recordings(3) settings(4)，与 sideNav 的行号一一对应。
+    // 历史遗留页面暂时仍用具体类型；迁移到 ui/pages/ 时只改工厂这一行。
+    m_pages.add({QStringLiteral("create"), tr("创建会议"),
+                 QStringLiteral("video"), 0, true},
+                [this](QWidget *) { return new stack_create_meet(this); });
+    m_pages.add({QStringLiteral("join"), tr("加入会议"),
+                 QStringLiteral("users"), 10, true},
+                [this](QWidget *) { return new ui::JoinMeetingPage(this); });
+    m_pages.add({QStringLiteral("history"), tr("会议记录"),
+                 QStringLiteral("calendar"), 20, true},
+                [this](QWidget *) { return new stack_meeting_history(this); });
+    m_pages.add({QStringLiteral("recordings"), tr("录制"),
+                 QStringLiteral("record"), 30, true},
+                [this](QWidget *) { return new stack_recordings(this); });
+    m_pages.add({QStringLiteral("settings"), tr("设置"),
+                 QStringLiteral("settings"), 40, true},
+                [this](QWidget *) { return new stack_setting(this); });
+
+    // 不进侧栏、由用户卡片进入的页面
+    m_pages.add({QStringLiteral("profile"), tr("个人资料"),
+                 QStringLiteral("user"), 100, false},
+                [this](QWidget *) { return new stack_user_profile(this); });
+}
+
+void main_window::build_pages() {
+    // 1) 按注册表创建全部页面，并按注册顺序加入内容栈
+    for (const ui::PageMeta &meta : m_pages.all()) {
+        QWidget *page = m_pages.create(meta.id, this);
+        if (page == nullptr) {
+            continue;
+        }
+        ui.contentStack->addWidget(page);
+        if (meta.in_nav) {
+            m_nav_pages.append(page);
+        }
+    }
+
+    // 2) 取出需要业务装配的具体类型（其余页面外壳不需要知道）
+    create_meeting_widget =
+        qobject_cast<stack_create_meet *>(m_pages.find(QStringLiteral("create")));
+    join_meeting_widget = qobject_cast<ui::JoinMeetingPage *>(
+        m_pages.find(QStringLiteral("join")));
+    history_widget = qobject_cast<stack_meeting_history *>(
+        m_pages.find(QStringLiteral("history")));
+    recordings_widget = qobject_cast<stack_recordings *>(
+        m_pages.find(QStringLiteral("recordings")));
+    setting_widget = qobject_cast<stack_setting *>(
+        m_pages.find(QStringLiteral("settings")));
+    user_profile_widget = qobject_cast<stack_user_profile *>(
+        m_pages.find(QStringLiteral("profile")));
+
+    if (recordings_widget != nullptr) {
+        connect(recordings_widget, &stack_recordings::playRequested, this,
+                [this](const RecordingEntry &entry) {
+                    auto *dialog = new RecordingPlaybackDialog(entry, this);
+                    dialog->setAttribute(Qt::WA_DeleteOnClose);
+                    dialog->show();
+                    dialog->play();
+                });
+    }
+
+    // 3) 侧栏切换：按"页"统一处理，新页面只要实现 ui::Page::on_show 就能懒刷新
+    ui.sideNav->setCurrentRow(0);
+    connect(ui.sideNav, &QListWidget::currentRowChanged, this,
+            [this](int row) {
+                if (ui.contentStack == nullptr || row < 0 ||
+                    row >= m_nav_pages.size()) {
+                    return;
+                }
+                QWidget *page = m_nav_pages.at(row);
+                if (page == nullptr) {
+                    return;
+                }
+                // 新页面：统一走 ui::Page 钩子
+                if (auto *ui_page = qobject_cast<ui::Page *>(page)) {
+                    ui_page->on_show();
+                } else if (auto *history =
+                               qobject_cast<stack_meeting_history *>(page)) {
+                    history->refresh();  // 历史遗留页面（迁移后删除此分支）
+                } else if (auto *recordings =
+                               qobject_cast<stack_recordings *>(page)) {
+                    recordings->refresh();  // 同上
+                }
+                ui.contentStack->setCurrentWidget(page);
+            });
+}
+
 void main_window::init_ui() {
     setAttribute(Qt::WA_StyledBackground, true);
     ui.setupUi(this);
 
     ui.userCard->installEventFilter(this);
 
-    create_meeting_widget = new stack_create_meet(this);
-    ui.contentStack->addWidget(create_meeting_widget);
-
-    join_meeting_widget = new stack_join_meet(this);
-    ui.contentStack->addWidget(join_meeting_widget);
-
-    history_widget = new stack_meeting_history(this);
-    ui.contentStack->addWidget(history_widget);
-
-    recordings_widget = new stack_recordings(this);
-    ui.contentStack->addWidget(recordings_widget);
-    connect(recordings_widget, &stack_recordings::playRequested, this,
-            [this](const RecordingEntry &entry) {
-                auto *dialog = new RecordingPlaybackDialog(entry, this);
-                dialog->setAttribute(Qt::WA_DeleteOnClose);
-                dialog->show();
-                dialog->play();
-            });
-
-    setting_widget = new stack_setting(this);
-    ui.contentStack->addWidget(setting_widget);
-
-    user_profile_widget = new stack_user_profile(this);
-    ui.contentStack->addWidget(user_profile_widget);
-
-    ui.sideNav->setCurrentRow(0);
-    connect(ui.sideNav, &QListWidget::currentRowChanged, this,
-            [this](int row) {
-                if (!ui.contentStack) {
-                    return;
-                }
-                if (row == 0 && create_meeting_widget) {
-                    ui.contentStack->setCurrentWidget(create_meeting_widget);
-                } else if (row == 1 && join_meeting_widget) {
-                    ui.contentStack->setCurrentWidget(join_meeting_widget);
-                } else if (row == 2 && history_widget) {
-                    history_widget->refresh();
-                    ui.contentStack->setCurrentWidget(history_widget);
-                } else if (row == 3 && recordings_widget) {
-                    recordings_widget->refresh();
-                    ui.contentStack->setCurrentWidget(recordings_widget);
-                } else if (row == 4 && setting_widget) {
-                    ui.contentStack->setCurrentWidget(setting_widget);
-                }
-            });
+    register_pages();
+    build_pages();
 
     connect(setting_widget, &stack_setting::uiPrefsChanged, this, [this]() {
         // 预留：主题等后续可在此刷新
@@ -319,8 +370,8 @@ void main_window::onMeetingConfirmed(bool created, int roomNo) {
     if (create_meeting_widget && create_meeting_widget->findChild<RecentMeetingList *>()) {
         create_meeting_widget->findChild<RecentMeetingList *>()->refresh();
     }
-    if (join_meeting_widget && join_meeting_widget->findChild<RecentMeetingList *>()) {
-        join_meeting_widget->findChild<RecentMeetingList *>()->refresh();
+    if (join_meeting_widget != nullptr) {
+        join_meeting_widget->refresh_recent();
     }
 }
 
@@ -332,8 +383,8 @@ void main_window::onMeetingClosed(qint64 durationMs) {
     if (create_meeting_widget && create_meeting_widget->findChild<RecentMeetingList *>()) {
         create_meeting_widget->findChild<RecentMeetingList *>()->refresh();
     }
-    if (join_meeting_widget && join_meeting_widget->findChild<RecentMeetingList *>()) {
-        join_meeting_widget->findChild<RecentMeetingList *>()->refresh();
+    if (join_meeting_widget != nullptr) {
+        join_meeting_widget->refresh_recent();
     }
 }
 

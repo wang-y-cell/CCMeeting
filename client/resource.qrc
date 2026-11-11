@@ -6,16 +6,22 @@
     <qresource prefix="/myEffect">
         <file>source/2.wav</file>
     </qresource>
+    <!--
+        QSS 已迁到 src/ui/theme/。
+        用 alias 保留 :/Style/source/xxx.qss 这个旧路径，
+        这样所有 setStyleSheet/loadWidgetStyleSheet 的调用点都不用改。
+        （后续可统一改成 :/Style/ui/theme/xxx.qss）
+    -->
     <qresource prefix="/Style">
-        <file>source/style.qss</file>
-        <file>source/login.qss</file>
-        <file>source/main_window.qss</file>
-        <file>source/meeting_widget.qss</file>
-        <file>source/meeting_settings_popup.qss</file>
-        <file>source/stack_recordings.qss</file>
-        <file>source/recording_playback_dialog.qss</file>
-        <file>source/edit_profile_dialog.qss</file>
-        <file>source/avatar_crop_dialog.qss</file>
+        <file alias="source/style.qss">src/ui/theme/style.qss</file>
+        <file alias="source/login.qss">src/ui/theme/login.qss</file>
+        <file alias="source/main_window.qss">src/ui/theme/main_window.qss</file>
+        <file alias="source/meeting_widget.qss">src/ui/theme/meeting_widget.qss</file>
+        <file alias="source/meeting_settings_popup.qss">src/ui/theme/meeting_settings_popup.qss</file>
+        <file alias="source/stack_recordings.qss">src/ui/theme/stack_recordings.qss</file>
+        <file alias="source/recording_playback_dialog.qss">src/ui/theme/recording_playback_dialog.qss</file>
+        <file alias="source/edit_profile_dialog.qss">src/ui/theme/edit_profile_dialog.qss</file>
+        <file alias="source/avatar_crop_dialog.qss">src/ui/theme/avatar_crop_dialog.qss</file>
     </qresource>
     <qresource prefix="/config">
         <file>config/client.json</file>
