@@ -118,15 +118,26 @@ QPushButton#joinMeeting_btn {
 | 头像裁剪 | `ui::AvatarCropDialog` / `ui::AvatarCropCanvas` → `ui/dialogs/` | |
 | 录制回放 | `ui::RecordingPlaybackDialog` → `ui/dialogs/recording_playback_dialog.*` | |
 
-**下一批（尚未迁移）**：
+**会议窗口 / 逻辑 / 基础层（已完成）**：
 
 | 对象 | 现状 |
 |---|---|
-| 会议窗口 | `meeting_widget` + `meeting_widget_ui.*`（预计迁到 `ui/pages/meeting_window.*`） |
-| 会话逻辑 | 6 个 controller 还在 `src/widget/meeting/`，待移到 `src/features/meeting/` |
-| 基础控件层 | `ui/primitives`（按钮/输入/卡片/开关）尚未抽出 |
-| 图标体系 | `ui/foundation/icon_provider` + SVG 图标按钮未做 |
-| 字体 | `resources/fonts/` 仍为空 |
+| 会议窗口 | `ui/pages/meeting_window.*`（`ui::MeetingWindow`）+ `meeting_window_ui.*` |
+| 会议设置弹窗 | `ui/pages/meeting_settings_popup.*`（`ui::MeetingSettingsPopup`） |
+| 会话逻辑 | 8 个 controller → `src/features/meeting/`，include 为 `features/meeting/*.h` |
+| 基础控件 | `ui/primitives/`：`PageHeader`、`Card`、`make_field_label`（加入/创建页已采用） |
+| 图标 | `resources/icons/*.svg`（13 个）+ `ui/foundation/icon_provider`（着色+缓存） |
+| 字体 | `ui/foundation/font_registry`（扫描 `:/ui/fonts` 注册，目录空时安全跳过） |
+| 截图回归 | `client/tools/image_diff.py` + UiPreview 固定时间种子（同版本连拍 0 差异） |
+
+**仍可继续优化（非阻塞）**：
+
+| 项 | 说明 |
+|---|---|
+| 其余页面改用语 primitives | settings / history / recordings / profile 的 `_ui.cpp` 仍手写布局 |
+| 图标着色实时刷新 | 会议工具栏图标在窗口创建时着色，切换主题后需重建窗口才更新 |
+| 字体文件 | `resources/fonts/` 仍为空，放入 ttf/otf 并在 qrc 登记后自动生效 |
+| 像素基线 | 建议把 `ui-preview-dark` 作为基线目录纳入评审流程（目前未提交到仓库） |
 ## 主题（深色 / 浅色）
 
 三件事配合工作，缺一不可：
