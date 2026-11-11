@@ -1,4 +1,4 @@
-#include "chat_controller.h"
+#include "features/meeting/chat_controller.h"
 
 #include "chatmessage.h"
 #include "configure/user_session.h"

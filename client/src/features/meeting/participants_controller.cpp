@@ -1,4 +1,4 @@
-#include "participants_controller.h"
+#include "features/meeting/participants_controller.h"
 
 #include "cameravideo.h"
 #include "partner.h"

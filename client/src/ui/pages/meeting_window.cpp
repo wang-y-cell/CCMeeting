@@ -1,5 +1,5 @@
 #include "ui/pages/meeting_window.h"
-#include "meeting_recorder.h"
+#include "features/meeting/meeting_recorder.h"
 #include "ui/pages/meeting_settings_popup.h"
 #include "recording_library.h"
 #include "configure/client_config.h"

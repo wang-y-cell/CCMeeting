@@ -1,4 +1,4 @@
-#include "meeting_controller.h"
+#include "features/meeting/meeting_controller.h"
 
 #include <QThread>
 #include <spdlog/spdlog.h>

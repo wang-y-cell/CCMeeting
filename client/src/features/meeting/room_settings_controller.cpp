@@ -1,6 +1,6 @@
-#include "room_settings_controller.h"
+#include "features/meeting/room_settings_controller.h"
 
-#include "meeting_recorder.h"
+#include "features/meeting/meeting_recorder.h"
 #include "ui/pages/meeting_settings_popup.h"
 #include "room_settings_flags.h"
 
