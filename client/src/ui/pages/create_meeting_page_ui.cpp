@@ -1,5 +1,9 @@
 #include "ui/pages/create_meeting_page_ui.h"
 
+#include "ui/primitives/card.h"
+#include "ui/primitives/field_label.h"
+#include "ui/primitives/page_header.h"
+
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -20,31 +24,19 @@ void ui::CreateMeetingPageUi::setupUi(QWidget *parent) {
     root->setSpacing(10);
     root->setContentsMargins(0, 0, 0, 0);
 
-    pageTitle = new QLabel(QObject::tr("创建会议"), parent);
-    pageTitle->setObjectName(QStringLiteral("pageTitle"));
-    root->addWidget(pageTitle);
-
-    pageDesc = new QLabel(
+    auto *header = new ui::PageHeader(
+        QObject::tr("创建会议"),
         QObject::tr("设置会议人数与时长，快速发起一场新会议"), parent);
-    pageDesc->setObjectName(QStringLiteral("pageDesc"));
-    root->addWidget(pageDesc);
+    pageTitle = header->title_label();
+    pageDesc = header->desc_label();
+    root->addWidget(header);
 
     root->addItem(
         new QSpacerItem(20, 10, QSizePolicy::Minimum, QSizePolicy::Fixed));
 
-    auto *frame = new QFrame(parent);
-    frame->setObjectName(QStringLiteral("frame"));
-    frame->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-    frame->setMinimumHeight(212);
-    // 表单不铺满整宽：限制在 560 以内，接近现代后台表单比例
-    frame->setMinimumWidth(520);
-    frame->setMaximumWidth(560);
-    frame->setFrameShape(QFrame::NoFrame);
-
-    auto *cardLayout = new QVBoxLayout(frame);
-    cardLayout->setObjectName(QStringLiteral("cardLayout"));
-    cardLayout->setSpacing(18);
-    cardLayout->setContentsMargins(24, 24, 24, 24);
+    // 卡片尺寸/内边距与旧实现一致（212 高、520–560 宽、24 内边距、18 间距）
+    auto *frame = new ui::Card(parent, 24, 18, 212, 520, 560);
+    QVBoxLayout *cardLayout = frame->body();
 
     auto *fieldsLayout = new QHBoxLayout();
     fieldsLayout->setObjectName(QStringLiteral("fieldsLayout"));
@@ -53,8 +45,7 @@ void ui::CreateMeetingPageUi::setupUi(QWidget *parent) {
     auto *peopleLayout = new QVBoxLayout();
     peopleLayout->setObjectName(QStringLiteral("peopleLayout"));
     peopleLayout->setSpacing(6);
-    fieldLabel = new QLabel(QObject::tr("参会人数上限"), frame);
-    fieldLabel->setObjectName(QStringLiteral("fieldLabel"));
+    fieldLabel = ui::make_field_label(QObject::tr("参会人数上限"), frame);
     lineEdit = new QLineEdit(frame);
     lineEdit->setObjectName(QStringLiteral("lineEdit"));
     lineEdit->setMinimumHeight(38);

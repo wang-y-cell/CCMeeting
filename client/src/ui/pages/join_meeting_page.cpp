@@ -1,5 +1,9 @@
 #include "ui/pages/join_meeting_page.h"
 
+#include "ui/primitives/card.h"
+#include "ui/primitives/field_label.h"
+#include "ui/primitives/page_header.h"
+
 #include "recent_meeting_list.h"
 
 #include <QFrame>
@@ -51,32 +55,21 @@ void JoinMeetingPage::build_ui() {
     root->setSpacing(10);
     root->setContentsMargins(0, 0, 0, 0);
 
-    m_title = new QLabel(tr("加入会议"), this);
-    m_title->setObjectName(QStringLiteral("pageTitle"));
-    root->addWidget(m_title);
-
-    m_desc = new QLabel(tr("输入房间号，快速加入已有会议"), this);
-    m_desc->setObjectName(QStringLiteral("pageDesc"));
-    root->addWidget(m_desc);
+    // 标题块由 primitives 统一（QSS 仍是 #pageTitle / #pageDesc）
+    auto *header = new ui::PageHeader(tr("加入会议"),
+                                      tr("输入房间号，快速加入已有会议"), this);
+    m_title = header->title_label();
+    m_desc = header->desc_label();
+    root->addWidget(header);
 
     root->addItem(
         new QSpacerItem(20, 10, QSizePolicy::Minimum, QSizePolicy::Fixed));
 
-    auto *frame = new QFrame(this);
-    frame->setObjectName(QStringLiteral("frame"));
-    frame->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-    frame->setMinimumHeight(172);
-    frame->setMinimumWidth(520);
-    frame->setMaximumWidth(560);
-    frame->setFrameShape(QFrame::NoFrame);
+    // 卡片与字段标签统一走 primitives（尺寸/内边距与旧实现一致）
+    auto *frame = new ui::Card(this, 24, 10, 172, 520, 560);
+    QVBoxLayout *card_layout = frame->body();
 
-    auto *card_layout = new QVBoxLayout(frame);
-    card_layout->setObjectName(QStringLiteral("cardLayout"));
-    card_layout->setSpacing(10);
-    card_layout->setContentsMargins(24, 24, 24, 24);
-
-    m_field_label = new QLabel(tr("房间号"), frame);
-    m_field_label->setObjectName(QStringLiteral("fieldLabel"));
+    m_field_label = ui::make_field_label(tr("房间号"), frame);
     card_layout->addWidget(m_field_label);
 
     auto *join_row = new QHBoxLayout();
