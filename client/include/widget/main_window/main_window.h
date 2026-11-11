@@ -57,6 +57,11 @@ private:
     void destroyMeetingWindow();
     ui::MeetingWindow *ensureMeetingWindow();
 
+    /** @brief 会议已开始：主窗口让位（隐藏），结束时再恢复 */
+    void hide_for_meeting();
+    /** @brief 会议结束/被销毁：恢复主窗口 */
+    void restore_after_meeting();
+
     /** @brief 注册所有页面（新增页面只改这里一行） */
     void register_pages();
     /** @brief 按注册表创建页面并装配内容栈 */
@@ -64,6 +69,8 @@ private:
 
     Ui_main_window ui;
     ui::MeetingWindow *widget = nullptr;
+    /** 主窗口是否因会议而隐藏（避免重复 hide/show） */
+    bool hidden_for_meeting_ = false;
 
     /** 页面注册表：外壳只依赖它，不再硬编码具体页面类 */
     ui::PageRegistry m_pages;
