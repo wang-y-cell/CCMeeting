@@ -56,6 +56,12 @@ public:
     /** @brief 追加一条记录（标记为进行中），返回记录的房间号 */
     static void append(MeetingRecordKind kind, int room_no);
 
+    /**
+     * @brief 测试钩子：固定"当前时间"，让截图/用例可复现
+     * @param now 有效时间表示覆盖；无效 QDateTime 表示恢复真实时间
+     */
+    static void set_now_override(const QDateTime &now);
+
     /** @brief 有记录处于进行中时，写入时长并结束它 */
     static void finish_open_session(qint64 duration_ms);
 

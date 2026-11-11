@@ -442,6 +442,9 @@ int run_meeting_history_selftest() {
 
 /// 截图用：写入几条样例记录（只在测试模式下调用）
 void seed_sample_history() {
+    // 固定时间戳：让截图可复现（否则每次运行时间不同，像素对比会误报）
+    MeetingHistory::set_now_override(
+        QDateTime(QDate(2026, 1, 1), QTime(10, 0, 0)));
     MeetingHistory::clear();
     MeetingHistory::append(MeetingRecordKind::Created, 12);
     MeetingHistory::finish_open_session(1830000);  // 30 分 30 秒
@@ -451,6 +454,7 @@ void seed_sample_history() {
     MeetingHistory::finish_open_session(90000);    // 1 分 30 秒
     MeetingHistory::append(MeetingRecordKind::Joined, 12);
     MeetingHistory::finish_open_session(600000);   // 10 分钟
+    MeetingHistory::set_now_override(QDateTime());  // 恢复真实时间
 }
 
 }  // namespace

@@ -18,6 +18,13 @@
 
 namespace {
 
+/** 测试钩子：非无效值时替代 QDateTime::currentDateTime() */
+QDateTime g_now_override;
+
+QDateTime current_time() {
+    return g_now_override.isValid() ? g_now_override : QDateTime::currentDateTime();
+}
+
 QString format_duration(qint64 ms) {
     if (ms <= 0) {
         return QString();
@@ -214,7 +221,7 @@ QVector<MeetingRecord> MeetingHistory::load() {
 }
 
 void MeetingHistory::append(MeetingRecordKind kind, int room_no) {
-    const QDateTime now = QDateTime::currentDateTime();
+    const QDateTime now = current_time();
     if (!use_database()) {
         QVector<MeetingRecord> records = load_json();
         MeetingRecord record;
@@ -393,4 +400,8 @@ void MeetingHistory::clear() {
     QSqlDatabase db = Storage::instance().connection();
     QSqlQuery query(db);
     query.exec(QStringLiteral("DELETE FROM meeting_history"));
+}
+
+void MeetingHistory::set_now_override(const QDateTime &now) {
+    g_now_override = now;
 }
