@@ -1615,6 +1615,70 @@ int run_popup_rounding_selftest() {
 }
 
 }  // namespace
+// ---------------------------------------------------------------------------
+// 缩放开销自检：验证标题按钮/最大化图标不再逐帧重排
+// 用法：UiPreview.exe --resize-cost-selftest
+// 期望：纯高度缩放 -> 0 次按钮重排、0 次图标刷新
+//       宽度缩放（拖左边）-> 只重排按钮，图标刷新仍为 0
+// ---------------------------------------------------------------------------
+namespace {
+
+int run_resize_cost_selftest() {
+    QStandardPaths::setTestModeEnabled(true);
+    bool all_ok = true;
+    auto check = [&](const char *name, bool ok, const QString &detail) {
+        all_ok = all_ok && ok;
+        std::printf("[resize-cost] %-28s %s  %s\n", name, ok ? "OK" : "FAIL",
+                    detail.toUtf8().constData());
+    };
+
+    main_window window;
+    window.setAttribute(Qt::WA_DontShowOnScreen, true);
+    window.resize(1000, 700);
+    window.show();
+    QCoreApplication::processEvents();
+    QThread::msleep(60);
+    QCoreApplication::processEvents();
+
+    const auto geo0 = window.title_geometry_update_count();
+    const auto icon0 = window.maximize_icon_update_count();
+
+    // 1) 纯高度变化（拖下边）：标题按钮位置与图标状态都不会变
+    QRect geometry = window.geometry();
+    for (int i = 1; i <= 60; ++i) {
+        window.setGeometry(geometry.x(), geometry.y(), geometry.width(),
+                           geometry.height() + i);
+        QCoreApplication::processEvents();
+    }
+    const auto geo_height = window.title_geometry_update_count() - geo0;
+    const auto icon_height = window.maximize_icon_update_count() - icon0;
+    check("高度缩放：不重排标题按钮", geo_height == 0,
+          QStringLiteral("次数=%1").arg(geo_height));
+    check("高度缩放：不刷新最大化图标", icon_height == 0,
+          QStringLiteral("次数=%1").arg(icon_height));
+
+    // 2) 宽度变化（拖左边）：按钮必须重排，但图标状态不变
+    const auto geo1 = window.title_geometry_update_count();
+    const auto icon1 = window.maximize_icon_update_count();
+    geometry = window.geometry();
+    for (int i = 1; i <= 60; ++i) {
+        window.setGeometry(geometry.x() - i, geometry.y(),
+                           geometry.width() + i, geometry.height());
+        QCoreApplication::processEvents();
+    }
+    const auto geo_left = window.title_geometry_update_count() - geo1;
+    const auto icon_left = window.maximize_icon_update_count() - icon1;
+    check("宽度缩放：按钮重排（必要）", geo_left >= 1,
+          QStringLiteral("次数=%1").arg(geo_left));
+    check("宽度缩放：不刷新最大化图标", icon_left == 0,
+          QStringLiteral("次数=%1").arg(icon_left));
+
+    window.hide();
+    std::printf("[resize-cost] 结论: %s\n", all_ok ? "PASS" : "FAIL");
+    return all_ok ? 0 : 1;
+}
+
+}  // namespace
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     QApplication::setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
@@ -1693,6 +1757,10 @@ int main(int argc, char *argv[]) {
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--popup-rounding-selftest")) {
         return run_popup_rounding_selftest();
+    }
+    if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
+                        QStringLiteral("--resize-cost-selftest")) {
+        return run_resize_cost_selftest();
     }
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--avatar-alpha-selftest")) {

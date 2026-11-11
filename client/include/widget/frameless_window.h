@@ -7,6 +7,7 @@
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QResizeEvent>
+#include <cstdint>
 
 #include "ui/foundation/window_effects.h"
 #include <QScreen>
@@ -100,6 +101,15 @@ public:
     }
     /** @brief 获得是否允许最大化的bool值,true表示允许,false表示不允许 */
     bool isMaximizable() const { return m_maximizable; }
+
+    /** @brief 标题按钮摆放次数（自检/性能诊断用） */
+    std::uint32_t title_geometry_update_count() const {
+        return m_title_geometry_updates;
+    }
+    /** @brief 最大化图标刷新次数（自检/性能诊断用） */
+    std::uint32_t maximize_icon_update_count() const {
+        return m_maximize_icon_updates;
+    }
 
 protected:
     /**
@@ -243,6 +253,15 @@ protected:
     /** @brief 是否已申请过系统圆角 */
     bool rounded_corners_applied_ = false;
 
+    /** 最近一次摆放标题按钮时的窗口宽度（宽度不变则跳过重排） */
+    int m_last_title_geometry_width = -1;
+    /** 最近一次刷新最大化图标时的状态 */
+    bool m_last_maximized_state = false;
+    bool m_maximize_icon_initialized = false;
+    /** 自检/性能诊断计数 */
+    std::uint32_t m_title_geometry_updates = 0;
+    std::uint32_t m_maximize_icon_updates = 0;
+
     /** @brief 窗口状态变化（如最大化）时同步按钮外观 */
     void changeEvent(QEvent *event) override {
         Base::changeEvent(event);
@@ -338,6 +357,15 @@ private:
         if (!m_closeBtn) {
             return;
         }
+        // 只有宽度变化才会改变标题按钮的位置：高度变化/纯移动直接跳过，
+        // 避免每帧 raise() + move() 触发多余的堆叠与重绘（拖左边缩放时抖动）
+        const int width = Base::width();
+        if (width == m_last_title_geometry_width) {
+            return;
+        }
+        m_last_title_geometry_width = width;
+        ++m_title_geometry_updates;
+
         const int closeX = Base::width() - m_closeBtn->width() - kBtnMargin;
         m_closeBtn->move(closeX, kBtnMargin);
 
@@ -357,7 +385,17 @@ private:
         if (!m_maxBtn) {
             return;
         }
-        if (Base::isMaximized()) {
+        // 最大化状态不随尺寸改变：只有状态翻转时才 setText/setToolTip，
+        // 否则每次 resize 都在重设按钮文本（会触发按钮重绘）
+        const bool maximized = Base::isMaximized();
+        if (m_maximize_icon_initialized && maximized == m_last_maximized_state) {
+            return;
+        }
+        m_last_maximized_state = maximized;
+        m_maximize_icon_initialized = true;
+        ++m_maximize_icon_updates;
+
+        if (maximized) {
             m_maxBtn->setText(QStringLiteral("❐"));
             m_maxBtn->setToolTip(QStringLiteral("还原"));
         } else {
