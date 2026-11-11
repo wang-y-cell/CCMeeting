@@ -1411,6 +1411,64 @@ int run_video_backdrop_selftest() {
 }
 
 }  // namespace
+// ---------------------------------------------------------------------------
+// 主窗口让位自检：会议确认后主窗口隐藏，会议结束后恢复
+// 用法：UiPreview.exe --main-hide-selftest
+// ---------------------------------------------------------------------------
+namespace {
+
+bool invoke_slot(QObject *object, const char *name, const QVariantList &args) {
+    QMetaObject::invokeMethod(object, name, Qt::DirectConnection,
+                              QGenericArgument(args.at(0).typeName(), args.at(0).constData()));
+    return true;
+}
+
+int run_main_hide_selftest() {
+    QStandardPaths::setTestModeEnabled(true);
+    bool all_ok = true;
+    auto check = [&](const char *name, bool ok, const QString &detail) {
+        all_ok = all_ok && ok;
+        std::printf("[main-hide] %-34s %s  %s\n", name, ok ? "OK" : "FAIL",
+                    detail.toUtf8().constData());
+    };
+
+    main_window window;
+    window.setAttribute(Qt::WA_DontShowOnScreen, true);
+    window.show();
+    QCoreApplication::processEvents();
+    check("初始主窗口可见", window.isVisible(), {});
+
+    // 模拟"会议已确认"：onMeetingConfirmed(bool, int)
+    bool invoked = QMetaObject::invokeMethod(
+        &window, "onMeetingConfirmed", Qt::DirectConnection,
+        Q_ARG(bool, true), Q_ARG(int, 123456));
+    QCoreApplication::processEvents();
+    check("会议确认后主窗口隐藏", invoked && !window.isVisible(),
+          QStringLiteral("invoked=%1 visible=%2")
+              .arg(invoked)
+              .arg(window.isVisible()));
+
+    // 模拟"会议结束"：onMeetingClosed(qint64)
+    invoked = QMetaObject::invokeMethod(&window, "onMeetingClosed",
+                                        Qt::DirectConnection,
+                                        Q_ARG(qint64, 60000));
+    QCoreApplication::processEvents();
+    check("会议结束后主窗口恢复", invoked && window.isVisible(),
+          QStringLiteral("invoked=%1 visible=%2")
+              .arg(invoked)
+              .arg(window.isVisible()));
+
+    // 重复确认/重复结束不应出问题（幂等）
+    QMetaObject::invokeMethod(&window, "onMeetingClosed", Qt::DirectConnection,
+                              Q_ARG(qint64, 0));
+    QCoreApplication::processEvents();
+    check("重复关闭仍保持可见", window.isVisible(), {});
+
+    std::printf("[main-hide] 结论: %s\n", all_ok ? "PASS" : "FAIL");
+    return all_ok ? 0 : 1;
+}
+
+}  // namespace
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     QApplication::setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
@@ -1477,6 +1535,10 @@ int main(int argc, char *argv[]) {
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--video-backdrop-selftest")) {
         return run_video_backdrop_selftest();
+    }
+    if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
+                        QStringLiteral("--main-hide-selftest")) {
+        return run_main_hide_selftest();
     }
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--avatar-alpha-selftest")) {

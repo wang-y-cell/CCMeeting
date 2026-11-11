@@ -90,6 +90,8 @@ void main_window::set_style() {
 }
 
 void main_window::destroyMeetingWindow() {
+    // 兜底：会议窗口被销毁时主窗口必须回来
+    restore_after_meeting();
     if (!widget) {
         return;
     }
@@ -391,6 +393,30 @@ void main_window::onConnectServerFinished(bool ok, QString ip, QString port,
     }
 }
 
+void main_window::hide_for_meeting() {
+    if (!isVisible()) {
+        return;
+    }
+    hidden_for_meeting_ = true;
+    hide();
+    spdlog::info("[main_window] 会议已开始 -> 隐藏主窗口");
+}
+
+void main_window::restore_after_meeting() {
+    if (!hidden_for_meeting_) {
+        return;
+    }
+    hidden_for_meeting_ = false;
+    // 可能被会议窗口抢走焦点/最小化，恢复时一并唤醒
+    if (isMinimized()) {
+        setWindowState(windowState() & ~Qt::WindowMinimized);
+    }
+    show();
+    raise();
+    activateWindow();
+    spdlog::info("[main_window] 会议已结束 -> 恢复主窗口");
+}
+
 void main_window::onMeetingConfirmed(bool created, int roomNo) {
     MeetingHistory::append(created ? MeetingRecordKind::Created
                                    : MeetingRecordKind::Joined,
@@ -405,6 +431,9 @@ void main_window::onMeetingConfirmed(bool created, int roomNo) {
     if (join_meeting_widget != nullptr) {
         join_meeting_widget->refresh_recent();
     }
+
+    // 需求：会议开始后主窗口让位，结束/终止时再出现
+    hide_for_meeting();
 }
 
 void main_window::onMeetingClosed(qint64 durationMs) {
@@ -418,6 +447,8 @@ void main_window::onMeetingClosed(qint64 durationMs) {
     if (join_meeting_widget != nullptr) {
         join_meeting_widget->refresh_recent();
     }
+
+    restore_after_meeting();
 }
 
 void main_window::onLogoutClicked() {
