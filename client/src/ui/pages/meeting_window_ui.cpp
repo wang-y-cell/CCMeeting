@@ -54,8 +54,8 @@ QPushButton *makeToolButton(const QString &objectName, const QString &text,
     if (const auto it = kIconByName.constFind(objectName); it != kIconByName.constEnd()) {
         const QColor icon_color =
             ui::ThemeManager::instance().color(QStringLiteral("textMuted"));
-        btn->setIcon(ui::IconProvider::instance().icon(it.value(), icon_color, 20));
-        btn->setIconSize(QSize(20, 20));
+        btn->setIcon(ui::IconProvider::instance().icon(it.value(), icon_color, 16));
+        btn->setIconSize(QSize(16, 16));
     }
     return btn;
 }
@@ -141,7 +141,7 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
     btnMeetingSettings->setFixedHeight(26);
     btnMeetingSettings->setIcon(ui::IconProvider::instance().icon(
         QStringLiteral("settings"),
-        ui::ThemeManager::instance().color(QStringLiteral("textMuted")), 14));
+        ui::ThemeManager::instance().color(QStringLiteral("textMuted")), 12));
 
     topStatusLayout->addWidget(topMainTitle);
     topStatusLayout->addWidget(topRoomChip);
@@ -273,7 +273,7 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
     sendmsg->setObjectName(QStringLiteral("sendmsg"));
     sendmsg->setIcon(ui::IconProvider::instance().icon(
         QStringLiteral("send"),
-        ui::ThemeManager::instance().color(QStringLiteral("onPrimary")), 16));
+        ui::ThemeManager::instance().color(QStringLiteral("onPrimary")), 14));
     sendmsg->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     verticalLayout_6->addWidget(sendmsg);
     tabWidget->addTab(tab_6, QObject::tr("聊天"));

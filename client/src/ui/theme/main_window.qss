@@ -50,7 +50,7 @@ QListWidget#sideNav {
 }
 
 QListWidget#sideNav {
-    icon-size: 18px;
+    icon-size: 16px;
 }
 
 QListWidget#sideNav::item {
