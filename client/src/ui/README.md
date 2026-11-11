@@ -101,3 +101,31 @@ QPushButton#joinMeeting_btn {
 | 加入会议 | ✅ `ui/pages/join_meeting_page.*`（注册表 + `on_show` 懒刷新） |
 | 创建会议 / 会议记录 / 录制 / 设置 / 个人资料 | ⏳ 仍走旧类，注册表已登记，只需替换工厂 |
 | 外壳（侧栏/栈） | ⏳ 侧栏仍由 `main_window_ui.cpp` 手工构建；已改为按注册表建内容栈 |
+## 主题（深色 / 浅色）
+
+三件事配合工作，缺一不可：
+
+1. **令牌层** `ui/foundation/design_tokens.h`
+   两套调色板 `kDark` / `kLight`，字段顺序必须一致。
+2. **样式层** `src/ui/theme/*.qss`
+   只允许写 `@token`，禁止 hex 字面量（`--theme-selftest` 会校验）。
+3. **应用层** `ui::ThemeManager`
+   - `apply_global(path)`：全局样式（`style.qss`）
+   - `apply_to(widget, path)`：窗口样式，同时**登记**到注册表
+   - `set_theme(Theme)`：重刷全局 + 所有已登记窗口，并发出 `theme_changed()`
+
+### 新增一个颜色
+
+1. `design_tokens.h` 的 `Palette` 加字段，并在 `kDark`、`kLight` 的**相同位置**填值
+2. `theme_manager.cpp` 的 `build_tokens()` 里加一行映射
+3. QSS 里用 `@新字段名`
+
+### 用户怎么切换
+
+设置 → 通用 → 主题：`跟随系统 / 浅色 / 深色`，存在 `Storage` 的 `ui/theme`
+（`system` / `light` / `dark`）。`system` 时监听 `QStyleHints::colorSchemeChanged` 自动跟随。
+
+### 新增窗口时
+
+用 `ui::ThemeManager::instance().apply_to(this, ":/Style/...")` 而不是
+`setStyleSheet()`，否则切主题时不会重刷（`style_loader.h` 的老接口已改为委托，可继续用）。

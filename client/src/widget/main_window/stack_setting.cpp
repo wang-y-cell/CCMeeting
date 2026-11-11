@@ -29,8 +29,13 @@
 #include <QPixmap>
 #include <QProgressBar>
 #include <QPushButton>
+#include <QGuiApplication>
+#include <QStyleHints>
+#include <QSignalBlocker>
+#include <QRadioButton>
 #include <QStyle>
 #include "storage.h"
+#include "ui/foundation/theme_manager.h"
 #include <QSize>
 #include <QStackedWidget>
 #include <QThreadPool>
@@ -154,6 +159,41 @@ stack_setting::stack_setting(QWidget *parent) : QWidget(parent) {
             s.value(QStringLiteral("video/autoPreview"), false).toBool();
     }
     update_preview_toggle_ui();
+
+    // 主题单选：改变即生效并持久化（不需要点保存）
+    {
+        const auto apply_mode = [this](const QString &mode) {
+            Storage::instance().setValue(QStringLiteral("ui/theme"), mode);
+            ui::ThemeManager &theme = ui::ThemeManager::instance();
+            if (mode == QLatin1String("light")) {
+                theme.set_theme(ui::Theme::Light);
+            } else if (mode == QLatin1String("dark")) {
+                theme.set_theme(ui::Theme::Dark);
+            } else {
+                const auto scheme = QGuiApplication::styleHints()->colorScheme();
+                theme.set_theme(scheme == Qt::ColorScheme::Light ? ui::Theme::Light
+                                                                 : ui::Theme::Dark);
+            }
+            spdlog::info("[stack_setting] theme mode={} applied={}",
+                         mode.toStdString(),
+                         ui::ThemeManager::name_of(theme.theme()).toStdString());
+        };
+        if (ui->themeSystem) {
+            connect(ui->themeSystem, &QRadioButton::toggled, this, [apply_mode](bool on) {
+                if (on) apply_mode(QStringLiteral("system"));
+            });
+        }
+        if (ui->themeLight) {
+            connect(ui->themeLight, &QRadioButton::toggled, this, [apply_mode](bool on) {
+                if (on) apply_mode(QStringLiteral("light"));
+            });
+        }
+        if (ui->themeDark) {
+            connect(ui->themeDark, &QRadioButton::toggled, this, [apply_mode](bool on) {
+                if (on) apply_mode(QStringLiteral("dark"));
+            });
+        }
+    }
 
     reloadFromConfig();
 }
@@ -797,6 +837,23 @@ void stack_setting::reloadFromConfig() {
         s.value(QStringLiteral("ui/soundEnabled"), true).toBool());
     ui->videoAutoPreview->setChecked(
         s.value(QStringLiteral("video/autoPreview"), false).toBool());
+
+    // 主题：回填当前选择（不触发 apply，避免切换时重刷两次）
+    {
+        const QString mode = s.value(QStringLiteral("ui/theme"),
+                                     QStringLiteral("system"))
+                                 .toString();
+        QRadioButton *target = ui->themeSystem;
+        if (mode == QLatin1String("light")) {
+            target = ui->themeLight;
+        } else if (mode == QLatin1String("dark")) {
+            target = ui->themeDark;
+        }
+        if (target != nullptr && !target->isChecked()) {
+            const QSignalBlocker blocker(target);
+            target->setChecked(true);
+        }
+    }
 
     loadUiPrefs();
     applyUiPrefs();

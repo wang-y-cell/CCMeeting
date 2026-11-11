@@ -23,3 +23,7 @@ build_message_server/
 .vscode/
 .clangd
 --settings-latency-test
+
+# UI 预览截图输出（UiPreview.exe 生成）
+ui-preview*/
+--theme/

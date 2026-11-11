@@ -2,24 +2,24 @@
  * meeting_widget.qss — 会议窗口
  * 令牌取值见 style.qss 顶部注释
  *
- * 层级：画布 #07080B < 窗口 #0B0D11 < 顶栏/侧栏 #101319
- *       < 卡片 #161A21 < 悬浮工具条 #161A21(带描边)
+ * 层级：画布 @canvasDeep < 窗口 @canvas < 顶栏/侧栏 @sidebar
+ *       < 卡片 @surface < 悬浮工具条 @surface(带描边)
  * ============================================================ */
 
 QWidget#meetingWidget {
-    background-color: #0B0D11;
-    border: 1px solid #232A35;
+    background-color: @canvas;
+    border: 1px solid @border;
 }
 
 /* ---------- 顶部状态栏 ---------- */
 
 QWidget#topStatusBar {
-    background-color: #101319;
-    border-bottom: 1px solid #1C2230;
+    background-color: @sidebar;
+    border-bottom: 1px solid @borderSoft;
 }
 
 QLabel#topMainTitle {
-    color: #E9EDF4;
+    color: @text;
     font-size: 14px;
     font-weight: 600;
     padding-right: 6px;
@@ -29,25 +29,25 @@ QLabel#topMainTitle {
 
 QLabel#topRoomChip,
 QLabel#topMemberChip {
-    background-color: #161A21;
-    color: #98A2B3;
-    border: 1px solid #1E2530;
+    background-color: @surface;
+    color: @textMuted;
+    border: 1px solid @borderSoft;
     border-radius: 999px;
     padding: 3px 12px;
     font-size: 12px;
 }
 
 QLabel#topSpeakerLabel {
-    color: #6A7383;
+    color: @textFaint;
     font-size: 12px;
     background: transparent;
     border: none;
 }
 
 QLabel#topMeetStatus {
-    background-color: #161A21;
-    color: #98A2B3;
-    border: 1px solid #1E2530;
+    background-color: @surface;
+    color: @textMuted;
+    border: 1px solid @borderSoft;
     border-radius: 999px;
     padding: 3px 12px;
     font-size: 12px;
@@ -56,14 +56,14 @@ QLabel#topMeetStatus {
 QLabel#topMeetStatus[joined="true"] {
     background-color: rgba(61, 214, 140, 0.12);
     border: 1px solid rgba(61, 214, 140, 0.28);
-    color: #3DD68C;
+    color: @success;
 }
 
 /* ---------- 主画面 ---------- */
 
 QGroupBox#groupBox_2 {
-    background-color: #07080B;
-    border: 1px solid #1C2230;
+    background-color: @canvasDeep;
+    border: 1px solid @borderSoft;
     border-radius: 12px;
     margin-top: 0;
     padding-top: 0;
@@ -76,14 +76,14 @@ QGroupBox#groupBox_2::title {
 }
 
 VideoGLWidget#mainshow_label {
-    background-color: #07080B;
+    background-color: @canvasDeep;
     border: none;
     border-radius: 12px;
 }
 
 /* 未入会时的画布占位提示 */
 QLabel#canvasHint {
-    color: #4E5666;
+    color: @textDisabled;
     font-size: 13px;
     background: transparent;
     border: none;
@@ -92,15 +92,15 @@ QLabel#canvasHint {
 /* ---------- 右侧面板 ---------- */
 
 QTabWidget#tabWidget {
-    background-color: #101319;
-    border: 1px solid #1C2230;
+    background-color: @sidebar;
+    border: 1px solid @borderSoft;
     border-radius: 12px;
 }
 
 QTabWidget::pane {
-    background-color: #101319;
+    background-color: @sidebar;
     border: none;
-    border-top: 1px solid #1C2230;
+    border-top: 1px solid @borderSoft;
     border-bottom-left-radius: 12px;
     border-bottom-right-radius: 12px;
     top: -1px;
@@ -108,7 +108,7 @@ QTabWidget::pane {
 
 QTabBar::tab {
     background-color: transparent;
-    color: #6A7383;
+    color: @textFaint;
     border: 1px solid transparent;
     border-radius: 6px;
     padding: 6px 14px;
@@ -118,25 +118,25 @@ QTabBar::tab {
 }
 
 QTabBar::tab:selected {
-    background-color: #212836;
-    border: 1px solid #2A3341;
-    color: #E9EDF4;
+    background-color: @raised;
+    border: 1px solid @overlay;
+    color: @text;
 }
 
 QTabBar::tab:hover:!selected {
-    background-color: #161A21;
-    color: #98A2B3;
+    background-color: @surface;
+    color: @textMuted;
 }
 
 /* ---------- 聊天 / 成员列表 ---------- */
 
 QListWidget,
 QListWidget#listWidget {
-    background-color: #0E1116;
+    background-color: @canvasDeep;
     border: none;
     border-radius: 8px;
     outline: none;
-    color: #E9EDF4;
+    color: @text;
     padding: 6px;
 }
 
@@ -166,14 +166,14 @@ QScrollArea QScrollBar:vertical {
 }
 
 QListWidget QScrollBar::handle:vertical {
-    background: #2A3341;
+    background: @overlay;
     border: none;
     border-radius: 3px;
     min-height: 24px;
 }
 
 QListWidget QScrollBar::handle:vertical:hover {
-    background: #3A4557;
+    background: @hover;
 }
 
 QListWidget QScrollBar::add-line:vertical,
@@ -209,37 +209,37 @@ QScrollArea > QWidget > QWidget {
 QPlainTextEdit,
 QTextEdit,
 QLineEdit {
-    background-color: #161A21;
-    border: 1px solid #1E2530;
+    background-color: @surface;
+    border: 1px solid @borderSoft;
     border-radius: 8px;
-    color: #E9EDF4;
+    color: @text;
     padding: 8px 10px;
     font-size: 13px;
-    selection-background-color: #4C8DFF;
-    selection-color: #FFFFFF;
+    selection-background-color: @primary;
+    selection-color: @onPrimary;
 }
 
 QPlainTextEdit:hover,
 QTextEdit:hover,
 QLineEdit:hover {
-    border-color: #2E3846;
+    border-color: @borderStrong;
 }
 
 QPlainTextEdit:focus,
 QTextEdit:focus,
 QLineEdit:focus {
-    border: 1px solid #4C8DFF;
+    border: 1px solid @primary;
 }
 
 /* ---------- 分组框（会议信息页） ---------- */
 
 QGroupBox {
-    background-color: #161A21;
-    border: 1px solid #1E2530;
+    background-color: @surface;
+    border: 1px solid @borderSoft;
     border-radius: 10px;
     margin-top: 14px;
     padding: 12px 10px 10px 10px;
-    color: #98A2B3;
+    color: @textMuted;
     font-size: 12px;
     font-weight: 500;
 }
@@ -249,26 +249,26 @@ QGroupBox::title {
     subcontrol-position: top left;
     left: 10px;
     padding: 0 6px;
-    color: #6A7383;
+    color: @textFaint;
     background-color: transparent;
 }
 
 /* ---------- 底部工具条 ---------- */
 
 QWidget#avToolbar {
-    background-color: #0B0D11;
+    background-color: @canvas;
     border: none;
 }
 
 QWidget#controlPill {
-    background-color: #12161D;
-    border: 1px solid #1E2530;
+    background-color: @popup;
+    border: 1px solid @borderSoft;
     border-radius: 12px;
 }
 
 QFrame#pillSep1,
 QFrame#pillSep2 {
-    background-color: #232A35;
+    background-color: @border;
     border: none;
     max-width: 1px;
     margin: 10px 6px;
@@ -283,7 +283,7 @@ QPushButton#btnTogglePanel {
     background-color: transparent;
     border: 1px solid transparent;
     border-radius: 8px;
-    color: #98A2B3;
+    color: @textMuted;
     font-size: 12px;
     font-weight: 500;
     padding: 6px 12px;
@@ -293,15 +293,15 @@ QPushButton#btnSideMembers:hover,
 QPushButton#btnSideChat:hover,
 QPushButton#btnSideInfo:hover,
 QPushButton#btnTogglePanel:hover {
-    background-color: #1B2029;
-    border-color: #232A35;
-    color: #E9EDF4;
+    background-color: @surface2;
+    border-color: @border;
+    color: @text;
 }
 
 QPushButton#btnTogglePanel:checked {
     background-color: rgba(76, 141, 255, 0.14);
     border-color: rgba(76, 141, 255, 0.24);
-    color: #E9EDF4;
+    color: @text;
 }
 
 /* 摄像头 / 麦克风 / 共享屏幕：开启=强调描边，关闭=中性 */
@@ -310,9 +310,9 @@ QPushButton#openAudio,
 QPushButton#openVedio,
 QPushButton#shareScreenBtn {
     border-radius: 8px;
-    border: 1px solid #232A35;
-    background-color: #161A21;
-    color: #98A2B3;
+    border: 1px solid @border;
+    background-color: @surface;
+    color: @textMuted;
     font-size: 12px;
     font-weight: 500;
     padding: 6px 12px;
@@ -321,9 +321,9 @@ QPushButton#shareScreenBtn {
 QPushButton#openAudio:hover,
 QPushButton#openVedio:hover,
 QPushButton#shareScreenBtn:hover {
-    background-color: #1B2029;
-    border-color: #2E3846;
-    color: #E9EDF4;
+    background-color: @surface2;
+    border-color: @borderStrong;
+    color: @text;
 }
 
 QPushButton#openAudio[avOn="true"],
@@ -331,7 +331,7 @@ QPushButton#openVedio[avOn="true"],
 QPushButton#shareScreenBtn[avOn="true"] {
     background-color: rgba(76, 141, 255, 0.16);
     border: 1px solid rgba(76, 141, 255, 0.32);
-    color: #E9EDF4;
+    color: @text;
 }
 
 QPushButton#openAudio[avOn="true"]:hover,
@@ -339,78 +339,78 @@ QPushButton#openVedio[avOn="true"]:hover,
 QPushButton#shareScreenBtn[avOn="true"]:hover {
     background-color: rgba(76, 141, 255, 0.24);
     border-color: rgba(76, 141, 255, 0.44);
-    color: #FFFFFF;
+    color: @onPrimary;
 }
 
 QPushButton#openAudio:disabled,
 QPushButton#openVedio:disabled,
 QPushButton#shareScreenBtn:disabled {
-    background-color: #101319;
-    border: 1px solid #1A2028;
-    color: #4E5666;
+    background-color: @sidebar;
+    border: 1px solid @borderSoft;
+    color: @textDisabled;
 }
 
 /* 设备下拉箭头 */
 
 QPushButton#audioDeviceBtn,
 QPushButton#videoDeviceBtn {
-    background-color: #161A21;
-    border: 1px solid #232A35;
+    background-color: @surface;
+    border: 1px solid @border;
     border-radius: 8px;
-    color: #6A7383;
+    color: @textFaint;
     font-size: 9px;
     padding: 0;
 }
 
 QPushButton#audioDeviceBtn:hover,
 QPushButton#videoDeviceBtn:hover {
-    background-color: #1B2029;
-    border-color: #2E3846;
-    color: #E9EDF4;
+    background-color: @surface2;
+    border-color: @borderStrong;
+    color: @text;
 }
 
 QPushButton#audioDeviceBtn:disabled,
 QPushButton#videoDeviceBtn:disabled {
-    background-color: #101319;
-    border-color: #1A2028;
-    color: #3A414D;
+    background-color: @sidebar;
+    border-color: @borderSoft;
+    color: @textDisabled;
 }
 
 /* 结束会议：语义色填充 */
 
 QPushButton#leaveMeetingBtn {
-    background-color: #E5484D;
-    border: 1px solid #E5484D;
+    background-color: @danger;
+    border: 1px solid @danger;
     border-radius: 8px;
-    color: #FFFFFF;
+    color: @onPrimary;
     font-size: 12px;
     font-weight: 600;
     padding: 6px 16px;
 }
 
 QPushButton#leaveMeetingBtn:hover {
-    background-color: #F05C60;
-    border-color: #F05C60;
+    background-color: @dangerHover;
+    border-color: @dangerHover;
 }
 
 QPushButton#leaveMeetingBtn:pressed {
-    background-color: #C93A3F;
-    border-color: #C93A3F;
+    background-color: @dangerPressed;
+    border-color: @dangerPressed;
 }
 
 QPushButton#leaveMeetingBtn:disabled {
-    background-color: #101319;
-    border: 1px solid #1A2028;
-    color: #4E5666;
+    background-color: @sidebar;
+    border: 1px solid @borderSoft;
+    color: @textDisabled;
 }
 
 /* ---------- 设备选择菜单 ---------- */
 
 QMenu#deviceSelectMenu {
-    background-color: #161A21;
-    border: 1px solid #2E3846;
+    background-color: @surface;
+    border: 1px solid @borderStrong;
     border-radius: 10px;
-    color: #E9EDF4;
+    color: @text;
     padding: 6px;
     font-size: 12px;
 }
@@ -423,52 +423,52 @@ QMenu#deviceSelectMenu::item {
 
 QMenu#deviceSelectMenu::item:selected {
     background-color: rgba(76, 141, 255, 0.16);
-    color: #FFFFFF;
+    color: @onPrimary;
 }
 
 QMenu#deviceSelectMenu::item:disabled {
-    color: #6A7383;
+    color: @textFaint;
     background: transparent;
 }
 
 QMenu#deviceSelectMenu::separator {
     height: 1px;
-    background: #232A35;
+    background: @border;
     margin: 6px 8px;
 }
 
 /* ---------- 发送按钮 ---------- */
 
 QPushButton#sendmsg {
-    background-color: #4C8DFF;
-    border: 1px solid #4C8DFF;
+    background-color: @primary;
+    border: 1px solid @primary;
     border-radius: 8px;
-    color: #FFFFFF;
+    color: @onPrimary;
     padding: 7px 16px;
     font-size: 13px;
     font-weight: 600;
 }
 
 QPushButton#sendmsg:hover {
-    background-color: #5E9BFF;
-    border-color: #5E9BFF;
+    background-color: @primaryHover;
+    border-color: @primaryHover;
 }
 
 QPushButton#sendmsg:pressed {
-    background-color: #3B7AE8;
-    border-color: #3B7AE8;
+    background-color: @primaryPressed;
+    border-color: @primaryPressed;
 }
 
 QPushButton#sendmsg:disabled {
-    background-color: #161A21;
-    border-color: #1E2530;
-    color: #4E5666;
+    background-color: @surface;
+    border-color: @borderSoft;
+    color: @textDisabled;
 }
 
 /* ---------- 通用文本 ---------- */
 
 QLabel {
-    color: #98A2B3;
+    color: @textMuted;
 }
 
 /* ---------- 无边框窗口标题栏按钮 ---------- */
@@ -477,7 +477,7 @@ QPushButton#framelessCloseBtn,
 QPushButton#framelessMaxBtn {
     background-color: transparent;
     border: none;
-    color: #6A7383;
+    color: @textFaint;
     font-size: 15px;
     font-weight: 500;
     padding: 0;
@@ -485,48 +485,48 @@ QPushButton#framelessMaxBtn {
 }
 
 QPushButton#framelessCloseBtn:hover {
-    background-color: #E5484D;
-    color: #FFFFFF;
+    background-color: @danger;
+    color: @onPrimary;
 }
 
 QPushButton#framelessMaxBtn:hover {
-    background-color: #212836;
-    color: #E9EDF4;
+    background-color: @raised;
+    color: @text;
 }
 /* ---------- 顶栏「会议设置」按钮 ---------- */
 
 QPushButton#btnMeetingSettings {
-    background-color: #161A21;
-    border: 1px solid #1E2530;
+    background-color: @surface;
+    border: 1px solid @borderSoft;
     border-radius: 999px;
-    color: #98A2B3;
+    color: @textMuted;
     font-size: 12px;
     padding: 2px 12px;
 }
 
 QPushButton#btnMeetingSettings:hover {
-    background-color: #1B2029;
-    border-color: #2E3846;
-    color: #E9EDF4;
+    background-color: @surface2;
+    border-color: @borderStrong;
+    color: @text;
 }
 
 QPushButton#btnMeetingSettings:pressed {
-    background-color: #12161D;
-    border-color: #4C8DFF;
+    background-color: @popup;
+    border-color: @primary;
 }
 /* ---------- 顶栏：会议时长 ---------- */
 
 QLabel#topDurationChip {
-    color: #6A7383;
-    background-color: #14181F;
-    border: 1px solid #1F2632;
+    color: @textFaint;
+    background-color: @inset;
+    border: 1px solid @borderSoft;
     border-radius: 999px;
     padding: 2px 10px;
     font-size: 11px;
 }
 
 QLabel#topDurationChip[running="true"] {
-    color: #3DD68C;
+    color: @success;
     background-color: rgba(61, 214, 140, 0.10);
     border: 1px solid rgba(61, 214, 140, 0.24);
 }

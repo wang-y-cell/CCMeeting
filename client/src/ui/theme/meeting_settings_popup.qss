@@ -8,13 +8,13 @@
 /* ---------- 会议设置弹出面板（Qt::Popup，锚定在按钮下方）---------- */
 
 QWidget#meetingSettingsPopup {
-    background-color: #12161D;
-    border: 1px solid #2A3341;
+    background-color: @popup;
+    border: 1px solid @overlay;
     border-radius: 12px;
 }
 
 QLabel#msTitle {
-    color: #E9EDF4;
+    color: @text;
     font-size: 13px;
     font-weight: 600;
     background: transparent;
@@ -22,14 +22,14 @@ QLabel#msTitle {
 }
 
 QLabel#msSection {
-    color: #6A7383;
+    color: @textFaint;
     font-size: 11px;
     background: transparent;
     border: none;
 }
 
 QLabel#msValue {
-    color: #E9EDF4;
+    color: @text;
     font-size: 12px;
     font-weight: 600;
     background: transparent;
@@ -37,34 +37,34 @@ QLabel#msValue {
 }
 
 QLabel#msHint {
-    color: #4E5666;
+    color: @textDisabled;
     font-size: 11px;
     background: transparent;
     border: none;
 }
 
 QLabel#msRoleBadge {
-    color: #98A2B3;
-    background-color: #1B2029;
-    border: 1px solid #232A35;
+    color: @textMuted;
+    background-color: @surface2;
+    border: 1px solid @border;
     border-radius: 9px;
     padding: 1px 8px;
     font-size: 11px;
 }
 
 QLabel#msRoleBadge[isHost="true"] {
-    color: #4C8DFF;
+    color: @primary;
     background-color: rgba(76, 141, 255, 0.14);
     border: 1px solid rgba(76, 141, 255, 0.28);
 }
 
 QFrame#msSep {
-    background-color: #1E2530;
+    background-color: @borderSoft;
     border: none;
 }
 
 QCheckBox#msSwitch {
-    color: #E9EDF4;
+    color: @text;
     font-size: 12px;
     spacing: 8px;
     padding: 2px 0;
@@ -72,36 +72,36 @@ QCheckBox#msSwitch {
 }
 
 QCheckBox#msSwitch:disabled {
-    color: #6A7383;
+    color: @textFaint;
 }
 
 QCheckBox#msSwitch::indicator {
     width: 15px;
     height: 15px;
     border-radius: 4px;
-    border: 1px solid #2E3846;
-    background: #1B2029;
+    border: 1px solid @borderStrong;
+    background: @surface2;
 }
 
 QCheckBox#msSwitch::indicator:hover {
-    border-color: #4C8DFF;
+    border-color: @primary;
 }
 
 QCheckBox#msSwitch::indicator:checked {
-    background: #4C8DFF;
-    border-color: #4C8DFF;
+    background: @primary;
+    border-color: @primary;
 }
 
 QCheckBox#msSwitch::indicator:disabled {
-    background: #14181F;
-    border-color: #232A35;
+    background: @inset;
+    border-color: @border;
 }
 
 QPushButton#msAction {
-    background-color: #1B2029;
-    border: 1px solid #232A35;
+    background-color: @surface2;
+    border: 1px solid @border;
     border-radius: 8px;
-    color: #E9EDF4;
+    color: @text;
     font-size: 12px;
     min-height: 30px;
     padding: 0 12px;
@@ -109,20 +109,20 @@ QPushButton#msAction {
 }
 
 QPushButton#msAction:hover {
-    background-color: #212836;
-    border-color: #2E3846;
+    background-color: @raised;
+    border-color: @borderStrong;
 }
 
 QPushButton#msAction:pressed {
-    background-color: #161A21;
+    background-color: @surface;
 }
 /* ---------- 录制按钮与状态 ---------- */
 
 QPushButton#msRecordBtn {
-    background-color: #1B2029;
-    border: 1px solid #2A3341;
+    background-color: @surface2;
+    border: 1px solid @overlay;
     border-radius: 8px;
-    color: #E9EDF4;
+    color: @text;
     font-size: 12px;
     font-weight: 500;
     min-height: 30px;
@@ -130,14 +130,14 @@ QPushButton#msRecordBtn {
 }
 
 QPushButton#msRecordBtn:hover {
-    background-color: #212836;
-    border-color: #3A4557;
+    background-color: @raised;
+    border-color: @hover;
 }
 
 QPushButton#msRecordBtn[recording="true"] {
     background-color: rgba(229, 72, 77, 0.16);
     border: 1px solid rgba(229, 72, 77, 0.38);
-    color: #F05C60;
+    color: @dangerHover;
 }
 
 QPushButton#msRecordBtn[recording="true"]:hover {
@@ -146,13 +146,13 @@ QPushButton#msRecordBtn[recording="true"]:hover {
 }
 
 QPushButton#msRecordBtn:disabled {
-    background-color: #14181F;
-    border-color: #1E2530;
-    color: #4E5666;
+    background-color: @inset;
+    border-color: @borderSoft;
+    color: @textDisabled;
 }
 
 QLabel#msRecordStatus {
-    color: #6A7383;
+    color: @textFaint;
     font-size: 11px;
     background: transparent;
     border: none;

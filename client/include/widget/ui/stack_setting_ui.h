@@ -2,6 +2,7 @@
 #define STACK_SETTING_UI_H
 
 class QCheckBox;
+class QRadioButton;
 class QComboBox;
 class QLabel;
 class QLineEdit;
@@ -48,6 +49,11 @@ public:
     // 界面
     QComboBox *uiStartPage = nullptr;
     QCheckBox *uiShowPageDesc = nullptr;
+
+    // 主题（system / light / dark）
+    QRadioButton *themeSystem = nullptr;
+    QRadioButton *themeLight = nullptr;
+    QRadioButton *themeDark = nullptr;
 
     QPushButton *saveBtn = nullptr;
     QPushButton *resetBtn = nullptr;

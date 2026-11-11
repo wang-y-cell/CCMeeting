@@ -4,15 +4,15 @@
  * ============================================================ */
 
 QDialog#login {
-    background-color: #0B0D11;
-    border: 1px solid #232A35;
+    background-color: @canvas;
+    border: 1px solid @border;
 }
 
 /* ---------- 品牌区 ---------- */
 
 QLabel#logoLabel {
     background-color: rgba(76, 141, 255, 0.16);
-    color: #4C8DFF;
+    color: @primary;
     border: 1px solid rgba(76, 141, 255, 0.28);
     border-radius: 16px;
     font-size: 22px;
@@ -21,7 +21,7 @@ QLabel#logoLabel {
 
 QLabel#brandLabel,
 QLabel#registerBrandLabel {
-    color: #E9EDF4;
+    color: @text;
     font-size: 24px;
     font-weight: 600;
     letter-spacing: 0.5px;
@@ -31,14 +31,14 @@ QLabel#registerBrandLabel {
 
 QLabel#subtitleLabel,
 QLabel#registerSubtitleLabel {
-    color: #98A2B3;
+    color: @textMuted;
     font-size: 13px;
     background: transparent;
     border: none;
 }
 
 QLabel#hintLabel {
-    color: #6A7383;
+    color: @textFaint;
     font-size: 12px;
     background: transparent;
     border: none;
@@ -48,7 +48,7 @@ QLabel#hintLabel {
 
 QLabel#createUserLink,
 QLabel#backToLoginLink {
-    color: #6A7383;
+    color: @textFaint;
     font-size: 12px;
     background: transparent;
     border: none;
@@ -56,46 +56,46 @@ QLabel#backToLoginLink {
 
 QLabel#createUserLink a,
 QLabel#backToLoginLink a {
-    color: #98A2B3;
+    color: @textMuted;
     text-decoration: none;
 }
 
 QLabel#createUserLink a:hover,
 QLabel#backToLoginLink a:hover {
-    color: #5E9BFF;
+    color: @primaryHover;
     text-decoration: none;
 }
 
 /* ---------- 输入框 ---------- */
 
 QLineEdit {
-    background-color: #1B2029;
-    color: #E9EDF4;
-    border: 1px solid #232A35;
+    background-color: @surface2;
+    color: @text;
+    border: 1px solid @border;
     border-radius: 8px;
     padding: 0 14px;
     font-size: 14px;
-    selection-background-color: #4C8DFF;
-    selection-color: #FFFFFF;
+    selection-background-color: @primary;
+    selection-color: @onPrimary;
 }
 
 QLineEdit:hover {
-    border-color: #2E3846;
-    background-color: #1E242E;
+    border-color: @borderStrong;
+    background-color: @surface3;
 }
 
 QLineEdit:focus {
-    border: 1px solid #4C8DFF;
-    background-color: #1E242E;
+    border: 1px solid @primary;
+    background-color: @surface3;
 }
 
 /* ---------- 主按钮 ---------- */
 
 QPushButton#login_button,
 QPushButton#register_button {
-    background-color: #4C8DFF;
-    color: #FFFFFF;
-    border: 1px solid #4C8DFF;
+    background-color: @primary;
+    color: @onPrimary;
+    border: 1px solid @primary;
     border-radius: 8px;
     font-size: 14px;
     font-weight: 600;
@@ -104,21 +104,21 @@ QPushButton#register_button {
 
 QPushButton#login_button:hover,
 QPushButton#register_button:hover {
-    background-color: #5E9BFF;
-    border-color: #5E9BFF;
+    background-color: @primaryHover;
+    border-color: @primaryHover;
 }
 
 QPushButton#login_button:pressed,
 QPushButton#register_button:pressed {
-    background-color: #3B7AE8;
-    border-color: #3B7AE8;
+    background-color: @primaryPressed;
+    border-color: @primaryPressed;
 }
 
 QPushButton#login_button:disabled,
 QPushButton#register_button:disabled {
-    background-color: #1B2029;
-    border-color: #232A35;
-    color: #6A7383;
+    background-color: @surface2;
+    border-color: @border;
+    color: @textFaint;
 }
 
 /* ---------- 无边框窗口标题栏按钮 ---------- */
@@ -127,18 +127,18 @@ QPushButton#framelessCloseBtn,
 QPushButton#framelessMaxBtn {
     background-color: transparent;
     border: none;
-    color: #6A7383;
+    color: @textFaint;
     font-size: 15px;
     font-weight: 500;
     border-radius: 6px;
 }
 
 QPushButton#framelessCloseBtn:hover {
-    background-color: #E5484D;
-    color: #FFFFFF;
+    background-color: @danger;
+    color: @onPrimary;
 }
 
 QPushButton#framelessMaxBtn:hover {
-    background-color: #212836;
-    color: #E9EDF4;
+    background-color: @raised;
+    color: @text;
 }
