@@ -54,7 +54,9 @@ QPixmap IconProvider::pixmap(const QString &name, const QColor &color, int size)
     QSvgRenderer renderer(path);
     QPainter painter(&canvas);
     painter.setRenderHint(QPainter::Antialiasing);
-    renderer.render(&painter);
+    // 必须显式给目标矩形：只传 painter 时 QSvgRenderer 会按 SVG 自身的
+    // 默认尺寸（24×24）绘制，画布只有 size×size，右侧/下方会被裁掉。
+    renderer.render(&painter, QRectF(0, 0, size, size));
     // 用颜色替换所有不透明像素（保留 alpha），得到"单色图标"
     painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
     painter.fillRect(canvas.rect(), color);
