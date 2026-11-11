@@ -869,6 +869,8 @@ void ui::SettingsPage::loadUiPrefs() {
     ui->uiStartPage->setCurrentIndex(idx >= 0 ? idx : 0);
     ui->uiShowPageDesc->setChecked(
         s.value(QStringLiteral("ui/showPageDesc"), true).toBool());
+    ui->meetingShowTabs->setChecked(
+        s.value(QStringLiteral("meeting/showTabs"), false).toBool());
 }
 
 void ui::SettingsPage::saveUiPrefs() const {
@@ -881,6 +883,7 @@ void ui::SettingsPage::saveUiPrefs() const {
                ui->uiStartPage->currentData().toInt());
     s.setValue(QStringLiteral("ui/showPageDesc"),
                ui->uiShowPageDesc->isChecked());
+    s.setValue(QStringLiteral("meeting/showTabs"), ui->meetingShowTabs->isChecked());
     s.setValue(QStringLiteral("record/fps"), ui->recordFps->currentData().toInt());
     s.setValue(QStringLiteral("ui/soundEnabled"), ui->soundEnabled->isChecked());
     s.setValue(QStringLiteral("video/autoPreview"),
@@ -947,6 +950,7 @@ void ui::SettingsPage::onResetClicked() {
     ui->audioEchoCancel->setChecked(true);
     ui->uiStartPage->setCurrentIndex(0);
     ui->uiShowPageDesc->setChecked(true);
+    ui->meetingShowTabs->setChecked(false);
     ui->recordFps->setCurrentIndex(0);  // 15 fps
     ui->soundEnabled->setChecked(true);
     ui->videoAutoPreview->setChecked(false);

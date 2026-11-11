@@ -30,6 +30,17 @@ public:
     /** @brief 取图标（按 名字+颜色+尺寸 缓存） */
     QIcon icon(const QString &name, const QColor &color, int size = 20);
 
+    /**
+     * @brief 合成双色图标：底色图标 + 覆盖色叠加（如"麦克风 + 红色斜杠"）
+     * @param base          底层图标名（mic / camera）
+     * @param overlay       覆盖层图标名（slash）
+     * @param base_color    底层颜色
+     * @param overlay_color 覆盖层颜色
+     */
+    QIcon composed_icon(const QString &base, const QString &overlay,
+                        const QColor &base_color, const QColor &overlay_color,
+                        int size = 22);
+
     /** @brief 取位图（已按 devicePixelRatio 渲染） */
     QPixmap pixmap(const QString &name, const QColor &color, int size = 20);
 

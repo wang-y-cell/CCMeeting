@@ -1,6 +1,7 @@
 #include "ui/pages/meeting_window.h"
 
 #include "ui/foundation/icon_provider.h"
+#include "configure/storage.h"
 #include "ui/foundation/theme_manager.h"
 #include "features/meeting/meeting_recorder.h"
 #include "ui/pages/meeting_settings_popup.h"
@@ -28,6 +29,7 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QMenu>
+#include <QCursor>
 #include <QMessageBox>
 #include <QPainter>
 #include <QPoint>
@@ -80,11 +82,48 @@ void apply_toggle_icon(QToolButton *button, const QString &icon_on,
         return;
     }
     auto &theme = ui::ThemeManager::instance();
-    const QColor color = on ? theme.color(QStringLiteral("icon"))
-                            : theme.color(QStringLiteral("danger"));
-    const QString name = on ? icon_on : icon_off;
-    button->setIcon(ui::IconProvider::instance().icon(name, color, size));
+    const QColor body = theme.color(QStringLiteral("icon"));
+    // 关闭状态：图标本体保持中性色，只把斜杠画成红色
+    const QColor slash = theme.color(QStringLiteral("danger"));
+    Q_UNUSED(icon_off);
+    auto &icons = ui::IconProvider::instance();
+    button->setIcon(on ? icons.icon(icon_on, body, size)
+                       : icons.composed_icon(icon_on, QStringLiteral("slash"),
+                                             body, slash, size));
     button->setIconSize(QSize(size, size));
+}
+
+}  // namespace
+namespace {
+
+/**
+ * @brief 弹出设备选择菜单
+ *
+ * 两个细节：
+ * 1) 箭头方向：默认朝上（表示"点开"），菜单打开期间朝下；
+ * 2) 再次点击按钮：QMenu 的鼠标抓取会先关掉菜单，此时判断鼠标是否
+ *    仍停在按钮上，是则重新弹出 —— 表现为"再点一次是重新打开，而不是关掉"。
+ */
+void popup_device_menu(QMenu *menu, QToolButton *button, QWidget *owner,
+                       const std::function<void()> &reopen) {
+    if (menu == nullptr || button == nullptr) {
+        return;
+    }
+    auto &icons = ui::IconProvider::instance();
+    auto &theme = ui::ThemeManager::instance();
+    const QColor color = theme.color(QStringLiteral("textMuted"));
+
+    button->setIcon(icons.icon(QStringLiteral("chevron-down"), color, 12));
+    QObject::connect(menu, &QMenu::aboutToHide, owner, [button, reopen, color]() {
+        button->setIcon(ui::IconProvider::instance().icon(
+            QStringLiteral("chevron-up"), color, 12));
+        const QRect button_rect(button->mapToGlobal(QPoint(0, 0)), button->size());
+        if (button_rect.contains(QCursor::pos())) {
+            // 菜单已关掉，稍后再弹一次，避免在 aboutToHide 里重入
+            QTimer::singleShot(0, button, [reopen]() { reopen(); });
+        }
+    });
+    menu->popup(menu->pos().isNull() ? QCursor::pos() : menu->pos());
 }
 
 }  // namespace
@@ -114,7 +153,6 @@ ui::MeetingWindow::MeetingWindow(QWidget *parent)
             [this](qint64 userId) {
                 main_user_id_ = userId;
                 ui.groupBox_2->setTitle(QString());
-
                 ui.topMainTitle->setText(_participants->display_name(userId));
             });
     connect(_participants, &ParticipantsController::mention_added, this,
@@ -374,6 +412,15 @@ void ui::MeetingWindow::init_settings_popup() {
 void ui::MeetingWindow::init_ui() {
     ui.setupUi(this);
 
+    // 右侧标签栏默认隐藏（可在 设置 → 界面 打开）
+    apply_tab_bar_visibility();
+    // 左上角"会议详情"按钮
+    connect(ui.btnMeetingInfo, &QPushButton::clicked, this,
+            [this]() { show_meeting_info_popup(); });
+    // 初始就是"静音 / 关摄像头"状态：显示带红色斜杠的图标
+    apply_toggle_icon(ui.openAudio, QStringLiteral("mic"), QString(), false);
+    apply_toggle_icon(ui.openVedio, QStringLiteral("camera"), QString(), false);
+
     // 视频画面底色跟随主题（未出画面时不再是死黑），切换主题时同步刷新
     {
         const auto apply_backdrop = [this]() {
@@ -502,6 +549,10 @@ void ui::MeetingWindow::reset_meeting_ui() {
     ui.sendmsg->setDisabled(true);
     ui.groupBox_2->setTitle(QString());
 
+    apply_tab_bar_visibility();
+    connect(ui.btnMeetingInfo, &QPushButton::clicked, this,
+            [this]() { show_meeting_info_popup(); });
+
     ui.topMainTitle->setText(QStringLiteral("主屏幕"));
     _roomNo = 0;
     _serverAddr.clear();
@@ -543,6 +594,82 @@ QString ui::MeetingWindow::format_duration_hms(qint64 seconds) {
         .arg(seconds % 60, 2, 10, QLatin1Char('0'));
 }
 
+void ui::MeetingWindow::apply_tab_bar_visibility() {
+    if (ui.tabWidget == nullptr || ui.tabWidget->tabBar() == nullptr) {
+        return;
+    }
+    // 默认隐藏标签栏（可在 设置 → 界面 → 会议窗口显示右侧标签栏 打开）
+    const bool show_tabs =
+        Storage::instance().value(QStringLiteral("meeting/showTabs"), false).toBool();
+    ui.tabWidget->tabBar()->setVisible(show_tabs);
+}
+
+void ui::MeetingWindow::show_meeting_info_popup() {
+    if (_infoPopup == nullptr) {
+        auto *popup = new QFrame(this, Qt::Popup | Qt::FramelessWindowHint);
+        popup->setObjectName(QStringLiteral("meetingInfoPopup"));
+        popup->setAttribute(Qt::WA_StyledBackground, true);
+        popup->setFixedWidth(280);
+
+        auto *layout = new QVBoxLayout(popup);
+        layout->setContentsMargins(16, 14, 16, 16);
+        layout->setSpacing(10);
+
+        auto *title = new QLabel(tr("会议详情"), popup);
+        title->setObjectName(QStringLiteral("infoPopupTitle"));
+        layout->addWidget(title);
+
+        auto add_row = [popup, layout](const QString &key, const QString &object_name) {
+            auto *row = new QWidget(popup);
+            auto *row_layout = new QHBoxLayout(row);
+            row_layout->setContentsMargins(0, 0, 0, 0);
+            row_layout->setSpacing(12);
+            auto *key_label = new QLabel(key, row);
+            key_label->setObjectName(QStringLiteral("infoPopupKey"));
+            key_label->setFixedWidth(64);
+            auto *value_label = new QLabel(QStringLiteral("-"), row);
+            value_label->setObjectName(object_name);
+            value_label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+            row_layout->addWidget(key_label);
+            row_layout->addWidget(value_label, 1);
+            layout->addWidget(row);
+        };
+        add_row(tr("主题"), QStringLiteral("infoPopupSubject"));
+        add_row(tr("会议号"), QStringLiteral("infoPopupRoomNo"));
+        add_row(tr("发起人"), QStringLiteral("infoPopupHost"));
+        add_row(tr("我的名称"), QStringLiteral("infoPopupSelfName"));
+        add_row(tr("参会时长"), QStringLiteral("infoPopupDuration"));
+        _infoPopup = popup;
+    }
+
+    // 刷新内容
+    const QString self_name = UserSession::instance().name();
+    const bool is_host = _roomSettings && _roomSettings->is_host();
+    if (auto *label = _infoPopup->findChild<QLabel *>(QStringLiteral("infoPopupSubject"))) {
+        label->setText(self_name.isEmpty() ? tr("会议") : tr("%1的会议").arg(self_name));
+    }
+    if (auto *label = _infoPopup->findChild<QLabel *>(QStringLiteral("infoPopupRoomNo"))) {
+        label->setText(_roomNo > 0 ? QString::number(_roomNo) : QStringLiteral("-"));
+    }
+    if (auto *label = _infoPopup->findChild<QLabel *>(QStringLiteral("infoPopupHost"))) {
+        label->setText(is_host ? self_name : tr("房主"));
+    }
+    if (auto *label = _infoPopup->findChild<QLabel *>(QStringLiteral("infoPopupSelfName"))) {
+        label->setText(self_name.isEmpty() ? QStringLiteral("-") : self_name);
+    }
+    if (auto *label = _infoPopup->findChild<QLabel *>(QStringLiteral("infoPopupDuration"))) {
+        const qint64 seconds = _sessionStartMs > 0
+                                   ? (QDateTime::currentMSecsSinceEpoch() - _sessionStartMs) / 1000
+                                   : 0;
+        label->setText(format_duration_hms(seconds));
+    }
+
+    _infoPopup->adjustSize();
+    const QPoint pos = ui.btnMeetingInfo->mapToGlobal(
+        QPoint(0, ui.btnMeetingInfo->height() + 6));
+    _infoPopup->move(pos);
+    _infoPopup->show();
+}
 void ui::MeetingWindow::refresh_duration_chip() {
     if (!ui.topDurationChip) {
         return;
@@ -893,6 +1020,10 @@ void ui::MeetingWindow::send_local_user_profile() {
 void ui::MeetingWindow::update_main_screen_title(qint64 userId) {
     ui.groupBox_2->setTitle(QString());
 
+    apply_tab_bar_visibility();
+    connect(ui.btnMeetingInfo, &QPushButton::clicked, this,
+            [this]() { show_meeting_info_popup(); });
+
     ui.topMainTitle->setText(_participants->display_name(userId));
 }
 
@@ -1038,7 +1169,9 @@ void ui::MeetingWindow::show_audio_device_menu() {
 
     const QPoint pos = ui.audioDeviceBtn->mapToGlobal(
         QPoint(0, -menu->sizeHint().height()));
-    menu->popup(pos);
+    menu->move(pos);
+    popup_device_menu(menu, ui.audioDeviceBtn, this,
+                      [this]() { show_audio_device_menu(); });
 }
 
 void ui::MeetingWindow::show_video_device_menu() {
@@ -1076,7 +1209,9 @@ void ui::MeetingWindow::show_video_device_menu() {
 
     const QPoint pos = ui.videoDeviceBtn->mapToGlobal(
         QPoint(0, -menu->sizeHint().height()));
-    menu->popup(pos);
+    menu->move(pos);
+    popup_device_menu(menu, ui.videoDeviceBtn, this,
+                      [this]() { show_video_device_menu(); });
 }
 
 void ui::MeetingWindow::on_create_meeting_result(int roomno) {

@@ -1359,6 +1359,31 @@ int run_icon_selftest() {
                   .arg(bottom));
     }
 
+    // 双色图标：mic + 红色斜杠，斜杠必须真的有红色像素
+    {
+        const QIcon composed = icons.composed_icon(
+            QStringLiteral("mic"), QStringLiteral("slash"),
+            QColor(QStringLiteral("#C5CCD9")), QColor(QStringLiteral("#E5484D")), 22);
+        const QImage image = composed.pixmap(22, 22).toImage().convertToFormat(
+            QImage::Format_ARGB32);
+        int red = 0;
+        int light = 0;
+        for (int y = 0; y < image.height(); ++y) {
+            for (int x = 0; x < image.width(); ++x) {
+                const QColor c = image.pixelColor(x, y);
+                if (qAlpha(image.pixel(x, y)) < 8) {
+                    continue;
+                }
+                if (c.red() > 150 && c.green() < 110) {
+                    ++red;
+                } else {
+                    ++light;
+                }
+            }
+        }
+        check("composed 图标斜杠为红色", red > 0,
+              QStringLiteral("红色像素=%1 其它=%2").arg(red).arg(light));
+    }
     std::printf("[icon] 结论: %s\n", all_ok ? "PASS" : "FAIL");
     return all_ok ? 0 : 1;
 }

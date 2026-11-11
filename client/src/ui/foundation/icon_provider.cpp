@@ -79,6 +79,22 @@ QIcon IconProvider::icon(const QString &name, const QColor &color, int size) {
     return result;
 }
 
+QIcon IconProvider::composed_icon(const QString &base, const QString &overlay,
+                                  const QColor &base_color,
+                                  const QColor &overlay_color, int size) {
+    const QPixmap base_pm = pixmap(base, base_color, size);
+    const QPixmap overlay_pm = pixmap(overlay, overlay_color, size);
+    if (base_pm.isNull()) {
+        return {};
+    }
+    QPixmap canvas = base_pm;
+    if (!overlay_pm.isNull()) {
+        QPainter painter(&canvas);
+        painter.drawPixmap(0, 0, overlay_pm);
+    }
+    return QIcon(canvas);
+}
+
 void IconProvider::clear_cache() { m_cache.clear(); }
 
 }  // namespace ui

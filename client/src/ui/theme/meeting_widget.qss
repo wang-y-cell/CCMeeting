@@ -222,10 +222,12 @@ QLineEdit:hover {
     border-color: @borderStrong;
 }
 
+/* 聚焦只做很轻的加深，不出现强调色描边（聊天框点击时不闪蓝边） */
 QPlainTextEdit:focus,
 QTextEdit:focus,
 QLineEdit:focus {
-    border: 1px solid @primary;
+    border: 1px solid @border;
+    outline: none;
 }
 
 /* ---------- 分组框（会议信息页） ---------- */
@@ -440,6 +442,50 @@ QPushButton#framelessMaxBtn:hover {
 }
 /* ---------- 顶栏「会议设置」按钮 ---------- */
 
+QPushButton#btnMeetingInfo {
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: @textMuted;
+    font-size: 12px;
+    padding: 2px 8px;
+}
+
+QPushButton#btnMeetingInfo:hover {
+    background-color: @hover;
+    color: @text;
+}
+
+QPushButton#btnMeetingInfo:pressed {
+    background-color: @surface2;
+}
+
+/* 会议详情弹窗 */
+QFrame#meetingInfoPopup {
+    background-color: @popup;
+    border: 1px solid @border;
+    border-radius: 10px;
+}
+
+QLabel#infoPopupTitle {
+    color: @text;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+QLabel#infoPopupKey {
+    color: @textFaint;
+    font-size: 12px;
+}
+
+QLabel#infoPopupSubject,
+QLabel#infoPopupRoomNo,
+QLabel#infoPopupHost,
+QLabel#infoPopupSelfName,
+QLabel#infoPopupDuration {
+    color: @text;
+    font-size: 12px;
+}
 QPushButton#btnMeetingSettings {
     background: transparent;
     border: none;
@@ -459,17 +505,16 @@ QPushButton#btnMeetingSettings:pressed {
 }
 /* ---------- 顶栏：会议时长 ---------- */
 
+/* 会议时长：纯文本（不加底色、不加绿框） */
 QLabel#topDurationChip {
-    color: @textFaint;
-    background-color: @inset;
-    border: 1px solid @borderSoft;
-    border-radius: 999px;
-    padding: 2px 10px;
-    font-size: 11px;
+    color: @textMuted;
+    background: transparent;
+    border: none;
+    padding: 0 4px;
+    font-size: 12px;
+    font-family: "Consolas", "Cascadia Mono", monospace;
 }
 
 QLabel#topDurationChip[running="true"] {
-    color: @success;
-    background-color: rgba(61, 214, 140, 0.10);
-    border: 1px solid rgba(61, 214, 140, 0.24);
+    color: @text;
 }

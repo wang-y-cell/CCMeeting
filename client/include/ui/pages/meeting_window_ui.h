@@ -25,6 +25,7 @@ public:
     QLabel *topMemberChip = nullptr;
     QLabel *topSpeakerLabel = nullptr;
     QLabel *topMeetStatus = nullptr;
+    QPushButton *btnMeetingInfo = nullptr;
     QPushButton *btnMeetingSettings = nullptr;
     QGroupBox *groupBox_2 = nullptr;
     VideoGLWidget *mainshow_label = nullptr;

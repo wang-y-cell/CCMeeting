@@ -51,6 +51,7 @@ public:
     // 界面
     QComboBox *uiStartPage = nullptr;
     QCheckBox *uiShowPageDesc = nullptr;
+    QCheckBox *meetingShowTabs = nullptr;
 
     // 主题（system / light / dark）
     QRadioButton *themeSystem = nullptr;
