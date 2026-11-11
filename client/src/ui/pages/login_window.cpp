@@ -1,4 +1,4 @@
-#include "login.h"
+#include "ui/pages/login_window.h"
 
 #include "login_store.h"
 
@@ -54,7 +54,7 @@ QNetworkRequest makeJsonRequest(const QUrl &url) {
 
 }  // namespace
 
-login::login(QWidget *parent)
+ui::LoginWindow::LoginWindow(QWidget *parent)
     : FramelessWindow<QDialog>(parent) {
     ui.setupUi(this);
     setWindowTitle(tr("登录"));
@@ -62,8 +62,8 @@ login::login(QWidget *parent)
     setMaximizable(false);
     set_style();
 
-    connect(ui.login_button, &QPushButton::clicked, this, &login::Login);
-    connect(ui.register_button, &QPushButton::clicked, this, &login::Register);
+    connect(ui.login_button, &QPushButton::clicked, this, &ui::LoginWindow::Login);
+    connect(ui.register_button, &QPushButton::clicked, this, &ui::LoginWindow::Register);
     connect(ui.createUserLink, &QLabel::linkActivated, this,
             [this](const QString &) { showRegisterPage(); });
     connect(ui.backToLoginLink, &QLabel::linkActivated, this,
@@ -76,7 +76,7 @@ login::login(QWidget *parent)
         if (ui.hintLabel) {
             ui.hintLabel->setText(tr("正在自动登录…"));
         }
-        QTimer::singleShot(40, this, &login::Login);
+        QTimer::singleShot(40, this, &ui::LoginWindow::Login);
     } else if (!creds.username.isEmpty()) {
         ui.account_line->setText(creds.username);
     }
@@ -91,21 +91,21 @@ login::login(QWidget *parent)
             });
 }
 
-void login::set_style() {
+void ui::LoginWindow::set_style() {
     loadWidgetStyleSheet(this, QStringLiteral(":/Style/source/login.qss"));
 }
 
-void login::showRegisterPage() {
+void ui::LoginWindow::showRegisterPage() {
     ui.stackedWidget->setCurrentWidget(ui.registerPage);
     setWindowTitle(tr("创建账号"));
 }
 
-void login::showLoginPage() {
+void ui::LoginWindow::showLoginPage() {
     ui.stackedWidget->setCurrentWidget(ui.loginPage);
     setWindowTitle(tr("登录"));
 }
 
-void login::Login() {
+void ui::LoginWindow::Login() {
     if (m_requestInFlight) {
         return;
     }
@@ -133,7 +133,7 @@ void login::Login() {
                QJsonDocument(body).toJson(QJsonDocument::Compact));
 }
 
-void login::Register() {
+void ui::LoginWindow::Register() {
     if (m_requestInFlight) {
         return;
     }
@@ -161,7 +161,7 @@ void login::Register() {
                QJsonDocument(body).toJson(QJsonDocument::Compact));
 }
 
-void login::onLoginFinished(QNetworkReply *reply) {
+void ui::LoginWindow::onLoginFinished(QNetworkReply *reply) {
     if (m_pendingRequest == PendingRequest::Register) {
         return;
     }
@@ -255,7 +255,7 @@ void login::onLoginFinished(QNetworkReply *reply) {
     flush_log();
 }
 
-void login::onRegisterFinished(QNetworkReply *reply) {
+void ui::LoginWindow::onRegisterFinished(QNetworkReply *reply) {
     if (m_pendingRequest != PendingRequest::Register) {
         return;
     }

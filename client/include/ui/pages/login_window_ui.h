@@ -8,7 +8,9 @@ class QStackedWidget;
 class QWidget;
 
 /** 登录对话框纯 UI，不含业务逻辑 */
-class Ui_login {
+namespace ui {
+
+class LoginWindowUi {
 public:
     QStackedWidget *stackedWidget = nullptr;
     QWidget *loginPage = nullptr;
@@ -30,5 +32,7 @@ public:
 
     void setupUi(QWidget *parent);
 };
+
+}  // namespace ui
 
 #endif // LOGIN_UI_H

@@ -23,6 +23,8 @@ class QVideoSink;
  * 不受窗口管理器支持最大化（isMaximized() 会变 true 但尺寸不变），
  * 回放窗口需要能放大/全屏，故用 QWidget 基类（与主窗口/会议窗口一致）。
  */
+namespace ui {
+
 class RecordingPlaybackDialog : public FramelessWindow<QWidget> {
     Q_OBJECT
 public:
@@ -51,5 +53,7 @@ private:
     QSlider *_slider = nullptr;
     bool _userSeeking = false;
 };
+
+}  // namespace ui
 
 #endif // RECORDING_PLAYBACK_DIALOG_H

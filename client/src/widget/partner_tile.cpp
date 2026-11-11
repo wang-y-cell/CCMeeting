@@ -1,4 +1,6 @@
 #include "partner_tile.h"
+
+#include "ui/foundation/theme_manager.h"
 #include "avatar_image_loader.h"
 #include "partner.h"
 #include "videoglwidget.h"
@@ -18,7 +20,7 @@ PartnerTile::PartnerTile(Partner *partner, QWidget *parent)
 
     m_displayWidget = new VideoGLWidget(this);
     // 头像透明角落要和成员面板底色一致，否则会出现异色方块
-    m_displayWidget->setClearColor(QColor(0x10, 0x13, 0x19));
+    m_displayWidget->setClearColor(ui::ThemeManager::instance().color(QStringLiteral("sidebar")));
     m_displayWidget->setDrawMode(VideoGLWidget::DrawMode::FitWidgetSmooth);
     m_displayWidget->setAlignment(Qt::AlignCenter);
     m_displayWidget->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
@@ -26,7 +28,8 @@ PartnerTile::PartnerTile(Partner *partner, QWidget *parent)
     m_nameLabel = new QLabel(this);
     m_nameLabel->setAlignment(Qt::AlignCenter);
     m_nameLabel->setWordWrap(true);
-    m_nameLabel->setStyleSheet(QStringLiteral("color:#c5ccd9;font-size:11px;"));
+    m_nameLabel->setStyleSheet(QStringLiteral("color:%1;font-size:11px;")
+                                    .arg(ui::ThemeManager::instance().color(QStringLiteral("icon")).name()));
     m_nameLabel->setText(m_partner->fallbackLabel());
 
     layout->addWidget(m_displayWidget, 1);

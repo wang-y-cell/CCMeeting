@@ -6,9 +6,12 @@
 #include <QImage>
 #include <optional>
 
-class AvatarCropCanvas;
 
 /** @brief 圆形头像裁剪对话框 */
+namespace ui {
+
+class AvatarCropCanvas;
+
 class AvatarCropDialog : public FramelessWindow<QDialog> {
     Q_OBJECT
 
@@ -30,3 +33,5 @@ private:
     QImage m_source;
     AvatarCropCanvas *m_canvas = nullptr;
 };
+
+}  // namespace ui

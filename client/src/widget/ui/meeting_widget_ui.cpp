@@ -1,5 +1,7 @@
 #include "meeting_widget_ui.h"
 
+#include "ui/foundation/theme_manager.h"
+
 #include "text/mytextedit.h"
 #include "videoglwidget.h"
 
@@ -156,11 +158,14 @@ void Ui_meeting_widget::setupUi(QWidget *parent) {
     canvasHint->setObjectName(QStringLiteral("canvasHint"));
     canvasHint->setAlignment(Qt::AlignCenter);
     canvasHint->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+    // 颜色走主题令牌，避免浅色主题下仍是深色文字
     canvasHint->setText(
-        QStringLiteral("<div style='font-size:15px;color:#7A8496;'>%1</div>"
-                       "<div style='font-size:12px;color:#4E5666;"
-                       "margin-top:8px;'>%2</div>")
-            .arg(QObject::tr("未加入会议"),
+        QStringLiteral("<div style='font-size:15px;color:%1;'>%2</div>"
+                       "<div style='font-size:12px;color:%3;"
+                       "margin-top:8px;'>%4</div>")
+            .arg(ui::ThemeManager::instance().color(QStringLiteral("textWeak")).name(),
+                 QObject::tr("未加入会议"),
+                 ui::ThemeManager::instance().color(QStringLiteral("textDisabled")).name(),
                  QObject::tr("创建或加入会议后，这里显示画面")));
     gridLayout->addWidget(canvasHint, 0, 0, Qt::AlignCenter);
 

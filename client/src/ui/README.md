@@ -108,14 +108,25 @@ QPushButton#joinMeeting_btn {
 | 设置 | `ui::SettingsPage` | 设备枚举（延后 50ms）+ 预览同步 |
 | 个人资料 | `ui::UserProfilePage` | 无（数据在刷新时拉取） |
 
+**外壳 / 窗口 / 对话框（已完成）**：
+
+| 对象 | 类 / 文件 | 说明 |
+|---|---|---|
+| 外壳 UI | `Ui_main_window` → `ui/shell/main_window_ui.*` | 侧栏条目由 `PageRegistry::nav()` 生成，UI 层不再知道有哪些页面 |
+| 登录窗口 | `ui::LoginWindow` → `ui/pages/login_window.*` | 含 `LoginWindowUi` |
+| 修改资料 | `ui::EditProfileDialog` → `ui/dialogs/edit_profile_dialog.*` | 含 `edit_profile_dialog_ui` |
+| 头像裁剪 | `ui::AvatarCropDialog` / `ui::AvatarCropCanvas` → `ui/dialogs/` | |
+| 录制回放 | `ui::RecordingPlaybackDialog` → `ui/dialogs/recording_playback_dialog.*` | |
+
 **下一批（尚未迁移）**：
 
 | 对象 | 现状 |
 |---|---|
-| 外壳 | `main_window` + `main_window_ui.*`（侧栏仍是手写按钮，未按注册表生成） |
-| 登录窗口 | `login` + `login_ui.*` |
-| 会议页 | `meeting_widget` + `meeting_widget_ui.*`（+ 6 个 controller 待移到 `src/features/`） |
-| 对话框 | `edit_profile_dialog_ui.*`、`avatar_crop_dialog`、`recording_playback_dialog` |
+| 会议窗口 | `meeting_widget` + `meeting_widget_ui.*`（预计迁到 `ui/pages/meeting_window.*`） |
+| 会话逻辑 | 6 个 controller 还在 `src/widget/meeting/`，待移到 `src/features/meeting/` |
+| 基础控件层 | `ui/primitives`（按钮/输入/卡片/开关）尚未抽出 |
+| 图标体系 | `ui/foundation/icon_provider` + SVG 图标按钮未做 |
+| 字体 | `resources/fonts/` 仍为空 |
 ## 主题（深色 / 浅色）
 
 三件事配合工作，缺一不可：

@@ -1,4 +1,4 @@
-#include "edit_profile_dialog_ui.h"
+#include "ui/dialogs/edit_profile_dialog_ui.h"
 
 #include <QComboBox>
 #include <QDate>

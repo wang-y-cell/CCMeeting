@@ -11,6 +11,8 @@
  * 导出时按取景圆映射到源图矩形，再裁成带透明角的圆形 PNG（默认 512×512）。
  * 由 AvatarCropDialog 嵌入使用。
  */
+namespace ui {
+
 class AvatarCropCanvas : public QWidget {
     Q_OBJECT
 
@@ -92,3 +94,5 @@ private:
     bool m_dragging = false;  ///< 是否正在拖动平移
     QPointF m_lastMousePos;   ///< 上一帧鼠标位置（拖动增量）
 };
+
+}  // namespace ui

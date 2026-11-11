@@ -2,7 +2,7 @@
 #define LOGIN_H
 
 #include "frameless_window.h"
-#include "login_ui.h"
+#include "ui/pages/login_window_ui.h"
 
 #include <QNetworkAccessManager>
 
@@ -11,7 +11,9 @@ class QNetworkReply;
 /**
  * @brief 登录对话框：通过 HTTP 调用认证服务校验账号
  */
-class login : public FramelessWindow<QDialog>
+namespace ui {
+
+class LoginWindow : public FramelessWindow<QDialog>
 {
     Q_OBJECT
 public:
@@ -19,8 +21,8 @@ public:
      * @brief 构造登录对话框
      * @param parent 父控件
      */
-    explicit login(QWidget *parent = nullptr);
-    ~login() override = default;
+    explicit LoginWindow(QWidget *parent = nullptr);
+    ~LoginWindow() override = default;
 
     /** @brief 发起登录请求 */
     void Login();
@@ -46,10 +48,12 @@ private slots:
 private:
     enum class PendingRequest { None, Login, Register };
 
-    Ui_login ui;
+    LoginWindowUi ui;
     QNetworkAccessManager m_nam; ///< HTTP 客户端
     bool m_requestInFlight = false; ///< 防止重复提交,当前处于请求状态的时候为true,调用结束时为false
     PendingRequest m_pendingRequest = PendingRequest::None;
 };
+
+}  // namespace ui
 
 #endif // LOGIN_H

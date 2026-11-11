@@ -2,7 +2,7 @@
 
 #include "avatar_image_loader.h"
 #include "configure/user_session.h"
-#include "edit_profile_dialog.h"
+#include "ui/dialogs/edit_profile_dialog.h"
 
 #include <QLabel>
 #include <QMessageBox>
@@ -65,9 +65,9 @@ void ui::UserProfilePage::onEditProfileClicked() {
         return;
     }
 
-    auto *dialog = new EditProfileDialog(this);
+    auto *dialog = new ui::EditProfileDialog(this);
     dialog->setAttribute(Qt::WA_DeleteOnClose);
-    connect(dialog, &EditProfileDialog::profileSaved, this,
+    connect(dialog, &ui::EditProfileDialog::profileSaved, this,
             &ui::UserProfilePage::onProfileSaved);
     dialog->open();
 }
