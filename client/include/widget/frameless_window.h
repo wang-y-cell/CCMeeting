@@ -7,6 +7,8 @@
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QResizeEvent>
+
+#include "ui/foundation/window_effects.h"
 #include <QScreen>
 #include <QGuiApplication>
 #include <QShowEvent>
@@ -219,18 +221,27 @@ protected:
     }
 
     /** @brief 尺寸变化后，重新摆放标题栏按钮并刷新最大化图标 */
+
     void resizeEvent(QResizeEvent *event) override {
         Base::resizeEvent(event);
         updateTitleButtonsGeometry();
         updateMaximizeButtonIcon();
     }
 
-    /** @brief 首次显示时校正按钮位置（构造时 width 可能仍为 0） */
+    /** @brief 首次显示时校正按钮位置（构造时 width 可能仍为 0）+ 申请系统圆角 */
     void showEvent(QShowEvent *event) override {
         Base::showEvent(event);
         updateTitleButtonsGeometry();
         updateMaximizeButtonIcon();
+        // Win11 DWM 圆角：让无边框窗口（主窗口/会议/回放/对话框）四角一致
+        if (!rounded_corners_applied_) {
+            rounded_corners_applied_ = true;
+            ui::enable_rounded_corners(this);
+        }
     }
+
+    /** @brief 是否已申请过系统圆角 */
+    bool rounded_corners_applied_ = false;
 
     /** @brief 窗口状态变化（如最大化）时同步按钮外观 */
     void changeEvent(QEvent *event) override {

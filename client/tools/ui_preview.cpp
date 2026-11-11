@@ -12,6 +12,7 @@
 #include "configure/user_session.h"
 #include "avatar_image_loader.h"
 #include "ui/dialogs/edit_profile_dialog.h"
+#include "ui/dialogs/avatar_crop_dialog.h"
 #include "ui/pages/login_window.h"
 #include "main_window.h"
 #include "ui/foundation/font_registry.h"
@@ -30,6 +31,8 @@
 #include "ui/pages/user_profile_page.h"
 
 #include <QApplication>
+#include "frameless_window.h"
+#include <functional>
 #include "mytextedit.h"
 #include <QImage>
 #include "ui/foundation/icon_provider.h"
@@ -1470,6 +1473,91 @@ int run_main_hide_selftest() {
 }
 
 }  // namespace
+// ---------------------------------------------------------------------------
+// 窗口主题自检：每个顶级窗口的根背景必须跟随主题
+// 用法：UiPreview.exe --window-theme-selftest
+// 背景：回放窗口曾因 QSS 根选择器写成 QDialog# 而窗口其实是 QWidget，
+//       根样式从未生效 -> 浅色主题下仍是深色窗口。这里用像素亮度做回归。
+// ---------------------------------------------------------------------------
+namespace {
+
+/// 取窗口某点亮度（0-255）
+int brightness_at(QWidget *widget, const QPoint &point) {
+    const QImage image = widget->grab().toImage();
+    if (image.isNull()) {
+        return -1;
+    }
+    const QPoint p(qBound(0, point.x(), image.width() - 1),
+                   qBound(0, point.y(), image.height() - 1));
+    const QColor c = image.pixelColor(p);
+    return (c.red() * 299 + c.green() * 587 + c.blue() * 114) / 1000;
+}
+
+int run_window_theme_selftest() {
+    QStandardPaths::setTestModeEnabled(true);
+    bool all_ok = true;
+    auto &theme = ui::ThemeManager::instance();
+
+    struct Case {
+        const char *name;
+        int width;
+        int height;
+        int sample_x;
+        int sample_y;
+        std::function<QWidget *()> make;
+    };
+
+    const QVector<Case> cases = {
+        {"login", 380, 460, 20, 20,
+         [] { return static_cast<QWidget *>(new ui::LoginWindow()); }},
+        {"edit-profile", 720, 720, 24, 24,
+         [] { return static_cast<QWidget *>(new ui::EditProfileDialog()); }},
+        {"avatar-crop", 520, 520, 24, 24,
+         [] {
+             QImage image(64, 64, QImage::Format_ARGB32_Premultiplied);
+             image.fill(Qt::white);
+             return static_cast<QWidget *>(new ui::AvatarCropDialog(image));
+         }},
+        {"recording-playback", 960, 620, 20, 20,
+         [] {
+             RecordingEntry entry;
+             entry.title = QStringLiteral("selftest");
+             return static_cast<QWidget *>(new ui::RecordingPlaybackDialog(entry));
+         }},
+        {"meeting-window", 1000, 700, 20, 60,
+         [] { return static_cast<QWidget *>(new ui::MeetingWindow()); }},
+        {"meeting-settings", 304, 360, 20, 20,
+         [] { return static_cast<QWidget *>(new ui::MeetingSettingsPopup()); }},
+        {"main-window", 1280, 800, 20, 20,
+         [] { return static_cast<QWidget *>(new main_window()); }},
+    };
+
+    for (int pass = 0; pass < 2; ++pass) {
+        const bool light = pass == 0;
+        theme.set_theme(light ? ui::Theme::Light : ui::Theme::Dark);
+        for (const Case &c : cases) {
+            QWidget *widget = c.make();
+            widget->setAttribute(Qt::WA_DontShowOnScreen, true);
+            widget->resize(c.width, c.height);
+            widget->show();
+            QCoreApplication::processEvents();
+            QThread::msleep(40);
+            const int brightness = brightness_at(widget, QPoint(c.sample_x, c.sample_y));
+            const bool ok = light ? (brightness >= 140) : (brightness <= 90);
+            all_ok = all_ok && ok;
+            std::printf("[win-theme] %-18s %-5s 亮度=%3d  %s\n", c.name,
+                        light ? "light" : "dark", brightness, ok ? "OK" : "FAIL");
+            widget->hide();
+            delete widget;
+        }
+    }
+
+    theme.set_theme(ui::Theme::Dark);
+    std::printf("[win-theme] 结论: %s\n", all_ok ? "PASS" : "FAIL");
+    return all_ok ? 0 : 1;
+}
+
+}  // namespace
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     QApplication::setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
@@ -1540,6 +1628,10 @@ int main(int argc, char *argv[]) {
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--main-hide-selftest")) {
         return run_main_hide_selftest();
+    }
+    if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
+                        QStringLiteral("--window-theme-selftest")) {
+        return run_window_theme_selftest();
     }
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--avatar-alpha-selftest")) {

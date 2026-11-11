@@ -1,5 +1,7 @@
 #include "ui/pages/meeting_settings_popup.h"
 
+#include "ui/foundation/window_effects.h"
+
 #include "netheader.h"
 #include "style_loader.h"
 
@@ -34,6 +36,8 @@ ui::MeetingSettingsPopup::MeetingSettingsPopup(QWidget *parent)
     : QWidget(parent, Qt::Popup | Qt::FramelessWindowHint) {
     setObjectName(QStringLiteral("meetingSettingsPopup"));
     setAttribute(Qt::WA_StyledBackground, true);
+    // 与其它无边框窗口保持一致的圆角
+    ui::enable_rounded_corners(this);
     setFixedWidth(304);
     loadWidgetStyleSheet(this, QStringLiteral(":/Style/source/meeting_settings_popup.qss"));
 
