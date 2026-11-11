@@ -49,6 +49,10 @@ QListWidget#sideNav {
     outline: none;
 }
 
+QListWidget#sideNav {
+    icon-size: 18px;
+}
+
 QListWidget#sideNav::item {
     color: @textMuted;
     border: 1px solid transparent;

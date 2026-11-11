@@ -16,6 +16,22 @@
         <file alias="loading.gif">resources/images/loading.gif</file>
     </qresource>
 
+    <qresource prefix="/ui/icons">
+        <file alias="calendar.svg">resources/icons/calendar.svg</file>
+        <file alias="camera-off.svg">resources/icons/camera-off.svg</file>
+        <file alias="camera.svg">resources/icons/camera.svg</file>
+        <file alias="hangup.svg">resources/icons/hangup.svg</file>
+        <file alias="mic-off.svg">resources/icons/mic-off.svg</file>
+        <file alias="mic.svg">resources/icons/mic.svg</file>
+        <file alias="record.svg">resources/icons/record.svg</file>
+        <file alias="screen-share.svg">resources/icons/screen-share.svg</file>
+        <file alias="send.svg">resources/icons/send.svg</file>
+        <file alias="settings.svg">resources/icons/settings.svg</file>
+        <file alias="user.svg">resources/icons/user.svg</file>
+        <file alias="users.svg">resources/icons/users.svg</file>
+        <file alias="video.svg">resources/icons/video.svg</file>
+    </qresource>
+
     <qresource prefix="/ui/audio">
         <file alias="message.wav">resources/audio/message.wav</file>
     </qresource>
