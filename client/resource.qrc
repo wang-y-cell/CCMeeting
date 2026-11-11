@@ -1,16 +1,28 @@
 <RCC>
-    <qresource prefix="/myImage">
-        <file>source/1.png</file>
-        <file>source/3.gif</file>
-    </qresource>
-    <qresource prefix="/myEffect">
-        <file>source/2.wav</file>
-    </qresource>
     <!--
-        QSS 已迁到 src/ui/theme/。
-        用 alias 保留 :/Style/source/xxx.qss 这个旧路径，
-        这样所有 setStyleSheet/loadWidgetStyleSheet 的调用点都不用改。
-        （后续可统一改成 :/Style/ui/theme/xxx.qss）
+        资源约定（详见 resources/README.md）：
+          图片  → resources/images/     :/ui/images/<名字>
+          音频  → resources/audio/      :/ui/audio/<名字>
+          字体  → resources/fonts/      :/ui/fonts/<名字>
+        代码里统一用 :/ui/... 访问，禁止相对路径。
+
+        历史遗留的 /myImage、/myEffect 前缀已移除；
+        原先引用它们的两处代码（configure.h、chat_controller.cpp）已改到新路径，
+        其中 chat_controller 原来用的是 qrc:/myEffect/2.wav（少了一层 source/，
+        实际一直加载失败），本次一并修正。
+    -->
+    <qresource prefix="/ui/images">
+        <file alias="demo-avatar.png">resources/images/demo-avatar.png</file>
+        <file alias="loading.gif">resources/images/loading.gif</file>
+    </qresource>
+
+    <qresource prefix="/ui/audio">
+        <file alias="message.wav">resources/audio/message.wav</file>
+    </qresource>
+
+    <!--
+        QSS 放在 src/ui/theme/（属于"代码性资源"，需要随代码一起评审）。
+        用 alias 保留 :/Style/source/xxx.qss 旧路径，调用点零改动。
     -->
     <qresource prefix="/Style">
         <file alias="source/style.qss">src/ui/theme/style.qss</file>
@@ -23,7 +35,12 @@
         <file alias="source/edit_profile_dialog.qss">src/ui/theme/edit_profile_dialog.qss</file>
         <file alias="source/avatar_crop_dialog.qss">src/ui/theme/avatar_crop_dialog.qss</file>
     </qresource>
+
+    <!--
+        内置默认配置：磁盘上 <exe>/config/client.json 优先，
+        不存在时回退到这里的 .default（加载日志会打印实际来源）。
+    -->
     <qresource prefix="/config">
-        <file>config/client.json</file>
+        <file alias="client.json.default">config/client.json</file>
     </qresource>
 </RCC>

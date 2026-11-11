@@ -42,7 +42,7 @@ bool ClientConfig::load() {
     const QStringList candidates = {
         QCoreApplication::applicationDirPath() + QStringLiteral("/config/client.json"),
         QCoreApplication::applicationDirPath() + QStringLiteral("/client.json"),
-        QStringLiteral(":/config/client.json"),
+        QStringLiteral(":/config/client.json.default"),
     };
 
     for (const QString& path : candidates) {
