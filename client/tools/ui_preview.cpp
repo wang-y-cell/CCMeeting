@@ -33,6 +33,7 @@
 
 #include <QApplication>
 #include <QMenu>
+#include <QPointer>
 #include <QMouseEvent>
 #include <QToolButton>
 #include "frameless_window.h"
@@ -1773,33 +1774,42 @@ int run_device_menu_selftest() {
     QThread::msleep(60);
     QCoreApplication::processEvents();
 
-    QWidget *popup = QApplication::activePopupWidget();
+    QPointer<QWidget> popup_guard = QApplication::activePopupWidget();
+    QWidget *popup = popup_guard.data();
     check("设备菜单已弹出", opened && popup != nullptr && popup->isVisible(),
           QStringLiteral("popup=%1").arg(popup != nullptr));
 
     auto *button = window.findChild<QToolButton *>(QStringLiteral("audioDeviceBtn"));
     if (button != nullptr && popup != nullptr) {
+        // 真实点击会先落到 popup 上：把"点击小箭头"的事件发给菜单本身，
+        // 菜单判定落在自身矩形外 -> 收起
         const QPoint center = button->mapToGlobal(button->rect().center());
-        QMouseEvent press(QEvent::MouseButtonPress, QPointF(center),
-                          QPointF(center), Qt::LeftButton, Qt::LeftButton,
-                          Qt::NoModifier);
-        QMouseEvent release(QEvent::MouseButtonRelease, QPointF(center),
-                            QPointF(center), Qt::LeftButton, Qt::NoButton,
-                            Qt::NoModifier);
-        QCoreApplication::sendEvent(&window, &press);
-        QCoreApplication::sendEvent(&window, &release);
+        const QPointF local = QPointF(popup->mapFromGlobal(center));
+        QMouseEvent press(QEvent::MouseButtonPress, local, QPointF(center),
+                          Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QMouseEvent release(QEvent::MouseButtonRelease, local, QPointF(center),
+                            Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(popup, &press);
+        QCoreApplication::sendEvent(popup, &release);
         QCoreApplication::processEvents();
-        QThread::msleep(40);
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        QThread::msleep(30);
         QCoreApplication::processEvents();
-        check("点小箭头后菜单仍打开", popup->isVisible(),
-              QStringLiteral("visible=%1").arg(popup->isVisible()));
+        // 需求：再点一次小箭头应该关闭菜单（菜单可能已 deleteLater）
+        const bool closed =
+            popup_guard.isNull() || !popup_guard->isVisible();
+        check("再点小箭头后菜单关闭", closed,
+              QStringLiteral("可见=%1 已销毁=%2")
+                  .arg(popup_guard.isNull() ? QStringLiteral("?")
+                                            : QString::number(popup_guard->isVisible()))
+                  .arg(popup_guard.isNull()));
     }
 
-    if (popup != nullptr) {
-        popup->close();
+    if (popup_guard) {
+        popup_guard->close();
     }
     QCoreApplication::processEvents();
-    check("关闭后箭头恢复向上",
+    check("箭头图标可用",
           button != nullptr && !button->icon().isNull(), {});
     window.hide();
     std::printf("[device-menu] 结论: %s\n", all_ok ? "PASS" : "FAIL");
