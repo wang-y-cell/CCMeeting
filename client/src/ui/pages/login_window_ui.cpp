@@ -1,4 +1,4 @@
-#include "login_ui.h"
+#include "ui/pages/login_window_ui.h"
 
 #include <QLabel>
 #include <QLineEdit>
@@ -8,7 +8,7 @@
 #include <QStackedWidget>
 #include <QVBoxLayout>
 
-void Ui_login::setupUi(QWidget *parent) {
+void ui::LoginWindowUi::setupUi(QWidget *parent) {
     parent->setObjectName(QStringLiteral("login"));
     parent->resize(380, 460);
     parent->setFixedSize(380, 460);

@@ -2,7 +2,7 @@
 #define EDIT_PROFILE_DIALOG_H
 
 #include "frameless_window.h"
-#include "edit_profile_dialog_ui.h"
+#include "ui/dialogs/edit_profile_dialog_ui.h"
 #include "configure/user_session.h"
 
 #include <QDialog>
@@ -11,6 +11,8 @@
 class QNetworkReply;
 
 /** 修改昵称 / 简介 / 头像 / 扩展资料 */
+namespace ui {
+
 class EditProfileDialog : public FramelessWindow<QDialog> {
     Q_OBJECT
 
@@ -39,5 +41,7 @@ private:
     bool m_busy = false;
     QNetworkReply *m_reply = nullptr;
 };
+
+}  // namespace ui
 
 #endif // EDIT_PROFILE_DIALOG_H

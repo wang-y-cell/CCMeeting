@@ -27,7 +27,7 @@
 #include "configure/storage.h"
 #include "configure/user_session.h"
 #include "avatar_image_loader.h"
-#include "login.h"
+#include "ui/pages/login_window.h"
 #include "main_window.h"
 #include "screen.h"
 #include "ui/foundation/theme_manager.h"
@@ -439,7 +439,7 @@ int main(int argc, char *argv[]) {
 
     spdlog::info("[main] show login dialog");
     flush_log();
-    login loginDialog;
+    ui::LoginWindow loginDialog;
 
     // 空闲预热 Qt Multimedia 设备枚举：首次 videoInputs() 冷启动 500ms+，
     // 若拖到用户第一次打开设置页才做，会表现为"点设置卡一下"。

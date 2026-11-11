@@ -1,5 +1,5 @@
-#include "avatar_crop_dialog.h"
-#include "avatar_crop_canvas.h"
+#include "ui/dialogs/avatar_crop_dialog.h"
+#include "ui/dialogs/avatar_crop_canvas.h"
 #include "style_loader.h"
 
 #include <QHBoxLayout>
@@ -7,7 +7,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 
-AvatarCropDialog::AvatarCropDialog(const QImage &source, QWidget *parent)
+ui::AvatarCropDialog::AvatarCropDialog(const QImage &source, QWidget *parent)
     : FramelessWindow<QDialog>(parent), m_source(source) {
     setObjectName(QStringLiteral("avatarCropDialog"));
     setWindowTitle(tr("裁剪头像"));
@@ -67,18 +67,18 @@ AvatarCropDialog::AvatarCropDialog(const QImage &source, QWidget *parent)
     btnRow->addWidget(okBtn, 1);
     root->addLayout(btnRow);
 
-    connect(zoomInBtn, &QPushButton::clicked, this, &AvatarCropDialog::onZoomIn);
-    connect(zoomOutBtn, &QPushButton::clicked, this, &AvatarCropDialog::onZoomOut);
-    connect(resetBtn, &QPushButton::clicked, this, &AvatarCropDialog::onReset);
+    connect(zoomInBtn, &QPushButton::clicked, this, &ui::AvatarCropDialog::onZoomIn);
+    connect(zoomOutBtn, &QPushButton::clicked, this, &ui::AvatarCropDialog::onZoomOut);
+    connect(resetBtn, &QPushButton::clicked, this, &ui::AvatarCropDialog::onReset);
     connect(cancelBtn, &QPushButton::clicked, this, &QDialog::reject);
     connect(okBtn, &QPushButton::clicked, this, &QDialog::accept);
 }
 
-QImage AvatarCropDialog::croppedImage() const {
+QImage ui::AvatarCropDialog::croppedImage() const {
     return m_canvas ? m_canvas->croppedImage() : QImage();
 }
 
-std::optional<QImage> AvatarCropDialog::cropFromFile(QWidget *parent,
+std::optional<QImage> ui::AvatarCropDialog::cropFromFile(QWidget *parent,
                                                      const QString &filePath) {
     QImage image(filePath);
     if (image.isNull()) {
@@ -97,19 +97,19 @@ std::optional<QImage> AvatarCropDialog::cropFromFile(QWidget *parent,
     return cropped;
 }
 
-void AvatarCropDialog::onZoomIn() {
+void ui::AvatarCropDialog::onZoomIn() {
     if (m_canvas) {
         m_canvas->zoomIn();
     }
 }
 
-void AvatarCropDialog::onZoomOut() {
+void ui::AvatarCropDialog::onZoomOut() {
     if (m_canvas) {
         m_canvas->zoomOut();
     }
 }
 
-void AvatarCropDialog::onReset() {
+void ui::AvatarCropDialog::onReset() {
     if (m_canvas) {
         m_canvas->setImage(m_source);
     }

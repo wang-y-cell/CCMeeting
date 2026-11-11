@@ -1,4 +1,4 @@
-#include "main_window_ui.h"
+#include "ui/shell/main_window_ui.h"
 
 #include <QFont>
 #include <QHBoxLayout>
@@ -52,23 +52,8 @@ void Ui_main_window::setupUi(QWidget *parent) {
     sideNav->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     sideNav->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
-    const QStringList sideNavItems = {
-        QObject::tr("创建会议"),
-        QObject::tr("加入会议"),
-        QObject::tr("会议记录"),
-        QObject::tr("录制"),
-        QObject::tr("设置"),
-    };
-    for (const auto &item : sideNavItems) {
-        auto *listItem = new QListWidgetItem(item);
-        listItem->setSizeHint(QSize(0, 48));
-        listItem->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-        QFont font = listItem->font();
-        font.setPointSize(11);
-        font.setWeight(QFont::DemiBold);
-        listItem->setFont(font);
-        sideNav->addItem(listItem);
-    }
+    // 侧栏条目由 PageRegistry 驱动，见 main_window::build_pages()
+    // （这里只负责创建空的 sideNav，避免 UI 层知道有哪些页面）
     leftColumn->addWidget(sideNav, 1);
 
     // 侧边栏底部：连接状态 + 版本，给左下角一个落点，避免大片空白

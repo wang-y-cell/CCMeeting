@@ -11,8 +11,8 @@
 #include <QSqlQuery>
 #include "configure/user_session.h"
 #include "avatar_image_loader.h"
-#include "edit_profile_dialog.h"
-#include "login.h"
+#include "ui/dialogs/edit_profile_dialog.h"
+#include "ui/pages/login_window.h"
 #include "main_window.h"
 #include "ui/foundation/theme_manager.h"
 #include "meeting_recorder.h"
@@ -20,7 +20,7 @@
 #include "meeting_widget.h"
 #include "screen.h"
 #include "recording_library.h"
-#include "recording_playback_dialog.h"
+#include "ui/dialogs/recording_playback_dialog.h"
 #include "ui/pages/meeting_history_page.h"
 #include "ui/pages/recordings_page.h"
 #include "ui/pages/settings_page.h"
@@ -333,7 +333,7 @@ int run_playback_maximize_test() {
     parentWindow.show();
     QCoreApplication::processEvents();
 
-    RecordingPlaybackDialog dialog(entry, &parentWindow);
+    ui::RecordingPlaybackDialog dialog(entry, &parentWindow);
     dialog.show();
     QCoreApplication::processEvents();
     QCoreApplication::processEvents();
@@ -1388,7 +1388,7 @@ int main(int argc, char *argv[]) {
                     .constData());
 
     {
-        login loginDialog;
+        ui::LoginWindow loginDialog;
         capture(&loginDialog, QStringLiteral("01-login"), 920, 600);
     }
 
@@ -1482,13 +1482,13 @@ int main(int argc, char *argv[]) {
     {
         const QVector<RecordingEntry> entries = RecordingLibrary::scan();
         if (!entries.isEmpty()) {
-            RecordingPlaybackDialog dialog(entries.first());
+            ui::RecordingPlaybackDialog dialog(entries.first());
             capture(&dialog, QStringLiteral("11-playback"), 960, 620);
         }
     }
 
     {
-        EditProfileDialog dialog;
+        ui::EditProfileDialog dialog;
         capture(&dialog, QStringLiteral("06-edit-profile"), 720, 720);
     }
 

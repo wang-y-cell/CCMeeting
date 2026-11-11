@@ -1,4 +1,4 @@
-#include "recording_playback_dialog.h"
+#include "ui/dialogs/recording_playback_dialog.h"
 
 #include "style_loader.h"
 #include "videoglwidget.h"
@@ -30,7 +30,7 @@ QString format_time(qint64 ms) {
 
 }  // namespace
 
-RecordingPlaybackDialog::RecordingPlaybackDialog(const RecordingEntry &entry,
+ui::RecordingPlaybackDialog::RecordingPlaybackDialog(const RecordingEntry &entry,
                                                  QWidget *parent)
     : FramelessWindow<QWidget>(parent), _entry(entry) {
     // 基类是 QWidget 且可能带 parent：必须显式声明为顶层窗口，
@@ -46,13 +46,13 @@ RecordingPlaybackDialog::RecordingPlaybackDialog(const RecordingEntry &entry,
     resize(960, 620);
 }
 
-RecordingPlaybackDialog::~RecordingPlaybackDialog() {
+ui::RecordingPlaybackDialog::~RecordingPlaybackDialog() {
     if (_player) {
         _player->stop();
     }
 }
 
-void RecordingPlaybackDialog::build_ui() {
+void ui::RecordingPlaybackDialog::build_ui() {
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(16, 46, 16, 14);
     root->setSpacing(10);
@@ -141,7 +141,7 @@ void RecordingPlaybackDialog::build_ui() {
                 _timeLabel->setText(tr("无法播放：%1").arg(message));
             });
     connect(_playBtn, &QPushButton::clicked, this,
-            &RecordingPlaybackDialog::toggle_play);
+            &ui::RecordingPlaybackDialog::toggle_play);
     connect(_slider, &QSlider::sliderPressed, this,
             [this]() { _userSeeking = true; });
     connect(_slider, &QSlider::sliderReleased, this, [this]() {
@@ -150,14 +150,14 @@ void RecordingPlaybackDialog::build_ui() {
     });
 }
 
-void RecordingPlaybackDialog::update_time_label(qint64 position_ms,
+void ui::RecordingPlaybackDialog::update_time_label(qint64 position_ms,
                                                 qint64 duration_ms) {
     _timeLabel->setText(QStringLiteral("%1 / %2")
                             .arg(format_time(position_ms),
                                  format_time(duration_ms)));
 }
 
-void RecordingPlaybackDialog::toggle_play() {
+void ui::RecordingPlaybackDialog::toggle_play() {
     if (_player->playbackState() == QMediaPlayer::PlayingState) {
         _player->pause();
     } else {
@@ -165,7 +165,7 @@ void RecordingPlaybackDialog::toggle_play() {
     }
 }
 
-bool RecordingPlaybackDialog::eventFilter(QObject *watched, QEvent *event) {
+bool ui::RecordingPlaybackDialog::eventFilter(QObject *watched, QEvent *event) {
     if (watched == _video && event->type() == QEvent::MouseButtonDblClick) {
         toggleMaximize();
         return true;
@@ -173,7 +173,7 @@ bool RecordingPlaybackDialog::eventFilter(QObject *watched, QEvent *event) {
     return FramelessWindow<QWidget>::eventFilter(watched, event);
 }
 
-void RecordingPlaybackDialog::play() {
+void ui::RecordingPlaybackDialog::play() {
     if (!_player) {
         return;
     }

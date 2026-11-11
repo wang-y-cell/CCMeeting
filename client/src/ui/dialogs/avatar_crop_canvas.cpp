@@ -1,4 +1,4 @@
-#include "avatar_crop_canvas.h"
+#include "ui/dialogs/avatar_crop_canvas.h"
 
 #include <QMouseEvent>
 #include <QPainter>
@@ -13,7 +13,7 @@ constexpr qreal kWheelFactor = 1.12;
 
 } // namespace
 
-AvatarCropCanvas::AvatarCropCanvas(QWidget *parent) : QWidget(parent) {
+ui::AvatarCropCanvas::AvatarCropCanvas(QWidget *parent) : QWidget(parent) {
     setObjectName(QStringLiteral("avatarCropCanvas"));
     setMinimumSize(320, 320);
     setMouseTracking(true);
@@ -22,21 +22,21 @@ AvatarCropCanvas::AvatarCropCanvas(QWidget *parent) : QWidget(parent) {
     setAttribute(Qt::WA_StyledBackground, true);
 }
 
-void AvatarCropCanvas::setImage(const QImage &image) {
+void ui::AvatarCropCanvas::setImage(const QImage &image) {
     m_image = image;
     resetTransform();
     update();
 }
 
-qreal AvatarCropCanvas::cropRadiusPx() const {
+qreal ui::AvatarCropCanvas::cropRadiusPx() const {
     return qMin(width(), height()) * 0.38;
 }
 
-QPointF AvatarCropCanvas::cropCenterPx() const {
+QPointF ui::AvatarCropCanvas::cropCenterPx() const {
     return QPointF(width() * 0.5, height() * 0.5);
 }
 
-qreal AvatarCropCanvas::coverMinScale() const {
+qreal ui::AvatarCropCanvas::coverMinScale() const {
     if (m_image.isNull() || m_image.width() <= 0 || m_image.height() <= 0) {
         return 1.0;
     }
@@ -44,7 +44,7 @@ qreal AvatarCropCanvas::coverMinScale() const {
     return qMax(diameter / m_image.width(), diameter / m_image.height());
 }
 
-void AvatarCropCanvas::resetTransform() {
+void ui::AvatarCropCanvas::resetTransform() {
     if (m_image.isNull()) {
         m_scale = 1.0;
         m_offset = QPointF();
@@ -60,7 +60,7 @@ void AvatarCropCanvas::resetTransform() {
     clampOffset();
 }
 
-void AvatarCropCanvas::clampOffset() {
+void ui::AvatarCropCanvas::clampOffset() {
     if (m_image.isNull()) {
         return;
     }
@@ -91,7 +91,7 @@ void AvatarCropCanvas::clampOffset() {
     }
 }
 
-void AvatarCropCanvas::zoomAt(const QPointF &anchor, qreal factor) {
+void ui::AvatarCropCanvas::zoomAt(const QPointF &anchor, qreal factor) {
     if (m_image.isNull()) {
         return;
     }
@@ -112,7 +112,7 @@ void AvatarCropCanvas::zoomAt(const QPointF &anchor, qreal factor) {
     update();
 }
 
-QImage AvatarCropCanvas::croppedImage(int outputSize) const {
+QImage ui::AvatarCropCanvas::croppedImage(int outputSize) const {
     if (m_image.isNull() || outputSize <= 0) {
         return {};
     }
@@ -143,7 +143,7 @@ QImage AvatarCropCanvas::croppedImage(int outputSize) const {
     return square;
 }
 
-void AvatarCropCanvas::paintEvent(QPaintEvent *event) {
+void ui::AvatarCropCanvas::paintEvent(QPaintEvent *event) {
     Q_UNUSED(event);
 
     QPainter painter(this);
@@ -187,7 +187,7 @@ void AvatarCropCanvas::paintEvent(QPaintEvent *event) {
     painter.drawEllipse(center, radius, radius);
 }
 
-void AvatarCropCanvas::mousePressEvent(QMouseEvent *event) {
+void ui::AvatarCropCanvas::mousePressEvent(QMouseEvent *event) {
     if (event->button() == Qt::LeftButton && hasImage()) {
         m_dragging = true;
         m_lastMousePos = event->position();
@@ -198,7 +198,7 @@ void AvatarCropCanvas::mousePressEvent(QMouseEvent *event) {
     QWidget::mousePressEvent(event);
 }
 
-void AvatarCropCanvas::mouseMoveEvent(QMouseEvent *event) {
+void ui::AvatarCropCanvas::mouseMoveEvent(QMouseEvent *event) {
     if (m_dragging) {
         m_offset += event->position() - m_lastMousePos;
         m_lastMousePos = event->position();
@@ -210,7 +210,7 @@ void AvatarCropCanvas::mouseMoveEvent(QMouseEvent *event) {
     QWidget::mouseMoveEvent(event);
 }
 
-void AvatarCropCanvas::mouseReleaseEvent(QMouseEvent *event) {
+void ui::AvatarCropCanvas::mouseReleaseEvent(QMouseEvent *event) {
     if (event->button() == Qt::LeftButton && m_dragging) {
         m_dragging = false;
         setCursor(Qt::OpenHandCursor);
@@ -220,7 +220,7 @@ void AvatarCropCanvas::mouseReleaseEvent(QMouseEvent *event) {
     QWidget::mouseReleaseEvent(event);
 }
 
-void AvatarCropCanvas::wheelEvent(QWheelEvent *event) {
+void ui::AvatarCropCanvas::wheelEvent(QWheelEvent *event) {
     if (!hasImage()) {
         event->ignore();
         return;
@@ -232,15 +232,15 @@ void AvatarCropCanvas::wheelEvent(QWheelEvent *event) {
     event->accept();
 }
 
-void AvatarCropCanvas::zoomIn() {
+void ui::AvatarCropCanvas::zoomIn() {
     zoomAt(cropCenterPx(), kWheelFactor);
 }
 
-void AvatarCropCanvas::zoomOut() {
+void ui::AvatarCropCanvas::zoomOut() {
     zoomAt(cropCenterPx(), 1.0 / kWheelFactor);
 }
 
-void AvatarCropCanvas::resizeEvent(QResizeEvent *event) {
+void ui::AvatarCropCanvas::resizeEvent(QResizeEvent *event) {
     QWidget::resizeEvent(event);
     if (!m_image.isNull()) {
         const qreal minScale = coverMinScale();

@@ -245,14 +245,29 @@ void main_window::build_pages() {
     if (recordings_widget != nullptr) {
         connect(recordings_widget, &ui::RecordingsPage::playRequested, this,
                 [this](const RecordingEntry &entry) {
-                    auto *dialog = new RecordingPlaybackDialog(entry, this);
+                    auto *dialog = new ui::RecordingPlaybackDialog(entry, this);
                     dialog->setAttribute(Qt::WA_DeleteOnClose);
                     dialog->show();
                     dialog->play();
                 });
     }
 
-    // 3) 侧栏切换：按"页"统一处理，新页面只要实现 ui::Page::on_show 就能懒刷新
+    // 3) 侧栏由注册表生成：新增页面只需 register_pages() 里加一行
+    ui.sideNav->clear();
+    const QList<ui::PageMeta> nav_metas = m_pages.nav();
+    for (const ui::PageMeta &meta : nav_metas) {
+        auto *item = new QListWidgetItem(meta.title, ui.sideNav);
+        item->setSizeHint(QSize(0, 48));
+        item->setTextAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+        item->setData(Qt::UserRole, meta.id);
+        QFont font = item->font();
+        font.setPointSize(11);
+        font.setWeight(QFont::DemiBold);
+        item->setFont(font);
+        ui.sideNav->addItem(item);
+    }
+
+    // 4) 侧栏切换：按"页"统一处理，新页面只要实现 ui::Page::on_show 就能懒刷新
     ui.sideNav->setCurrentRow(0);
     connect(ui.sideNav, &QListWidget::currentRowChanged, this,
             [this](int row) {

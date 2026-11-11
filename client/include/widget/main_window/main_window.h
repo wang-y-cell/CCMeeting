@@ -2,11 +2,11 @@
 #define MAIN_WINDOW_H
 
 #include "frameless_window.h"
-#include "main_window_ui.h"
+#include "ui/shell/main_window_ui.h"
 #include "meeting_widget.h"
 #include "ui/pages/create_meeting_page.h"
 #include "ui/pages/user_profile_page.h"
-#include "recording_playback_dialog.h"
+#include "ui/dialogs/recording_playback_dialog.h"
 #include "ui/pages/meeting_history_page.h"
 #include "ui/pages/recordings_page.h"
 #include "ui/pages/settings_page.h"

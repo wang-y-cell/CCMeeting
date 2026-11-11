@@ -1,6 +1,6 @@
-#include "edit_profile_dialog.h"
+#include "ui/dialogs/edit_profile_dialog.h"
 
-#include "avatar_crop_dialog.h"
+#include "ui/dialogs/avatar_crop_dialog.h"
 #include "avatar_image_loader.h"
 #include "configure/client_config.h"
 #include "configure/user_session.h"
@@ -57,7 +57,7 @@ UserProfileExtras extrasFromJson(const QJsonObject &data) {
 
 }  // namespace
 
-EditProfileDialog::EditProfileDialog(QWidget *parent)
+ui::EditProfileDialog::EditProfileDialog(QWidget *parent)
     : FramelessWindow<QDialog>(parent) {
     setWindowTitle(tr("修改资料"));
     setTitleBarHeight(40);
@@ -71,15 +71,15 @@ EditProfileDialog::EditProfileDialog(QWidget *parent)
     loadFromSession();
 
     connect(ui.changeAvatarBtn, &QPushButton::clicked, this,
-            &EditProfileDialog::onChangeAvatarClicked);
+            &ui::EditProfileDialog::onChangeAvatarClicked);
     connect(ui.saveBtn, &QPushButton::clicked, this,
-            &EditProfileDialog::onSaveClicked);
+            &ui::EditProfileDialog::onSaveClicked);
     connect(ui.cancelBtn, &QPushButton::clicked, this, &QDialog::reject);
     connect(ui.birthdayEdit, &QDateEdit::dateChanged, this,
-            &EditProfileDialog::refreshAgeLabel);
+            &ui::EditProfileDialog::refreshAgeLabel);
 }
 
-void EditProfileDialog::refreshAgeLabel() {
+void ui::EditProfileDialog::refreshAgeLabel() {
     if (!ui.ageValue || !ui.birthdayEdit) {
         return;
     }
@@ -93,7 +93,7 @@ void EditProfileDialog::refreshAgeLabel() {
     ui.ageValue->setText(age >= 0 ? QString::number(age) : QStringLiteral("-"));
 }
 
-void EditProfileDialog::loadFromSession() {
+void ui::EditProfileDialog::loadFromSession() {
     const auto &session = UserSession::instance();
     ui.nicknameEdit->setText(session.name());
     ui.infoEdit->setPlainText(session.info());
@@ -118,7 +118,7 @@ void EditProfileDialog::loadFromSession() {
         [this](const QPixmap &pixmap) { ui.avatarPreview->setPixmap(pixmap); });
 }
 
-UserProfileExtras EditProfileDialog::collectExtras() const {
+UserProfileExtras ui::EditProfileDialog::collectExtras() const {
     UserProfileExtras extras = UserSession::instance().extras();
     extras.gender = ui.genderCombo->currentData().toString();
     const QDate date = ui.birthdayEdit->date();
@@ -133,7 +133,7 @@ UserProfileExtras EditProfileDialog::collectExtras() const {
     return extras;
 }
 
-void EditProfileDialog::setBusy(bool busy) {
+void ui::EditProfileDialog::setBusy(bool busy) {
     m_busy = busy;
     ui.saveBtn->setEnabled(!busy);
     ui.cancelBtn->setEnabled(!busy);
@@ -147,7 +147,7 @@ void EditProfileDialog::setBusy(bool busy) {
     ui.infoEdit->setEnabled(!busy);
 }
 
-void EditProfileDialog::onChangeAvatarClicked() {
+void ui::EditProfileDialog::onChangeAvatarClicked() {
     if (m_busy) {
         return;
     }
@@ -159,7 +159,7 @@ void EditProfileDialog::onChangeAvatarClicked() {
         return;
     }
 
-    const auto cropped = AvatarCropDialog::cropFromFile(this, filePath);
+    const auto cropped = ui::AvatarCropDialog::cropFromFile(this, filePath);
     if (!cropped.has_value() || cropped->isNull()) {
         return;
     }
@@ -171,7 +171,7 @@ void EditProfileDialog::onChangeAvatarClicked() {
                     Qt::SmoothTransformation));
 }
 
-void EditProfileDialog::onSaveClicked() {
+void ui::EditProfileDialog::onSaveClicked() {
     if (m_busy) {
         return;
     }
@@ -194,7 +194,7 @@ void EditProfileDialog::onSaveClicked() {
     }
 }
 
-void EditProfileDialog::uploadPendingAvatar() {
+void ui::EditProfileDialog::uploadPendingAvatar() {
     QByteArray bytes;
     QBuffer buffer(&bytes);
     buffer.open(QIODevice::WriteOnly);
@@ -222,10 +222,10 @@ void EditProfileDialog::uploadPendingAvatar() {
     m_reply = nam->post(makeJsonRequest(url),
                         QJsonDocument(body).toJson(QJsonDocument::Compact));
     connect(m_reply, &QNetworkReply::finished, this,
-            &EditProfileDialog::onAvatarUploadFinished);
+            &ui::EditProfileDialog::onAvatarUploadFinished);
 }
 
-void EditProfileDialog::onAvatarUploadFinished() {
+void ui::EditProfileDialog::onAvatarUploadFinished() {
     QNetworkReply *reply = m_reply;
     m_reply = nullptr;
     if (!reply) {
@@ -278,7 +278,7 @@ void EditProfileDialog::onAvatarUploadFinished() {
     submitProfileUpdate();
 }
 
-void EditProfileDialog::submitProfileUpdate() {
+void ui::EditProfileDialog::submitProfileUpdate() {
     auto *nam = AvatarImageLoader::instance().networkManager();
     if (!nam) {
         setBusy(false);
@@ -304,10 +304,10 @@ void EditProfileDialog::submitProfileUpdate() {
     m_reply = nam->post(makeJsonRequest(url),
                         QJsonDocument(body).toJson(QJsonDocument::Compact));
     connect(m_reply, &QNetworkReply::finished, this,
-            &EditProfileDialog::onProfileUpdateFinished);
+            &ui::EditProfileDialog::onProfileUpdateFinished);
 }
 
-void EditProfileDialog::onProfileUpdateFinished() {
+void ui::EditProfileDialog::onProfileUpdateFinished() {
     QNetworkReply *reply = m_reply;
     m_reply = nullptr;
     if (!reply) {
