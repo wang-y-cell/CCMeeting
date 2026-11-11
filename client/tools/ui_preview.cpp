@@ -1962,6 +1962,22 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    // 单个成员卡片：验证头像为 72 方形、名字常驻显示
+    {
+        QWidget panel;
+        panel.setObjectName(QStringLiteral("tab_5"));
+        panel.resize(300, 330);
+        ui::ThemeManager::instance().apply_to(
+            &panel, QStringLiteral(":/Style/source/meeting_widget.qss"));
+        auto *partner = new Partner(1001, &panel);
+        auto *tile = new PartnerTile(partner, &panel);
+        tile->setGeometry(8, 8, 284, 302);
+        QImage avatar(144, 144, QImage::Format_ARGB32_Premultiplied);
+        avatar.fill(QColor(QStringLiteral("#4C8DFF")));
+        tile->displayWidget()->setFrame(makeCircularAvatarImage(avatar));
+        tile->updateProfile(QStringLiteral("王宇"), QString());
+        capture(&panel, QStringLiteral("00-member-tile"), 300, 330);
+    }
     {
         ui::MeetingWindow meeting;
         capture(&meeting, QStringLiteral("05-meeting"), 1360, 860);
