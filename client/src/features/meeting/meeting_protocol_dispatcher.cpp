@@ -1,4 +1,4 @@
-#include "meeting_protocol_dispatcher.h"
+#include "features/meeting/meeting_protocol_dispatcher.h"
 
 #include <spdlog/spdlog.h>
 

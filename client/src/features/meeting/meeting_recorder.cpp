@@ -1,4 +1,4 @@
-#include "meeting_recorder.h"
+#include "features/meeting/meeting_recorder.h"
 
 #include "recording_library.h"
 

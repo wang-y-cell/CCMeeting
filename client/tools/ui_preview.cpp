@@ -15,7 +15,7 @@
 #include "ui/pages/login_window.h"
 #include "main_window.h"
 #include "ui/foundation/theme_manager.h"
-#include "meeting_recorder.h"
+#include "features/meeting/meeting_recorder.h"
 #include "ui/pages/meeting_settings_popup.h"
 #include "ui/pages/meeting_window.h"
 #include "screen.h"

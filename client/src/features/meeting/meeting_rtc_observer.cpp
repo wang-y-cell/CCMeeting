@@ -1,4 +1,4 @@
-#include "meeting_rtc_observer.h"
+#include "features/meeting/meeting_rtc_observer.h"
 
 #include <QMetaObject>
 #include <QString>

@@ -1,8 +1,8 @@
-#include "meeting_media_controller.h"
+#include "features/meeting/meeting_media_controller.h"
 
 #include "configure/client_config.h"
 #include "configure/user_session.h"
-#include "meeting_rtc_observer.h"
+#include "features/meeting/meeting_rtc_observer.h"
 
 #include "storage.h"
 

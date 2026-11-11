@@ -2,12 +2,12 @@
 #define MEETING_WIDGET_H
 
 #include "frameless_window.h"
-#include "chat_controller.h"
-#include "meeting_recorder.h"
-#include "room_settings_controller.h"
+#include "features/meeting/chat_controller.h"
+#include "features/meeting/meeting_recorder.h"
+#include "features/meeting/room_settings_controller.h"
 #include "ui/pages/meeting_settings_popup.h"
 #include "room_settings_flags.h"
-#include "meeting_controller.h"
+#include "features/meeting/meeting_controller.h"
 #include "networkmanager.h"
 #include "message.h"
 #include "partner.h"
@@ -15,10 +15,10 @@
 #include "chatmessage.h"
 #include "cameravideo.h"
 
-#include "meeting_media_controller.h"
-#include "meeting_protocol_dispatcher.h"
-#include "participants_controller.h"
-#include "meeting_rtc_observer.h"
+#include "features/meeting/meeting_media_controller.h"
+#include "features/meeting/meeting_protocol_dispatcher.h"
+#include "features/meeting/participants_controller.h"
+#include "features/meeting/meeting_rtc_observer.h"
 #include <xrtc/ixrtc_engine.h>
 #include <xrtc/xrtc_defines.h>
 
