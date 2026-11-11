@@ -28,6 +28,8 @@
 #include "stack_user_profile.h"
 
 #include <QApplication>
+#include "configure.h"
+#include <QMovie>
 #include <QAudioDevice>
 #include <QCameraDevice>
 #include <QElapsedTimer>
@@ -1083,6 +1085,78 @@ int run_storage_dump() {
 }
 
 }  // namespace
+// ---------------------------------------------------------------------------
+// 资源布局自检：确认 :/ui/... 路径可用、旧路径已移除、内置默认配置可解析
+// 用法：UiPreview.exe --resource-selftest
+// ---------------------------------------------------------------------------
+namespace {
+
+bool resource_exists(const char *path) {
+    return QFile::exists(QString::fromUtf8(path));
+}
+
+int run_resource_selftest() {
+    bool all_ok = true;
+    auto check = [&](const char *name, bool ok) {
+        all_ok = all_ok && ok;
+        std::printf("[res] %-46s %s\n", name, ok ? "OK" : "FAIL");
+    };
+
+    // 1) 新布局存在
+    check(":/ui/images/loading.gif", resource_exists(":/ui/images/loading.gif"));
+    check(":/ui/audio/message.wav", resource_exists(":/ui/audio/message.wav"));
+    check(":/ui/images/demo-avatar.png",
+          resource_exists(":/ui/images/demo-avatar.png"));
+
+    // 2) 旧布局已移除（避免两套路径共存）
+    check("旧路径 /myEffect/source/2.wav 已移除",
+          !resource_exists(":/myEffect/source/2.wav"));
+    check("旧路径 /myImage/source/3.gif 已移除",
+          !resource_exists(":/myImage/source/3.gif"));
+
+    // 3) 代码里的常量指向的资源真实存在
+    check("Source::wait_gif 可解析",
+          resource_exists(Source::wait_gif));
+    check("Source::at_sound 可解析",
+          resource_exists(Source::at_sound));
+
+    // 4) GIF 能被 QMovie 识别（不只是文件存在）
+    {
+        QMovie movie(QStringLiteral(":/ui/images/loading.gif"));
+        check("loading.gif 可被 QMovie 加载", movie.isValid());
+    }
+
+    // 5) QSS 资源仍在旧别名路径下可用
+    check(":/Style/source/main_window.qss",
+          resource_exists(":/Style/source/main_window.qss"));
+
+    // 6) 内置默认配置可解析且含 auth 段
+    {
+        QFile file(QStringLiteral(":/config/client.json.default"));
+        bool ok = false;
+        if (file.open(QIODevice::ReadOnly)) {
+            const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+            ok = doc.isObject() &&
+                 doc.object().contains(QStringLiteral("auth")) &&
+                 doc.object().contains(QStringLiteral("meeting_server"));
+        }
+        check(":/config/client.json.default 可解析", ok);
+    }
+
+    // 7) 字体目录（可选，没放字体时不算失败，仅提示）
+    {
+        const QDir fonts_dir(QStringLiteral(":/ui/fonts"));
+        const int count = fonts_dir.exists() ? fonts_dir.entryList(
+                              QDir::Files, QDir::Name).size()
+                                             : 0;
+        std::printf("[res] %-46s %d 个\n", ":/ui/fonts 字体数（可选）", count);
+    }
+
+    std::printf("[res] 结论: %s\n", all_ok ? "PASS" : "FAIL");
+    return all_ok ? 0 : 1;
+}
+
+}  // namespace
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     QApplication::setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
@@ -1121,6 +1195,10 @@ int main(int argc, char *argv[]) {
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--join-codec-selftest")) {
         return run_join_codec_selftest();
+    }
+    if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
+                        QStringLiteral("--resource-selftest")) {
+        return run_resource_selftest();
     }
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--avatar-alpha-selftest")) {

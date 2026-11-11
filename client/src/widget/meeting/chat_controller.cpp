@@ -100,7 +100,7 @@ void ChatController::play_mention_sound() {
     }
     if (!_sound) {
         _sound = new QSoundEffect(this);
-        _sound->setSource(QUrl(QStringLiteral("qrc:/myEffect/2.wav")));
+        _sound->setSource(QUrl(QStringLiteral("qrc:/ui/audio/message.wav")));
         _sound->setVolume(1.0);
     }
     _sound->play();
