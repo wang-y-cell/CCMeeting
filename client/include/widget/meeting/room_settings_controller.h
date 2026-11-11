@@ -5,7 +5,9 @@
 #include <cstdint>
 
 class MeetingRecorder;
+namespace ui {
 class MeetingSettingsPopup;
+}  // namespace ui
 class QPushButton;
 class QWidget;
 
@@ -76,7 +78,7 @@ private:
     void update_popup_state();
 
     MeetingRecorder *_recorder = nullptr;
-    MeetingSettingsPopup *_popup = nullptr;
+    ui::MeetingSettingsPopup *_popup = nullptr;
     QPushButton *_anchor = nullptr;
     QWidget *_owner = nullptr;
 

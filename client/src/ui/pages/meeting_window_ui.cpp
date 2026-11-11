@@ -1,4 +1,4 @@
-#include "meeting_widget_ui.h"
+#include "ui/pages/meeting_window_ui.h"
 
 #include "ui/foundation/theme_manager.h"
 
@@ -73,7 +73,7 @@ void setupStableVerticalScrollBar(QAbstractScrollArea *area) {
 
 }  // namespace
 
-void Ui_meeting_widget::setupUi(QWidget *parent) {
+void ui::MeetingWindowUi::setupUi(QWidget *parent) {
     parent->setObjectName(QStringLiteral("Widget"));
     parent->resize(922, 610);
     parent->setWindowTitle(QObject::tr("云会议"));

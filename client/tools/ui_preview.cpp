@@ -16,8 +16,8 @@
 #include "main_window.h"
 #include "ui/foundation/theme_manager.h"
 #include "meeting_recorder.h"
-#include "meeting_settings_popup.h"
-#include "meeting_widget.h"
+#include "ui/pages/meeting_settings_popup.h"
+#include "ui/pages/meeting_window.h"
 #include "screen.h"
 #include "recording_library.h"
 #include "ui/dialogs/recording_playback_dialog.h"
@@ -818,7 +818,7 @@ int run_duration_selftest() {
                           {65, "00:01:05"},  {3599, "00:59:59"},
                           {3661, "01:01:01"}, {360000, "100:00:00"}};
     for (const Case &c : cases) {
-        const QString got = MeetingWidget::format_duration_hms(c.seconds);
+        const QString got = ui::MeetingWindow::format_duration_hms(c.seconds);
         const bool pass = got == QString::fromLatin1(c.expected);
         ok = ok && pass;
         std::printf("[duration] %llds -> %s %s\n",
@@ -1457,20 +1457,20 @@ int main(int argc, char *argv[]) {
     }
 
     {
-        MeetingWidget meeting;
+        ui::MeetingWindow meeting;
         capture(&meeting, QStringLiteral("05-meeting"), 1360, 860);
     }
 
 
     // 会议设置弹出面板：房主视角 / 普通成员视角
     {
-        MeetingSettingsPopup hostPopup;
+        ui::MeetingSettingsPopup hostPopup;
         hostPopup.set_room_no(1);
         hostPopup.set_host(true);
         hostPopup.set_settings(ROOM_SETTINGS_DEFAULT);
         capture(&hostPopup, QStringLiteral("08-meeting-settings-host"), 304, 340);
 
-        MeetingSettingsPopup memberPopup;
+        ui::MeetingSettingsPopup memberPopup;
         memberPopup.set_room_no(7);
         memberPopup.set_host(false);
         memberPopup.set_settings(ROOM_SETTINGS_ALLOW_RECORD);

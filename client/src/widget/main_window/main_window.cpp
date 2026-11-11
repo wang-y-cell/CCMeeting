@@ -48,7 +48,7 @@ main_window::main_window(QWidget *parent) : FramelessWindow<QWidget>(parent) {
     set_style();
     refreshUserCard();
 
-    // 延迟创建 MeetingWidget：其 QSoundEffect 会加载 Qt Multimedia(FFmpeg)，
+    // 延迟创建 ui::MeetingWindow：其 QSoundEffect 会加载 Qt Multimedia(FFmpeg)，
     // 过早加载后 WebRTC 摄像头枚举（设置页）在部分环境会直接崩溃。
     connect(create_meeting_widget, &ui::CreateMeetingPage::createMeetingClicked,
             this, &main_window::CreateMeeting_button_clicked);
@@ -88,7 +88,7 @@ void main_window::set_style() {
         this, QStringLiteral(":/Style/source/main_window.qss"));
 }
 
-void main_window::destroyMeetingWidget() {
+void main_window::destroyMeetingWindow() {
     if (!widget) {
         return;
     }
@@ -97,31 +97,31 @@ void main_window::destroyMeetingWidget() {
     widget = nullptr;
 }
 
-MeetingWidget *main_window::ensureMeetingWidget() {
+ui::MeetingWindow *main_window::ensureMeetingWindow() {
     if (widget) {
         return widget;
     }
-    spdlog::info("[main_window] lazy create MeetingWidget");
+    spdlog::info("[main_window] lazy create ui::MeetingWindow");
     spdlog::default_logger()->flush();
-    widget = new MeetingWidget(nullptr);
+    widget = new ui::MeetingWindow(nullptr);
     widget->hide();
-    connect(widget, &MeetingWidget::connect_server_finished_signal, this,
+    connect(widget, &ui::MeetingWindow::connect_server_finished_signal, this,
             &main_window::onConnectServerFinished);
-    connect(widget, &MeetingWidget::meeting_confirmed_signal, this,
+    connect(widget, &ui::MeetingWindow::meeting_confirmed_signal, this,
             &main_window::onMeetingConfirmed);
-    connect(widget, &MeetingWidget::meeting_closed_signal, this,
+    connect(widget, &ui::MeetingWindow::meeting_closed_signal, this,
             &main_window::onMeetingClosed);
-    spdlog::info("[main_window] MeetingWidget ready");
+    spdlog::info("[main_window] ui::MeetingWindow ready");
     spdlog::default_logger()->flush();
     return widget;
 }
 
 main_window::~main_window() {
-    destroyMeetingWidget();
+    destroyMeetingWindow();
 }
 
 void main_window::closeEvent(QCloseEvent *event) {
-    destroyMeetingWidget();
+    destroyMeetingWindow();
     FramelessWindow<QWidget>::closeEvent(event);
 }
 
@@ -315,7 +315,7 @@ void main_window::CreateMeeting_button_clicked(quint32 max_participants,
     spdlog::info(
         "[main_window] CreateMeeting max_participants={} duration_minutes={}",
         max_participants, duration_minutes);
-    MeetingWidget *meeting = ensureMeetingWidget();
+    ui::MeetingWindow *meeting = ensureMeetingWindow();
     if (meeting == nullptr) {
         QMessageBox::warning(this, "warning", "会议窗口未初始化");
         return;
@@ -335,7 +335,7 @@ void main_window::CreateMeeting_button_clicked(quint32 max_participants,
 void main_window::JoinMeeting_button_clicked(const QString &roomNo) {
     spdlog::info("[main_window] JoinMeeting roomNo={}",
                  roomNo.toUtf8().constData());
-    MeetingWidget *meeting = ensureMeetingWidget();
+    ui::MeetingWindow *meeting = ensureMeetingWindow();
     if (meeting == nullptr) {
         QMessageBox::warning(this, "warning", "会议窗口未初始化");
         return;

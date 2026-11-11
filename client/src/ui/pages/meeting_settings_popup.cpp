@@ -1,4 +1,4 @@
-#include "meeting_settings_popup.h"
+#include "ui/pages/meeting_settings_popup.h"
 
 #include "netheader.h"
 #include "style_loader.h"
@@ -30,12 +30,12 @@ QCheckBox *make_switch(const QString &objectName, const QString &text,
 
 }  // namespace
 
-MeetingSettingsPopup::MeetingSettingsPopup(QWidget *parent)
+ui::MeetingSettingsPopup::MeetingSettingsPopup(QWidget *parent)
     : QWidget(parent, Qt::Popup | Qt::FramelessWindowHint) {
     setObjectName(QStringLiteral("meetingSettingsPopup"));
     setAttribute(Qt::WA_StyledBackground, true);
     setFixedWidth(304);
-    loadWidgetStyleSheet(this, QStringLiteral(":/Style/source/meeting_settings_popup.qss"));
+    loadWidgetStyleSheet(this, QStringLiteral(":/Style/source/MeetingSettingsPopup.qss"));
 
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(16, 14, 16, 14);
@@ -132,7 +132,7 @@ MeetingSettingsPopup::MeetingSettingsPopup(QWidget *parent)
     });
 }
 
-QFrame *MeetingSettingsPopup::make_separator() {
+QFrame *ui::MeetingSettingsPopup::make_separator() {
     auto *line = new QFrame(this);
     line->setObjectName(QStringLiteral("msSep"));
     line->setFrameShape(QFrame::HLine);
@@ -141,12 +141,12 @@ QFrame *MeetingSettingsPopup::make_separator() {
     return line;
 }
 
-void MeetingSettingsPopup::set_room_no(int room_no) {
+void ui::MeetingSettingsPopup::set_room_no(int room_no) {
     _roomValue->setText(room_no > 0 ? QString::number(room_no)
                                     : QStringLiteral("-"));
 }
 
-void MeetingSettingsPopup::set_host(bool is_host) {
+void ui::MeetingSettingsPopup::set_host(bool is_host) {
     _isHost = is_host;
     _roleBadge->setText(is_host ? tr("房主") : tr("成员"));
     _roleBadge->setProperty("isHost", is_host);
@@ -158,7 +158,7 @@ void MeetingSettingsPopup::set_host(bool is_host) {
     _hostHint->setVisible(!is_host);
 }
 
-void MeetingSettingsPopup::set_settings(std::uint32_t flags) {
+void ui::MeetingSettingsPopup::set_settings(std::uint32_t flags) {
     _flags = flags;
     const QSignalBlocker blockRecord(_allowRecord);
     const QSignalBlocker blockShare(_allowShare);
@@ -166,13 +166,13 @@ void MeetingSettingsPopup::set_settings(std::uint32_t flags) {
     _allowShare->setChecked((flags & ROOM_SETTINGS_ALLOW_MEMBER_SHARE) != 0);
 }
 
-void MeetingSettingsPopup::set_can_record(bool can_record) {
+void ui::MeetingSettingsPopup::set_can_record(bool can_record) {
     _canRecord = can_record;
     _recordBtn->setEnabled(can_record);
     _recordHint->setVisible(!can_record);
 }
 
-void MeetingSettingsPopup::set_recording(bool recording, qint64 elapsed_ms) {
+void ui::MeetingSettingsPopup::set_recording(bool recording, qint64 elapsed_ms) {
     _recording = recording;
     _recordBtn->setText(recording ? tr("停止录制") : tr("开始录制"));
     _recordBtn->setProperty("recording", recording);
@@ -195,7 +195,7 @@ void MeetingSettingsPopup::set_recording(bool recording, qint64 elapsed_ms) {
                      .arg(seconds, 2, 10, QLatin1Char('0'))));
 }
 
-void MeetingSettingsPopup::emit_settings() {
+void ui::MeetingSettingsPopup::emit_settings() {
     if (!_isHost) {
         // 非房主不会走到这里（控件已禁用），兜底再挡一次
         set_settings(_flags);

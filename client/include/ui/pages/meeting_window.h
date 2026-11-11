@@ -5,7 +5,7 @@
 #include "chat_controller.h"
 #include "meeting_recorder.h"
 #include "room_settings_controller.h"
-#include "meeting_settings_popup.h"
+#include "ui/pages/meeting_settings_popup.h"
 #include "room_settings_flags.h"
 #include "meeting_controller.h"
 #include "networkmanager.h"
@@ -33,7 +33,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "meeting_widget_ui.h"
+#include "ui/pages/meeting_window_ui.h"
 
 class QAction;
 class QListWidgetItem;
@@ -57,7 +57,9 @@ struct state {
     bool _hasPendingConnect = false; //是否有未处理的连接请求
 };
 
-class MeetingWidget : public FramelessWindow<QWidget> {
+namespace ui {
+
+class MeetingWindow : public FramelessWindow<QWidget> {
 public:
     /**
      * @brief 会议时长格式化（纯函数，方便单测）
@@ -71,9 +73,9 @@ private:
     state _state; //维护会议状态
     qint64 main_user_id_ = 0;
     /** 房间开关位掩码（房主修改，服务端广播） */
-    ///房间开关 + 录制控制（原 MeetingWidget 内实现）
+    ///房间开关 + 录制控制（原 MeetingWindow 内实现）
     RoomSettingsController *_roomSettings = nullptr;
-    ///xrtc 回调与帧合并（原 MeetingWidget 内实现）
+    ///xrtc 回调与帧合并（原 MeetingWindow 内实现）
     MeetingRtcObserver *_rtcObserver = nullptr;
     ///媒体引擎生命周期 / 本端音视频 / 屏幕共享 / 设备切换
     MeetingMediaController *_media = nullptr;
@@ -101,11 +103,11 @@ private:
     std::shared_ptr<NetworkManager> _network;
     std::unique_ptr<MeetingController> _controller;
     std::unique_ptr<QThread> _controller_thread;
-    ///成员卡片与主画面选择（原 MeetingWidget 内实现）
+    ///成员卡片与主画面选择（原 MeetingWindow 内实现）
     ParticipantsController *_participants = nullptr;
-    ///网络消息分发（原 MeetingWidget 内实现）
+    ///网络消息分发（原 MeetingWindow 内实现）
     MeetingProtocolDispatcher *_protocol = nullptr;
-    ///聊天面板渲染与输入（原 MeetingWidget 内实现）
+    ///聊天面板渲染与输入（原 MeetingWindow 内实现）
     ChatController *_chat = nullptr;
     CameraVideo *_cameraVideo = nullptr;
     int _roomNo = 0;
@@ -178,8 +180,8 @@ private:
 
 
 public:
-    explicit MeetingWidget(QWidget *parent = nullptr);
-    ~MeetingWidget() override;
+    explicit MeetingWindow(QWidget *parent = nullptr);
+    ~MeetingWindow() override;
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -252,7 +254,9 @@ signals:
                                         ConnectAction action);
 
 private:
-    Ui_meeting_widget ui;
+    MeetingWindowUi ui;
 };
+
+}  // namespace ui
 
 #endif // MEETING_WIDGET_H
