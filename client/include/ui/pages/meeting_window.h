@@ -180,8 +180,8 @@ private:
     void handle_rtc_session_lost(const QString &reason);
     void send_local_user_profile();
     void update_main_screen_title(qint64 userId);
-    void show_audio_device_menu();
-    void show_video_device_menu();
+    Q_INVOKABLE void show_audio_device_menu();
+    Q_INVOKABLE void show_video_device_menu();
     void show_side_panel_tab(int index);
     qint64 local_user_id() const;
 
