@@ -22,4 +22,18 @@ namespace ui {
  */
 bool enable_rounded_corners(QWidget *window, int fallback_radius = 12);
 
+/**
+ * @brief 给所有弹出型窗口（QMenu / 下拉框 / Qt::Popup）自动加圆角
+ *
+ * 装一个应用级事件过滤器，在窗口 Show 时统一申请 DWM 圆角，
+ * 覆盖设备选择菜单、下拉框弹层等"临时窗口"。
+ */
+void install_popup_rounding();
+
+/**
+ * @brief 查询窗口当前是否处于 DWM 圆角状态（自检用）
+ * @return true 表示 DWM 圆角偏好为 ROUND
+ */
+bool query_rounded_corners(QWidget *window);
+
 }  // namespace ui
