@@ -60,7 +60,7 @@ def _not_found_response() -> JSONResponse:
 def create_app(config: AuthServerConfig | None = None) -> FastAPI:
     config = config or load_config()
 
-    db = Database(config.sqlite_file())
+    db = Database(config.sqlite_file(), mysql=config.database_kwargs())
     repository = UserRepository(db)
     service = AuthService(repository, config)
 

@@ -6,6 +6,15 @@
   "sqlite": {
     "path": "data/auth.db"
   },
+  "mysql": {
+    "enabled": false,
+    "host": "127.0.0.1",
+    "port": 3306,
+    "user": "ccmeeting",
+    "password": "",
+    "database": "ccmeeting",
+    "connect_timeout": 5
+  },
   "assets": {
     "public_base_url": "http://127.0.0.1:9000",
     "static_root": "./static",
