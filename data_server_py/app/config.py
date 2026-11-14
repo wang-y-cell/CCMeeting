@@ -25,10 +25,34 @@ class AssetsConfig:
 
 
 @dataclass
+class MysqlConfig:
+    """MySQL 连接配置（enabled=false 时继续使用 SQLite）。"""
+
+    enabled: bool = False
+    host: str = "127.0.0.1"
+    port: int = 3306
+    user: str = "ccmeeting"
+    password: str = ""
+    database: str = "ccmeeting"
+    connect_timeout: int = 5
+
+    def kwargs(self) -> dict:
+        return {
+            "host": self.host,
+            "port": self.port,
+            "user": self.user,
+            "password": self.password,
+            "database": self.database,
+            "connect_timeout": self.connect_timeout,
+        }
+
+
+@dataclass
 class AuthServerConfig:
     listen_address: str = "0.0.0.0"
     listen_port: int = 9000
     sqlite_path: str = "data/auth.db"
+    mysql: MysqlConfig = field(default_factory=MysqlConfig)
     assets: AssetsConfig = field(default_factory=AssetsConfig)
 
     # ---- 与 C++ 版同名的语义 ----
@@ -57,6 +81,13 @@ class AuthServerConfig:
 
     def sqlite_file(self) -> Path:
         return _resolve(self.sqlite_path)
+
+    def database_kwargs(self) -> dict | None:
+        """传给 Database(...) 的 mysql 参数；None 表示使用 SQLite。"""
+        return self.mysql.kwargs() if self.mysql.enabled else None
+
+    def database_backend(self) -> str:
+        return "mysql" if self.mysql.enabled else "sqlite"
 
 
 def _resolve(value: str) -> Path:
@@ -107,6 +138,22 @@ def _apply(config: AuthServerConfig, root: dict) -> None:
     if isinstance(sqlite, dict) and isinstance(sqlite.get("path"), str):
         config.sqlite_path = sqlite["path"]
 
+    mysql = root.get("mysql")
+    if isinstance(mysql, dict):
+        config.mysql.enabled = bool(mysql.get("enabled", False))
+        if isinstance(mysql.get("host"), str):
+            config.mysql.host = mysql["host"]
+        if isinstance(mysql.get("port"), int):
+            config.mysql.port = mysql["port"]
+        if isinstance(mysql.get("user"), str):
+            config.mysql.user = mysql["user"]
+        if isinstance(mysql.get("password"), str):
+            config.mysql.password = mysql["password"]
+        if isinstance(mysql.get("database"), str):
+            config.mysql.database = mysql["database"]
+        if isinstance(mysql.get("connect_timeout"), int):
+            config.mysql.connect_timeout = mysql["connect_timeout"]
+
     assets = root.get("assets")
     if isinstance(assets, dict):
         if isinstance(assets.get("public_base_url"), str):
@@ -125,3 +172,16 @@ def _apply(config: AuthServerConfig, root: dict) -> None:
         config.listen_port = int(os.environ["CCMEETING_AUTH_PORT"])
     if os.environ.get("CCMEETING_AUTH_PUBLIC_BASE"):
         config.assets.public_base_url = os.environ["CCMEETING_AUTH_PUBLIC_BASE"]
+    # MySQL：密码优先取环境变量（生产环境不要把密码写进配置文件）
+    if os.environ.get("CCMEETING_MYSQL_PASSWORD"):
+        config.mysql.password = os.environ["CCMEETING_MYSQL_PASSWORD"]
+    if os.environ.get("CCMEETING_MYSQL_HOST"):
+        config.mysql.host = os.environ["CCMEETING_MYSQL_HOST"]
+    if os.environ.get("CCMEETING_MYSQL_PORT"):
+        config.mysql.port = int(os.environ["CCMEETING_MYSQL_PORT"])
+    if os.environ.get("CCMEETING_MYSQL_USER"):
+        config.mysql.user = os.environ["CCMEETING_MYSQL_USER"]
+    if os.environ.get("CCMEETING_MYSQL_DATABASE"):
+        config.mysql.database = os.environ["CCMEETING_MYSQL_DATABASE"]
+    if os.environ.get("CCMEETING_DB_BACKEND", "").lower() == "mysql":
+        config.mysql.enabled = True
