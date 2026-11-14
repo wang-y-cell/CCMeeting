@@ -9,14 +9,13 @@ sys_user_roles / sys_role_permissions，但代码里零引用、库里也一直�
     # 1) 只检查，不删除
     .venv\\Scripts\\python tools\\prune_unused_tables.py --dry-run
 
-    # 2) 清理本地 SQLite
+    # 2) 清理线上 MySQL（读 config/auth_server.json 的 mysql 段）
     .venv\\Scripts\\python tools\\prune_unused_tables.py
 
-    # 3) 清理 MySQL（读取 config/auth_server.json 的 mysql 段；密码可用环境变量）
-    .venv\\Scripts\\python tools\\prune_unused_tables.py --backend mysql
+    # 3) 强制删除有数据的遗留表
+    .venv\\Scripts\\python tools\\prune_unused_tables.py --force
 
-    # 4) 指定 SQLite 文件
-    .venv\\Scripts\\python tools\\prune_unused_tables.py --sqlite data/auth.db
+
 """
 
 from __future__ import annotations
@@ -40,29 +39,15 @@ def _count(db: Database, table: str) -> int | None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="删除未使用的 RBAC 表")
-    parser.add_argument("--backend", choices=["sqlite", "mysql"], default=None,
-                        help="数据库后端；默认按配置（无配置则 sqlite）")
-    parser.add_argument("--sqlite", default=None, help="SQLite 文件路径（可选）")
+    parser = argparse.ArgumentParser(description="删除未使用的 RBAC 表（MySQL）")
     parser.add_argument("--dry-run", action="store_true", help="只检查不删除")
     parser.add_argument("--force", action="store_true",
                         help="即使表里有数据也删除（默认只删空表）")
     args = parser.parse_args()
 
     config = load_config()
-    backend = args.backend or config.database_backend()
-
-    if backend == "mysql":
-        kwargs = config.database_kwargs()
-        if kwargs is None:
-            print("[prune] 配置里 mysql.enabled=false，无法按 mysql 后端连接")
-            return 2
-        db = Database(mysql=kwargs)
-        print(f"[prune] 后端: mysql  {kwargs['host']}:{kwargs['port']}/{kwargs['database']}")
-    else:
-        path = Path(args.sqlite) if args.sqlite else config.sqlite_file()
-        db = Database(path)
-        print(f"[prune] 后端: sqlite  {path}")
+    db = Database(**config.mysql.kwargs())
+    print(f"[prune] 后端: mysql  {config.database_target()}")
 
     try:
         existing = set(db.existing_tables())
@@ -73,10 +58,10 @@ def main() -> int:
 
         for table in targets:
             rows = _count(db, table)
-            state = "空表" if rows == 0 else f"{rows} 行数据"
             if rows is None:
                 print(f"[prune] {table:<24} 读取失败，跳过")
                 continue
+            state = "空表" if rows == 0 else f"{rows} 行数据"
             if args.dry_run:
                 print(f"[prune] {table:<24} 存在（{state}）-> 待删除")
                 continue
@@ -84,10 +69,7 @@ def main() -> int:
                 print(f"[prune] {table:<24} 存在（{state}）-> 不为空，跳过（可加 --force）")
                 continue
             try:
-                if db.is_mysql:
-                    db.execute(f"DROP TABLE IF EXISTS {table}")
-                else:
-                    db.execute(f"DROP TABLE {table}")
+                db.execute(f"DROP TABLE IF EXISTS {table}")
                 print(f"[prune] {table:<24} 已删除（{state}）")
             except Exception as exc:  # noqa: BLE001
                 print(f"[prune] {table:<24} 删除失败: {exc}")

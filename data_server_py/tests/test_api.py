@@ -24,23 +24,6 @@ PNG_1PX = base64.b64decode(
 )
 
 
-@pytest.fixture()
-def ctx(tmp_path: Path):
-    config = AuthServerConfig(
-        listen_address="127.0.0.1",
-        listen_port=9000,
-        sqlite_path=str(tmp_path / "data" / "auth.db"),
-        assets=AssetsConfig(
-            public_base_url="http://testserver",
-            static_root=str(Path(__file__).resolve().parent.parent / "static"),
-            upload_root=str(tmp_path / "uploads"),
-            default_avatar_path="/static/avatar/default.png",
-            max_avatar_bytes=2 * 1024 * 1024,
-        ),
-    )
-    app = create_app(config)
-    with TestClient(app) as client:
-        yield client, app, config
 
 
 def _register(client, username="alice", password="secret-123"):
