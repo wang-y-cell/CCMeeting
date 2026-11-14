@@ -26,9 +26,8 @@ class AssetsConfig:
 
 @dataclass
 class MysqlConfig:
-    """MySQL 连接配置（enabled=false 时继续使用 SQLite）。"""
+    """MySQL 连接配置（服务端唯一使用的数据库）。"""
 
-    enabled: bool = False
     host: str = "127.0.0.1"
     port: int = 3306
     user: str = "ccmeeting"
@@ -51,7 +50,6 @@ class MysqlConfig:
 class AuthServerConfig:
     listen_address: str = "0.0.0.0"
     listen_port: int = 9000
-    sqlite_path: str = "data/auth.db"
     mysql: MysqlConfig = field(default_factory=MysqlConfig)
     assets: AssetsConfig = field(default_factory=AssetsConfig)
 
@@ -79,15 +77,9 @@ class AuthServerConfig:
     def upload_dir(self) -> Path:
         return _resolve(self.assets.upload_root)
 
-    def sqlite_file(self) -> Path:
-        return _resolve(self.sqlite_path)
-
-    def database_kwargs(self) -> dict | None:
-        """传给 Database(...) 的 mysql 参数；None 表示使用 SQLite。"""
-        return self.mysql.kwargs() if self.mysql.enabled else None
-
-    def database_backend(self) -> str:
-        return "mysql" if self.mysql.enabled else "sqlite"
+    def database_target(self) -> str:
+        """日志用：host:port/database。"""
+        return f"{self.mysql.host}:{self.mysql.port}/{self.mysql.database}"
 
 
 def _resolve(value: str) -> Path:
@@ -134,13 +126,8 @@ def _apply(config: AuthServerConfig, root: dict) -> None:
         if isinstance(http.get("listen_port"), int):
             config.listen_port = http["listen_port"]
 
-    sqlite = root.get("sqlite")
-    if isinstance(sqlite, dict) and isinstance(sqlite.get("path"), str):
-        config.sqlite_path = sqlite["path"]
-
     mysql = root.get("mysql")
     if isinstance(mysql, dict):
-        config.mysql.enabled = bool(mysql.get("enabled", False))
         if isinstance(mysql.get("host"), str):
             config.mysql.host = mysql["host"]
         if isinstance(mysql.get("port"), int):
@@ -183,5 +170,4 @@ def _apply(config: AuthServerConfig, root: dict) -> None:
         config.mysql.user = os.environ["CCMEETING_MYSQL_USER"]
     if os.environ.get("CCMEETING_MYSQL_DATABASE"):
         config.mysql.database = os.environ["CCMEETING_MYSQL_DATABASE"]
-    if os.environ.get("CCMEETING_DB_BACKEND", "").lower() == "mysql":
-        config.mysql.enabled = True
+

@@ -30,6 +30,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.config import load_config  # noqa: E402
+import sqlite3  # noqa: E402
+
 from app.db import Database  # noqa: E402
 
 TABLES = (
@@ -65,28 +67,25 @@ def main() -> int:
     args = parser.parse_args()
 
     config = load_config()
-    kwargs = config.database_kwargs()
-    if kwargs is None:
-        print("[migrate] 配置里 mysql.enabled=false。")
-        print("[migrate] 请先在 config/auth_server.json 打开 mysql.enabled（或设置 CCMEETING_DB_BACKEND=mysql）")
-        return 2
+    kwargs = config.mysql.kwargs()
 
-    sqlite_path = Path(args.sqlite) if args.sqlite else config.sqlite_file()
+    sqlite_path = Path(args.sqlite) if args.sqlite else Path("data/auth.db")
     if not sqlite_path.exists() and not args.verify:
         print(f"[migrate] 源 SQLite 不存在: {sqlite_path}")
         return 2
 
-    source = Database(sqlite_path)
-    target = Database(mysql=kwargs)
+    source = sqlite3.connect(str(sqlite_path))
+    source.row_factory = sqlite3.Row
+    target = Database(**kwargs)
     print(f"[migrate] 源: sqlite {sqlite_path}")
-    print(f"[migrate] 目标: mysql {kwargs['host']}:{kwargs['port']}/{kwargs['database']}")
+    print(f"[migrate] 目标: mysql {config.database_target()}")
 
     try:
         if args.verify:
             ok = True
             for table, _pk, _cols in TABLES:
                 try:
-                    src = int(source.query_one(f"SELECT COUNT(*) FROM {table}")[0])
+                    src = int(source.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
                 except Exception:
                     src = -1
                 try:
@@ -102,7 +101,9 @@ def main() -> int:
         plan: list[tuple[str, list[tuple]]] = []
         for table, _pk, cols in TABLES:
             try:
-                rows = source.query_all(f"SELECT {', '.join(cols)} FROM {table}")
+                rows = source.execute(
+                    f"SELECT {', '.join(cols)} FROM {table}"
+                ).fetchall()
             except Exception:
                 rows = []
             plan.append((table, [tuple(r[i] for i in range(len(cols))) for r in rows]))

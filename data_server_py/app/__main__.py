@@ -21,7 +21,7 @@ def main() -> int:
         stream=sys.stdout,
     )
     config = load_config()
-    print(f"[auth-py] sqlite : {config.sqlite_file()}")
+    print(f"[auth-py] mysql  : {config.database_target()}")
     print(f"[auth-py] static : {config.static_dir()}")
     print(f"[auth-py] uploads: {config.upload_dir()}")
     print(f"[auth-py] base   : {config.assets.public_base_url}")
@@ -34,7 +34,7 @@ def main() -> int:
         port=config.listen_port,
         log_level="info",
         # 由中间件统一写 Server: CloudMeetingAuthServer，禁掉 uvicorn 自己的
-        # 单进程即可满足当前规模；多进程会各自持有 sqlite 连接反而无益
+        # 单进程即可满足当前规模；多进程共享 MySQL 连接需要额外连接池，暂不引入
         server_header=False,
         workers=1,
     )

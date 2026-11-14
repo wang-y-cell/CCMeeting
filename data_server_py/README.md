@@ -1,4 +1,4 @@
-# CloudMeeting 认证服务（Python / FastAPI 版）
+# CloudMeeting 认证服务（Python / FastAPI + MySQL）
 
 C++ 版 `data_server/` 的等价实现。**接口契约逐字节对齐**，Qt 客户端无需任何改动即可切换。
 当前状态：**仅在本地验证，未部署**。
@@ -55,7 +55,7 @@ $env:CCMEETING_AUTH_PUBLIC_BASE = "http://127.0.0.1:9100"
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
-# 35 passed, 3 skipped（MySQL 用例默认跳过）
+# 33 passed（需要 MySQL，见 3.5 节）
 ```
 
 覆盖：健康检查、注册/重复注册/超长用户名、登录成功/错密码/不存在/禁用账号、
@@ -72,20 +72,13 @@ $env:CCMEETING_AUTH_PUBLIC_BASE = "http://127.0.0.1:9100"
 
 实测结果：**27 个用例，0 处意外不一致，2 处预期差异**（见第 5 节）。
 
-## 3.5 数据库：SQLite / MySQL 双后端
+## 3.5 数据库：MySQL（服务端唯一后端）
 
-服务端支持两种后端，**同一套 SQL、同一套接口**，只改配置即可切换：
-
-| 后端 | 适用场景 | 配置 |
-|---|---|---|
-| SQLite（默认） | 本地开发、单机、用户量小 | `sqlite.path` |
-| MySQL | 生产部署、多实例、未来加会议记录/聊天历史 | `mysql.enabled = true` + `mysql.*` |
+服务端**只使用 MySQL**（客户端本地仍然用 SQLite，两者互不影响）。
 
 ```jsonc
 // config/auth_server.json
-"sqlite": { "path": "data/auth.db" },
 "mysql": {
-  "enabled": true,
   "host": "127.0.0.1",
   "port": 3306,
   "user": "ccmeeting",
@@ -95,24 +88,32 @@ $env:CCMEETING_AUTH_PUBLIC_BASE = "http://127.0.0.1:9100"
 }
 ```
 
-环境变量（优先级高于配置文件）：
+环境变量覆盖（优先级最高）：
 
 ```
-CCMEETING_DB_BACKEND=mysql        # 强制启用 MySQL
 CCMEETING_MYSQL_HOST / _PORT / _USER / _PASSWORD / _DATABASE
 ```
 
-**表结构**：只保留真正使用的 3 张表 —— `sys_users`、`sys_user_profiles`、
-`sys_user_login_logs`。原先照模板建的 RBAC 四张表（`sys_roles`、
-`sys_permissions`、`sys_user_roles`、`sys_role_permissions`）代码零引用、
-库里一直是空表，已从 DDL 中删除。
+**表结构**：3 张表 —— `sys_users`、`sys_user_profiles`、`sys_user_login_logs`。
+启动时会自动建表（`CREATE TABLE IF NOT EXISTS`），并**兜底删除**历史遗留的
+RBAC 四张表（`sys_roles` / `sys_permissions` / `sys_user_roles` /
+`sys_role_permissions`），因此旧库升级不需要手工清理。
 
-### 从 SQLite 迁到 MySQL
+### 建库（一次性）
+
+```sql
+CREATE DATABASE ccmeeting CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'ccmeeting'@'127.0.0.1' IDENTIFIED BY '换成你的密码';
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP
+  ON ccmeeting.* TO 'ccmeeting'@'127.0.0.1';
+FLUSH PRIVILEGES;
+```
+
+> 只需要这一个库的权限；不需要 `DROP DATABASE` 等全局权限。
+
+### 从旧 SQLite（data/auth.db）迁到 MySQL
 
 ```powershell
-# 0) 先装依赖
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-
 # 1) 看一眼会迁多少数据（dry-run）
 .\.venv\Scripts\python.exe tools\migrate_sqlite_to_mysql.py
 
@@ -123,32 +124,30 @@ CCMEETING_MYSQL_HOST / _PORT / _USER / _PASSWORD / _DATABASE
 .\.venv\Scripts\python.exe tools\migrate_sqlite_to_mysql.py --verify
 ```
 
-### 清理历史遗留表
+迁移完成后 `data/auth.db` 可以归档删除；服务端不再读取它。
+
+### 清理历史遗留表（可选）
 
 ```powershell
-# 只检查
 .\.venv\Scripts\python.exe tools\prune_unused_tables.py --dry-run
-# 删除（只删空表；有数据的表需加 --force）
 .\.venv\Scripts\python.exe tools\prune_unused_tables.py
-# 对 MySQL 执行
-.\.venv\Scripts\python.exe tools\prune_unused_tables.py --backend mysql
 ```
 
-### MySQL 集成测试（可选）
+### 测试
 
 ```powershell
+# 服务端测试全部跑在真实 MySQL 上：每个测试自动建一个临时库、结束即删
 $env:CCMEETING_TEST_MYSQL = "1"
 $env:CCMEETING_MYSQL_HOST = "127.0.0.1"
 $env:CCMEETING_MYSQL_PORT = "3306"
 $env:CCMEETING_MYSQL_USER = "root"
 $env:CCMEETING_MYSQL_PASSWORD = "..."
-$env:CCMEETING_MYSQL_DATABASE = "ccmeeting_test"
-.\.venv\Scripts\python.exe -m pytest -q      # 38 passed
+.\.venv\Scripts\python.exe -m pytest -q      # 33 passed
 ```
 
-实测（本地 MySQL 8.0）：三张表建表、行对象双形态（下标/列名）、
-`datetime('now')` → `NOW()` 方言转换、嵌套事务回滚、以及整条 HTTP
-链路（注册 → 登录 → 改资料 → 再登录校验）全部通过。
+实测（本地 MySQL 8.0）：建表（无 RBAC 表）、行对象双形态（下标/列名）、
+`datetime('now')` → `NOW()`、嵌套事务回滚、启动时清理遗留表、
+整条 HTTP 链路（注册 → 登录 → 改资料 → 头像）全部通过。
 ## 4. 切换方式（客户端零改动）
 
 客户端的服务器地址来自 `client/config/client.json` 的 `public_base_url`。
@@ -174,7 +173,7 @@ $env:CCMEETING_MYSQL_DATABASE = "ccmeeting_test"
 2. **令牌化登录**：现在仍是"每次登录传密码"；建议改为 refresh token。
 3. **限流**：登录接口没有失败次数限制，可被暴力破解；建议加 `slowapi` 或前置网关。
 4. **告警**：`sys_user_login_logs` 已有数据，可加"异地登录"提示。
-5. **服务端切 MySQL**：代码已支持，线上切换按第 3.5 节的迁移/校验/回滚流程执行。
+5. **部署 MySQL**：按第 3.5 节建库 + 迁移 + 校验；回滚只需保留迁移前的 SQLite 备份。
 
 ## 7. 迁移到服务器时注意
 

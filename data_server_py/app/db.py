@@ -1,73 +1,24 @@
-"""数据库访问层：默认 SQLite，可通过配置切换到 MySQL。
+"""MySQL 访问层（服务端只使用 MySQL；客户端仍用 SQLite，互不影响）。
 
 设计要点
 --------
-1. **同一套 SQL**：业务层（repository.py）写的都是 `?` 占位符 + 标准 SQL，
-   这里在 MySQL 分支做两处方言转换（`?` → `%s`，`datetime('now')` → `NOW()`），
-   因此迁移不需要改 repository。
-2. **统一行对象**：SQLite 的 `sqlite3.Row` 同时支持 `row[0]` 和 `row["col"]`，
-   MySQL 的默认游标只支持下标、DictCursor 只支持键。这里用 `Row` 包装两种
-   后端的结果，让上层代码保持原样。
-3. **时间字段统一成字符串**：SQLite 里 `created_at` 是 TEXT，MySQL 用 DATETIME
-   会返回 datetime 对象；包装时统一转成 `YYYY-MM-DD HH:MM:SS` 字符串，
-   保证 JSON 输出与旧版完全一致。
-4. **表结构精简**：只保留真正用到的 3 张表（用户 / 资料 / 登录日志）。
-   原先照模板建的 RBAC 四张表（sys_roles / sys_permissions /
-   sys_user_roles / sys_role_permissions）从未被读写，已删除。
+1. **repository 不用改**：业务 SQL 仍写成 `?` 占位符 + `datetime('now')`，
+   这里统一转换（`?` → `%s`、`datetime('now')` → `NOW()`）。
+2. **统一行对象**：默认游标返回 tuple，只支持下标；`Row` 包装后同时支持
+   `row[0]` 与 `row["col"]`，与 repository 现有写法兼容。
+3. **时间字段统一成字符串**：DATETIME 查询结果统一格式化成
+   `YYYY-MM-DD HH:MM:SS`，保证 API 的 JSON 输出稳定。
+4. **表结构精简**：只保留真正使用的 3 张表（用户 / 资料 / 登录日志）；
+   历史上照模板建的 RBAC 四张表从未被读写，已删除，并在启动时兜底清理。
 """
 
 from __future__ import annotations
 
-import sqlite3
 import threading
 from datetime import date, datetime
-from pathlib import Path
 from typing import Any, Sequence
 
-# ---------------------------------------------------------------------------
-# 表结构
-# ---------------------------------------------------------------------------
-
-SCHEMA_SQL_SQLITE = """
-CREATE TABLE IF NOT EXISTS sys_users (
-    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    status INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS sys_user_profiles (
-    user_id INTEGER PRIMARY KEY,
-    nickname TEXT,
-    avatar_url TEXT,
-    info TEXT,
-    gender TEXT,
-    birthday TEXT,
-    address TEXT,
-    phone TEXT,
-    email TEXT,
-    extra_json TEXT,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-    FOREIGN KEY (user_id) REFERENCES sys_users(user_id)
-);
-
-CREATE TABLE IF NOT EXISTS sys_user_login_logs (
-    log_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    login_ip TEXT NOT NULL,
-    device_info TEXT,
-    status INTEGER NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE INDEX IF NOT EXISTS idx_login_logs_user_id ON sys_user_login_logs(user_id);
-CREATE INDEX IF NOT EXISTS idx_login_logs_created_at ON sys_user_login_logs(created_at);
-"""
-
-SCHEMA_SQL_MYSQL = """
+SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS sys_users (
     user_id BIGINT PRIMARY KEY AUTO_INCREMENT,
     username VARCHAR(64) NOT NULL UNIQUE,
@@ -105,7 +56,7 @@ CREATE TABLE IF NOT EXISTS sys_user_login_logs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 """
 
-#: 已废弃的表（历史模板遗留，代码零引用；供清理脚本/迁移脚本使用）
+#: 已废弃的表（历史模板遗留，代码零引用）——启动时兜底清理
 OBSOLETE_TABLES = (
     "sys_role_permissions",
     "sys_user_roles",
@@ -114,12 +65,8 @@ OBSOLETE_TABLES = (
 )
 
 
-# ---------------------------------------------------------------------------
-# 统一行对象
-# ---------------------------------------------------------------------------
-
 def _normalize(value: Any) -> Any:
-    """把 MySQL 的 datetime 转成与 SQLite 一致的字符串。"""
+    """把 datetime 转成固定格式字符串（与旧版 JSON 输出保持一致）。"""
     if isinstance(value, datetime):
         return value.strftime("%Y-%m-%d %H:%M:%S")
     if isinstance(value, date):
@@ -128,7 +75,7 @@ def _normalize(value: Any) -> Any:
 
 
 class Row:
-    """同时支持下标与列名的行对象（对齐 sqlite3.Row 的用法）。"""
+    """同时支持下标与列名的行对象（对齐原 sqlite3.Row 的用法）。"""
 
     __slots__ = ("_values", "_index")
 
@@ -151,67 +98,49 @@ class Row:
         return f"Row({dict(zip(self._index, self._values))})"
 
 
-# ---------------------------------------------------------------------------
-# 数据库
-# ---------------------------------------------------------------------------
-
 class Database:
     """单连接 + 锁；线程池里的请求共享它。
 
-    - ``Database(path)``           → SQLite（默认，测试与本地开发）
-    - ``Database(mysql=kwargs)``   → MySQL（生产）
+    ``Database(host=..., user=..., ...)`` 连接 MySQL 并确保表结构存在。
     """
 
-    def __init__(self, db_path: Path | None = None, *, mysql: dict | None = None) -> None:
+    def __init__(
+        self,
+        host: str = "127.0.0.1",
+        port: int = 3306,
+        user: str = "ccmeeting",
+        password: str = "",
+        database: str = "ccmeeting",
+        connect_timeout: int = 5,
+    ) -> None:
         self._lock = threading.RLock()
-        self._path = db_path
-        self._is_mysql = mysql is not None
         self._tx_depth = 0
+        self.target = f"{host}:{port}/{database}"
 
-        if self._is_mysql:
-            self._conn = self._connect_mysql(mysql or {})
-            self._init_mysql_schema()
-        else:
-            if db_path is None:
-                raise ValueError("SQLite 模式需要 db_path")
-            self._conn = self._connect_sqlite(db_path)
-            with self._lock:
-                self._conn.executescript(SCHEMA_SQL_SQLITE)
-
-    # ------------------------------------------------------------ 连接
-    @staticmethod
-    def _connect_sqlite(db_path: Path) -> sqlite3.Connection:
-        db_path.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(db_path), check_same_thread=False, isolation_level=None)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
-        conn.execute("PRAGMA busy_timeout=3000")
-        conn.execute("PRAGMA foreign_keys=ON")
-        return conn
-
-    @staticmethod
-    def _connect_mysql(mysql: dict):
         try:
-            import pymysql  # 延迟导入：SQLite 模式不需要该依赖
-        except ImportError as exc:  # pragma: no cover - 依赖缺失时给出清晰提示
+            import pymysql
+        except ImportError as exc:  # pragma: no cover
             raise RuntimeError(
-                "启用 MySQL 需要安装 PyMySQL：pip install PyMySQL"
+                "服务端需要 MySQL 驱动：pip install PyMySQL"
             ) from exc
 
-        return pymysql.connect(
-            host=mysql.get("host", "127.0.0.1"),
-            port=int(mysql.get("port", 3306)),
-            user=mysql.get("user", "ccmeeting"),
-            password=mysql.get("password", ""),
-            database=mysql.get("database", "ccmeeting"),
+        self._conn = pymysql.connect(
+            host=host,
+            port=int(port),
+            user=user,
+            password=password,
+            database=database,
             charset="utf8mb4",
             autocommit=True,
-            connect_timeout=int(mysql.get("connect_timeout", 5)),
+            connect_timeout=int(connect_timeout),
         )
+        self._init_schema()
+        # 兜底清理历史遗留表（存在才删）
+        self.drop_obsolete_tables()
 
-    def _init_mysql_schema(self) -> None:
-        statements = [s.strip() for s in SCHEMA_SQL_MYSQL.split(";")]
+    # ------------------------------------------------------------ 初始化
+    def _init_schema(self) -> None:
+        statements = [s.strip() for s in SCHEMA_SQL.split(";")]
         with self._lock:
             cursor = self._conn.cursor()
             try:
@@ -221,23 +150,9 @@ class Database:
             finally:
                 cursor.close()
 
-    # ------------------------------------------------------------ 属性
-    @property
-    def path(self) -> Path | None:
-        return self._path
-
-    @property
-    def is_mysql(self) -> bool:
-        return self._is_mysql
-
-    @property
-    def backend_name(self) -> str:
-        return "mysql" if self._is_mysql else "sqlite"
-
     # ------------------------------------------------------------ 方言
-    def _sql(self, sql: str) -> str:
-        if not self._is_mysql:
-            return sql
+    @staticmethod
+    def _sql(sql: str) -> str:
         return sql.replace("?", "%s").replace("datetime('now')", "NOW()")
 
     def _fetch(self, cursor, many: bool):
@@ -252,57 +167,47 @@ class Database:
     # ------------------------------------------------------------ 查询
     def query_one(self, sql: str, params: tuple = ()):
         with self._lock:
-            if self._is_mysql:
-                cursor = self._conn.cursor()
-                try:
-                    cursor.execute(self._sql(sql), params)
-                    return self._fetch(cursor, many=False)
-                finally:
-                    cursor.close()
-            return self._conn.execute(sql, params).fetchone()
+            cursor = self._conn.cursor()
+            try:
+                cursor.execute(self._sql(sql), params)
+                return self._fetch(cursor, many=False)
+            finally:
+                cursor.close()
 
     def query_all(self, sql: str, params: tuple = ()):
         with self._lock:
-            if self._is_mysql:
-                cursor = self._conn.cursor()
-                try:
-                    cursor.execute(self._sql(sql), params)
-                    return self._fetch(cursor, many=True)
-                finally:
-                    cursor.close()
-            return self._conn.execute(sql, params).fetchall()
+            cursor = self._conn.cursor()
+            try:
+                cursor.execute(self._sql(sql), params)
+                return self._fetch(cursor, many=True)
+            finally:
+                cursor.close()
 
     def execute(self, sql: str, params: tuple = ()) -> int:
         """返回受影响行数。"""
         with self._lock:
-            if self._is_mysql:
-                cursor = self._conn.cursor()
-                try:
-                    cursor.execute(self._sql(sql), params)
-                    return int(cursor.rowcount)
-                finally:
-                    cursor.close()
-            cursor = self._conn.execute(sql, params)
-            return int(cursor.rowcount)
+            cursor = self._conn.cursor()
+            try:
+                cursor.execute(self._sql(sql), params)
+                return int(cursor.rowcount)
+            finally:
+                cursor.close()
 
     def insert(self, sql: str, params: tuple = ()) -> int:
         """执行插入并返回 lastrowid。"""
         with self._lock:
-            if self._is_mysql:
-                cursor = self._conn.cursor()
-                try:
-                    cursor.execute(self._sql(sql), params)
-                    return int(cursor.lastrowid or 0)
-                finally:
-                    cursor.close()
-            cursor = self._conn.execute(sql, params)
-            return int(cursor.lastrowid or 0)
+            cursor = self._conn.cursor()
+            try:
+                cursor.execute(self._sql(sql), params)
+                return int(cursor.lastrowid or 0)
+            finally:
+                cursor.close()
 
     def transaction(self):
         """显式事务上下文（支持嵌套：只有最外层真正 BEGIN / COMMIT）。
 
-        MySQL 里重复 `BEGIN` 会隐式提交上一个事务，SQLite 里嵌套 BEGIN 会直接报错，
-        所以用 `_tx_depth` 计数：内层只计数，由最外层统一提交或回滚。
+        MySQL 里重复 `BEGIN` 会隐式提交上一个事务，所以用 `_tx_depth` 计数：
+        内层只计数，由最外层统一提交或回滚。
         """
 
         class _Tx:
@@ -314,10 +219,7 @@ class Database:
                 db._lock.acquire()
                 db._tx_depth += 1
                 if db._tx_depth == 1:
-                    if db._is_mysql:
-                        db._conn.begin()
-                    else:
-                        db._conn.execute("BEGIN IMMEDIATE")
+                    db._conn.begin()
                 return db
 
             def __exit__(self, exc_type, exc, tb):
@@ -326,15 +228,9 @@ class Database:
                 try:
                     if db._tx_depth == 0:
                         if exc_type is None:
-                            if db._is_mysql:
-                                db._conn.commit()
-                            else:
-                                db._conn.execute("COMMIT")
+                            db._conn.commit()
                         else:
-                            if db._is_mysql:
-                                db._conn.rollback()
-                            else:
-                                db._conn.execute("ROLLBACK")
+                            db._conn.rollback()
                 finally:
                     db._lock.release()
                 return False
@@ -343,29 +239,23 @@ class Database:
 
     # ------------------------------------------------------------ 维护
     def drop_obsolete_tables(self) -> list[str]:
-        """删除历史遗留、从未使用的 RBAC 表（存在才删）。返回实际删除的表名。"""
+        """删除历史遗留、从未使用的 RBAC 表（存在才删）。"""
         dropped: list[str] = []
         with self._lock:
             for table in OBSOLETE_TABLES:
                 try:
-                    if self._is_mysql:
-                        cursor = self._conn.cursor()
-                        try:
-                            cursor.execute(f"DROP TABLE IF EXISTS {table}")
-                        finally:
-                            cursor.close()
-                    else:
-                        self._conn.execute(f"DROP TABLE IF EXISTS {table}")
+                    cursor = self._conn.cursor()
+                    try:
+                        cursor.execute(f"DROP TABLE IF EXISTS {table}")
+                    finally:
+                        cursor.close()
                     dropped.append(table)
                 except Exception:  # 表不存在或权限不足 → 跳过
                     continue
         return dropped
 
     def existing_tables(self) -> list[str]:
-        if self._is_mysql:
-            rows = self.query_all("SHOW TABLES")
-            return [r[0] for r in rows]
-        rows = self.query_all("SELECT name FROM sqlite_master WHERE type='table'")
+        rows = self.query_all("SHOW TABLES")
         return [r[0] for r in rows]
 
     def close(self) -> None:
