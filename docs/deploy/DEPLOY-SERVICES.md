@@ -2,10 +2,13 @@
 
 在本地 Windows 上执行一条命令，完成：备份 → 同步代码 → 装依赖 → 装 systemd unit → 重启服务 → 健康检查（失败自动回滚）。
 
+> 本文档只讲**怎么用**；可执行脚本、systemd unit、配置模板都在仓库的 deploy/ 目录。
+> 下文的 deploy/...、data_server_py/... 路径均相对**仓库根目录**。
+
 ## 第三方服务（Janus / coturn）
 
 本脚本管理的 `janus` / `coturn` 只是「重启 + 健康检查」；它们的**安装、编译、配置、证书、端口**
-见 [`docs/DEPLOY-JANUS-COTURN.md`](../docs/DEPLOY-JANUS-COTURN.md)，
+见 [`DEPLOY-JANUS-COTURN.md`](DEPLOY-JANUS-COTURN.md)，
 配置模板在 `deploy/thirdparty/`（占位符替换后使用，**不要把密码提交进仓库**）。
 
 ## 前置条件

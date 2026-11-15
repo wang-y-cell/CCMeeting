@@ -3,7 +3,7 @@
 本文档记录**两个第三方服务**的完整部署方法：版本、编译依赖、配置、证书、systemd 托管、端口/安全组、验证与迁移。
 目标是：**换一台新服务器时，照着本文档能从零重建**（服务器上不依赖任何"只在机器上"的知识）。
 
-> 认证服务（Python）与信令服务（C++）的部署见 [`deploy/README.md`](../deploy/README.md)；
+> 认证服务（Python）与信令服务（C++）的部署见 [`DEPLOY-SERVICES.md`](DEPLOY-SERVICES.md)；
 > 本文件只管 Janus 和 coturn。
 
 ---
