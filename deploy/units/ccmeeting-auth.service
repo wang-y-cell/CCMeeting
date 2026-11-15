@@ -1,0 +1,18 @@
+[Unit]
+Description=CloudMeeting auth server (FastAPI + MySQL)
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+Type=simple
+WorkingDirectory=/root/code/CCMeeting/data_server_py
+EnvironmentFile=/etc/ccmeeting-auth.env
+Environment=CCMEETING_AUTH_PORT=9000
+ExecStart=/root/code/CCMeeting/data_server_py/.venv/bin/python -m app
+Restart=always
+RestartSec=2
+StandardOutput=append:/root/code/CCMeeting/data_server_py/auth.log
+StandardError=append:/root/code/CCMeeting/data_server_py/auth.log
+
+[Install]
+WantedBy=multi-user.target
