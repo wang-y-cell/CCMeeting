@@ -1,0 +1,20 @@
+# Janus WebSockets 传输配置模板
+#
+# 部署时覆盖到：
+#   /opt/janus/etc/janus/janus.transport.websockets.jcfg
+#
+# 客户端 client.json 的 janus_ws_url 对应 ws_port（wss 对应 wss_port）。
+
+general: {
+	json = "compact"
+	ws_port = 8188
+	ws_interface = "0.0.0.0"
+	wss_port = 8989
+	# 证书（自签或 Let's Encrypt）
+	cert_pem = "/opt/janus/share/janus/certs/mycert.pem"
+	key_pem = "/opt/janus/share/janus/certs/mykey.pem"
+	# 管理接口保持关闭
+	admin_ws = false
+	admin_ws_port = 7188
+	admin_wss = false
+}
