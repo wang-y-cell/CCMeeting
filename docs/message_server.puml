@@ -1,0 +1,183 @@
+@startuml message_server
+title CCMeeting 消息服务器 (server) 类图
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+' ========== 配置 ==========
+package "config" {
+  class ServerConfig <<struct>> {
+    +max_rooms : size_t
+    +max_participants_per_room : size_t
+    +listen_port : uint16_t
+  }
+}
+
+' ========== 网络层 ==========
+package "network" {
+  class Buffer {
+    -_buffer : vector<uint8_t>
+    -_read_pos : size_t
+    -_write_pos : size_t
+    +readable_size() : size_type
+    +writable_size() : size_type
+    +write(data, size) : void
+    +normalize() : void
+  }
+
+  class Connection {
+    +Id : uint64_t
+    -_id : Id
+    -_socket : tcp::socket
+    -_read_buffer : Buffer
+    -_write_queue : queue<Buffer>
+    +start() : void
+    +close() : void
+    +send(data, length) : void
+    +read_buffer() : Buffer&
+    +consume_read(size) : void
+    +id() : Id
+    +peer_ip_network() : uint32_t
+  }
+
+  class Server {
+    -_io_ctx : io_context&
+    -_acceptor : tcp::acceptor
+    -_connection_handler : ConnectionHandler
+    +set_connection_handler(handler) : void
+    +start() : void
+    -do_accept() : void
+  }
+}
+
+' ========== 协议层 ==========
+package "protocol" {
+  enum MessageType {
+    TextSend / TextRecv
+    CreateMeeting / JoinMeeting / ExitMeeting
+    CloseCamera
+    CreateMeetingResponse
+    PartnerJoin / PartnerExit / PartnerJoin2
+    JoinMeetingResponse
+    UserProfile
+    .. reserved legacy ..
+    ImgSend / AudioSend (0-3)
+  }
+
+  enum DecodeStatus {
+    NeedMore
+    Ok
+    Invalid
+  }
+
+  class Packet <<struct>> {
+    +type : MessageType
+    +ip : uint32_t
+    +payload : vector<uint8_t>
+  }
+
+  class Codec {
+    {static} +kHeaderSize : size_t
+    {static} +kMagic : char
+    {static} +kTail : char
+    {static} +try_decode(buffer, packet) : DecodeStatus
+    {static} +encode(packet) : vector<uint8_t>
+  }
+}
+
+' ========== 会议域 ==========
+package "meeting" {
+  class RoomOptions <<struct>> {
+    +max_participants : size_t
+    +duration_minutes : uint32_t
+  }
+
+  class Participant <<struct>> {
+    +connection : shared_ptr<Connection>
+    +ip_network : uint32_t
+    +is_owner : bool
+    +user_id : uint64_t
+    +display_name : string
+    +avatar_url : string
+  }
+
+  class Room {
+    +CloseCallback : function
+    -_room_id : uint32_t
+    -_participants : map<Connection::Id, Participant>
+    -_expire_timer : steady_timer
+    +id() : uint32_t
+    +add_participant(conn, is_owner) : bool
+    +remove_participant(conn_id) : void
+    +handle_packet(from, packet) : void
+    +notify_user_joined(newcomer) : void
+    +start_expire_timer() : void
+    -broadcast(packet, exclude) : void
+    -close_room() : void
+  }
+
+  class RoomManager {
+    enum JoinResult {
+      Ok
+      NotFound
+      Full
+      Closed
+    }
+    -_rooms : map<uint32_t, shared_ptr<Room>>
+    -_next_room_id : uint32_t
+    +create_room(owner, options) : optional<uint32_t>
+    +join_room(room_id, conn) : JoinResult
+    +get_room(room_id) : shared_ptr<Room>
+    +remove_room(room_id) : void
+  }
+}
+
+' ========== 服务层 ==========
+package "service" {
+  class MeetingService {
+    -_config : ServerConfig
+    -_room_manager : RoomManager
+    -_connection_room : map<Connection::Id, shared_ptr<Room>>
+    +MeetingService(config, io_ctx)
+    +bind_server(server) : void
+    -on_new_connection(conn) : void
+    -on_connection_read(conn) : void
+    -on_connection_close(conn) : void
+    -handle_lobby_packet(conn, packet) : void
+    -handle_create_meeting(conn, packet) : void
+    -handle_join_meeting(conn, packet) : void
+    -cleanup_room(room_id) : void
+  }
+}
+
+' ========== 关系 ==========
+Server ..> Connection : accept 创建
+Connection *-- Buffer : 读缓冲
+
+Codec ..> Buffer : 拆包
+Codec ..> Packet : 编解码
+Packet --> MessageType
+
+MeetingService o-- ServerConfig
+MeetingService *-- RoomManager
+MeetingService ..> Server : bind
+MeetingService ..> Connection : 回调读写
+MeetingService ..> Codec : 解码
+MeetingService ..> Packet : 路由
+
+RoomManager o-- ServerConfig
+RoomManager "1" *-- "0..*" Room : 管理
+
+Room *-- Participant
+Room ..> Connection : 广播/转发
+Room ..> Packet
+Participant --> Connection
+
+note bottom of MeetingService
+  未入房：CREATE_MEETING / JOIN_MEETING
+  已入房：TEXT / CLOSE_CAMERA / USER_PROFILE 转发
+  legacy 媒体包 (0-3) 静默丢弃
+end note
+
+@enduml
