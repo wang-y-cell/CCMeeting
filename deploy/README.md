@@ -2,6 +2,12 @@
 
 在本地 Windows 上执行一条命令，完成：备份 → 同步代码 → 装依赖 → 装 systemd unit → 重启服务 → 健康检查（失败自动回滚）。
 
+## 第三方服务（Janus / coturn）
+
+本脚本管理的 `janus` / `coturn` 只是「重启 + 健康检查」；它们的**安装、编译、配置、证书、端口**
+见 [`docs/DEPLOY-JANUS-COTURN.md`](../docs/DEPLOY-JANUS-COTURN.md)，
+配置模板在 `deploy/thirdparty/`（占位符替换后使用，**不要把密码提交进仓库**）。
+
 ## 前置条件
 
 - 本机能 `ssh root@8.153.155.18`（密码方式，需 `%TEMP%\cc_askpass.cmd` 这个 SSH_ASKPASS 脚本；

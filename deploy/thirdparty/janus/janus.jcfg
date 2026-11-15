@@ -1,0 +1,20 @@
+# Janus 主配置模板（只写覆盖项，其余保持 Janus 默认）
+#
+# 部署时替换 ${PUBLIC_IP} 为服务器公网 IP，然后覆盖到：
+#   /opt/janus/etc/janus/janus.jcfg
+#
+# 注意：nat_1_1_mapping 决定 SDP 里宣告的媒体地址，
+#       漏写/写错会导致"信令通、媒体不通"。
+
+general: {
+	debug_level = 4
+	# 默认值 janusoverlord 是公开的，必须改成强随机值
+	admin_secret = "${JANUS_ADMIN_SECRET}"
+}
+
+media: {
+	# 媒体端口段（安全组必须放行对应 UDP 段）
+	rtp_port_range = "20000-40000"
+	# 对外宣告的公网 IP
+	nat_1_1_mapping = "${PUBLIC_IP}"
+}

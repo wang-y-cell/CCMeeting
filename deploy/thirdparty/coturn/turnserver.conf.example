@@ -1,0 +1,36 @@
+# coturn 配置模板
+#
+# 部署时替换占位符后覆盖到：
+#   /usr/local/etc/turnserver.conf      （源码安装）
+#   或 /etc/turnserver.conf             （apt 安装）
+#
+# 占位符：
+#   ${PRIVATE_IP}     服务器内网 IP（直连公网时与公网 IP 相同）
+#   ${PUBLIC_IP}      服务器公网 IP
+#   ${TURN_USER}      TURN 用户名（必须与客户端 client.json 一致）
+#   ${TURN_PASSWORD}  TURN 密码（必须与客户端 client.json 一致，建议强随机）
+#
+# 注意：密码不要提交进仓库；本文件只作为模板。
+
+listening-ip=0.0.0.0
+relay-ip=${PRIVATE_IP}
+# 1:1 NAT 云主机必须写 "公网/内网"；直连公网可只写公网 IP
+external-ip=${PUBLIC_IP}/${PRIVATE_IP}
+listening-port=3478
+tls-listening-port=5349
+relay-threads=50
+# relay 端口段（安全组需要放行对应 UDP 段；收窄可减少规则数量）
+min-port=49152
+max-port=50100
+fingerprint
+lt-cred-mech
+realm=shanghai
+user=${TURN_USER}:${TURN_PASSWORD}
+userdb=/etc/turnuserdb.conf
+cert=/etc/turn_server_cert.pem
+pkey=/etc/turn_server_pkey.pem
+no-cli
+no-multicast-peers
+stale-nonce
+log-file=/var/log/turnserver.log
+simple-log
