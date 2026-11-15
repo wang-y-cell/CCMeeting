@@ -28,7 +28,7 @@
 ## 环境准备
 
 1. **客户端**：Visual Studio（与 xrtc 要求一致的 MSVC 工具集）、Qt 6（如 `F:/Qt/6.8.3/msvc2022_64`）、独立 Ninja（如 `F:/ninja/ninja.exe`）
-2. **服务端**：GCC/MinGW 或 MSVC 均可；**Boost 可选**（未指定时自动下载）；认证服另需 Python 3.10+（依赖见 `data_server_py/requirements.txt`）与 MySQL 8.0
+2. **服务端**：**Linux（含 WSL2）上的 GCC** —— 信令服务源码直接 `#include <arpa/inet.h>` 等 POSIX 头，MSVC 下配置能过、编译会 `fatal error C1083`（实测）；Boost 可选（本机装 1.83 即可，没有会下载源码包）；认证服另需 Python 3.10+（依赖见 `data_server_py/requirements.txt`）与 MySQL 8.0
 3. 客户端 / 服务端首次配置可能从 GitHub 下载依赖（需能访问网络；国内可设代理）
 
 ## 客户端（MSVC + Ninja）
@@ -55,16 +55,28 @@ Release：把 `Debug` 换成 `Release`，并改 `-DCMAKE_BUILD_TYPE=Release`。
 
 ## 消息服务器
 
+> ⚠️ **只能在 Linux 上编译**：`message_server/` 源码用了 `arpa/inet.h` 等 POSIX 头，
+> 在 Windows 上用 MSVC 会 `fatal error C1083: 无法打开包括文件: "arpa/inet.h"`（实测）。
+> Windows 下请走 WSL2（下面的第二种命令）。
+
+Linux / 服务器上：
+
 ```bash
 cmake -S . -B build/message_server -G Ninja \
-  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_CLIENT=OFF -DBUILD_SERVER=ON
 cmake --build build/message_server -j
 ```
 
+Windows 上（WSL2，仓库在 `/mnt/f/...`）：
+
+```bash
+wsl -e bash -c "cd /mnt/f/wy/code/qt/CCMeeting && cmake -S . -B build/server-wsl -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_CLIENT=OFF -DBUILD_SERVER=ON && cmake --build build/server-wsl -j"
+```
+
 首次配置若本机没有 Boost，会自动下载头文件包到 `third_party/boost-*/`（可加 `-DBoost_ROOT=<路径>` 跳过下载）。
 
-输出：`build/message_server/message_server/CloudMeetingServer`（Windows 下为 `.exe`）。
+输出：`build/<上面用的目录>/message_server/CloudMeetingServer`（如 `build/server-wsl/message_server/CloudMeetingServer`，无 `.exe`）。
 
 ## 认证服务器（Python）
 
@@ -95,7 +107,7 @@ python -m venv .venv
 | 目标 | 产物 | 怎么跑 |
 |---|---|---|
 | 客户端 | `build/client/client/CloudMeeting.exe` | 直接双击；Qt 依赖用 `windeployqt` 部署 |
-| 消息服务器 | `build/message_server/message_server/CloudMeetingServer`（Windows 为 `.exe`） | 启动后监听 WebSocket 8888 |
+| 消息服务器 | `build/<目录>/message_server/CloudMeetingServer`（Linux 产物，无 `.exe`；Windows 用 `build/server-wsl`） | 启动后监听 WebSocket 8888 |
 | 认证服务器 | 无构建产物 | `cd data_server_py && .venv\Scripts\python.exe -m app`（`0.0.0.0:9000`） |
 
 启动顺序与端口见下文「运行」。
