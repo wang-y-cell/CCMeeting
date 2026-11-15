@@ -27,3 +27,6 @@ build_message_server/
 # UI 预览截图输出（UiPreview.exe 生成）
 ui-preview*/
 --theme/
+
+# bench（C++ 服务端压测构建产物，不入库）
+bench/build/

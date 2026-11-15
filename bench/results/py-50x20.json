@@ -1,0 +1,40 @@
+{
+  "uri": "ws://127.0.0.1:8899",
+  "clients": 50,
+  "rooms": 1,
+  "messages_per_sender": 20,
+  "senders": 50,
+  "sent": 1000,
+  "delivered": 49000,
+  "join_fail": 0,
+  "connect_ms": {
+    "count": 50,
+    "p50": 12.757,
+    "p99": 27.45,
+    "avg": 13.166,
+    "max": 27.45
+  },
+  "create_ms": {
+    "count": 1,
+    "p50": 0.526,
+    "p99": 0.526,
+    "avg": 0.526,
+    "max": 0.526
+  },
+  "join_ms": {
+    "count": 49,
+    "p50": 9.094,
+    "p99": 14.988,
+    "avg": 9.53,
+    "max": 14.988
+  },
+  "text_ms": {
+    "count": 49000,
+    "p50": 15.294,
+    "p99": 22.647,
+    "avg": 14.61,
+    "max": 25.515
+  },
+  "wall_s": 0.575,
+  "deliver_rate_per_s": 85276.0
+}
