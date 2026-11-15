@@ -9,7 +9,10 @@ log.txt
 # 服务端自动下载的 Boost 源码包（体积大，不提交）
 third_party/boost-*/
 third_party/boost_*/
-docs/
+# Doxygen 生成物（docs 下的 .md/.puml 源文件仍入库）
+docs/html/
+docs/latex/
+docs/xml/
 server2/uploads/
 server2/data/
 *.db
