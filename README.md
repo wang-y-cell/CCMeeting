@@ -21,8 +21,9 @@
 
 - Python / FastAPI 实现（原 C++ 版 `data_server/` 已迁移并移除）
 - HTTP 用户注册 / 登录 / 资料与头像；接口契约与原 C++ 版逐字段一致，客户端无需改动
-- SQLite 用户数据持久化（同一份表结构），密码使用 **Argon2id**；旧的单轮 SHA-256 仍可验证并在登录后自动升级
+- **MySQL 8.0** 用户数据持久化（3 张表：`sys_users` / `sys_user_profiles` / `sys_user_login_logs`），密码使用 **Argon2id**；旧的单轮 SHA-256 仍可验证并在登录后自动升级
 - 详见 [`data_server_py/README.md`](data_server_py/README.md)
+- 部署：见 [docs/deploy/DEPLOY-SERVICES.md](docs/deploy/DEPLOY-SERVICES.md)（本地一条命令）与 [deploy/](deploy/)（脚本/unit/模板）
 
 ## 技术栈与第三方库
 
@@ -37,9 +38,9 @@ git submodule update --init --recursive
 | 客户端 | **Qt 6** + **MSVC** | 与 xrtc/webrtc 预编译库 ABI 一致 |
 | 客户端 | **xrtc**（`third_party/webrtcSDK`） | `add_subdirectory` 后链接 `xrtc`；WebRTC/Boost/json 由 xrtc 自动准备 |
 | 消息服务器 | **Boost.Asio / System**（≥ 1.70） | 异步 TCP；无本机 Boost 时自动下载头文件包 |
-| 认证服务器 | **Boost.Asio / Beast** + **nlohmann/json** | HTTP + JSON；Boost 同上 |
+| 认证服务器 | **Python 3.10+ / FastAPI / uvicorn** | HTTP + JSON（原 C++ 版已移除） |
 | 共用 | **spdlog** | 日志 |
-| 认证服务器 | **OpenSSL**、**SQLite3** | 密码哈希、数据库 |
+| 认证服务器 | **argon2-cffi**、**PyMySQL** | 密码哈希、MySQL 访问 |
 
 构建：**仅使用 CMake**（不再提供 `build.py`）。CMake ≥ 3.19，推荐 **Ninja**（不要用 `depot_tools` 里的 ninja）。
 
@@ -48,7 +49,7 @@ git submodule update --init --recursive
 ## 环境准备
 
 1. **客户端**：Visual Studio（与 xrtc 要求一致的 MSVC 工具集）、Qt 6（如 `F:/Qt/6.8.3/msvc2022_64`）、独立 Ninja（如 `F:/ninja/ninja.exe`）
-2. **服务端**：GCC/MinGW 或 MSVC 均可；**Boost 可选**（未指定时自动下载）；认证服另需 OpenSSL、SQLite3
+2. **服务端**：GCC/MinGW 或 MSVC 均可；**Boost 可选**（未指定时自动下载）；认证服另需 Python 3.10+（依赖见 `data_server_py/requirements.txt`）与 MySQL 8.0
 3. `git submodule update --init --recursive`
 4. 客户端 / 服务端首次配置可能从 GitHub 下载依赖（需能访问网络；国内可设代理）
 

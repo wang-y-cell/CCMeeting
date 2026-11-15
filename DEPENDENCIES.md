@@ -104,8 +104,8 @@
 
 | 组件 | 版本 | 用途 | 许可证 | 备注 |
 |---|---|---|---|---|
-| Janus Gateway | **1.4.2**（commit `4602fcc`） | WebRTC 网关 | **GPLv3** | 源码编译，`--prefix=/opt/janus`；部署见 `docs/DEPLOY-JANUS-COTURN.md` |
-| coturn | **4.16.0** | TURN 中继（3478/5349） | BSD-3-Clause | 源码编译到 `/usr/local`；部署见 `docs/DEPLOY-JANUS-COTURN.md` |
+| Janus Gateway | **1.4.2**（commit `4602fcc`） | WebRTC 网关 | **GPLv3** | 源码编译，`--prefix=/opt/janus`；部署见 `docs/deploy/DEPLOY-JANUS-COTURN.md` |
+| coturn | **4.16.0** | TURN 中继（3478/5349） | BSD-3-Clause | 源码编译到 `/usr/local`；部署见 `docs/deploy/DEPLOY-JANUS-COTURN.md` |
 | MySQL | 8.0 | 认证服务数据库 | GPLv2 | 作为服务使用，不随产品分发 |
 | Python | 3.10+ | 认证服务运行时 | PSF-2.0 | — |
 | Nginx/Caddy（计划中） | — | HTTPS/WSS 反向代理 | BSD-2-Clause / Apache-2.0 | 见 README「尚未做」章节 |
