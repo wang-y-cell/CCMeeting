@@ -1,0 +1,14 @@
+[Unit]
+Description=Janus WebRTC Gateway (8188/8989)
+After=network.target
+
+[Service]
+Type=simple
+# 注意：不要加 -b（daemonize），否则 systemd 会认为进程退出并循环重启
+ExecStart=/opt/janus/bin/janus -L /tmp/janus.log
+Restart=always
+RestartSec=3
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

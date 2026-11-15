@@ -1,0 +1,14 @@
+[Unit]
+Description=CloudMeeting signaling server (WebSocket 8888)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/code/build/server/message_server
+ExecStart=/root/code/build/server/message_server/CloudMeetingServer
+Restart=always
+RestartSec=2
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
