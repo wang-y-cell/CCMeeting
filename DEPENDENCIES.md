@@ -31,7 +31,7 @@
 | `watchfiles` | 1.3.0 | uvicorn[standard] | MIT |
 | `python-dotenv` | 1.2.4 | uvicorn[standard] | BSD-3-Clause |
 | `PyYAML` | 6.0.3 | uvicorn[standard] | MIT |
-| `websockets` | 12.0（压测用） | uvicorn[standard] / `bench/` | BSD-3-Clause |
+| `websockets` | 12.0 | uvicorn[standard] | BSD-3-Clause |
 | `argon2-cffi-bindings` | 26.1.0 | argon2-cffi | MIT |
 | `cffi` / `pycparser` | 2.1.1 / 3.12 | argon2-cffi-bindings | MIT / BSD-3-Clause |
 
@@ -96,7 +96,7 @@
 | `spdlog` | 1.17.0 | 日志 | MIT | `third_party/spdlog` |
 | `nlohmann/json` | 3.12.0 | 协议 JSON | MIT | vendored |
 
-> 构建：`wsl -e bash bench/build_cpp.sh`（Release，`-O2`）。
+> 构建：见 [`docs/build/BUILD.md`](docs/build/BUILD.md)「消息服务器」一节（`-DBUILD_CLIENT=OFF -DBUILD_SERVER=ON`）。
 
 ---
 
