@@ -28,7 +28,7 @@
 ## 环境准备
 
 1. **客户端**：Visual Studio（与 xrtc 要求一致的 MSVC 工具集）、Qt 6（如 `F:/Qt/6.8.3/msvc2022_64`）、独立 Ninja（如 `F:/ninja/ninja.exe`）
-2. **服务端**：**Linux（含 WSL2）上的 GCC** —— 信令服务源码直接 `#include <arpa/inet.h>` 等 POSIX 头，MSVC 下配置能过、编译会 `fatal error C1083`（实测）；Boost 可选（本机装 1.83 即可，没有会下载源码包）；认证服另需 Python 3.10+（依赖见 `data_server_py/requirements.txt`）与 MySQL 8.0
+2. **服务端**：**Linux（含 WSL2）上的 GCC** —— 信令服务源码直接 `#include <arpa/inet.h>` 等 POSIX 头，MSVC 下配置能过、编译会 `fatal error C1083`（实测）；Boost 可选（本机装 1.83 即可，没有会下载源码包）；认证服另需 Python 3.10+（依赖见 `data_server/requirements.txt`）与 MySQL 8.0
 3. 客户端 / 服务端首次配置可能从 GitHub 下载依赖（需能访问网络；国内可设代理）
 
 ## 客户端（MSVC + Ninja）
@@ -83,13 +83,13 @@ wsl -e bash -c "cd /mnt/f/wy/code/qt/CCMeeting && cmake -S . -B build/server-wsl
 不再由 CMake 构建，改用虚拟环境直接运行：
 
 ```powershell
-cd data_server_py
+cd data_server
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe -m app        # 默认 0.0.0.0:9000
 ```
 
-测试与一致性对照见 [`../../data_server_py/README.md`](../../data_server_py/README.md)。
+测试与一致性对照见 [`../../data_server/README.md`](../../data_server/README.md)。
 
 ## 常用 -D 选项
 
@@ -108,13 +108,13 @@ python -m venv .venv
 |---|---|---|
 | 客户端 | `build/client/client/CloudMeeting.exe` | 直接双击；Qt 依赖用 `windeployqt` 部署 |
 | 消息服务器 | `build/<目录>/message_server/CloudMeetingServer`（Linux 产物，无 `.exe`；Windows 用 `build/server-wsl`） | 启动后监听 WebSocket 8888 |
-| 认证服务器 | 无构建产物 | `cd data_server_py && .venv\Scripts\python.exe -m app`（`0.0.0.0:9000`） |
+| 认证服务器 | 无构建产物 | `cd data_server && .venv\Scripts\python.exe -m app`（`0.0.0.0:9000`） |
 
 启动顺序与端口见下文「运行」。
 
 ## 运行
 
-1. 启动认证服务：`cd data_server_py && .venv\Scripts\python.exe -m app`（或服务器上的 `systemctl start ccmeeting-auth`）
+1. 启动认证服务：`cd data_server && .venv\Scripts\python.exe -m app`（或服务器上的 `systemctl start ccmeeting-auth`）
 2. 启动 **CloudMeetingServer**（信令，WebSocket 8888）
 3. 启动 **CloudMeeting** 客户端并连接（可将 Qt `bin` 加入 PATH，或用 `windeployqt` 部署依赖）
 

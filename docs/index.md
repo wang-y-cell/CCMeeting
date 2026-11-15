@@ -105,7 +105,7 @@
 |---|---|
 | [`../README.md`](../README.md) | **项目简介**（定位、三个组成部分、特性）+ 文档入口表；不写编译细节 |
 | [`../DEPENDENCIES.md`](../DEPENDENCIES.md) | 第三方依赖清单：版本、用途、许可证、引入方式（更新依赖时三处对齐的规则也在这里） |
-| [`../data_server_py/README.md`](../data_server_py/README.md) | 认证服务（Python / FastAPI + MySQL）实现说明：与 C++ 版的契约对照、目录结构、本地运行、测试 |
+| [`../data_server/README.md`](../data_server/README.md) | 认证服务（Python / FastAPI + MySQL）实现说明：与 C++ 版的契约对照、目录结构、本地运行、测试 |
 | [`../client/src/ui/README.md`](../client/src/ui/README.md) | UI 层目录约定：分层与依赖方向、新增页面的三步、QSS 令牌写法、主题机制、旧目录迁移清单 |
 | [`../client/resources/README.md`](../client/resources/README.md) | 客户端资源约定：qrc 前缀与访问路径、新增资源三步、禁止相对路径、运行时数据存放位置、当前资源清单 |
 

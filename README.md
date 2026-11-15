@@ -9,7 +9,7 @@
 |---|---|---|
 | 客户端 `client/` | Qt 6 + C++（MSVC） | 无边框会议界面；音视频走 WebRTC（xrtc + Janus VideoRoom） |
 | 信令服务器 `message_server/` | C++ / Boost.Asio | WebSocket + JSON：房间、成员进出、文字、房间开关等**控制消息**，不转发媒体 |
-| 认证服务器 `data_server_py/` | Python / FastAPI + MySQL 8.0 | 注册、登录、资料与头像（密码 Argon2id） |
+| 认证服务器 `data_server/` | Python / FastAPI + MySQL 8.0 | 注册、登录、资料与头像（密码 Argon2id） |
 
 ## 特性
 
@@ -28,7 +28,7 @@
 | 怎么部署到云服务器 | [`docs/deploy/DEPLOY-SERVICES.md`](docs/deploy/DEPLOY-SERVICES.md)、[`docs/deploy/DEPLOY-JANUS-COTURN.md`](docs/deploy/DEPLOY-JANUS-COTURN.md) |
 | 架构与模块分层 | [`docs/architecture/`](docs/architecture/)（PlantUML 类图） |
 | 第三方依赖与许可证 | [`DEPENDENCIES.md`](DEPENDENCIES.md) |
-| 认证服务实现细节 | [`data_server_py/README.md`](data_server_py/README.md) |
+| 认证服务实现细节 | [`data_server/README.md`](data_server/README.md) |
 | UI 层约定 / 资源约定 | [`client/src/ui/README.md`](client/src/ui/README.md)、[`client/resources/README.md`](client/resources/README.md) |
 
 新增或调整文档时，请同步更新 [`docs/index.md`](docs/index.md)。

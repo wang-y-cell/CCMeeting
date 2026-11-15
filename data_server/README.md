@@ -1,9 +1,11 @@
 # CloudMeeting 认证服务（Python / FastAPI + MySQL）
 
-C++ 版 `data_server/` 的等价实现。**接口契约逐字节对齐**，Qt 客户端无需任何改动即可切换。
+原 C++ 版认证服务的等价实现（**C++ 版已随重构移除，本目录是唯一实现**）。**接口契约逐字节对齐**，Qt 客户端无需任何改动。
 当前状态：**仅在本地验证，未部署**。
 
-## 1. 与 C++ 版的关系
+## 1. 与已移除的 C++ 版的关系（历史对照）
+
+> 下表是当初迁移时的对照记录，C++ 版代码已不在仓库里，仅供理解契约来源。
 
 | 项 | C++ 版 | Python 版（本目录） |
 |---|---|---|
@@ -18,7 +20,7 @@ C++ 版 `data_server/` 的等价实现。**接口契约逐字节对齐**，Qt �
 ## 2. 目录结构
 
 ```
-data_server_py/
+data_server/
 ├── app/
 │   ├── config.py      配置文件加载（与 C++ 的 auth_server.json 同构）
 │   ├── db.py          SQLite 连接与建表（DDL 与 C++ 相同）
@@ -38,7 +40,7 @@ data_server_py/
 ## 3. 本地运行
 
 ```powershell
-cd data_server_py
+cd data_server
 # 首次：创建虚拟环境并装依赖（已建好，可跳过）
 F:\python3\python.exe -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt pytest httpx
@@ -188,9 +190,9 @@ Description=CloudMeeting auth server (FastAPI)
 After=network.target
 
 [Service]
-WorkingDirectory=/root/code/CCMeeting/data_server_py
+WorkingDirectory=/root/code/CCMeeting/data_server
 Environment=CCMEETING_AUTH_PORT=9000
-ExecStart=/root/code/CCMeeting/data_server_py/.venv/bin/uvicorn app.api:create_app --factory --host 0.0.0.0 --port 9000
+ExecStart=/root/code/CCMeeting/data_server/.venv/bin/uvicorn app.api:create_app --factory --host 0.0.0.0 --port 9000
 Restart=always
 
 [Install]

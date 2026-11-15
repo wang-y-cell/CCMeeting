@@ -4,7 +4,7 @@
 sys_user_roles / sys_role_permissions，但代码里零引用、库里也一直是空表。
 本脚本会先检查它们是否存在、是否为空，再决定是否 DROP（默认只对空表动手）。
 
-用法（在 data_server_py 目录下）：
+用法（在 data_server 目录下）：
 
     # 1) 只检查，不删除
     .venv\\Scripts\\python tools\\prune_unused_tables.py --dry-run

@@ -3,7 +3,7 @@
 在本地 Windows 上执行一条命令，完成：备份 → 同步代码 → 装依赖 → 装 systemd unit → 重启服务 → 健康检查（失败自动回滚）。
 
 > 本文档只讲**怎么用**；可执行脚本、systemd unit、配置模板都在仓库的 deploy/ 目录。
-> 下文的 deploy/...、data_server_py/... 路径均相对**仓库根目录**。
+> 下文的 deploy/...、data_server/... 路径均相对**仓库根目录**。
 
 ## 第三方服务（Janus / coturn）
 
