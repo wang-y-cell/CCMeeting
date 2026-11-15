@@ -65,9 +65,9 @@ sync_repo() {
     git checkout -f "$REF" >/dev/null 2>&1
     log "代码已同步到 $REF: $(git rev-parse --short HEAD)"
     # 服务器上 public_base_url 用环境变量覆盖；这里保证配置文件不会回落到 127.0.0.1
-    if [ -f data_server_py/config/auth_server.json ]; then
+    if [ -f data_server/config/auth_server.json ]; then
         sed -i 's#"public_base_url": *"[^"]*"#"public_base_url": "http://8.153.155.18:9000"#' \
-            data_server_py/config/auth_server.json || true
+            data_server/config/auth_server.json || true
     fi
 }
 
@@ -86,7 +86,7 @@ install_units() {
 }
 
 install_deps() {
-    cd "$REPO/data_server_py"
+    cd "$REPO/data_server"
     [ -x .venv/bin/python ] || { log "创建虚拟环境"; python3 -m venv .venv; }
     log "安装 Python 依赖"
     .venv/bin/pip install -q -r requirements.txt

@@ -12,8 +12,8 @@ endif()
 #-------------------------------------------------
 option(BUILD_CLIENT "Build CloudMeeting Qt client (MSVC + xrtc)" ON)
 option(BUILD_SERVER "Build message_server (WebSocket meeting signaling)" OFF)
-# 注意：原 C++ 认证服务 data_server 已迁到 data_server_py/（Python/FastAPI），
-# 不再由 CMake 构建。BUILD_SERVER2 选项随之移除。
+# 注意：认证服务是 data_server/（Python / FastAPI），不由 CMake 构建；
+# 原 C++ 版认证服务已移除，BUILD_SERVER2 选项随之删除。
 
 # 客户端依赖 xrtc/webrtc 预编译库，Windows 上必须用 MSVC x64（与 webrtcSDK 一致）
 if(BUILD_CLIENT AND WIN32 AND NOT MSVC)

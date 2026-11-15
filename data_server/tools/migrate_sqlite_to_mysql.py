@@ -6,7 +6,7 @@
 - 默认 dry-run（只统计不写入），加 --apply 才真正写
 - 迁移前会自动建表（复用 Database 的 DDL），并把 MySQL 里的旧数据清空（--reset）
 
-用法（在 data_server_py 目录下）：
+用法（在 data_server 目录下）：
 
     # 1) 看一眼会迁移多少数据
     .venv\\Scripts\\python tools\\migrate_sqlite_to_mysql.py

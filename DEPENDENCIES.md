@@ -34,7 +34,7 @@ git -C third_party/json   describe --tags --always
 
 ---
 
-## 1. 服务端认证服务（`data_server_py/`，Python）
+## 1. 服务端认证服务（`data_server/`，Python）
 
 ### 1.1 运行时依赖（`requirements.txt`）
 
@@ -152,7 +152,7 @@ git -C third_party/json   describe --tags --always
 
 ```bash
 # 1) 在干净环境重建虚拟环境并安装
-cd data_server_py
+cd data_server
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 
@@ -190,7 +190,7 @@ curl -s http://127.0.0.1:9000/api/health
 
 ```bash
 # Python 实际安装版本
-data_server_py/.venv/bin/python -m pip freeze
+data_server/.venv/bin/python -m pip freeze
 
 # vendored 库版本
 grep SPDLOG_VER_ third_party/spdlog/include/spdlog/version.h
