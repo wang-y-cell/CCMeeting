@@ -1,7 +1,4 @@
-# 本地一键部署包装器：把 deploy/ 目录送到服务器并执行 deploy.sh
-#
-# 用法：powershell -File deploy\deploy.ps1 [all|auth|signal|janus|coturn|units|verify|backup]
-param(
+﻿param(
     [string]$Target = "all",
     [string]$Remote = "root@8.153.155.18",
     [string]$RepoPath = "/root/code/CCMeeting"
@@ -19,27 +16,34 @@ if (Test-Path $askpass) {
     $env:DISPLAY = "localhost:0"
 }
 
-Write-Host "[deploy] 目标: $Target  服务器: $Remote" -ForegroundColor Cyan
+Write-Host "[deploy] target=$Target  host=$Remote" -ForegroundColor Cyan
 
-# 1) 把 deploy 目录同步到服务器（脚本与 unit 定义以本地为准）
-Write-Host "[deploy] 同步 deploy/ 到服务器..." -ForegroundColor Cyan
+# 1) 创建远程目录
 & ssh -o StrictHostKeyChecking=no $Remote "mkdir -p $RepoPath/deploy/units"
-if ($LASTEXITCODE -ne 0) { throw "创建远程目录失败" }
-& scp -o StrictHostKeyChecking=no -r (Join-Path $deployDir "deploy.sh") "${Remote}:$RepoPath/deploy/deploy.sh"
-if ($LASTEXITCODE -ne 0) { throw "上传 deploy.sh 失败" }
+if ($LASTEXITCODE -ne 0) { throw "mkdir failed" }
+
+# 2) 把 deploy.sh 转成 LF 后上传（避免 CRLF 破坏 bash）
+$srcSh = Join-Path $deployDir "deploy.sh"
+$tmpSh = Join-Path $env:TEMP "deploy_sh_lf.sh"
+$text = [System.IO.File]::ReadAllText($srcSh).Replace("`r`n", "`n")
+[System.IO.File]::WriteAllText($tmpSh, $text, (New-Object System.Text.UTF8Encoding($false)))
+& scp -o StrictHostKeyChecking=no $tmpSh "${Remote}:$RepoPath/deploy/deploy.sh"
+if ($LASTEXITCODE -ne 0) { throw "upload deploy.sh failed" }
+
+# 3) 上传 systemd unit
 foreach ($unit in (Get-ChildItem (Join-Path $deployDir "units") -Filter *.service)) {
     & scp -o StrictHostKeyChecking=no $unit.FullName "${Remote}:$RepoPath/deploy/units/$($unit.Name)"
-    if ($LASTEXITCODE -ne 0) { throw "上传 $($unit.Name) 失败" }
+    if ($LASTEXITCODE -ne 0) { throw "upload $($unit.Name) failed" }
 }
 
-# 2) 执行部署（失败会由服务器脚本自动回滚）
-Write-Host "[deploy] 在服务器执行 deploy.sh $Target ..." -ForegroundColor Cyan
-& ssh -o StrictHostKeyChecking=no $Remote "cd $RepoPath && sed -i 's/\r`$//' deploy/deploy.sh && bash deploy/deploy.sh $Target"
+# 4) 执行部署（失败由服务器脚本自动回滚）
+Write-Host "[deploy] running deploy.sh $Target ..." -ForegroundColor Cyan
+& ssh -o StrictHostKeyChecking=no $Remote "cd $RepoPath && bash deploy/deploy.sh $Target"
 $exit = $LASTEXITCODE
 
 if ($exit -eq 0) {
-    Write-Host "[deploy] ✅ 部署成功" -ForegroundColor Green
+    Write-Host "[deploy] OK - deployment succeeded" -ForegroundColor Green
 } else {
-    Write-Host "[deploy] ❌ 部署失败（服务器已尝试回滚，详见 /root/deploy.log）" -ForegroundColor Red
+    Write-Host "[deploy] FAILED - server rolled back, see /root/deploy.log" -ForegroundColor Red
 }
 exit $exit
