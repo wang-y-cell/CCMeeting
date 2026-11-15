@@ -8,6 +8,32 @@
 
 ---
 
+## 0. submodule 钉定的版本
+
+`third_party/` 下的依赖全部通过 git submodule 引入，**钉在各自的 release tag 上**（不是分支快照），
+升级必须显式 `checkout` 新 tag 再提交 gitlink 变更：
+
+| submodule | 钉定 tag | 版本 | 说明 |
+|---|---|---|---|
+| `third_party/spdlog` | `v1.17.0` | 1.17.0 | 日志，客户端与服务端共用 |
+| `third_party/json` | `v3.12.0` | 3.12.0 | nlohmann/json，协议序列化 |
+| `third_party/gtest` | `v1.18.0` | 1.18.0 | 当前构建未启用，保留备用 |
+| `third_party/httplib` | `v0.66.0` | 0.66.0 | 旧认证服务用过，现已不引用，保留备用 |
+| `third_party/webrtcSDK` | **无可用 tag** | 自家 xrtc，停在 `v1.0.0` 之后 26 个提交的 `main` | 跟随自家主分支更新；如需固定，先在 xrtc 仓库打新 tag |
+
+核对/升级方式：
+
+```bash
+git submodule status --recursive        # 全部应为「空格开头」，无 - / + / U
+git -C third_party/spdlog describe --tags --always
+git -C third_party/json   describe --tags --always
+```
+
+> **不要用 `git submodule update --remote`**：`.gitmodules` 没有配置 `branch`，
+> 它会跟随上游默认分支（例如 json 的 `develop`），把钉住的 tag 冲掉。
+
+---
+
 ## 1. 服务端认证服务（`data_server_py/`，Python）
 
 ### 1.1 运行时依赖（`requirements.txt`）
@@ -151,12 +177,12 @@ curl -s http://127.0.0.1:9000/api/health
 
 ## 7. 未使用但保留的 vendored 库
 
-| 目录 | 说明 |
-|---|---|
-| `third_party/httplib` | 旧 C++ 认证服务用过，已随认证服务删除而**不再被引用** |
-| `third_party/gtest` | 当前构建未启用；如后续加 C++ 单测再启用 |
+| 目录 | 钉定版本 | 说明 |
+|---|---|---|
+| `third_party/httplib` | `v0.66.0`（0.66.0） | 旧 C++ 认证服务用过，已随认证服务删除而**不再被引用**；保留备用 |
+| `third_party/gtest` | `v1.18.0`（1.18.0） | 当前构建未启用；如后续加 C++ 单测再启用 |
 
-> 这两个目录可以保留（不参与构建），也可以在确认无用后删除，以减小仓库体积。
+> 这两个目录**不参与构建**，暂时保留（以后可能用上）；已和其他 submodule 一样钉在 release tag 上。
 
 ---
 
