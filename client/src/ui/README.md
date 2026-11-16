@@ -3,6 +3,34 @@
 UI 代码集中在这里，按"依赖单向"分层。新增界面时按下面的规则放文件，
 不要往 `src/widget/` 里再加东西（那是旧目录，正在逐步迁出）。
 
+## 客户端整体分层（会议会话重构后）
+
+客户端按「能力 → 装配 → 界面」单向分层，`ui/` 不再自己 new 网络与线程：
+
+```
+ui/foundation → ui/primitives → ui/pages / ui/shell
+                                     │
+                                     ▼
+                           app/MeetingSession        ← 唯一装配点
+                             │        │        │
+                    network/*    features/*   configure/*（接口）
+                                                  │
+                                        configure/storage（实现）
+```
+
+- `app/MeetingSession`（`client/include/app/meeting_session.h`）：
+  创建并持有 `NetworkManager`、工作线程、`MeetingController`、协议分发，以及
+  成员/聊天/房间设置/媒体/录制 5 个控制器；`stop_workers()` 统一收尾。
+  窗口只负责「视图 + 视图事件连接」，不再 `new`/`moveToThread`。
+- `configure/preferences.h`：界面读写偏好只走 `preferences()` 接口，
+  不直接 `Storage::instance()`。
+- `configure/meeting_repository.h`、`configure/recording_repository.h`：
+  页面读写会议记录 / 录制库走 `meeting_repository()`、`recording_repository()`。
+- 三个接口都提供 `set_xxx(nullptr)` 形式的注入点，测试可替换成内存实现。
+
+依赖约束：`ui/` 可以依赖 `app/` 与 `configure/` 的**接口**，但不得直接 include
+`configure/storage.h`（实现细节），也不得自己创建 `NetworkManager` / `QThread`。
+
 ## 目录结构
 
 ```
@@ -166,3 +194,22 @@ QPushButton#joinMeeting_btn {
 
 用 `ui::ThemeManager::instance().apply_to(this, ":/Style/...")` 而不是
 `setStyleSheet()`，否则切主题时不会重刷（`style_loader.h` 的老接口已改为委托，可继续用）。
+
+## 重构记录（2026-11）
+
+已完成：
+
+- 会议窗口不再自建网络 / 线程 / 控制器，统一由 `app/MeetingSession` 装配与收尾；
+- 界面层不再直接依赖 `Storage` 单例，改走 `preferences()`；
+- 页面不再直接调 `MeetingHistory` / `RecordingLibrary`，改走
+  `meeting_repository()` / `recording_repository()`；
+- 删除 `NetworkManager` 的 snake_case ↔ camelCase 双份别名（每增加一个发送接口只需改一处）；
+- UI 类命名统一为 `XxxUi`（`MainWindowUi` / `EditProfileDialogUi`），移除空转的 `AUTOUIC`；
+- 全局 `struct state` 收进 `ui::MeetingState`；
+- 新增 `client/tests/`（发送队列 / 编解码 / 协议分发）并接入 `ctest` 与 CI。
+
+仍待处理：
+
+- `client/src/widget/main_window.*` 仍是外壳实现，文件名与 `ui/shell/` 不一致（迁移中）；
+- `screen.*` 还放在 `client/` 根目录，未归入 `ui/foundation` 或独立的 `media/` 层；
+- 设置 / 会议记录 / 录制 / 资料四个页面仍是手写布局，尚未改用 `ui/primitives`。

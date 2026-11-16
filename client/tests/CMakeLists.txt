@@ -1,13 +1,52 @@
 # --------------------------------------------------
 # 客户端单元测试（Qt Test）
 #
-# 运行：
-#   ctest --test-dir build/client --output-on-failure
+# 两种用法：
+#
+# 1) 主构建（随客户端一起）：
+#      cmake -S . -B build/client -DBUILD_TESTS=ON
+#      ctest --test-dir build/client --output-on-failure
+#
+# 2) 独立构建（CI 用，不需要 WebRTC SDK / 不需要子模块）：
+#      cmake -S client/tests -B build/tests
+#      ctest --test-dir build/tests --output-on-failure
 #
 # 原则：测试目标只链接「不依赖界面 / 网络 / 媒体引擎」的纯逻辑单元，
 # 这样在没有服务器、没有摄像头的机器上也能跑。
 # --------------------------------------------------
-find_package(Qt6 REQUIRED COMPONENTS Test)
+cmake_minimum_required(VERSION 3.19)
+
+# 测试类自身带 Q_OBJECT（QTEST_*_MAIN 需要 moc）
+set(CMAKE_AUTOMOC ON)
+
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    # 独立构建：自己解决 Qt 与 spdlog，避免依赖 third_party/webrtcSDK
+    project(ccmeeting_client_tests LANGUAGES CXX)
+
+    set(CMAKE_CXX_STANDARD 17)
+    set(CMAKE_CXX_STANDARD_REQUIRED ON)
+    set(CCMEETING_TESTS_STANDALONE ON)
+
+    find_package(Qt6 REQUIRED COMPONENTS Core Test)
+
+    if(NOT TARGET spdlog::spdlog)
+        include(FetchContent)
+        set(SPDLOG_BUILD_EXAMPLE OFF CACHE BOOL "" FORCE)
+        set(SPDLOG_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+        set(SPDLOG_BUILD_BENCH OFF CACHE BOOL "" FORCE)
+        set(SPDLOG_INSTALL OFF CACHE BOOL "" FORCE)
+        FetchContent_Declare(spdlog
+            GIT_REPOSITORY https://github.com/gabime/spdlog.git
+            GIT_TAG v1.17.0
+            GIT_SHALLOW TRUE)
+        FetchContent_MakeAvailable(spdlog)
+    endif()
+
+    enable_testing()
+else()
+    # 作为 client/ 的子目录：Qt / spdlog / 编译选项由父工程提供
+    find_package(Qt6 REQUIRED COMPONENTS Test)
+endif()
 
 set(CCMEETING_TEST_LIB_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/network/messageNet/message.cpp"
@@ -25,14 +64,16 @@ function(ccmeeting_add_test target)
         Qt6::Test
         spdlog::spdlog
     )
-    # 必须与 spdlog / 客户端主程序保持一致的迭代器调试级别，
-    # 否则 MSVC 会报 LNK2038（_ITERATOR_DEBUG_LEVEL 不匹配）
-    target_compile_definitions(${target} PRIVATE
-        _ITERATOR_DEBUG_LEVEL=0
-        _HAS_ITERATOR_DEBUGGING=0
-    )
     if(MSVC)
-        target_compile_options(${target} PRIVATE /utf-8)
+        target_compile_options(${target} PRIVATE /utf-8 /bigobj)
+    endif()
+    if(NOT CCMEETING_TESTS_STANDALONE)
+        # 必须与主工程的 spdlog 保持一致的迭代器调试级别，
+        # 否则 MSVC 会报 LNK2038（_ITERATOR_DEBUG_LEVEL 不匹配）
+        target_compile_definitions(${target} PRIVATE
+            _ITERATOR_DEBUG_LEVEL=0
+            _HAS_ITERATOR_DEBUGGING=0
+        )
     endif()
     add_test(NAME ${target} COMMAND ${target})
 endfunction()

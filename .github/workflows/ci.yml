@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------
+  # 客户端单元测试：独立测试工程，不拉 WebRTC SDK / 不需要子模块
+  # ---------------------------------------------------------------
+  client-unit-tests:
+    name: 客户端单元测试 (Qt 6.8.3 / MSVC / Ninja)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: win64_msvc2022_64
+          cache: true
+
+      - name: 配置 MSVC 环境
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: 配置测试工程
+        run: cmake -S client/tests -B build/tests -G Ninja -DCMAKE_BUILD_TYPE=Debug
+
+      - name: 编译
+        run: cmake --build build/tests
+
+      - name: 运行单元测试
+        run: ctest --test-dir build/tests --output-on-failure
+
+  # ---------------------------------------------------------------
+  # 认证服务测试：pytest + 真实 MySQL 8（fixtures 会建/删临时库）
+  # ---------------------------------------------------------------
+  auth-service-tests:
+    name: 认证服务测试 (pytest / MySQL 8)
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      CCMEETING_TEST_MYSQL: '1'
+      CCMEETING_MYSQL_HOST: 127.0.0.1
+      CCMEETING_MYSQL_PORT: '3306'
+      CCMEETING_MYSQL_USER: root
+      CCMEETING_MYSQL_PASSWORD: root
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r data_server/requirements.txt pytest httpx cryptography
+
+      - name: 运行测试
+        run: python -m pytest data_server/tests -q
+
+  # ---------------------------------------------------------------
+  # 静态检查：QSS 引用必须真实存在（历史上有过改名导致样式静默失效）
+  # ---------------------------------------------------------------
+  qss-audit:
+    name: QSS 引用检查
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 审计 :/Style/source/*.qss 引用
+        run: python client/tools/audit_qss_refs.py

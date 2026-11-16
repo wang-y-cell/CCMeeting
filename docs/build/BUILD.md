@@ -53,6 +53,30 @@ cmd /c "`"$vcvars`" && cmake -S . -B build/client -G Ninja -DCMAKE_BUILD_TYPE=De
 
 Release：把 `Debug` 换成 `Release`，并改 `-DCMAKE_BUILD_TYPE=Release`。
 
+## 客户端单元测试
+
+客户端测试只覆盖「不依赖界面 / 网络 / 媒体引擎」的纯逻辑单元（发送队列、编解码、协议分发），
+因此**不需要 WebRTC SDK、也不需要 `git submodule update`**：
+
+```powershell
+# 方式 1：跟随主构建（client/CMakeLists.txt 里 BUILD_TESTS 默认 ON）
+cmd /c "`"$vcvars`" && cmake --build build/client && ctest --test-dir build/client --output-on-failure"
+
+# 方式 2：独立构建（CI 用；只编测试，不碰 client 主目标）
+cmd /c "`"$vcvars`" && cmake -S client/tests -B build/tests -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=F:/ninja/ninja.exe -DCMAKE_PREFIX_PATH=F:/Qt/6.8.3/msvc2022_64 && cmake --build build/tests && ctest --test-dir build/tests --output-on-failure"
+```
+
+现有用例在 `client/tests/`：`test_priority_queue`、`test_message_codec`、`test_protocol_dispatcher`。
+
+新增被测单元时：把被测 `.cpp` 加进目标源；**带 `Q_OBJECT` 的类还要把 `.h` 一起列进目标源**，
+否则 AUTOMOC 不会为它生成 moc，链接会报 `MeetingProtocolDispatcher::staticMetaObject` 未定义。
+
+> **已知约束（务必遵守）**：主工程为对齐预编译的 `webrtc.lib`，全量编译在
+> `_ITERATOR_DEBUG_LEVEL=0` 下，与 Qt 调试库的 `std::string` 布局不一致。
+> 因此**不要在跨 Qt 边界处使用 `QString::toStdString()` / `QString::fromStdString()`**，
+> 否则会得到空串或含 `\0` 的损坏字节（`meeting_window.cpp` 里有历史注释，单测也踩过）。
+> 需要转换时走字节：`QByteArray(s.data(), int(s.size()))`、`QString::fromUtf8(s.data(), int(s.size()))`。
+
 ## 消息服务器
 
 > ⚠️ **只能在 Linux 上编译**：`message_server/` 源码用了 `arpa/inet.h` 等 POSIX 头，

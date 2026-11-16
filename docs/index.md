@@ -8,11 +8,9 @@
 | 位置 | 内容 | 什么时候看 |
 |---|---|---|
 | [`index.md`](index.md) | 本文件：文档索引 + 目录职责划分与归类规则 | 找文档、决定"这份文档该放哪"时 |
-| [`build/BUILD.md`](build/BUILD.md) | 构建与运行手册：技术栈、环境准备、三端的编译命令、常用 `-D` 选项、产物、启动顺序、Doxygen | 要编译 / 运行 / 生成 API 文档时 |
+| [`build/BUILD.md`](build/BUILD.md) | 构建与运行手册：技术栈、环境准备、三端的编译命令、客户端单元测试（ctest）、常用 `-D` 选项、产物、启动顺序、Doxygen | 要编译 / 运行 / 跑测试 / 生成 API 文档时 |
 | [`deploy/DEPLOY-SERVICES.md`](deploy/DEPLOY-SERVICES.md) | 一键部署（本地 → 云服务器）的**怎么用**：备份 → 同步 → 装依赖 → 装 unit → 重启 → 健康检查，失败自动回滚 | 要部署/更新/回滚服务端时 |
 | [`deploy/DEPLOY-JANUS-COTURN.md`](deploy/DEPLOY-JANUS-COTURN.md) | Janus 与 coturn 的**从零重建手册**：版本、编译依赖、配置、证书、systemd、端口/安全组、验证、迁移 | 要重装、迁移或排查 Janus / coturn 时 |
-| [`architecture/client.puml`](architecture/client.puml) | 客户端类图：配置与会话、UI 层、网络层、显示层、xrtc SDK | 想了解客户端分层与消息流转 |
-| [`architecture/message_server.puml`](architecture/message_server.puml) | 信令服务器类图（C++、Boost.Asio）：协议编解码、房间与成员管理、服务层路由 | 想了解信令服务内部结构 |
 | [`notes/以发现bug但是没有修复.md`](notes/以发现bug但是没有修复.md) | 已知但未修复的问题清单（2 条，均与头像有关） | 排查头像显示问题前先看 |
 
 ---
@@ -54,43 +52,17 @@
 从零到能跑起来的操作手册，按内容分节：
 
 - **技术栈与依赖获取**：Qt 6 / MSVC、xrtc、Boost、spdlog、Python 依赖一览，以及 `git submodule update --init --recursive`；
-- **环境准备**：客户端（VS + Qt 6 + 独立 Ninja）、服务端（GCC/MinGW 或 MSVC，Boost 可选）、认证服（Python 3.10+ 与 MySQL 8.0）；
+- **环境准备**：客户端（VS + Qt 6 + 独立 Ninja）、服务端（**Linux/WSL2 上的 GCC**，MSVC 编不了）、认证服（Python 3.10+ 与 MySQL 8.0）；
 - **客户端（MSVC + Ninja）**：为什么要在**一条 cmd** 里加载 `vcvars64.bat`，完整配置编译命令、可选 `-DBoost_ROOT`、产物与 Release 切换；
-- **消息服务器**：`cmake -DBUILD_CLIENT=OFF -DBUILD_SERVER=ON` 配置与编译，产物 `build/message_server/message_server/CloudMeetingServer`；
+- **客户端单元测试**：两种跑法（跟随主构建 / 独立 `client/tests` 工程）、现有用例、新增用例的 CMake 约定，以及 `_ITERATOR_DEBUG_LEVEL=0` 下禁止跨 Qt 边界用 `std::string` 的约束；
+- **消息服务器**：`cmake -DBUILD_CLIENT=OFF -DBUILD_SERVER=ON` 配置与编译（Windows 上走 WSL2 的 `build/server-wsl`），产物 `message_server/CloudMeetingServer`；
 - **认证服务器（Python）**：虚拟环境 + `python -m app`（`0.0.0.0:9000`），不走 CMake；
 - **常用 `-D` 选项**：`BUILD_CLIENT` / `BUILD_SERVER`、`QT_INSTALL_PATH`、`Boost_ROOT`、`CCMEETING_BOOST_URL`、`CMAKE_BUILD_TYPE`、`CMAKE_MAKE_PROGRAM`；
 - **构建产物一览**：三个目标各自的产物与启动方式；
 - **运行**：认证服务 → 信令服务（8888）→ 客户端的启动顺序；
 - **生成 API 文档（可选）**：`doxygen Doxyfile` → `docs/html/index.html`（生成物被 gitignore）。
 
-## 3. `docs/architecture/` —— 架构图（PlantUML）
-
-两份 `.puml` 都是**类图**，需要 PlantUML 渲染：IDE 插件，或 `plantuml -tpng docs/architecture/*.puml`。
-
-### [`client.puml`](architecture/client.puml)
-
-客户端类图，按包划分：
-
-| 包 | 关键类 |
-|---|---|
-| `configure` | `ClientConfig`（单例，`auth` / `meeting_server` / `webrtc` 三段配置）、`UserSession` |
-| `widget` | `FramelessWindow<T>` 基类、`login`、`main_window`、`MeetingWidget`（同时实现 `XRtcEngineObserver`）、`MeetingController`、`Partner` |
-| `messageNet` | `NetworkManager`、`MessageHub`（单发送线程 + 优先级队列）、`Connection`（IO 线程 + 流式解帧）、`MessageCodec` + `WireStreamParser`、`PriorityMessageQueue`、`Message` 抽象基类及其 13 个消息子类 |
-| `message.video` | `CameraVideo`（主画面 + 各成员画面）、`ImgDisplay` |
-| `xrtc`（外部 SDK） | `IXRtcEngine`、`XRtcEngineObserver`、`XRTCJoinConfig`、`XRTCVideoFrame` |
-
-图下方的 note 说明了稳态链路：房间/文字/成员控制走 TCP 到 `message_server`，音视频走 WebRTC 到 Janus VideoRoom。
-
-### [`message_server.puml`](architecture/message_server.puml)
-
-信令服务器类图（C++、Boost.Asio）：
-
-- `network`：`Buffer`（读写游标 + normalize）、`Connection`（异步读 + 写队列）、`Server`（accept）；
-- `protocol`：`MessageType` 枚举、`Packet`、`Codec`（magic + 长度 + tail，`NeedMore/Ok/Invalid` 三态拆包）；
-- `meeting`：`Room`（广播/转发、过期定时器、关闭回调）、`Participant`、`RoomManager`（`create/join/get/remove`）；
-- `service`：`MeetingService` 接收连接与读事件，未入房走 `CREATE_MEETING`/`JOIN_MEETING`，已入房转发 `TEXT`/`CLOSE_CAMERA`/`USER_PROFILE`，legacy 媒体包（0–3）静默丢弃。
-
-## 4. `docs/notes/` —— 笔记
+## 3. `docs/notes/` —— 笔记
 
 ### [`以发现bug但是没有修复.md`](notes/以发现bug但是没有修复.md)
 
@@ -99,7 +71,7 @@
 1. 注册用户时选择头像后无法显示；
 2. 进入房间后看不到其他人的头像。
 
-## 5. 仓库其他文档（不在 `docs/` 内，一并标位置）
+## 4. 仓库其他文档（不在 `docs/` 内，一并标位置）
 
 | 位置 | 内容 |
 |---|---|
@@ -109,26 +81,24 @@
 | [`../client/src/ui/README.md`](../client/src/ui/README.md) | UI 层目录约定：分层与依赖方向、新增页面的三步、QSS 令牌写法、主题机制、旧目录迁移清单 |
 | [`../client/resources/README.md`](../client/resources/README.md) | 客户端资源约定：qrc 前缀与访问路径、新增资源三步、禁止相对路径、运行时数据存放位置、当前资源清单 |
 
-## 6. 目录职责划分与维护规则
+## 5. 目录职责划分与维护规则
 
 本目录存放**人读的文档**；**机器执行**的脚本、systemd unit、配置模板都在仓库根目录的 `deploy/`。
 
 | 目录 | 内容 | 判定 |
 |---|---|---|
 | `deploy/`（仓库根） | 脚本、unit 文件、配置模板 | **改它部署行为会变** |
-| `docs/`（本目录） | 说明、构建/部署手册、架构图、笔记 | **改它部署行为不变** |
+| `docs/`（本目录） | 说明、构建/部署手册、笔记 | **改它部署行为不变** |
 
 新增文档时：
 
 - 部署/运维相关的放 `docs/deploy/`；
 - 编译、运行、开发环境相关的放 `docs/build/`；
-- 架构/设计图放 `docs/architecture/`；
 - 临时笔记、已知问题放 `docs/notes/`；
 - 脚本文档只写"怎么用"，脚本本身留在仓库根 `deploy/`，两处不要互相复制命令细节；
 - 仓库根 `README.md` **只放项目简介与文档入口**，细节一律写进本目录；
 - 最后更新本文件的「一览表」与对应小节（**新增、改名、删除**都要改）。
 
 > 代码内的 `README.md`、`DEPENDENCIES.md` 保留在仓库根目录（与项目本体同层），不搬进 `docs/`。
-> `.puml` 需要 PlantUML 渲染（IDE 插件或 `plantuml -tpng docs/architecture/*.puml`）。
 > 注意：`docs/html/index.html` 是 `doxygen Doxyfile` 生成的 API 文档入口（默认被 `.gitignore` 忽略），
 > 与本文件 `docs/index.md` 无关。
