@@ -34,7 +34,7 @@
 #include <QSignalBlocker>
 #include <QRadioButton>
 #include <QStyle>
-#include "storage.h"
+#include "configure/preferences.h"
 #include "ui/foundation/theme_manager.h"
 #include <QSize>
 #include <QStackedWidget>
@@ -154,7 +154,7 @@ ui::SettingsPage::SettingsPage(QWidget *parent) : Page(parent) {
 
     // 预览默认值来自「通用」里的开关（默认关闭）
     {
-        Storage &s = Storage::instance();
+        IPreferences &s = preferences();
         video_preview_enabled_ =
             s.value(QStringLiteral("video/autoPreview"), false).toBool();
     }
@@ -163,7 +163,7 @@ ui::SettingsPage::SettingsPage(QWidget *parent) : Page(parent) {
     // 主题单选：改变即生效并持久化（不需要点保存）
     {
         const auto apply_mode = [this](const QString &mode) {
-            Storage::instance().setValue(QStringLiteral("ui/theme"), mode);
+            preferences().set_value(QStringLiteral("ui/theme"), mode);
             ui::ThemeManager &theme = ui::ThemeManager::instance();
             if (mode == QLatin1String("light")) {
                 theme.set_theme(ui::Theme::Light);
@@ -278,7 +278,7 @@ void ui::SettingsPage::refreshVideoDevices() {
         return;
     }
 
-    Storage &s = Storage::instance();
+    IPreferences &s = preferences();
     const QString savedId =
         s.value(QStringLiteral("video/deviceId")).toString();
 
@@ -316,7 +316,7 @@ void ui::SettingsPage::refreshAudioDevices() {
         return;
     }
 
-    Storage &s = Storage::instance();
+    IPreferences &s = preferences();
     const QString savedId =
         s.value(QStringLiteral("audio/deviceId")).toString();
 
@@ -365,7 +365,7 @@ void ui::SettingsPage::rebuildResolutionList() {
     }
 
     const auto &cfg = ClientConfig::instance().webrtc().video;
-    Storage &s = Storage::instance();
+    IPreferences &s = preferences();
     const int preferW =
         s.value(QStringLiteral("video/width"), cfg.width).toInt();
     const int preferH =
@@ -409,7 +409,7 @@ void ui::SettingsPage::rebuildFpsList() {
 
     const QSize res = currentResolution();
     const auto &cfg = ClientConfig::instance().webrtc().video;
-    Storage &s = Storage::instance();
+    IPreferences &s = preferences();
     const int preferFps =
         s.value(QStringLiteral("video/fps"), cfg.fps).toInt();
 
@@ -652,7 +652,7 @@ void ui::SettingsPage::onOpenRecordDirClicked() {
 }
 
 void ui::SettingsPage::onResetRecordDirClicked() {
-    Storage &settings = Storage::instance();
+    IPreferences &settings = preferences();
     settings.remove(QStringLiteral("record/saveDir"));
     refreshRecordDirLabel();
 }
@@ -826,7 +826,7 @@ void ui::SettingsPage::onMicTestClicked() {
 
 void ui::SettingsPage::reloadFromConfig() {
     // 通用页：录制目录 / 帧率 / 提示音 / 预览默认值（不涉及服务器连接参数）
-    Storage &s = Storage::instance();
+    IPreferences &s = preferences();
     refreshRecordDirLabel();
     const int fps = s.value(QStringLiteral("record/fps"), 15).toInt();
     const int fpsIndex = ui->recordFps->findData(fps);
@@ -858,7 +858,7 @@ void ui::SettingsPage::reloadFromConfig() {
 }
 
 void ui::SettingsPage::loadUiPrefs() {
-    Storage &s = Storage::instance();
+    IPreferences &s = preferences();
     ui->audioMuteOnJoin->setChecked(
         s.value(QStringLiteral("audio/muteOnJoin"), false).toBool());
     ui->audioEchoCancel->setChecked(
@@ -874,33 +874,33 @@ void ui::SettingsPage::loadUiPrefs() {
 }
 
 void ui::SettingsPage::saveUiPrefs() const {
-    Storage &s = Storage::instance();
-    s.setValue(QStringLiteral("audio/muteOnJoin"),
+    IPreferences &s = preferences();
+    s.set_value(QStringLiteral("audio/muteOnJoin"),
                ui->audioMuteOnJoin->isChecked());
-    s.setValue(QStringLiteral("audio/echoCancel"),
+    s.set_value(QStringLiteral("audio/echoCancel"),
                ui->audioEchoCancel->isChecked());
-    s.setValue(QStringLiteral("ui/startPage"),
+    s.set_value(QStringLiteral("ui/startPage"),
                ui->uiStartPage->currentData().toInt());
-    s.setValue(QStringLiteral("ui/showPageDesc"),
+    s.set_value(QStringLiteral("ui/showPageDesc"),
                ui->uiShowPageDesc->isChecked());
-    s.setValue(QStringLiteral("meeting/showTabs"), ui->meetingShowTabs->isChecked());
-    s.setValue(QStringLiteral("record/fps"), ui->recordFps->currentData().toInt());
-    s.setValue(QStringLiteral("ui/soundEnabled"), ui->soundEnabled->isChecked());
-    s.setValue(QStringLiteral("video/autoPreview"),
+    s.set_value(QStringLiteral("meeting/showTabs"), ui->meetingShowTabs->isChecked());
+    s.set_value(QStringLiteral("record/fps"), ui->recordFps->currentData().toInt());
+    s.set_value(QStringLiteral("ui/soundEnabled"), ui->soundEnabled->isChecked());
+    s.set_value(QStringLiteral("video/autoPreview"),
                ui->videoAutoPreview->isChecked());
 
     if (ui->videoDeviceCombo && ui->videoDeviceCombo->isEnabled()) {
-        s.setValue(QStringLiteral("video/deviceId"),
+        s.set_value(QStringLiteral("video/deviceId"),
                    ui->videoDeviceCombo->currentData().toString());
     }
     if (ui->audioDeviceCombo && ui->audioDeviceCombo->isEnabled()) {
-        s.setValue(QStringLiteral("audio/deviceId"),
+        s.set_value(QStringLiteral("audio/deviceId"),
                    ui->audioDeviceCombo->currentData().toString());
     }
     const QSize res = currentResolution();
-    s.setValue(QStringLiteral("video/width"), res.width());
-    s.setValue(QStringLiteral("video/height"), res.height());
-    s.setValue(QStringLiteral("video/fps"), currentFps());
+    s.set_value(QStringLiteral("video/width"), res.width());
+    s.set_value(QStringLiteral("video/height"), res.height());
+    s.set_value(QStringLiteral("video/fps"), currentFps());
 }
 
 void ui::SettingsPage::applyUiPrefs() {
@@ -954,14 +954,14 @@ void ui::SettingsPage::onResetClicked() {
     ui->recordFps->setCurrentIndex(0);  // 15 fps
     ui->soundEnabled->setChecked(true);
     ui->videoAutoPreview->setChecked(false);
-    Storage &reset_settings = Storage::instance();
+    IPreferences &reset_settings = preferences();
     reset_settings.remove(QStringLiteral("record/saveDir"));
     refreshRecordDirLabel();
 
-    Storage &s = Storage::instance();
-    s.setValue(QStringLiteral("video/width"), 640);
-    s.setValue(QStringLiteral("video/height"), 480);
-    s.setValue(QStringLiteral("video/fps"), 30);
+    IPreferences &s = preferences();
+    s.set_value(QStringLiteral("video/width"), 640);
+    s.set_value(QStringLiteral("video/height"), 480);
+    s.set_value(QStringLiteral("video/fps"), 30);
     s.remove(QStringLiteral("video/deviceId"));
     s.remove(QStringLiteral("audio/deviceId"));
 

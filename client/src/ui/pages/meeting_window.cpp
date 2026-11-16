@@ -2,7 +2,7 @@
 
 #include "app/meeting_session.h"
 #include "ui/foundation/icon_provider.h"
-#include "configure/storage.h"
+#include "configure/preferences.h"
 #include "ui/foundation/theme_manager.h"
 #include "features/meeting/meeting_recorder.h"
 #include "ui/pages/meeting_settings_popup.h"
@@ -572,7 +572,7 @@ void ui::MeetingWindow::apply_tab_bar_visibility() {
     }
     // 默认隐藏标签栏（可在 设置 → 界面 → 会议窗口显示右侧标签栏 打开）
     const bool show_tabs =
-        Storage::instance().value(QStringLiteral("meeting/showTabs"), false).toBool();
+        preferences().value(QStringLiteral("meeting/showTabs"), false).toBool();
     ui.tabWidget->tabBar()->setVisible(show_tabs);
 }
 

@@ -4,7 +4,7 @@
 #include "configure/user_session.h"
 #include "features/meeting/meeting_rtc_observer.h"
 
-#include "storage.h"
+#include "configure/preferences.h"
 
 #include <spdlog/spdlog.h>
 
@@ -39,7 +39,7 @@ xrtc::XRTCJoinConfig MeetingMediaController::build_join_config(
     config.select_strategy = xrtc::XRTCVideoSelectStrategy::kPreferRequested;
 
     if (_rtc) {
-        Storage &prefs = Storage::instance();
+        IPreferences &prefs = preferences();
         const auto cameras = _rtc->get_video_device_info();
         if (!_videoDeviceId.empty()) {
             config.video_device_id = _videoDeviceId;
