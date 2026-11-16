@@ -8,7 +8,7 @@
 #include <QDateTime>
 #include <QEvent>
 #include <QListWidget>
-#include "storage.h"
+#include "configure/preferences.h"
 #include <QSoundEffect>
 #include <QUrl>
 #include <QWidget>
@@ -92,7 +92,7 @@ void ChatController::append_local(const QString &text,
 void ChatController::play_mention_sound() {
     // 提示音可以在「设置 → 通用」里关闭
     const bool enabled =
-        Storage::instance()
+        preferences()
             .value(QStringLiteral("ui/soundEnabled"), true)
             .toBool();
     if (!enabled) {

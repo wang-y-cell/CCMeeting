@@ -24,6 +24,7 @@
 #include <string>
 
 #include "configure/client_config.h"
+#include "configure/preferences.h"
 #include "configure/storage.h"
 #include "configure/user_session.h"
 #include "avatar_image_loader.h"
@@ -372,7 +373,7 @@ int main(int argc, char *argv[]) {
     // 这样所有窗口创建时就是正确配色，不会闪一下深浅切换。
     {
         auto &theme = ui::ThemeManager::instance();
-        const QString mode = Storage::instance()
+        const QString mode = preferences()
                                  .value(QStringLiteral("ui/theme"),
                                         QStringLiteral("system"))
                                  .toString();
@@ -402,7 +403,7 @@ int main(int argc, char *argv[]) {
                          &QStyleHints::colorSchemeChanged, &app,
                          [&theme](Qt::ColorScheme) {
                              const QString current =
-                                 Storage::instance()
+                                 preferences()
                                      .value(QStringLiteral("ui/theme"),
                                             QStringLiteral("system"))
                                      .toString();

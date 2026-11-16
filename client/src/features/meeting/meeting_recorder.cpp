@@ -6,7 +6,7 @@
 #include <QMediaCaptureSession>
 #include <QMediaFormat>
 #include <QMediaRecorder>
-#include "storage.h"
+#include "configure/preferences.h"
 #include <QTimer>
 #include <QUrl>
 #include <QVideoFrame>
@@ -61,7 +61,7 @@ void MeetingRecorder::setup_pipeline(bool use_matroska_mjpeg) {
     _recorder->setMediaFormat(format);
     _recorder->setQuality(QMediaRecorder::HighQuality);
     // 录制帧率来自「设置 → 通用 → 录制帧率」，默认 15fps
-    Storage &settings = Storage::instance();
+    IPreferences &settings = preferences();
     const int fps = qBound(10, settings.value(QStringLiteral("record/fps"), 15).toInt(), 60);
     _recorder->setVideoFrameRate(fps);
     _minFrameIntervalMs = qMax<qint64>(16, 1000 / fps);
