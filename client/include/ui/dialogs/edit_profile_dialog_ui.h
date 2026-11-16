@@ -11,7 +11,7 @@ class QTextEdit;
 class QWidget;
 
 /** 修改资料弹窗纯 UI，不含业务逻辑 */
-class Ui_edit_profile_dialog {
+class EditProfileDialogUi {
 public:
     QLabel *avatarPreview = nullptr;
     QPushButton *changeAvatarBtn = nullptr;

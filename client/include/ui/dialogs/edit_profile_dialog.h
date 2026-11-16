@@ -36,7 +36,7 @@ private:
     void submitProfileUpdate();
     UserProfileExtras collectExtras() const;
 
-    Ui_edit_profile_dialog ui;
+    EditProfileDialogUi ui;
     QImage m_pendingAvatar;
     bool m_busy = false;
     QNetworkReply *m_reply = nullptr;

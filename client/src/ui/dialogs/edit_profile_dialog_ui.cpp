@@ -13,7 +13,7 @@
 #include <QTextEdit>
 #include <QVBoxLayout>
 
-void Ui_edit_profile_dialog::setupUi(QWidget *parent) {
+void EditProfileDialogUi::setupUi(QWidget *parent) {
     parent->setObjectName(QStringLiteral("editProfileDialog"));
     parent->resize(560, 620);
     parent->setMinimumSize(480, 420);

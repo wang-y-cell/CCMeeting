@@ -14,7 +14,7 @@ void MeetingController::connect_to_server_slot(QString ip, QString port,
                   reinterpret_cast<quintptr>(QThread::currentThreadId()));
     bool ok = false;
     if (_network)
-        ok = _network->connectToServer(ip, port, nullptr);
+        ok = _network->connect_to_server(ip, port, nullptr);
     emit connect_finished_signal(ok, ip, port, action, room_no);
 }
 
@@ -27,7 +27,7 @@ void MeetingController::create_meeting_slot(quint32 max_participants,
     if (spdlog::default_logger())
         spdlog::default_logger()->flush();
     if (_network)
-        _network->sendCreateMeeting(max_participants, duration_minutes);
+        _network->send_create_meeting(max_participants, duration_minutes);
 }
 
 void MeetingController::join_meeting_slot(QString room_no) {
@@ -35,12 +35,12 @@ void MeetingController::join_meeting_slot(QString room_no) {
     spdlog::info("[MeetingController] join_meeting_slot room_no={}",
                  room.constData());
     if (_network)
-        _network->sendJoinMeeting(
+        _network->send_join_meeting(
             std::string(room.constData(), static_cast<std::size_t>(room.size())));
 }
 
 void MeetingController::disconnect_from_host_slot() {
     spdlog::debug("[MeetingController] disconnect_from_host_slot");
     if (_network)
-        _network->disconnectFromHost();
+        _network->disconnect_from_host();
 }

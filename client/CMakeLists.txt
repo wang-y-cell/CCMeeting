@@ -3,12 +3,11 @@
 # CloudMeeting client（Qt6 + xrtc）
 #
 #-------------------------------------------------
-set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
-set(CMAKE_AUTOUIC_SEARCH_PATHS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui"
-)
+# 本项目没有 .ui 文件：界面由手写的 *Ui 类（MainWindowUi / MeetingWindowUi ...）搭建，
+# 因此不启用 AUTOUIC。若将来引入 .ui，再打开 CMAKE_AUTOUIC 并配置
+# CMAKE_AUTOUIC_SEARCH_PATHS。
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

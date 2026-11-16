@@ -67,7 +67,7 @@ private:
     /** @brief 按注册表创建页面并装配内容栈 */
     void build_pages();
 
-    Ui_main_window ui;
+    MainWindowUi ui;
     ui::MeetingWindow *widget = nullptr;
     /** 主窗口是否因会议而隐藏（避免重复 hide/show） */
     bool hidden_for_meeting_ = false;
