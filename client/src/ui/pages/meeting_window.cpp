@@ -6,7 +6,6 @@
 #include "ui/foundation/theme_manager.h"
 #include "features/meeting/meeting_recorder.h"
 #include "ui/pages/meeting_settings_popup.h"
-#include "recording_library.h"
 #include "configure/client_config.h"
 #include "configure/configure.h"
 #include "configure/user_session.h"

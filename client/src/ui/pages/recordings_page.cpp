@@ -1,5 +1,6 @@
 #include "ui/pages/recordings_page.h"
 
+#include "configure/recording_repository.h"
 #include "style_loader.h"
 
 #include <QDesktopServices>
@@ -81,7 +82,7 @@ void ui::RecordingsPage::build_ui() {
 
 void ui::RecordingsPage::open_folder() {
     QDesktopServices::openUrl(
-        QUrl::fromLocalFile(RecordingLibrary::recordingsDir()));
+        QUrl::fromLocalFile(recording_repository().recordings_dir()));
 }
 
 void ui::RecordingsPage::clear_rows() {
@@ -98,7 +99,7 @@ void ui::RecordingsPage::clear_rows() {
 }
 
 void ui::RecordingsPage::refresh() {
-    _entries = RecordingLibrary::scan();
+    _entries = recording_repository().scan();
     clear_rows();
 
     if (_entries.isEmpty()) {
@@ -171,7 +172,7 @@ void ui::RecordingsPage::add_row(const RecordingEntry &entry, int index) {
             return;
         }
         const RecordingEntry target = _entries.at(index);
-        RecordingLibrary::remove(target);
+        recording_repository().remove(target);
         refresh();
     });
 

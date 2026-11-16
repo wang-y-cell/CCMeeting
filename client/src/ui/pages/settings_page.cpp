@@ -1,6 +1,6 @@
 #include "ui/pages/settings_page.h"
 
-#include "recording_library.h"
+#include "configure/recording_repository.h"
 
 #include "configure/client_config.h"
 #include "ui/pages/settings_page_ui.h"
@@ -641,14 +641,14 @@ void ui::SettingsPage::refreshRecordDirLabel() {
     if (!ui || !ui->recordDirLabel) {
         return;
     }
-    const QString dir = RecordingLibrary::recordingsDir();
+    const QString dir = recording_repository().recordings_dir();
     ui->recordDirLabel->setText(QDir::toNativeSeparators(dir));
     ui->recordDirLabel->setToolTip(dir);
 }
 
 void ui::SettingsPage::onOpenRecordDirClicked() {
     QDesktopServices::openUrl(
-        QUrl::fromLocalFile(RecordingLibrary::recordingsDir()));
+        QUrl::fromLocalFile(recording_repository().recordings_dir()));
 }
 
 void ui::SettingsPage::onResetRecordDirClicked() {
