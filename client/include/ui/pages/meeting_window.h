@@ -126,6 +126,19 @@ private:
     void close_meeting_window();
     void reset_meeting_ui();
     void update_meeting_info();
+
+    // ---- 会话对象访问器（空安全）----
+    // init_ui() 在 _session 创建之前就会调用 update_meeting_info() 等函数，
+    // 因此这里统一做空判断，避免"构造期访问不存在的控制器"。
+    NetworkManager *network() const;
+    MeetingController *controller() const;
+    MeetingProtocolDispatcher *protocol() const;
+    ParticipantsController *participants() const;
+    ChatController *chat() const;
+    RoomSettingsController *room_settings() const;
+    MeetingMediaController *media() const;
+    MeetingRtcObserver *rtc_observer() const;
+    MeetingRecorder *recorder() const;
     /** @brief 刷新顶栏「会议时长」chip（每秒调用） */
     void refresh_duration_chip();
 

@@ -34,7 +34,6 @@ struct MeetingViewPorts {
     CameraVideo *camera = nullptr;           ///< 主画面/成员小窗渲染器
     QListWidget *chat_list = nullptr;        ///< 聊天消息列表
     MyTextEdit *chat_input = nullptr;        ///< 聊天输入框
-    QPushButton *settings_anchor = nullptr;  ///< 会议设置抽屉的锚点按钮
     QWidget *owner = nullptr;                ///< 弹窗/提示的父窗口
 };
 
