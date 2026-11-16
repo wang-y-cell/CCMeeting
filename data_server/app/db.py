@@ -119,24 +119,92 @@ class Database:
 
         try:
             import pymysql
+            import pymysql.err
         except ImportError as exc:  # pragma: no cover
             raise RuntimeError(
                 "服务端需要 MySQL 驱动：pip install PyMySQL"
             ) from exc
 
-        self._conn = pymysql.connect(
-            host=host,
-            port=int(port),
-            user=user,
-            password=password,
-            database=database,
-            charset="utf8mb4",
-            autocommit=True,
-            connect_timeout=int(connect_timeout),
-        )
-        self._init_schema()
-        # 兜底清理历史遗留表（存在才删）
-        self.drop_obsolete_tables()
+        self._pymysql = pymysql
+        self._err = pymysql.err
+        self._params = {
+            "host": host,
+            "port": int(port),
+            "user": user,
+            "password": password,
+            "database": database,
+            "charset": "utf8mb4",
+            "autocommit": True,
+            "connect_timeout": int(connect_timeout),
+        }
+        self._conn = self._connect()
+
+        try:
+            self._init_schema()
+            # 兜底清理历史遗留表（存在才删）
+            self.drop_obsolete_tables()
+        except Exception:
+            # 建表失败时不要留下半初始化对象：关掉连接再抛
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+            raise
+
+    # ------------------------------------------------------------ 连接维护
+    def _connect(self):
+        """新建一条连接（参数在 __init__ 里存好，重连时复用）。"""
+        return self._pymysql.connect(**self._params)
+
+    def _reconnect_locked(self) -> None:
+        """持锁状态下丢弃旧连接并重连。"""
+        old = self._conn
+        try:
+            old.close()
+        except Exception:
+            pass
+        self._conn = self._connect()
+
+    def _ensure_locked(self):
+        """持锁状态下确保连接可用。
+
+        MySQL 的 ``wait_timeout``（默认 8 小时）会主动断开长时间空闲的连接；
+        服务端是「单连接 + 锁」的模型，如果不保活，空闲一夜后的第一个请求
+        就会拿到 ``InterfaceError (0, '')`` / ``MySQL server has gone away``，
+        表现为登录接口 500（健康检查却仍是 200，因为它不碰数据库）。
+        """
+        try:
+            self._conn.ping(reconnect=True)
+        except Exception:
+            self._reconnect_locked()
+        return self._conn
+
+    def _is_stale_error(self, exc: BaseException) -> bool:
+        """判断异常是不是「连接已失效」这类可以重连重试的错误。"""
+        if not isinstance(exc, (self._err.InterfaceError, self._err.OperationalError)):
+            return False
+        code = exc.args[0] if exc.args else None
+        # 0   : pymysql 内部 InterfaceError（socket 已被对端关闭）
+        # 2006: MySQL server has gone away
+        # 2013: Lost connection to MySQL server during query
+        # 2014: Commands out of sync
+        # 2045/2055: 连接/网络相关
+        return code in (0, 2006, 2013, 2014, 2045, 2055)
+
+    def _with_cursor(self, run):
+        """持锁执行：先保活，遇到连接失效则重连并重试一次。
+
+        事务内不重试：重连会丢掉未提交事务，交给调用方回滚更安全。
+        """
+        with self._lock:
+            self._ensure_locked()
+            try:
+                return run(self._conn)
+            except Exception as exc:
+                if self._tx_depth or not self._is_stale_error(exc):
+                    raise
+                self._reconnect_locked()
+                return run(self._conn)
 
     # ------------------------------------------------------------ 初始化
     def _init_schema(self) -> None:
@@ -166,42 +234,65 @@ class Database:
 
     # ------------------------------------------------------------ 查询
     def query_one(self, sql: str, params: tuple = ()):
-        with self._lock:
-            cursor = self._conn.cursor()
+        def run(conn):
+            cursor = conn.cursor()
             try:
                 cursor.execute(self._sql(sql), params)
                 return self._fetch(cursor, many=False)
             finally:
                 cursor.close()
 
+        return self._with_cursor(run)
+
     def query_all(self, sql: str, params: tuple = ()):
-        with self._lock:
-            cursor = self._conn.cursor()
+        def run(conn):
+            cursor = conn.cursor()
             try:
                 cursor.execute(self._sql(sql), params)
                 return self._fetch(cursor, many=True)
             finally:
                 cursor.close()
 
+        return self._with_cursor(run)
+
     def execute(self, sql: str, params: tuple = ()) -> int:
         """返回受影响行数。"""
-        with self._lock:
-            cursor = self._conn.cursor()
+
+        def run(conn) -> int:
+            cursor = conn.cursor()
             try:
                 cursor.execute(self._sql(sql), params)
                 return int(cursor.rowcount)
             finally:
                 cursor.close()
 
+        return self._with_cursor(run)
+
     def insert(self, sql: str, params: tuple = ()) -> int:
         """执行插入并返回 lastrowid。"""
-        with self._lock:
-            cursor = self._conn.cursor()
+
+        def run(conn) -> int:
+            cursor = conn.cursor()
             try:
                 cursor.execute(self._sql(sql), params)
                 return int(cursor.lastrowid or 0)
             finally:
                 cursor.close()
+
+        return self._with_cursor(run)
+
+    def ping(self) -> bool:
+        """保活探针：连接不可用则尝试重连，返回是否可用。
+
+        注意：**不要**把它接进 `/api/health`——那个接口的响应体是客户端契约
+        （`{"code":0,"message":"ok"}`），改了会破坏兼容。
+        """
+        with self._lock:
+            try:
+                self._conn.ping(reconnect=True)
+                return True
+            except Exception:
+                return False
 
     def transaction(self):
         """显式事务上下文（支持嵌套：只有最外层真正 BEGIN / COMMIT）。
@@ -217,9 +308,15 @@ class Database:
             def __enter__(self):
                 db = self._db
                 db._lock.acquire()
-                db._tx_depth += 1
-                if db._tx_depth == 1:
-                    db._conn.begin()
+                try:
+                    db._tx_depth += 1
+                    if db._tx_depth == 1:
+                        db._ensure_locked()
+                        db._conn.begin()
+                except Exception:
+                    db._tx_depth -= 1
+                    db._lock.release()
+                    raise
                 return db
 
             def __exit__(self, exc_type, exc, tb):
@@ -231,6 +328,11 @@ class Database:
                             db._conn.commit()
                         else:
                             db._conn.rollback()
+                except Exception:
+                    # 连接已坏：未提交事务随连接失效，重连避免后续请求继续报错
+                    db._reconnect_locked()
+                    if exc_type is None:
+                        raise
                 finally:
                     db._lock.release()
                 return False
