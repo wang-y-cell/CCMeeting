@@ -39,7 +39,19 @@ class QAction;
 class QListWidgetItem;
 class QMenu;
 
-struct state {
+namespace app {
+class MeetingSession;
+}
+
+namespace ui {
+
+/**
+ * @brief 会议窗口的会话状态
+ *
+ * 原先是不在命名空间里的全局 `struct state`，与 Qt/系统头里的同名符号
+ * 容易撞名；现在收进 ui 命名空间并改成有意义的类型名。
+ */
+struct MeetingState {
     bool _createmeet = false; //是否创建会议
     bool _joinmeet = false; //是否加入会议
 
@@ -57,8 +69,6 @@ struct state {
     bool _hasPendingConnect = false; //是否有未处理的连接请求
 };
 
-namespace ui {
-
 class MeetingWindow : public FramelessWindow<QWidget> {
 public:
     /**
@@ -70,15 +80,9 @@ public:
     Q_OBJECT
 private:
     static QRect pos;
-    state _state; //维护会议状态
+    MeetingState _state; //维护会议状态
     qint64 main_user_id_ = 0;
     /** 房间开关位掩码（房主修改，服务端广播） */
-    ///房间开关 + 录制控制（原 MeetingWindow 内实现）
-    RoomSettingsController *_roomSettings = nullptr;
-    ///xrtc 回调与帧合并（原 MeetingWindow 内实现）
-    MeetingRtcObserver *_rtcObserver = nullptr;
-    ///媒体引擎生命周期 / 本端音视频 / 屏幕共享 / 设备切换
-    MeetingMediaController *_media = nullptr;
     /** 本地录制器（录制当前主画面） */
 
     /** 仅用于首次记录本地预览分辨率（诊断用） */
@@ -102,15 +106,6 @@ private:
     quint32 _pendingDurationMinutes = 60;
     quint32 _createMaxParticipants = 8;
     quint32 _createDurationMinutes = 60;
-    std::shared_ptr<NetworkManager> _network;
-    std::unique_ptr<MeetingController> _controller;
-    std::unique_ptr<QThread> _controller_thread;
-    ///成员卡片与主画面选择（原 MeetingWindow 内实现）
-    ParticipantsController *_participants = nullptr;
-    ///网络消息分发（原 MeetingWindow 内实现）
-    MeetingProtocolDispatcher *_protocol = nullptr;
-    ///聊天面板渲染与输入（原 MeetingWindow 内实现）
-    ChatController *_chat = nullptr;
     CameraVideo *_cameraVideo = nullptr;
     int _roomNo = 0;
     QString _serverAddr;
@@ -122,9 +117,10 @@ private:
 private:
     void init_ui();
     void init_connect();
+    /** @brief 成员/协议/媒体/聊天控制器的视图信号连接（对象由 MeetingSession 创建） */
+    void init_controllers_wiring();
     /** @brief 创建房间设置面板与录制控制器 */
     void init_settings_popup();
-    void init_permanent_workers();
     void end_meeting_session();
     /** 结束会议会话并隐藏会议窗口（加入失败 / 断线 / 超时等） */
     void close_meeting_window();
@@ -262,6 +258,14 @@ signals:
 
 private:
     MeetingWindowUi ui;
+
+    /**
+     * @brief 会话装配层：网络、工作线程、控制器与协议分发的唯一持有者
+     *
+     * 必须最后声明 —— 成员按声明逆序析构，这样它最先析构，
+     * 其内部辅助对象（持有界面控件指针）销毁时窗口与控件都还活着。
+     */
+    std::unique_ptr<app::MeetingSession> _session;
 };
 
 }  // namespace ui
