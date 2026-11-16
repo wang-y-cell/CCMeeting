@@ -213,3 +213,14 @@ if(BUILD_UI_PREVIEW)
         COMMENT "Copy client.json to UiPreview output directory"
     )
 endif()
+
+#-------------------------------------------------
+# 单元测试（Qt Test）
+#
+#   cmake ... -DBUILD_TESTS=ON
+#   ctest --test-dir build/client --output-on-failure
+#-------------------------------------------------
+option(BUILD_TESTS "Build client unit tests (Qt Test)" ON)
+if(BUILD_TESTS)
+    add_subdirectory(tests)
+endif()
