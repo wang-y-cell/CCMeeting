@@ -26,7 +26,6 @@
 | **全部文档索引** | [`docs/index.md`](docs/index.md) |
 | 怎么编译、怎么跑起来 | [`docs/build/BUILD.md`](docs/build/BUILD.md) |
 | 怎么部署到云服务器 | [`docs/deploy/DEPLOY-SERVICES.md`](docs/deploy/DEPLOY-SERVICES.md)、[`docs/deploy/DEPLOY-JANUS-COTURN.md`](docs/deploy/DEPLOY-JANUS-COTURN.md) |
-| 架构与模块分层 | [`docs/architecture/`](docs/architecture/)（PlantUML 类图） |
 | 第三方依赖与许可证 | [`DEPENDENCIES.md`](DEPENDENCIES.md) |
 | 认证服务实现细节 | [`data_server/README.md`](data_server/README.md) |
 | UI 层约定 / 资源约定 | [`client/src/ui/README.md`](client/src/ui/README.md)、[`client/resources/README.md`](client/resources/README.md) |

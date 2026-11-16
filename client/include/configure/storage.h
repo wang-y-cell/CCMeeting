@@ -48,9 +48,13 @@ public:
         QString secret;
     };
 
+    //是否有注册过的账号
     bool hasCredentials();
+    //加载注册的账号
     bool loadCredentials(Credentials &out);
+    //保存账号
     bool saveCredentials(const QString &username, const QString &secret);
+    //清空账号
     void clearCredentials();
 
 private:
@@ -59,11 +63,15 @@ private:
     Storage(const Storage &) = delete;
     Storage &operator=(const Storage &) = delete;
 
+    //创建最基础的表
     bool ensure_schema();
+    //将注册表中的数据同步到sqlite中
     void migrate_from_registry();
+    //对数据库执行初始化操作
     void exec_pragma();
 
     bool _open = false;
+    //是否降级到注册表
     bool _fallback = false;
     QString _path;
     QSettings _fallbackStore{QStringLiteral("CCMeeting"), QStringLiteral("Client")};

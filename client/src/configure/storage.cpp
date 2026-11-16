@@ -239,9 +239,13 @@ bool Storage::open() {
         return true;
     }
 
+    //返回一个特定于当前应用程序的、可写入的本地目录路径,windows下是
+    // %LOCALAPPDATA% 下的应用专属目录（例如 C:/Users/<USER>/AppData/Local/<APPNAME>）
     QString base =
         QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
     if (base.isEmpty()) {
+        //QDir::homePath(): 当前用户主目录（Home Directory）绝对路径的静态函数
+        //windows: 返回当前用户的配置文件目录，通常是 C:/Users/<Username>
         base = QDir::homePath() + QStringLiteral("/.ccmeeting");
     }
     if (!QDir().mkpath(base)) {
