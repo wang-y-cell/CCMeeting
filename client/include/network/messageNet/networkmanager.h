@@ -66,53 +66,6 @@ public:
 
     void stop();
 
-    // 兼容旧调用名（逐步迁移）
-    MessageHub *messageHub() const { return message_hub(); }
-    /**
-     * @brief 连接到服务器
-     * @param ip 服务器IP地址
-     * @param port 服务器端口
-     * @param validate_parent 验证父窗口
-     * @return 连接是否成功
-     */
-    bool connectToServer(const QString &ip, const QString &port, QWidget *validate_parent = nullptr)
-    {
-        return connect_to_server(ip, port, validate_parent);
-    }
-    /**
-     * @brief 断开与服务器的连接
-     */
-    void disconnectFromHost() { disconnect_from_host(); }
-    /**
-     * @brief 发送创建会议请求
-     * @param max_participants 人数上限
-     * @param duration_minutes 时长（分钟）
-     */
-    void sendCreateMeeting(std::uint32_t max_participants = 8,
-                           std::uint32_t duration_minutes = 60)
-    {
-        send_create_meeting(max_participants, duration_minutes);
-    }
-    /**
-     * @brief 发送加入会议请求
-     * @param room_no 会议室号
-     */
-    void sendJoinMeeting(const std::string &room_no) { send_join_meeting(room_no); }
-    /**
-     * @brief 发送文本消息
-     * @param text 文本消息
-     */
-    void sendText(const std::string &text) { send_text(text); }
-    /**
-     * @brief 发送关闭摄像头请求
-     */
-    void sendCloseCamera() { send_close_camera(); }
-    void sendUserProfile(qint64 user_id, const std::string &display_name,
-                         const std::string &avatar_url) {
-        send_user_profile(user_id, display_name, avatar_url);
-    }
-    void sendRoomSettings(std::uint32_t flags) { send_room_settings(flags); }
-
 signals:
     void request_message_ready(MessagePtr msg);
     void user_info_message_ready(MessagePtr msg);

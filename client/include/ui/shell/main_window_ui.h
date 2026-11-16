@@ -8,7 +8,7 @@ class QStackedWidget;
 class QWidget;
 
 /** 主窗口纯 UI，不含业务逻辑 */
-class Ui_main_window {
+class MainWindowUi {
 public:
     QWidget *userCard = nullptr;
     QLabel *avatarLabel = nullptr;

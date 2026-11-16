@@ -9,7 +9,7 @@
 #include <QStackedWidget>
 #include <QVBoxLayout>
 
-void Ui_main_window::setupUi(QWidget *parent) {
+void MainWindowUi::setupUi(QWidget *parent) {
     parent->setObjectName(QStringLiteral("main_window"));
     parent->resize(960, 640);
     parent->setMinimumSize(1200, 720);
