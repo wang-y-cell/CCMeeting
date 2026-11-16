@@ -4,7 +4,7 @@
 #include "avatar_image_loader.h"
 #include "configure/client_config.h"
 #include "configure/login_store.h"
-#include "configure/meeting_history.h"
+#include "configure/meeting_repository.h"
 #include "recent_meeting_list.h"
 #include "configure/user_session.h"
 #include "style_loader.h"
@@ -418,7 +418,7 @@ void main_window::restore_after_meeting() {
 }
 
 void main_window::onMeetingConfirmed(bool created, int roomNo) {
-    MeetingHistory::append(created ? MeetingRecordKind::Created
+    meeting_repository().append(created ? MeetingRecordKind::Created
                                    : MeetingRecordKind::Joined,
                            roomNo);
     // 首页的「最近 N 个会议」与记录页都刷新一份
@@ -437,7 +437,7 @@ void main_window::onMeetingConfirmed(bool created, int roomNo) {
 }
 
 void main_window::onMeetingClosed(qint64 durationMs) {
-    MeetingHistory::finish_open_session(durationMs);
+    meeting_repository().finish_open_session(durationMs);
     if (history_widget) {
         history_widget->refresh();
     }

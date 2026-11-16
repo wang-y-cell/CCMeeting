@@ -1,5 +1,6 @@
 #include "recent_meeting_list.h"
 
+#include "configure/meeting_repository.h"
 #include <QEvent>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -75,7 +76,7 @@ void RecentMeetingList::clear_rows() {
 void RecentMeetingList::refresh() {
     clear_rows();
 
-    const QVector<MeetingRecord> records = MeetingHistory::recent(_kind, _limit);
+    const QVector<MeetingRecord> records = meeting_repository().recent(_kind, _limit);
     _emptyHint->setVisible(records.isEmpty());
 
     for (const MeetingRecord &record : records) {

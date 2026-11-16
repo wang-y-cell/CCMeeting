@@ -1,5 +1,6 @@
 #include "ui/pages/meeting_history_page.h"
 
+#include "configure/meeting_repository.h"
 
 
 #include <QFrame>
@@ -111,7 +112,7 @@ void ui::MeetingHistoryPage::build_ui() {
         apply_filter();
     });
     connect(_clearBtn, &QPushButton::clicked, this, [this]() {
-        MeetingHistory::clear();
+        meeting_repository().clear();
         refresh();
     });
 }
@@ -130,7 +131,7 @@ void ui::MeetingHistoryPage::clear_rows() {
 }
 
 void ui::MeetingHistoryPage::refresh() {
-    _records = MeetingHistory::load();
+    _records = meeting_repository().load();
 
     int created = 0;
     int joined = 0;
@@ -212,7 +213,7 @@ void ui::MeetingHistoryPage::add_row(const MeetingRecord &record, int load_index
     layout->addWidget(deleteBtn);
 
     connect(deleteBtn, &QPushButton::clicked, this, [this, load_index]() {
-        MeetingHistory::remove_at(load_index);
+        meeting_repository().remove_at(load_index);
         refresh();
     });
 
