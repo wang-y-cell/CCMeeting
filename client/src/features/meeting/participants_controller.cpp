@@ -2,9 +2,8 @@
 
 #include "media/avatar_service.h"
 #include "media/video/meeting_video.h"
-#include "domain/partner.h"
-#include "ui/composites/partner_tile.h"
 #include "media/video/video_gl_widget.h"
+#include "ui/composites/participant_card.h"
 
 #include <QVBoxLayout>
 
@@ -18,32 +17,25 @@ ParticipantsController::ParticipantsController(QVBoxLayout *tiles_layout,
                                                QObject *parent)
     : QObject(parent), _tilesLayout(tiles_layout), _video(video) {}
 
-Partner *ParticipantsController::add(qint64 user_id) {
+ParticipantCard *ParticipantsController::add(qint64 user_id) {
     const auto found = _partners.find(user_id);
     if (found != _partners.end()) {
         return found->second;
     }
 
-    auto *partner = new Partner(user_id, nullptr);
-    auto *tile = new PartnerTile(partner,
-                                 _tilesLayout ? _tilesLayout->parentWidget()
-                                              : nullptr);
-    partner->setParent(tile);
-    connect(partner, &Partner::clicked, this,
+    auto *card = new ParticipantCard(
+        user_id, _tilesLayout ? _tilesLayout->parentWidget() : nullptr);
+    connect(card, &ParticipantCard::clicked, this,
             &ParticipantsController::member_clicked);
-    _partners.emplace(user_id, partner);
+    _partners.emplace(user_id, card);
     if (_tilesLayout) {
-        _tilesLayout->addWidget(tile);
+        _tilesLayout->addWidget(card);
     }
-    if (VideoGLWidget *widget = partner->displayWidget()) {
-        if (_video) {
-            _video->bind(user_id, widget);
-        }
+    if (_video) {
+        _video->bind(user_id, card->displayWidget());
     }
-    // 资料可能比成员事件晚到：先显示默认/已缓存头像，资料到了再刷新
-    load_avatar(user_id, partner->avatarUrl());
     emit count_changed(count());
-    return partner;
+    return card;
 }
 
 void ParticipantsController::remove(qint64 user_id) {
@@ -51,45 +43,42 @@ void ParticipantsController::remove(qint64 user_id) {
     if (it == _partners.end()) {
         return;
     }
-    Partner *partner = it->second;
-    disconnect(partner, &Partner::clicked, this,
+    ParticipantCard *card = it->second;
+    disconnect(card, &ParticipantCard::clicked, this,
                &ParticipantsController::member_clicked);
     if (_video) {
         _video->bind(user_id, nullptr);
     }
     _avatarGen.remove(user_id);
-    if (PartnerTile *tile = partner->tile()) {
-        if (_tilesLayout) {
-            _tilesLayout->removeWidget(tile);
-        }
-        partner->setTile(nullptr);
-        tile->deleteLater();
+    if (_tilesLayout) {
+        _tilesLayout->removeWidget(card);
     }
-    partner->deleteLater();
+    card->deleteLater();
     _partners.erase(it);
+
+    // 主画面用户离开：清空主画面，等用户重新选择
+    if (_mainUserId == user_id) {
+        _mainUserId = 0;
+        if (_video) {
+            _video->setMainUser(0);
+        }
+        emit main_changed(0);
+    }
     emit count_changed(count());
 }
 
 void ParticipantsController::clear() {
-    if (_partners.empty()) {
-        _avatarGen.clear();
-        return;
-    }
     for (auto it = _partners.begin(); it != _partners.end();) {
-        Partner *partner = it->second;
-        disconnect(partner, &Partner::clicked, this,
+        ParticipantCard *card = it->second;
+        disconnect(card, &ParticipantCard::clicked, this,
                    &ParticipantsController::member_clicked);
         if (_video) {
             _video->bind(it->first, nullptr);
         }
-        if (PartnerTile *tile = partner->tile()) {
-            if (_tilesLayout) {
-                _tilesLayout->removeWidget(tile);
-            }
-            partner->setTile(nullptr);
-            tile->deleteLater();
+        if (_tilesLayout) {
+            _tilesLayout->removeWidget(card);
         }
-        partner->deleteLater();
+        card->deleteLater();
         it = _partners.erase(it);
     }
     _avatarGen.clear();
@@ -111,9 +100,7 @@ void ParticipantsController::load_avatar(qint64 user_id, const QString &url) {
                 return;
             }
             const QImage avatar = makeCircularAvatarImage(pixmap.toImage());
-            if (PartnerTile *tile = it->second->tile()) {
-                tile->showAvatar(avatar);
-            }
+            it->second->show_avatar(avatar);
             if (_video) {
                 _video->setAvatar(user_id, avatar);
             }
@@ -123,11 +110,11 @@ void ParticipantsController::load_avatar(qint64 user_id, const QString &url) {
 void ParticipantsController::apply_profile(qint64 user_id,
                                            const QString &display_name,
                                            const QString &avatar_url) {
-    Partner *partner = add(user_id);
-    if (!partner) {
+    ParticipantCard *card = add(user_id);
+    if (!card) {
         return;
     }
-    partner->setProfile(display_name, avatar_url);
+    card->set_profile(display_name, avatar_url);
     load_avatar(user_id, avatar_url);
     emit mention_added(display_name);
 }
@@ -137,7 +124,7 @@ QString ParticipantsController::display_name(qint64 user_id) const {
     if (it == _partners.end()) {
         return QString::number(user_id);
     }
-    const QString name = it->second->displayName();
+    const QString name = it->second->display_name();
     return name.isEmpty() ? QString::number(user_id) : name;
 }
 
@@ -146,18 +133,18 @@ QString ParticipantsController::avatar_url(qint64 user_id) const {
     if (it == _partners.end()) {
         return QString();
     }
-    return it->second->avatarUrl();
+    return it->second->avatar_url();
 }
 
 void ParticipantsController::select_main(qint64 user_id) {
-    const auto previous = _partners.find(_mainUserId);
-    if (previous != _partners.end()) {
-        previous->second->resetBorder();
+    _mainUserId = user_id;
+    if (_video) {
+        _video->setMainUser(_mainUserId);
     }
-    const auto current = _partners.find(user_id);
-    if (current != _partners.end()) {
-        current->second->setSelected(true);
-    }
+    emit main_changed(_mainUserId);
+}
+
+void ParticipantsController::set_main_user(qint64 user_id) {
     _mainUserId = user_id;
     if (_video) {
         _video->setMainUser(_mainUserId);

@@ -12,7 +12,6 @@
 #include "config/user_session.h"
 #include "protocol/message.h"
 #include "protocol/net_header.h"
-#include "ui/composites/partner_tile.h"
 #include "core/screen.h"
 #include "ui/composites/my_text_edit.h"
 #include "media/video/video_gl_widget.h"
@@ -174,7 +173,6 @@ ui::MeetingWindow::MeetingWindow(QWidget *parent)
     spdlog::info("[MeetingWindow] init_ui done");
     spdlog::default_logger()->flush();
 
-    main_user_id_ = 0;
     _video = new MeetingVideo(this);
     _video->bindMain(ui.mainshow_label);
     spdlog::info("[MeetingWindow] MeetingVideo ready");
@@ -220,10 +218,10 @@ void ui::MeetingWindow::init_controllers_wiring() {
             &ui::MeetingWindow::on_recv_user_slot);
     connect(tiles, &ParticipantsController::main_changed, this,
             [this](qint64 userId) {
-                main_user_id_ = userId;
                 ui.groupBox_2->setTitle(QString());
                 ui.topMainTitle->setText(
-                    participants()->display_name(userId));
+                    userId > 0 ? participants()->display_name(userId)
+                               : QString());
             });
     connect(tiles, &ParticipantsController::mention_added, this,
             [this](const QString &name) {
@@ -943,7 +941,7 @@ void ui::MeetingWindow::on_preview_frame(xrtc::XRTCVideoFrame frame) {
     }
     // 录制：只录主画面（本端是主画面时才推帧）
     if (room_settings() && room_settings()->is_recording() &&
-        local_user_id() == main_user_id_) {
+        local_user_id() == participants()->main_user_id()) {
         room_settings()->recorder()->push_frame(frame);
     }
     _video->show(local_user_id(), frame);
@@ -955,7 +953,7 @@ void ui::MeetingWindow::on_remote_frame(qint64 user_id, xrtc::XRTCVideoFrame fra
         return;
     }
     // 录制：远端帧里只录当前主画面的那一路
-    if (room_settings() && room_settings()->is_recording() && user_id == main_user_id_) {
+    if (room_settings() && room_settings()->is_recording() && user_id == participants()->main_user_id()) {
         room_settings()->recorder()->push_frame(frame);
     }
     _video->show(user_id, frame);
@@ -1021,12 +1019,8 @@ void ui::MeetingWindow::send_local_user_profile() {
 
 void ui::MeetingWindow::update_main_screen_title(qint64 userId) {
     ui.groupBox_2->setTitle(QString());
-
-    apply_tab_bar_visibility();
-    connect(ui.btnMeetingInfo, &QPushButton::clicked, this,
-            [this]() { show_meeting_info_popup(); });
-
-    ui.topMainTitle->setText(participants()->display_name(userId));
+    ui.topMainTitle->setText(userId > 0 ? participants()->display_name(userId)
+                                       : QString());
 }
 
 qint64 ui::MeetingWindow::local_user_id() const {
@@ -1225,12 +1219,11 @@ void ui::MeetingWindow::on_create_meeting_result(int roomno) {
         ui.sendmsg->setDisabled(false);
 
         const qint64 selfId = local_user_id();
-        main_user_id_ = selfId;
-        _video->setMainUser(main_user_id_);
+        participants()->set_main_user(selfId);
         participants()->apply_profile(selfId, UserSession::instance().name(),
                               UserSession::instance().avatar());
         participants()->add(selfId);
-        update_main_screen_title(main_user_id_);
+        update_main_screen_title(participants()->main_user_id());
         spdlog::info("[MeetingWindow] start_meeting_media begin");
         if (spdlog::default_logger())
             spdlog::default_logger()->flush();
@@ -1271,12 +1264,11 @@ void ui::MeetingWindow::on_join_meeting_result(int c) {
                              tr("成员已满，无法加入"));
     } else if (c > 0) {
         const qint64 selfId = local_user_id();
-        main_user_id_ = selfId;
-        _video->setMainUser(main_user_id_);
+        participants()->set_main_user(selfId);
         participants()->apply_profile(selfId, UserSession::instance().name(),
                               UserSession::instance().avatar());
         participants()->add(selfId);
-        update_main_screen_title(main_user_id_);
+        update_main_screen_title(participants()->main_user_id());
         ui.sendmsg->setDisabled(false);
         _state._joinmeet = true;
         start_meeting_media();
@@ -1309,10 +1301,8 @@ void ui::MeetingWindow::on_text_received(qint64 user_id, const QString &str) {
 }
 
 void ui::MeetingWindow::on_partner_joined(qint64 user_id) {
-    Partner *p = participants()->add(user_id);
-    if (p) {
-        update_meeting_info();
-    }
+    participants()->add(user_id);
+    update_meeting_info();
     // 已在房成员收到新人加入后重发自己的资料，覆盖服务端尚未缓存到资料的竞态
     if (_state._createmeet || _state._joinmeet)
         send_local_user_profile();
@@ -1321,11 +1311,6 @@ void ui::MeetingWindow::on_partner_joined(qint64 user_id) {
 void ui::MeetingWindow::on_partner_exited(qint64 user_id) {
     const QString name = participants()->display_name(user_id);
     participants()->remove(user_id);
-    if (main_user_id_ == user_id) {
-        // 主画面用户走了：清空主画面，等用户重新选择（main_user_id_ 保持，
-        // 与旧行为一致——顶部标题在重新选择前不会被刷新成 0）
-        _video->setMainUser(0);
-    }
     const QString atTag = QStringLiteral("@") + name;
     if (chat()) {
         chat()->remove_mention_tag(atTag);
@@ -1348,7 +1333,7 @@ void ui::MeetingWindow::on_partners_snapshot(const QList<qint64> &user_ids) {
 void ui::MeetingWindow::on_user_profile(qint64 user_id, const QString &display_name,
                                     const QString &avatar_url) {
     participants()->apply_profile(user_id, display_name, avatar_url);
-    update_main_screen_title(main_user_id_);
+    update_main_screen_title(participants()->main_user_id());
 }
 
 void ui::MeetingWindow::on_remote_host_closed() {

@@ -10,8 +10,6 @@
 #include "features/meeting/meeting_controller.h"
 #include "protocol/network_manager.h"
 #include "protocol/message.h"
-#include "domain/partner.h"
-#include "ui/composites/partner_tile.h"
 #include "ui/composites/chat_message.h"
 #include "media/video/meeting_video.h"
 
@@ -81,7 +79,6 @@ public:
 private:
     static QRect pos;
     MeetingState _state; //维护会议状态
-    qint64 main_user_id_ = 0;
     /** 房间开关位掩码（房主修改，服务端广播） */
     /** 本地录制器（录制当前主画面） */
 

@@ -29,7 +29,6 @@ ui（foundation → primitives → composites → pages → shell）
 | `core/` | 平台与存储基础设施：`screen`、`storage`（SQLite 单一后端） | 认识任何业务概念 |
 | `config/` | 配置与会话：`client_config`、`auth_config`、`user_session`、`login_store`、`preferences`、`stdtypes` | include `ui/` |
 | `data/` | 业务数据：`meeting_record`、`meeting_repository`、`meeting_history`（实现）、`recording_repository`、`recording_library`（实现） | 弹窗、控件 |
-| `domain/` | 纯业务模型：`partner` | 依赖 UI |
 | `protocol/` | 线上协议与传输：`connection`、`message(_hub/_codec)`、`net_header`、`network_manager`、`room_settings_flags` | include `ui/`、`media/` |
 | `media/` | 图像/视频资源：`avatar_service`、`media/video/*`（样式/渲染/路由）、`media/recording/*` | 依赖 `ui/` 或 `protocol/` |
 | `features/meeting/` | 8 个 controller（会议、聊天、成员、媒体、协议分发、RTC 观察、房间设置） | 自己 new 线程/网络 |
@@ -59,7 +58,7 @@ include/ui/                      源文件镜像（保持项目 include/ + src/ 
 │   └── resource_paths.h         资源路径常量（Source::at_sound 等，原 configure.h）
 ├── primitives/                  ② 原子控件（PageHeader / Card / field_label）
 ├── composites/                  ③ 组合控件（无独立页面语义）
-│   ├── partner_tile.h           成员卡片
+│   ├── participant_card.h       成员卡片（数据 + 视图合并，原 Partner+PartnerTile）
 │   ├── recent_meeting_list.h    最近会议列表
 │   ├── chat_message.h           聊天气泡（原 message/text）
 │   └── my_text_edit.h           带 @ 补全的输入框（原 message/text）
@@ -246,6 +245,17 @@ QPushButton#joinMeeting_btn {
   手工解绑契约；同时删掉没人读的 `setLocalUserId()`；
 - 成员小窗头像「72×72 居中」现在只有 `VideoStyles::memberAvatar()` 一个来源，
   消除了 `PartnerTile` 与本类两套样式互相覆盖的问题。
+
+### 成员卡片合并（2026-11 第五轮回）
+
+- `Partner`（数据）+ `PartnerTile`（视图）合并为 `ui/composites/participant_card.h`：
+  一个成员一个 QWidget，去掉双向指针、`setParent` 技巧与转发方法；
+- 主画面用户只存一份：由 `ParticipantsController` 持有，`MeetingWindow` 通过
+  `participants()->main_user_id()` 查询，`MeetingVideo` 只在 `setMainUser()` 时同步；
+- 删除选中描边空实现（`setSelected` / `resetBorder` / `applyBorder`）与
+  `updateLabelGeometry()`；卡片布局只保留 `set_video_mode()` 一个入口；
+- 成员加入不再预加载默认头像：等 `apply_profile` 一次加载，避免同一人两次请求；
+- 顺带修掉 `update_main_screen_title()` 里每次调用都重复 `connect` 的隐患。
 
 ### 画面路由 API 收敛（2026-11 第四轮回）
 
