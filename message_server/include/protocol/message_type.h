@@ -14,11 +14,7 @@ namespace protocol {
 
 enum class MessageType : uint16_t {
     // 客户端 → 服务器
-    ImgSend = 0,   // reserved legacy
-    ImgRecv,       // reserved legacy
-    AudioSend,     // reserved legacy
-    AudioRecv,     // reserved legacy
-    TextSend,
+    TextSend = 0,
     TextRecv,
     CreateMeeting,
     ExitMeeting,

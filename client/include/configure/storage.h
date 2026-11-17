@@ -2,21 +2,20 @@
 #define STORAGE_H
 
 #include <QSqlDatabase>
-#include <QSettings>
 #include <QString>
 #include <QVariant>
 
 /**
- * @brief 统一本地存储（SQLite）
+ * @brief 统一本地存储（SQLite，单一后端）
  *
  * 库文件：%LOCALAPPDATA%\CCMeeting\ccmeeting.db（WAL 模式）
  *
- * 承担两类数据，替代原来的注册表：
+ * 承担两类数据：
  * - app_settings：界面/设备/录制等偏好键值（key, value, type）
  * - credentials ：登录凭据（DPAPI 密文），供自动登录使用
  *
- * 打开失败时自动降级到 QSettings（注册表），保证程序仍可运行；
- * 首次打开会把注册表里的历史偏好一次性迁移进数据库（旧数据保留）。
+ * 只有 SQLite 一个后端：打开失败时本次运行不做持久化（读到默认值、
+ * 写入被忽略并记日志），不再降级到注册表——避免出现两套数据源。
  *
  * 线程约束：SQLite 连接不可跨线程使用，本类只允许在 GUI 线程访问。
  */
@@ -25,12 +24,10 @@ public:
     /** @brief 全局单例 */
     static Storage &instance();
 
-    /** @brief 打开（建目录/建库/建表/迁移），失败则降级到 QSettings */
+    /** @brief 打开（建目录/建库/建表）；失败返回 false，本次运行不持久化 */
     bool open();
     bool isOpen() const { return _open; }
-    /** @brief 是否处于降级（QSettings）模式 */
-    bool usingFallback() const { return _fallback; }
-    /** @brief 已打开的数据库连接（未打开时无效），供各业务模块直接查询 */
+    /** @brief 已打开的数据库连接（未打开时无效） */
     QSqlDatabase connection() const;
     QString databasePath() const { return _path; }
 
@@ -40,21 +37,15 @@ public:
     void setValue(const QString &key, const QVariant &value);
     /** @brief 删除某个偏好 */
     void remove(const QString &key);
-    /** @brief 兼容旧调用（数据库已是即时提交） */
-    void sync() {}
 
     struct Credentials {
         QString username;
         QString secret;
     };
 
-    //是否有注册过的账号
     bool hasCredentials();
-    //加载注册的账号
     bool loadCredentials(Credentials &out);
-    //保存账号
     bool saveCredentials(const QString &username, const QString &secret);
-    //清空账号
     void clearCredentials();
 
 private:
@@ -63,18 +54,11 @@ private:
     Storage(const Storage &) = delete;
     Storage &operator=(const Storage &) = delete;
 
-    //创建最基础的表
     bool ensure_schema();
-    //将注册表中的数据同步到sqlite中
-    void migrate_from_registry();
-    //对数据库执行初始化操作
     void exec_pragma();
 
     bool _open = false;
-    //是否降级到注册表
-    bool _fallback = false;
     QString _path;
-    QSettings _fallbackStore{QStringLiteral("CCMeeting"), QStringLiteral("Client")};
 };
 
 #endif // STORAGE_H

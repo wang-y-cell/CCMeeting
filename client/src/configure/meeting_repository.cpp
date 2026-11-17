@@ -1,9 +1,11 @@
 #include "configure/meeting_repository.h"
 
+#include "configure/meeting_history.h"
+
 namespace {
 
 /**
- * @brief 默认实现：转发给 MeetingHistory（SQLite → JSON 回退）
+ * @brief 默认实现：转发给 MeetingHistory（SQLite 单一后端）
  *
  * 只做转发，不加业务规则：记录语义与排序规则仍由 MeetingHistory 决定。
  */

@@ -4,7 +4,7 @@
 // 逐个窗口 setAttribute(WA_DontShowOnScreen) 后 show() + grab()，不会真的显示到桌面。
 
 #include "configure/client_config.h"
-#include "configure/meeting_history.h"
+#include "configure/meeting_repository.h"
 #include "configure/login_store.h"
 #include "configure/storage.h"
 
@@ -22,7 +22,7 @@
 #include "ui/pages/meeting_settings_popup.h"
 #include "ui/pages/meeting_window.h"
 #include "screen.h"
-#include "recording_library.h"
+#include "configure/recording_repository.h"
 #include "ui/dialogs/recording_playback_dialog.h"
 #include "ui/pages/meeting_history_page.h"
 #include "ui/pages/recordings_page.h"
@@ -424,24 +424,24 @@ namespace {
 
 int run_meeting_history_selftest() {
     QStandardPaths::setTestModeEnabled(true);
-    MeetingHistory::clear();
+    meeting_repository().clear();
     std::printf("[hist-test] 存储路径 %s\n",
-                MeetingHistory::storage_path().toUtf8().constData());
+                meeting_repository().storage_path().toUtf8().constData());
 
-    MeetingHistory::append(MeetingRecordKind::Created, 1);
-    MeetingHistory::finish_open_session(125000);  // 2 分 05 秒
-    MeetingHistory::append(MeetingRecordKind::Joined, 7);
-    MeetingHistory::finish_open_session(3600000);  // 1 小时
+    meeting_repository().append(MeetingRecordKind::Created, 1);
+    meeting_repository().finish_open_session(125000);  // 2 分 05 秒
+    meeting_repository().append(MeetingRecordKind::Joined, 7);
+    meeting_repository().finish_open_session(3600000);  // 1 小时
 
-    const auto all = MeetingHistory::load();
+    const auto all = meeting_repository().load();
     std::printf("[hist-test] 记录数=%d 最新=房间%d(%s) 时长=%s\n",
                 static_cast<int>(all.size()),
                 all.isEmpty() ? -1 : all.first().roomNo,
                 all.isEmpty() ? "" : all.first().kindText().toUtf8().constData(),
                 all.isEmpty() ? "" : all.first().durationText().toUtf8().constData());
 
-    const auto created = MeetingHistory::recent(MeetingRecordKind::Created, 5);
-    const auto joined = MeetingHistory::recent(MeetingRecordKind::Joined, 5);
+    const auto created = meeting_repository().recent(MeetingRecordKind::Created, 5);
+    const auto joined = meeting_repository().recent(MeetingRecordKind::Joined, 5);
     std::printf("[hist-test] 创建=%d 加入=%d\n",
                 static_cast<int>(created.size()),
                 static_cast<int>(joined.size()));
@@ -449,7 +449,7 @@ int run_meeting_history_selftest() {
     const bool ok = all.size() == 2 && created.size() == 1 &&
                     joined.size() == 1 && !all.first().open &&
                     all.first().durationMs == 3600000;
-    MeetingHistory::clear();
+    meeting_repository().clear();
     std::printf("[hist-test] 结论: %s\n", ok ? "PASS" : "FAIL");
     return ok ? 0 : 1;
 }
@@ -457,18 +457,18 @@ int run_meeting_history_selftest() {
 /// 截图用：写入几条样例记录（只在测试模式下调用）
 void seed_sample_history() {
     // 固定时间戳：让截图可复现（否则每次运行时间不同，像素对比会误报）
-    MeetingHistory::set_now_override(
+    meeting_repository().set_now_override(
         QDateTime(QDate(2026, 1, 1), QTime(10, 0, 0)));
-    MeetingHistory::clear();
-    MeetingHistory::append(MeetingRecordKind::Created, 12);
-    MeetingHistory::finish_open_session(1830000);  // 30 分 30 秒
-    MeetingHistory::append(MeetingRecordKind::Joined, 7);
-    MeetingHistory::finish_open_session(420000);   // 7 分钟
-    MeetingHistory::append(MeetingRecordKind::Created, 5);
-    MeetingHistory::finish_open_session(90000);    // 1 分 30 秒
-    MeetingHistory::append(MeetingRecordKind::Joined, 12);
-    MeetingHistory::finish_open_session(600000);   // 10 分钟
-    MeetingHistory::set_now_override(QDateTime());  // 恢复真实时间
+    meeting_repository().clear();
+    meeting_repository().append(MeetingRecordKind::Created, 12);
+    meeting_repository().finish_open_session(1830000);  // 30 分 30 秒
+    meeting_repository().append(MeetingRecordKind::Joined, 7);
+    meeting_repository().finish_open_session(420000);   // 7 分钟
+    meeting_repository().append(MeetingRecordKind::Created, 5);
+    meeting_repository().finish_open_session(90000);    // 1 分 30 秒
+    meeting_repository().append(MeetingRecordKind::Joined, 12);
+    meeting_repository().finish_open_session(600000);   // 10 分钟
+    meeting_repository().set_now_override(QDateTime());  // 恢复真实时间
 }
 
 }  // namespace
@@ -718,7 +718,7 @@ int run_general_settings_selftest() {
         QDir::tempPath() + QStringLiteral("/ccm-rec-selftest");
     QDir(customDir).removeRecursively();
     settings.setValue(QStringLiteral("record/saveDir"), customDir);
-    const QString resolved = RecordingLibrary::recordingsDir();
+    const QString resolved = recording_repository().recordings_dir();
     const bool dir_ok =
         QDir(resolved) == QDir(customDir) && QDir(customDir).exists();
     std::printf("[general-test] saveDir 生效: %s (resolved=%s)\n",
@@ -899,7 +899,7 @@ int run_login_store_selftest() {
 }  // namespace
 
 // ---------------------------------------------------------------------------
-// 统一存储自检：SQLite 建库、类型往返、凭据读写、注册表迁移
+// 统一存储自检：SQLite 建库、类型往返、凭据读写
 // 用法：UiPreview.exe --storage-selftest
 // ---------------------------------------------------------------------------
 namespace {
@@ -910,9 +910,9 @@ int run_storage_selftest() {
     QCoreApplication::setApplicationName(QStringLiteral("CCMeeting"));
     Storage &storage = Storage::instance();
     const bool opened = storage.open();
-    std::printf("[storage] db=%s open=%d fallback=%d\n",
+    std::printf("[storage] db=%s open=%d\n",
                 storage.databasePath().toUtf8().constData(),
-                storage.isOpen() ? 1 : 0, storage.usingFallback() ? 1 : 0);
+                storage.isOpen() ? 1 : 0);
 
     // 备份用户现有凭据，测完还原
     Storage::Credentials backup;
@@ -960,13 +960,6 @@ int run_storage_selftest() {
         storage.saveCredentials(backup.username, backup.secret);
     }
 
-    // 迁移结果：注册表里的偏好应已在库中
-    const QVariant migrated =
-        storage.value(QStringLiteral("video/deviceId")).toString();
-    std::printf("[storage] 迁移示例 video/deviceId=%s\n",
-                migrated.toString().isEmpty() ? "(空)" :
-                migrated.toString().toUtf8().constData());
-
     std::printf("[storage] 结论: %s\n", ok ? "PASS" : "FAIL");
     return ok ? 0 : 1;
 }
@@ -982,15 +975,15 @@ namespace {
 int run_unified_storage_selftest() {
     Storage &storage = Storage::instance();
     storage.open();
-    std::printf("[unified] db=%s open=%d fallback=%d\n",
+    std::printf("[unified] db=%s open=%d\n",
                 storage.databasePath().toUtf8().constData(),
-                storage.isOpen() ? 1 : 0, storage.usingFallback() ? 1 : 0);
+                storage.isOpen() ? 1 : 0);
 
     // ---- 会议记录 ----
-    const QVector<MeetingRecord> history = MeetingHistory::load();
+    const QVector<MeetingRecord> history = meeting_repository().load();
     std::printf("[unified] 会议记录 %d 条，存储位置=%s\n",
                 static_cast<int>(history.size()),
-                MeetingHistory::storage_path().toUtf8().constData());
+                meeting_repository().storage_path().toUtf8().constData());
     if (!history.isEmpty()) {
         std::printf("[unified] 最新一条: 房间%d %s 时长=%s\n", history.first().roomNo,
                     history.first().startedText().toUtf8().constData(),
@@ -998,7 +991,7 @@ int run_unified_storage_selftest() {
     }
 
     // ---- 录制元数据 ----
-    const QVector<RecordingEntry> recordings = RecordingLibrary::scan();
+    const QVector<RecordingEntry> recordings = recording_repository().scan();
     std::printf("[unified] 录制文件 %d 个\n",
                 static_cast<int>(recordings.size()));
     if (!recordings.isEmpty()) {
@@ -1028,15 +1021,15 @@ int run_unified_storage_selftest() {
                 dbHistory, dbRecordings);
 
     // 顶部统计条数据
-    const MeetingStats stats = MeetingHistory::stats();
+    const MeetingStats stats = meeting_repository().stats();
     int recCount = 0;
-    const qint64 recBytes = RecordingLibrary::total_bytes(&recCount);
+    const qint64 recBytes = recording_repository().total_bytes(&recCount);
     std::printf("[unified] 统计条: 本周 %d 场 / 总时长 %.1f 分钟 / 占用 %d 个 %.1f MB\n",
                 stats.weekCount, stats.totalDurationMs / 60000.0, recCount,
                 recBytes / (1024.0 * 1024.0));
 
     // 只校验"库可用 + 两层计数一致"，不假设一定有数据（用户可能清空过）
-    const bool ok = storage.isOpen() && !storage.usingFallback() &&
+    const bool ok = storage.isOpen() &&
                     dbHistory == history.size() &&
                     dbRecordings == recordings.size();
     std::printf("[unified] 结论: %s\n", ok ? "PASS" : "FAIL");
@@ -1054,9 +1047,9 @@ namespace {
 int run_storage_dump() {
     Storage &storage = Storage::instance();
     storage.open();
-    std::printf("[dump] db=%s open=%d fallback=%d\n",
+    std::printf("[dump] db=%s open=%d\n",
                 storage.databasePath().toUtf8().constData(),
-                storage.isOpen() ? 1 : 0, storage.usingFallback() ? 1 : 0);
+                storage.isOpen() ? 1 : 0);
     QSqlDatabase db = storage.connection();
     if (!db.isValid()) {
         std::printf("[dump] 数据库不可用\n");
@@ -1932,6 +1925,8 @@ int main(int argc, char *argv[]) {
 
     // 截图模式一律使用测试目录，并写入样例会议记录，避免污染用户真实数据
     QStandardPaths::setTestModeEnabled(true);
+    // 会议记录/偏好只有 SQLite 一个后端：先打开存储，样例数据才写得进去
+    Storage::instance().open();
     seed_sample_history();
 
     // 输出目录：跳过 --theme <mode> 之类的选项，取第一个非选项参数
@@ -2018,7 +2013,7 @@ int main(int argc, char *argv[]) {
 
             // 空状态：清空后重绘，确认标题/说明之间不再出现大片空白
             if (auto *history = window.findChild<ui::MeetingHistoryPage *>()) {
-                MeetingHistory::clear();
+                meeting_repository().clear();
                 history->refresh();
                 capture(&window, QStringLiteral("12b-history-empty"), 1280, 800);
                 seed_sample_history();
@@ -2136,7 +2131,7 @@ int main(int argc, char *argv[]) {
     
     // 回放窗口（取列表里最近的一条；没有录制时界面仍可渲染）
     {
-        const QVector<RecordingEntry> entries = RecordingLibrary::scan();
+        const QVector<RecordingEntry> entries = recording_repository().scan();
         if (!entries.isEmpty()) {
             ui::RecordingPlaybackDialog dialog(entries.first());
             capture(&dialog, QStringLiteral("11-playback"), 960, 620);

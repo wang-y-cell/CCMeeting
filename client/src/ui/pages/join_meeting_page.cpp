@@ -18,9 +18,7 @@
 namespace ui {
 
 JoinMeetingPage::JoinMeetingPage(QWidget *parent) : Page(parent) {
-    // 保持旧的对象名：main_window.qss 里有 #stack_join_meet 之外的全局选择器，
-    // 但留旧名可以让"迁移即零样式变更"。（后续 QSS 收敛后可改为 #join）
-    setObjectName(QStringLiteral("stack_join_meet"));
+    setObjectName(QStringLiteral("join"));
     build_ui();
 
     connect(m_join_button, &QPushButton::clicked, this, [this]() {

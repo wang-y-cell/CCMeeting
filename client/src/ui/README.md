@@ -223,6 +223,26 @@ QPushButton#joinMeeting_btn {
 - 成员小窗头像「72×72 居中」现在只有 `VideoStyles::memberAvatar()` 一个来源，
   消除了 `PartnerTile` 与 `CameraVideo` 两套样式互相覆盖的问题。
 
+### 兼容层清理（2026-11 第三轮回）
+
+删除所有「只为兼容历史而存在」的代码，只留一套实现：
+
+- `widget/style_loader.h` 兼容包装删除，7 处调用点直接
+  `ui::ThemeManager::instance().apply_to(...)`；
+- `Storage` 只保留 SQLite：删除 QSettings 降级、注册表历史键迁移、
+  `login/*` 残留清理、空实现 `sync()`；打开失败时本次运行不持久化；
+- 删除旧数据目录迁移（`%LOCALAPPDATA%\CloudMeeting` → `CCMeeting`）；
+- `MeetingHistory` 删除 JSON 存储路径与一次性导入，只剩 SQLite；
+  记录类型拆到 `configure/meeting_record.h`，工具/页面统一走 `meeting_repository()`；
+- 协议删除 0–3 号旧媒体类型（`img_send` / `img_recv` / `audio_send` /
+  `audio_recv`），客户端与服务端同步删除；
+- `PageRegistry` 只接受 `ui::Page`，不再接受任意 QWidget；
+- 加入会议页的 `objectName` 由 `stack_join_meet` 改为 `join`；
+- 会议记录 SQL 增加 `id DESC` 次级排序，同一秒内的多条记录顺序稳定。
+
+刻意保留（属于运行环境兼容，不是历史兼容）：Win10 圆角遮罩回退、
+H.264 不可用时回退 MJPEG/Matroska、OpenGL 用 R8 单通道纹理。
+
 仍待处理：
 
 - `client/src/widget/main_window.*` 仍是外壳实现，文件名与 `ui/shell/` 不一致（迁移中）；

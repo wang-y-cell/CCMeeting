@@ -8,11 +8,11 @@
  * @brief 偏好读写接口（界面层唯一可见的偏好入口）
  *
  * 背景：界面层原先直接调 `Storage::instance()`，等于让 UI 知道
- * SQLite 连接、QSettings 降级、GUI 线程约束这些实现细节；
+ * SQLite 连接、打开失败时的降级策略、GUI 线程约束这些实现细节；
  * 换存储、加缓存、写测试都无从下手。
  *
  * 现在界面只依赖本接口：
- *   - 生产实现 `StoragePreferences` 委托给 `Storage`（SQLite，失败降级 QSettings）
+ *   - 生产实现 `StoragePreferences` 委托给 `Storage`（SQLite 单一后端）
  *   - 测试/预览工具可 `set_preferences()` 注入内存实现，不碰真实磁盘
  *
  * 线程约束：与 `Storage` 相同，只允许在 GUI 线程访问。

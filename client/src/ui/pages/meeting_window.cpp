@@ -1,9 +1,10 @@
 #include "ui/pages/meeting_window.h"
 
+#include "ui/foundation/theme_manager.h"
+
 #include "app/meeting_session.h"
 #include "ui/foundation/icon_provider.h"
 #include "configure/preferences.h"
-#include "ui/foundation/theme_manager.h"
 #include "features/meeting/meeting_recorder.h"
 #include "ui/pages/meeting_settings_popup.h"
 #include "configure/client_config.h"
@@ -13,7 +14,6 @@
 #include "netheader.h"
 #include "partner_tile.h"
 #include "screen.h"
-#include "style_loader.h"
 #include "text/mytextedit.h"
 #include "videoglwidget.h"
 
@@ -462,7 +462,7 @@ void ui::MeetingWindow::init_ui() {
     refresh_duration_chip();
     setObjectName(QStringLiteral("meetingWidget"));
 
-    loadWidgetStyleSheet(this,
+    ui::ThemeManager::instance().apply_to(this,
                          QStringLiteral(":/Style/source/meeting_widget.qss"));
 
     // 普通 QWidget 默认不绘制 stylesheet 背景，需显式开启，否则顶栏/底栏

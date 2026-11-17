@@ -56,14 +56,6 @@ CREATE TABLE IF NOT EXISTS sys_user_login_logs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 """
 
-#: 已废弃的表（历史模板遗留，代码零引用）——启动时兜底清理
-OBSOLETE_TABLES = (
-    "sys_role_permissions",
-    "sys_user_roles",
-    "sys_permissions",
-    "sys_roles",
-)
-
 
 def _normalize(value: Any) -> Any:
     """把 datetime 转成固定格式字符串（与旧版 JSON 输出保持一致）。"""
@@ -141,8 +133,6 @@ class Database:
 
         try:
             self._init_schema()
-            # 兜底清理历史遗留表（存在才删）
-            self.drop_obsolete_tables()
         except Exception:
             # 建表失败时不要留下半初始化对象：关掉连接再抛
             try:
@@ -340,22 +330,6 @@ class Database:
         return _Tx(self)
 
     # ------------------------------------------------------------ 维护
-    def drop_obsolete_tables(self) -> list[str]:
-        """删除历史遗留、从未使用的 RBAC 表（存在才删）。"""
-        dropped: list[str] = []
-        with self._lock:
-            for table in OBSOLETE_TABLES:
-                try:
-                    cursor = self._conn.cursor()
-                    try:
-                        cursor.execute(f"DROP TABLE IF EXISTS {table}")
-                    finally:
-                        cursor.close()
-                    dropped.append(table)
-                except Exception:  # 表不存在或权限不足 → 跳过
-                    continue
-        return dropped
-
     def existing_tables(self) -> list[str]:
         rows = self.query_all("SHOW TABLES")
         return [r[0] for r in rows]

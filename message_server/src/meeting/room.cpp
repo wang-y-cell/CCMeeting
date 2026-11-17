@@ -255,12 +255,6 @@ void Room::handle_packet(std::shared_ptr<network::Connection> from,
             broadcast(outbound);  // 含发起者，保证全员视图一致
             break;
         }
-        case protocol::MessageType::ImgSend:
-        case protocol::MessageType::ImgRecv:
-        case protocol::MessageType::AudioSend:
-        case protocol::MessageType::AudioRecv:
-            // reserved legacy TCP media (0–3); media plane is WebRTC
-            break;
         default:
             spdlog::warn("room {} ignored message type {}", _room_id,
                          static_cast<int>(packet.type));

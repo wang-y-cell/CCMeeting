@@ -11,8 +11,8 @@
  *                [](QWidget *parent) { return new JoinMeetingPage(parent); });
  * @endcode
  *
- * 注册表只负责"元数据 + 懒创建 + 缓存"，不关心页面是 ui::Page 还是历史遗留的
- * QWidget；这样旧页面可以继续用，新页面按 ui::Page 写，迁移是渐进的。
+ * 注册表只负责"元数据 + 懒创建 + 缓存"；页面统一是 `ui::Page`（带
+ * page_id/title/nav_order/on_show），不再接受任意 QWidget。
  */
 
 #include <QHash>
@@ -23,6 +23,8 @@
 #include <functional>
 
 namespace ui {
+
+class Page;
 
 /** 页面元数据（侧栏/栈用它排序和生成导航） */
 struct PageMeta {
@@ -35,7 +37,7 @@ struct PageMeta {
 
 class PageRegistry {
 public:
-    using Factory = std::function<QWidget *(QWidget *parent)>;
+    using Factory = std::function<Page *(QWidget *parent)>;
 
     /** @brief 登记一个页面（重复 id 会覆盖，便于测试时替换实现） */
     void add(const PageMeta &meta, Factory factory);
@@ -46,10 +48,10 @@ public:
      * @param parent 父控件（只有第一次创建时生效）
      * @return 页面指针；id 不存在返回 nullptr
      */
-    QWidget *create(const QString &id, QWidget *parent);
+    Page *create(const QString &id, QWidget *parent);
 
     /** @brief 已在内存中的页面（未创建返回 nullptr） */
-    QWidget *find(const QString &id) const;
+    Page *find(const QString &id) const;
 
     /** @brief 全部页面元数据（按 order 排序，order 相同按注册顺序） */
     QList<PageMeta> all() const;
@@ -67,7 +69,7 @@ private:
     struct Entry {
         PageMeta meta;
         Factory factory;
-        QWidget *instance = nullptr;
+        Page *instance = nullptr;
         int index = 0;  ///< 注册顺序，用于稳定排序
     };
 

@@ -26,16 +26,11 @@
 /**
  * @brief 线上消息类型
  *
- * 传输已改为 WebSocket，线上用 JSON 的 `t` 字段表示类型
- * （见 MessageCodec::type_name），这里的枚举值只用于程序内部。
- * 0–3 为旧 TCP JPEG/PCM 媒体槽位，保留但不再使用；媒体面走 WebRTC。
+ * 传输为 WebSocket，线上用 JSON 的 `t` 字段表示类型（见 MessageCodec::type_name），
+ * 这里的枚举值只用于程序内部。
  */
 enum MSG_TYPE : std::uint8_t {
-    IMG_SEND = 0,  // reserved legacy
-    IMG_RECV,      // reserved legacy
-    AUDIO_SEND,    // reserved legacy
-    AUDIO_RECV,    // reserved legacy
-    TEXT_SEND,
+    TEXT_SEND = 0,
     TEXT_RECV,
     CREATE_MEETING,
     EXIT_MEETING,

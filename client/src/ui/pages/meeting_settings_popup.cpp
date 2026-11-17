@@ -1,9 +1,10 @@
 #include "ui/pages/meeting_settings_popup.h"
 
+#include "ui/foundation/theme_manager.h"
+
 #include "ui/foundation/window_effects.h"
 
 #include "netheader.h"
-#include "style_loader.h"
 
 #include <QCheckBox>
 #include <QFrame>
@@ -39,7 +40,7 @@ ui::MeetingSettingsPopup::MeetingSettingsPopup(QWidget *parent)
     // 与其它无边框窗口保持一致的圆角
     ui::enable_rounded_corners(this);
     setFixedWidth(304);
-    loadWidgetStyleSheet(this, QStringLiteral(":/Style/source/meeting_settings_popup.qss"));
+    ui::ThemeManager::instance().apply_to(this, QStringLiteral(":/Style/source/meeting_settings_popup.qss"));
 
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(16, 14, 16, 14);
