@@ -80,21 +80,35 @@ VideoGLWidget::~VideoGLWidget() {
     }
 }
 
-void VideoGLWidget::setDrawMode(DrawMode mode) { m_drawMode = mode; }
+void VideoGLWidget::setStyle(const VideoStyle &style) {
+    // heightFraction 归一化：非法值回落到 0.5，避免空矩形/除零
+    const double fraction =
+        (style.heightFraction > 0.0 && style.heightFraction <= 1.0)
+            ? style.heightFraction
+            : 0.5;
 
-void VideoGLWidget::setFixedOutputSize(const QSize &size) {
-    m_fixedOutputSize = size;
+    if (m_drawMode == style.mode && m_fixedOutputSize == style.fixedOutputSize &&
+        m_contentRect == style.contentRect && m_alignment == style.alignment &&
+        qFuzzyCompare(m_heightFraction, fraction)) {
+        return;  // 样式未变：不重复重绘
+    }
+
+    m_drawMode = style.mode;
+    m_fixedOutputSize = style.fixedOutputSize;
+    m_contentRect = style.contentRect;
+    m_alignment = style.alignment;
+    m_heightFraction = fraction;
+    update();
 }
 
-void VideoGLWidget::setContentRect(const QRect &rect) { m_contentRect = rect; }
-
-void VideoGLWidget::setAlignment(Qt::Alignment alignment) {
-    m_alignment = alignment;
-}
-
-void VideoGLWidget::setHeightFraction(double fraction) {
-    if (fraction > 0.0 && fraction <= 1.0)
-        m_heightFraction = fraction;
+VideoStyle VideoGLWidget::style() const {
+    VideoStyle style;
+    style.mode = m_drawMode;
+    style.fixedOutputSize = m_fixedOutputSize;
+    style.contentRect = m_contentRect;
+    style.alignment = m_alignment;
+    style.heightFraction = m_heightFraction;
+    return style;
 }
 
 void VideoGLWidget::setI420Frame(xrtc::XRTCVideoFrame frame) {

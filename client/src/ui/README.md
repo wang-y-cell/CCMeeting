@@ -208,6 +208,21 @@ QPushButton#joinMeeting_btn {
 - 全局 `struct state` 收进 `ui::MeetingState`；
 - 新增 `client/tests/`（发送队列 / 编解码 / 协议分发）并接入 `ctest` 与 CI。
 
+### 画面渲染（2026-11 第二轮回）
+
+- 样式收敛到 `message/video/video_style.h`：`DrawMode` 唯一定义、`VideoStyle` 值对象、
+  具名预设 `VideoStyles::video() / memberAvatar() / mainAvatar()`（原来枚举被定义两遍，
+  靠 `static_cast<int>` 互转）；
+- `ImgDisplay` 改为**无状态**入口：`ImgDisplay::show(widget, image, style)` /
+  `show_video(widget, frame, style)` / `clear(widget)`，不再持控件、不再存样式，
+  因此没有「先 setDrawMode 再 setFrame」的顺序依赖，也没有悬空指针；
+- `VideoGLWidget` 只保留 `setStyle()` 一个样式入口（原 5 个 setter 合并），
+  样式与帧互相独立，`setStyle` 有变化才重绘；
+- `CameraVideo` 用 `QPointer<VideoGLWidget>` 记录控件，删除 `detachFromWidgets()`
+  手工解绑契约；同时删掉没人读的 `setLocalUserId()`；
+- 成员小窗头像「72×72 居中」现在只有 `VideoStyles::memberAvatar()` 一个来源，
+  消除了 `PartnerTile` 与 `CameraVideo` 两套样式互相覆盖的问题。
+
 仍待处理：
 
 - `client/src/widget/main_window.*` 仍是外壳实现，文件名与 `ui/shell/` 不一致（迁移中）；

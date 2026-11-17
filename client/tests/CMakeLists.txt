@@ -58,6 +58,7 @@ function(ccmeeting_add_test target)
         "${CMAKE_CURRENT_SOURCE_DIR}/../include"
         "${CMAKE_CURRENT_SOURCE_DIR}/../include/network"
         "${CMAKE_CURRENT_SOURCE_DIR}/../include/network/messageNet"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../include/message/video"
     )
     target_link_libraries(${target} PRIVATE
         Qt6::Core
@@ -93,3 +94,7 @@ ccmeeting_add_test(test_protocol_dispatcher
     test_protocol_dispatcher.cpp
     "${CMAKE_CURRENT_SOURCE_DIR}/../include/features/meeting/meeting_protocol_dispatcher.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/features/meeting/meeting_protocol_dispatcher.cpp")
+
+# 画面样式预设：头像 72×72、主画面头像 10% 高度、视频等比铺满
+ccmeeting_add_test(test_video_style
+    test_video_style.cpp)

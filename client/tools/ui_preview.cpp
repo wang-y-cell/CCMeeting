@@ -28,6 +28,7 @@
 #include "ui/pages/recordings_page.h"
 #include "ui/pages/settings_page.h"
 #include "messagecodec.h"
+#include "ImgDisplay.h"
 #include "videoglwidget.h"
 #include "ui/pages/user_profile_page.h"
 
@@ -2058,11 +2059,10 @@ int main(int argc, char *argv[]) {
                                                  (y * 255) / frame.height(), 160));
             }
         }
-        // 注意顺序：setFrame 是 RGBA 内容（会被当作头像→缩回 72），
+        // setFrame 属于 RGBA 内容（会被当作头像 → 缩回 72），
         // 所以先送帧，再显式切到"视频模式"，等价于 I420 帧到达的效果
-        tile->displayWidget()->setFrame(frame);
+        ImgDisplay::show(tile->displayWidget(), frame, VideoStyles::video());
         tile->set_video_mode(true);
-        tile->displayWidget()->setDrawMode(VideoGLWidget::DrawMode::FitWidgetSmooth);
         tile->updateProfile(QStringLiteral("李雷"), QString());
         capture(&panel, QStringLiteral("00b-member-tile-video"), 300, 330);
     }
@@ -2078,7 +2078,8 @@ int main(int argc, char *argv[]) {
         tile->setGeometry(8, 8, 284, 302);
         QImage avatar(144, 144, QImage::Format_ARGB32_Premultiplied);
         avatar.fill(QColor(QStringLiteral("#4C8DFF")));
-        tile->displayWidget()->setFrame(makeCircularAvatarImage(avatar));
+        ImgDisplay::show(tile->displayWidget(), makeCircularAvatarImage(avatar),
+                               VideoStyles::memberAvatar());
         tile->updateProfile(QStringLiteral("王宇"), QString());
         capture(&panel, QStringLiteral("00-member-tile"), 300, 330);
     }
