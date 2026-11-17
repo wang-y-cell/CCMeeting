@@ -296,3 +296,6 @@ H.264 不可用时回退 MJPEG/Matroska、OpenGL 用 R8 单通道纹理。
 
 - 设置 / 会议记录 / 录制 / 资料四个页面仍是手写布局，尚未改用 `ui/primitives`；
 - `ui/foundation` 里仍有少量历史命名（如 `frameless_window` 模板参数风格），可后续统一。
+
+完整的重构待办（P0/P1/P2、每条的现状/方案/验收，以及"不需要再动"的清单）见
+[`docs/notes/待重构清单.md`](../../../docs/notes/待重构清单.md)。

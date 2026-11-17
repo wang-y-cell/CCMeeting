@@ -12,6 +12,7 @@
 | [`deploy/DEPLOY-SERVICES.md`](deploy/DEPLOY-SERVICES.md) | 一键部署（本地 → 云服务器）的**怎么用**：备份 → 同步 → 装依赖 → 装 unit → 重启 → 健康检查，失败自动回滚 | 要部署/更新/回滚服务端时 |
 | [`deploy/DEPLOY-JANUS-COTURN.md`](deploy/DEPLOY-JANUS-COTURN.md) | Janus 与 coturn 的**从零重建手册**：版本、编译依赖、配置、证书、systemd、端口/安全组、验证、迁移 | 要重装、迁移或排查 Janus / coturn 时 |
 | [`notes/以发现bug但是没有修复.md`](notes/以发现bug但是没有修复.md) | 已知但未修复的问题清单（2 条，均与头像有关） | 排查头像显示问题前先看 |
+| [`notes/待重构清单.md`](notes/待重构清单.md) | 客户端待重构项：P0/P1/P2 优先级、每条的现状证据 / 方案 / 风险 / 验收、明确"不需要再动"的部分、其他待决事项 | 计划重构、评估改动范围、避免重复评审时 |
 
 ---
 
@@ -70,6 +71,16 @@
 
 1. 注册用户时选择头像后无法显示；
 2. 进入房间后看不到其他人的头像。
+
+### [`待重构清单.md`](notes/待重构清单.md)
+
+面向代码维护的工作清单（**先记录、未改代码**），按优先级排列：
+
+- **P0**：`ui::SettingsPage` 拆分（870 行 / 4 类职责）；`MessageHub`+`Connection` 可靠性（假已发送、静默丢包、线程收尾、无心跳）；
+- **P1**：`MeetingWindow` 减重（1332 行 / 80 方法）；窗口缩放不连贯（逐帧 `setGeometry` + GL FBO 重建 + 聊天全量重排）；`MeetingMediaController` 拆分；
+- **P2**：`MainWindow` 抽会议协调器、`ChatController` 抽排版层、`MessageCodec` 表驱动、`main.cpp` 抽 bootstrap；
+- 附「明确不需要再动」清单（MeetingSession / MeetingVideo / ParticipantCard / repositories / PageRegistry / Storage 等）与统一验收标准（编译 + ctest + UiPreview 截图比对）；
+- 其他待决：认证服务旧 SHA-256 账号、截图基线入库、CI 首次实跑确认。
 
 ## 4. 仓库其他文档（不在 `docs/` 内，一并标位置）
 
