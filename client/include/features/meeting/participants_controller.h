@@ -8,7 +8,7 @@
 #include <unordered_map>
 
 class MeetingVideo;
-class Partner;
+class ParticipantCard;
 class QVBoxLayout;
 class QWidget;
 
@@ -29,7 +29,7 @@ public:
                            QObject *parent = nullptr);
 
     /** @brief 加入一位成员（已存在则返回现有对象） */
-    Partner *add(qint64 user_id);
+    ParticipantCard *add(qint64 user_id);
     /** @brief 移除成员并释放卡片 */
     void remove(qint64 user_id);
     /** @brief 清空全部成员 */
@@ -46,8 +46,12 @@ public:
     /** @brief 成员数量 */
     int count() const { return static_cast<int>(_partners.size()); }
 
-    /** @brief 选中某位成员为主画面 */
+    /** @brief 选中某位成员为主画面（用户点击） */
     void select_main(qint64 user_id);
+    /** @brief 当前主画面用户（0 表示无） */
+    qint64 main_user_id() const { return _mainUserId; }
+    /** @brief 会议开始/结束等场景由外层设置主画面（不发选中态副作用） */
+    void set_main_user(qint64 user_id);
 
     /** @brief 该成员视频停止：回退到头像 */
     void close_video(qint64 user_id);
@@ -68,7 +72,7 @@ private:
 
     QVBoxLayout *_tilesLayout = nullptr;
     MeetingVideo *_video = nullptr;
-    std::unordered_map<qint64, Partner *> _partners;
+    std::unordered_map<qint64, ParticipantCard *> _partners;
     QHash<qint64, quint64> _avatarGen;  ///< userId → 头像加载代数
     qint64 _mainUserId = 0;
 };

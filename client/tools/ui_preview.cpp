@@ -40,6 +40,7 @@
 #include "ui/foundation/frameless_window.h"
 #include <functional>
 #include "ui/composites/my_text_edit.h"
+#include "ui/composites/participant_card.h"
 #include <QImage>
 #include "ui/foundation/icon_provider.h"
 #include <QRegularExpression>
@@ -2044,9 +2045,8 @@ int main(int argc, char *argv[]) {
         panel.resize(300, 330);
         ui::ThemeManager::instance().apply_to(
             &panel, QStringLiteral(":/Style/source/meeting_widget.qss"));
-        auto *partner = new Partner(1002, &panel);
-        auto *tile = new PartnerTile(partner, &panel);
-        tile->setGeometry(8, 8, 284, 302);
+        auto *card = new ParticipantCard(1002, &panel);
+        card->setGeometry(8, 8, 284, 302);
         QImage frame(640, 360, QImage::Format_ARGB32_Premultiplied);
         for (int y = 0; y < frame.height(); ++y) {
             for (int x = 0; x < frame.width(); ++x) {
@@ -2056,9 +2056,9 @@ int main(int argc, char *argv[]) {
         }
         // setFrame 属于 RGBA 内容（会被当作头像 → 缩回 72），
         // 所以先送帧，再显式切到"视频模式"，等价于 I420 帧到达的效果
-        ImgDisplay::show(tile->displayWidget(), frame, VideoStyles::video());
-        tile->set_video_mode(true);
-        tile->updateProfile(QStringLiteral("李雷"));
+        ImgDisplay::show(card->displayWidget(), frame, VideoStyles::video());
+        card->set_video_mode(true);
+        card->set_profile(QStringLiteral("李雷"), QString());
         capture(&panel, QStringLiteral("00b-member-tile-video"), 300, 330);
     }
     // 单个成员卡片：验证头像为 72 方形、名字常驻显示
@@ -2068,14 +2068,13 @@ int main(int argc, char *argv[]) {
         panel.resize(300, 330);
         ui::ThemeManager::instance().apply_to(
             &panel, QStringLiteral(":/Style/source/meeting_widget.qss"));
-        auto *partner = new Partner(1001, &panel);
-        auto *tile = new PartnerTile(partner, &panel);
-        tile->setGeometry(8, 8, 284, 302);
+        auto *card = new ParticipantCard(1001, &panel);
+        card->setGeometry(8, 8, 284, 302);
         QImage avatar(144, 144, QImage::Format_ARGB32_Premultiplied);
         avatar.fill(QColor(QStringLiteral("#4C8DFF")));
-        ImgDisplay::show(tile->displayWidget(), makeCircularAvatarImage(avatar),
+        ImgDisplay::show(card->displayWidget(), makeCircularAvatarImage(avatar),
                                VideoStyles::memberAvatar());
-        tile->updateProfile(QStringLiteral("王宇"));
+        card->set_profile(QStringLiteral("王宇"), QString());
         capture(&panel, QStringLiteral("00-member-tile"), 300, 330);
     }
     {
