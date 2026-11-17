@@ -210,9 +210,7 @@ ui::MeetingWindow::~MeetingWindow() {
     // 先释放会话层：其内部控制器持有界面控件指针，必须在控件销毁前断开并释放
     _session.reset();
 
-    if (_cameraVideo) {
-        _cameraVideo->detachFromWidgets();
-    }
+    // 控件由卡片/窗口持有，CameraVideo 用 QPointer 记录，无需手工解绑
 }
 
 void ui::MeetingWindow::init_controllers_wiring() {
@@ -1228,7 +1226,6 @@ void ui::MeetingWindow::on_create_meeting_result(int roomno) {
 
         const qint64 selfId = local_user_id();
         main_user_id_ = selfId;
-        _cameraVideo->setLocalUserId(selfId);
         _cameraVideo->setMainUserId(main_user_id_);
         participants()->apply_profile(selfId, UserSession::instance().name(),
                               UserSession::instance().avatar());
@@ -1276,7 +1273,6 @@ void ui::MeetingWindow::on_join_meeting_result(int c) {
     } else if (c > 0) {
         const qint64 selfId = local_user_id();
         main_user_id_ = selfId;
-        _cameraVideo->setLocalUserId(selfId);
         _cameraVideo->setMainUserId(main_user_id_);
         participants()->apply_profile(selfId, UserSession::instance().name(),
                               UserSession::instance().avatar());

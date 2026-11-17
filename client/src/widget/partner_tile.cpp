@@ -1,6 +1,7 @@
 #include "partner_tile.h"
 
 #include "ui/foundation/theme_manager.h"
+#include "ImgDisplay.h"
 #include "avatar_image_loader.h"
 #include "partner.h"
 #include "videoglwidget.h"
@@ -9,11 +10,6 @@
 #include <QMouseEvent>
 #include <QResizeEvent>
 #include <QVBoxLayout>
-
-namespace {
-/// 头像边长：与主窗口侧栏头像（72）一致
-constexpr int kAvatarSide = 72;
-}  // namespace
 
 PartnerTile::PartnerTile(Partner *partner, QWidget *parent)
     : QWidget(parent), m_partner(partner) {
@@ -28,14 +24,12 @@ PartnerTile::PartnerTile(Partner *partner, QWidget *parent)
     setCursor(Qt::PointingHandCursor);
 
     m_displayWidget = new VideoGLWidget(this);
-    // 控件本身铺满卡片：头像用 FixedSize(72) 居中绘制，视频帧由
-    // ImgDisplay 切回 FitWidgetSmooth 后铺满整个卡片
-    m_displayWidget->setDrawMode(VideoGLWidget::DrawMode::FixedSize);
-    m_displayWidget->setFixedOutputSize(QSize(kAvatarSide, kAvatarSide));
+    // 控件本身铺满卡片：画面样式（头像 72×72 / 视频铺满）不在这里设置，
+    // 而是随每次显示由 ImgDisplay::show() 传入，避免出现两个样式来源。
     // 头像透明角落要和卡片底色一致，否则会出现异色方块
     m_displayWidget->setClearColor(ui::ThemeManager::instance().color(QStringLiteral("surface")));
-    m_displayWidget->setAlignment(Qt::AlignCenter);
-    m_displayWidget->setFixedSize(kAvatarSide, kAvatarSide);
+    const int avatarSide = VideoStyles::kMemberAvatarSide;
+    m_displayWidget->setFixedSize(avatarSide, avatarSide);
     m_displayWidget->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 
     m_nameLabel = new QLabel(this);
@@ -83,14 +77,13 @@ void PartnerTile::updateProfile(const QString &displayName,
 void PartnerTile::showAvatarImage(const QImage &image) {
     if (!m_displayWidget || image.isNull())
         return;
-    m_displayWidget->setDrawMode(VideoGLWidget::DrawMode::FixedSize);
-    m_displayWidget->setFixedOutputSize(QSize(kAvatarSide, kAvatarSide));
-    m_displayWidget->setAlignment(Qt::AlignCenter);
-    m_displayWidget->setFrame(makeCircularAvatarImage(image));
+    // 单次调用完成"样式 + 画面"，不再有 setDrawMode→setFrame 的顺序依赖
+    ImgDisplay::show(m_displayWidget, makeCircularAvatarImage(image),
+                     VideoStyles::memberAvatar());
 }
 
 void PartnerTile::loadAvatar(const QString &avatarUrl) {
-    const QSize targetSize(kAvatarSide, kAvatarSide);
+    const QSize targetSize(VideoStyles::kMemberAvatarSide, VideoStyles::kMemberAvatarSide);
     AvatarImageLoader::instance().load(
         avatarUrl, targetSize, this, [this](const QPixmap &pixmap) {
             if (!pixmap.isNull()) {
@@ -132,15 +125,15 @@ void PartnerTile::set_video_mode(bool video) {
         m_displayWidget->setMinimumSize(0, 0);
         m_displayWidget->setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
         m_displayWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-        m_displayWidget->setMinimumWidth(qMax(m_side - 8, kAvatarSide));
-        m_displayWidget->setFixedHeight(qMax(m_side - 22, kAvatarSide));
+        m_displayWidget->setMinimumWidth(qMax(m_side - 8, VideoStyles::kMemberAvatarSide));
+        m_displayWidget->setFixedHeight(qMax(m_side - 22, VideoStyles::kMemberAvatarSide));
         if (m_layout) {
             m_layout->setAlignment(m_displayWidget, Qt::Alignment());
         }
     } else {
         // 头像：固定 72×72 并居中
         m_displayWidget->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-        m_displayWidget->setFixedSize(kAvatarSide, kAvatarSide);
+        m_displayWidget->setFixedSize(VideoStyles::kMemberAvatarSide, VideoStyles::kMemberAvatarSide);
         if (m_layout) {
             m_layout->setAlignment(m_displayWidget, Qt::AlignCenter);
         }

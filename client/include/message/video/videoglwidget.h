@@ -11,6 +11,8 @@
 
 #include <xrtc/xrtc_defines.h>
 
+#include "video_style.h"
+
 /**
  * @brief 会议画面 OpenGL 控件。
  *
@@ -32,16 +34,11 @@ signals:
 
 public:
     /**
-     * @brief 画面相对控件的缩放与适配策略（与 ImgDisplay::DrawMode 对应）
+     * @brief 缩放适配策略（唯一定义在 video_style.h）
+     *
+     * 保留类内别名，历史写法 `VideoGLWidget::DrawMode::X` 仍然可用。
      */
-    enum class DrawMode {
-        FitWidgetSmooth,               ///< 等比缩放入控件，居中（默认）
-        FitWidgetFast,                 ///< 同 Fit，语义保留（GPU 侧无额外平滑差）
-        StretchWidget,                 ///< 拉伸铺满控件，不保持宽高比
-        FixedSize,                     ///< 按 setFixedOutputSize() 限制输出区域
-        ScaleToHeightFractionCentered, ///< 高度 = 控件高 × heightFraction，宽度等比
-        Custom                         ///< 当前实现等同铺满内容区
-    };
+    using DrawMode = ::DrawMode;
 
     /**
      * @brief 构造 OpenGL 画面控件
@@ -52,33 +49,15 @@ public:
     ~VideoGLWidget() override;
 
     /**
-     * @brief 设置绘制适配模式
-     * @param mode DrawMode
+     * @brief 一次性设置样式
+     *
+     * 样式与帧内容互相独立、先后顺序无关：样式变化会触发一次重绘，
+     * 所以「只改样式不换帧」也能立刻看到效果。
+     * @param style 样式值对象
      */
-    void setDrawMode(DrawMode mode);
-    /** @brief 当前绘制模式 */
-    DrawMode drawMode() const { return m_drawMode; }
-
-    /**
-     * @brief FixedSize 模式下的目标像素尺寸
-     * @param size 输出尺寸
-     */
-    void setFixedOutputSize(const QSize &size);
-    /**
-     * @brief 内容摆放区域（控件坐标）；无效 QRect 表示使用整个控件
-     * @param rect 内容矩形
-     */
-    void setContentRect(const QRect &rect);
-    /**
-     * @brief 画面在内容区内的对齐（如 Qt::AlignCenter）
-     * @param alignment 对齐标志
-     */
-    void setAlignment(Qt::Alignment alignment);
-    /**
-     * @brief ScaleToHeightFractionCentered：显示高度占控件高度的比例
-     * @param fraction (0, 1]
-     */
-    void setHeightFraction(double fraction);
+    void setStyle(const VideoStyle &style);
+    /** @brief 当前样式（副本） */
+    VideoStyle style() const;
 
     /**
      * @brief 提交一帧 I420 视频（移动语义；持有 frame.storage 至上传完成）

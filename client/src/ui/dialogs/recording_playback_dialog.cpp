@@ -1,6 +1,7 @@
 #include "ui/dialogs/recording_playback_dialog.h"
 
 #include "style_loader.h"
+#include "ImgDisplay.h"
 #include "videoglwidget.h"
 
 #include <QHBoxLayout>
@@ -77,8 +78,6 @@ void ui::RecordingPlaybackDialog::build_ui() {
     // ---- 画面 ----
     _video = new VideoGLWidget(this);
     _video->setObjectName(QStringLiteral("playbackVideo"));
-    _video->setDrawMode(VideoGLWidget::DrawMode::FitWidgetSmooth);
-    _video->setAlignment(Qt::AlignCenter);
     _video->setMinimumHeight(360);
     _video->installEventFilter(this);  // 双击画面 → 放大/还原
     root->addWidget(_video, 1);
@@ -116,7 +115,8 @@ void ui::RecordingPlaybackDialog::build_ui() {
                 }
                 const QImage image = frame.toImage();
                 if (!image.isNull()) {
-                    _video->setFrame(image);
+                    // 样式随帧传入，不需要提前设置
+                    ImgDisplay::show(_video, image, VideoStyles::video());
                 }
             });
     connect(_player, &QMediaPlayer::durationChanged, this,
