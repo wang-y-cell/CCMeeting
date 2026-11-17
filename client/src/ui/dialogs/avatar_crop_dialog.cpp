@@ -1,6 +1,7 @@
 #include "ui/dialogs/avatar_crop_dialog.h"
+
+#include "ui/foundation/theme_manager.h"
 #include "ui/dialogs/avatar_crop_canvas.h"
-#include "style_loader.h"
 
 #include <QHBoxLayout>
 #include <QLabel>
@@ -16,7 +17,7 @@ ui::AvatarCropDialog::AvatarCropDialog(const QImage &source, QWidget *parent)
     setResizable(false);
     setModal(true);
     resize(520, 620);
-    loadWidgetStyleSheet(
+    ui::ThemeManager::instance().apply_to(
         this, QStringLiteral(":/Style/source/avatar_crop_dialog.qss"));
 
     auto *root = new QVBoxLayout(this);

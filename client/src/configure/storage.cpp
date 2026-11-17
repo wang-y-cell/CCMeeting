@@ -15,14 +15,6 @@ namespace {
 constexpr const char *kConnection = "ccmeeting";
 constexpr const char *kSchemaVersion = "1";
 
-/// 需要从注册表迁移过来的历史键（与旧代码写入的键一一对应）
-const char *const kLegacyKeys[] = {
-    "video/deviceId",   "video/width",      "video/height",
-    "video/fps",        "video/autoPreview","audio/deviceId",
-    "audio/muteOnJoin", "audio/echoCancel", "ui/startPage",
-    "ui/showPageDesc",  "ui/soundEnabled",  "record/fps",
-    "record/saveDir",
-};
 
 QString type_name(const QVariant &value) {
     switch (static_cast<QMetaType::Type>(value.typeId())) {
@@ -147,93 +139,6 @@ bool Storage::ensure_schema() {
     return true;
 }
 
-void Storage::migrate_from_registry() {
-    QSqlDatabase db = QSqlDatabase::database(QString::fromLatin1(kConnection));
-
-    // 每次启动都做一次"补导入"：已存在于库中的键不会覆盖，
-    // 这样旧版客户端或手工改注册表写入的新值也能带过来。
-    int migrated = 0;
-    for (const char *key : kLegacyKeys) {
-        const QString name = QString::fromLatin1(key);
-        if (!_fallbackStore.contains(name)) {
-            continue;
-        }
-        const QVariant value = _fallbackStore.value(name);
-        QVariant existing;
-        {
-            QSqlQuery query(db);
-            query.prepare(QStringLiteral(
-                "SELECT value, type FROM app_settings WHERE key = ?"));
-            query.addBindValue(name);
-            if (query.exec() && query.next()) {
-                existing = from_text(query.value(0).toString(),
-                                     query.value(1).toString());
-            }
-        }
-        if (existing.isValid()) {
-            continue;  // 已有新值，不覆盖
-        }
-        QSqlQuery insert(db);
-        insert.prepare(QStringLiteral(
-            "INSERT OR REPLACE INTO app_settings(key, value, type) "
-            "VALUES(?, ?, ?)"));
-        insert.addBindValue(name);
-        insert.addBindValue(to_text(value));
-        insert.addBindValue(type_name(value));
-        if (insert.exec()) {
-            ++migrated;
-        }
-    }
-
-    // 旧版把凭据存在 app_settings 的 login/* 里，搬到 credentials 表后清掉，
-    // 避免同一份 DPAPI 密文在库里存两份。
-    {
-        QSqlQuery hasCreds(db);
-        bool needCreds = true;
-        if (hasCreds.exec(QStringLiteral(
-                "SELECT COUNT(*) FROM credentials WHERE id = 1")) &&
-            hasCreds.next()) {
-            needCreds = hasCreds.value(0).toInt() == 0;
-        }
-        QSqlQuery legacyUser(db);
-        legacyUser.prepare(QStringLiteral(
-            "SELECT value FROM app_settings WHERE key='login/username'"));
-        QSqlQuery legacyPass(db);
-        legacyPass.prepare(QStringLiteral(
-            "SELECT value FROM app_settings WHERE key='login/password'"));
-        const bool hasUser = legacyUser.exec() && legacyUser.next();
-        const bool hasPass = legacyPass.exec() && legacyPass.next();
-        if (needCreds && hasUser && hasPass) {
-            QSqlQuery insert(db);
-            insert.prepare(QStringLiteral(
-                "INSERT OR REPLACE INTO credentials(id, username, secret, "
-                "updated_at) VALUES(1, ?, ?, ?)"));
-            insert.addBindValue(legacyUser.value(0).toString());
-            insert.addBindValue(legacyPass.value(0).toString());
-            insert.addBindValue(
-                QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
-            insert.exec();
-            spdlog::info("[Storage] 旧凭据已搬入 credentials 表");
-        }
-        QSqlQuery drop(db);
-        if (drop.exec(QStringLiteral(
-                "DELETE FROM app_settings WHERE key LIKE 'login/%'"))) {
-            spdlog::info("[Storage] 已清理 app_settings 中的 {} 条 login/* 残留",
-                         drop.numRowsAffected());
-        }
-    }
-
-    QSqlQuery mark(db);
-    mark.prepare(QStringLiteral(
-        "INSERT OR REPLACE INTO meta(key, value) "
-        "VALUES('migrated_registry_v1', '1')"));
-    mark.exec();
-    if (migrated > 0) {
-        spdlog::info("[Storage] 从注册表补导入 {} 项偏好（旧数据保留）",
-                     migrated);
-    }
-}
-
 bool Storage::open() {
     if (_open) {
         return true;
@@ -258,25 +163,20 @@ bool Storage::open() {
                                                 QString::fromLatin1(kConnection));
     db.setDatabaseName(_path);
     if (!db.open()) {
-        spdlog::error("[Storage] 打开数据库失败: {} → 降级为注册表存储",
+        spdlog::error("[Storage] 打开数据库失败，本次运行不持久化: {}",
                       db.lastError().text().toUtf8().constData());
-        _fallback = true;
         return false;
     }
 
     exec_pragma();
     if (!ensure_schema()) {
-        spdlog::error("[Storage] 建表失败 → 降级为注册表存储");
+        spdlog::error("[Storage] 建表失败，本次运行不持久化");
         db.close();
-        _fallback = true;
         return false;
     }
 
     _open = true;
-    _fallback = false;
     spdlog::info("[Storage] 数据库就绪: {}", _path.toUtf8().constData());
-
-    migrate_from_registry();
     return true;
 }
 
@@ -289,7 +189,7 @@ QSqlDatabase Storage::connection() const {
 
 QVariant Storage::value(const QString &key, const QVariant &def) {
     if (!_open) {
-        return _fallbackStore.contains(key) ? _fallbackStore.value(key) : def;
+        return def;
     }
     QSqlDatabase db = QSqlDatabase::database(QString::fromLatin1(kConnection));
     QSqlQuery query(db);
@@ -304,7 +204,8 @@ QVariant Storage::value(const QString &key, const QVariant &def) {
 
 void Storage::setValue(const QString &key, const QVariant &value) {
     if (!_open) {
-        _fallbackStore.setValue(key, value);
+        spdlog::warn("[Storage] 存储不可用，忽略写入 key={}",
+                     key.toUtf8().constData());
         return;
     }
     QSqlDatabase db = QSqlDatabase::database(QString::fromLatin1(kConnection));
@@ -324,7 +225,6 @@ void Storage::setValue(const QString &key, const QVariant &value) {
 
 void Storage::remove(const QString &key) {
     if (!_open) {
-        _fallbackStore.remove(key);
         return;
     }
     QSqlDatabase db = QSqlDatabase::database(QString::fromLatin1(kConnection));
@@ -341,18 +241,7 @@ bool Storage::hasCredentials() {
 
 bool Storage::loadCredentials(Credentials &out) {
     if (!_open) {
-        const QString user = _fallbackStore.value(QStringLiteral("login/username"))
-                                 .toString();
-        const QString secret =
-            _fallbackStore.value(QStringLiteral("login/password")).toString();
-        const bool autoLogin =
-            _fallbackStore.value(QStringLiteral("login/auto"), false).toBool();
-        if (!autoLogin || user.isEmpty() || secret.isEmpty()) {
-            return false;
-        }
-        out.username = user;
-        out.secret = secret;
-        return true;
+        return false;
     }
 
     QSqlDatabase db = QSqlDatabase::database(QString::fromLatin1(kConnection));
@@ -369,11 +258,8 @@ bool Storage::loadCredentials(Credentials &out) {
 
 bool Storage::saveCredentials(const QString &username, const QString &secret) {
     if (!_open) {
-        _fallbackStore.setValue(QStringLiteral("login/username"), username);
-        _fallbackStore.setValue(QStringLiteral("login/password"), secret);
-        _fallbackStore.setValue(QStringLiteral("login/auto"), true);
-        _fallbackStore.sync();
-        return true;
+        spdlog::warn("[Storage] 存储不可用，跳过保存凭据");
+        return false;
     }
     QSqlDatabase db = QSqlDatabase::database(QString::fromLatin1(kConnection));
     QSqlQuery query(db);
@@ -393,10 +279,6 @@ bool Storage::saveCredentials(const QString &username, const QString &secret) {
 
 void Storage::clearCredentials() {
     if (!_open) {
-        _fallbackStore.remove(QStringLiteral("login/username"));
-        _fallbackStore.remove(QStringLiteral("login/password"));
-        _fallbackStore.remove(QStringLiteral("login/auto"));
-        _fallbackStore.sync();
         return;
     }
     QSqlDatabase db = QSqlDatabase::database(QString::fromLatin1(kConnection));

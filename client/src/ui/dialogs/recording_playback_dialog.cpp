@@ -1,6 +1,7 @@
 #include "ui/dialogs/recording_playback_dialog.h"
 
-#include "style_loader.h"
+#include "ui/foundation/theme_manager.h"
+
 #include "ImgDisplay.h"
 #include "videoglwidget.h"
 
@@ -44,7 +45,7 @@ ui::RecordingPlaybackDialog::RecordingPlaybackDialog(const RecordingEntry &entry
     setResizable(true);
     setMaximizable(true);
     build_ui();
-    loadWidgetStyleSheet(
+    ui::ThemeManager::instance().apply_to(
         this, QStringLiteral(":/Style/source/recording_playback_dialog.qss"));
     resize(960, 620);
 }

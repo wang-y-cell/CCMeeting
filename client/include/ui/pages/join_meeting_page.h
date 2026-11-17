@@ -2,7 +2,7 @@
 
 /**
  * @file join_meeting_page.h
- * @brief 加入会议页（ui/pages 迁移示例）
+ * @brief 加入会议页
  *
  * 这是"页面只做视图"的样板：
  *  - 不持有网络/存储对象，只发信号 join_requested(roomNo)

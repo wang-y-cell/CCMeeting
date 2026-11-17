@@ -219,73 +219,6 @@ void on_terminate() {
 
 }  // namespace
 
-/**
- * @brief 迁移旧版用户数据目录
- *
- * 旧版本没有设置应用名，数据落在 %LOCALAPPDATA%\CloudMeeting；
- * 现在固定为 %LOCALAPPDATA%\CCMeeting。检测到旧目录且新目录不存在时整体搬迁，
- * 失败则退化为复制（旧目录保留），避免用户丢会议记录/缓存。
- */
-static void migrate_legacy_data_dir() {
-    const QString local =
-        QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
-    if (local.isEmpty()) {
-        return;
-    }
-    const QDir parent = QFileInfo(local).absoluteDir();
-    const QString legacy = parent.filePath(QStringLiteral("CloudMeeting"));
-    if (!QFileInfo::exists(legacy)) {
-        return;
-    }
-    // 一次性标记：迁移过就不再补拷，否则已被改名/入库的旧文件会被反复拷回来
-    const QString marker =
-        QDir(local).filePath(QStringLiteral(".legacy_migrated"));
-    if (QFileInfo::exists(marker)) {
-        return;
-    }
-
-    QDir dir;
-    if (!QFileInfo::exists(local)) {
-        if (dir.rename(legacy, local)) {
-            spdlog::info("[main] 用户数据目录已整体迁移 {} -> {}",
-                         legacy.toUtf8().constData(),
-                         local.toUtf8().constData());
-            QFile markerFile(QDir(local).filePath(
-                QStringLiteral(".legacy_migrated")));
-            if (markerFile.open(QIODevice::WriteOnly)) {
-                markerFile.write(QDateTime::currentDateTimeUtc()
-                                     .toString(Qt::ISODate)
-                                     .toUtf8());
-            }
-            return;
-        }
-    }
-
-    // 新目录已存在（或整体搬迁失败）：只补缺失的文件，不覆盖已有数据
-    int copied = 0;
-    const QDir src(legacy);
-    QDir().mkpath(local);
-    for (const QFileInfo &info :
-         src.entryInfoList(QDir::Files | QDir::NoDotAndDotDot)) {
-        const QString target = QDir(local).filePath(info.fileName());
-        if (QFileInfo::exists(target)) {
-            continue;
-        }
-        if (QFile::copy(info.absoluteFilePath(), target)) {
-            ++copied;
-        }
-    }
-    if (copied > 0) {
-        spdlog::info("[main] 从旧目录补齐 {} 个数据文件（旧目录保留）", copied);
-    }
-    // 写标记：下次启动不再扫描旧目录
-    QFile markerFile(marker);
-    if (markerFile.open(QIODevice::WriteOnly)) {
-        markerFile.write(QDateTime::currentDateTimeUtc()
-                             .toString(Qt::ISODate)
-                             .toUtf8());
-    }
-}
 int main(int argc, char *argv[]) {
     //在程序因为未捕获的异常而即将崩溃（调用 std::terminate）时，
     //拦截这个异常，提取出有用的错误信息并记录到日志中，最后再安全地终止程序
@@ -306,7 +239,6 @@ int main(int argc, char *argv[]) {
     // AppLocalDataLocation 规则是 <AppData>/<org>/<app>，会多出一层目录。
 
     qInstallMessageHandler(qt_message_handler);
-    migrate_legacy_data_dir();
 
     // applicationDirPath 在部分启动方式下可能为空，用 argv[0] 兜底
     QString app_dir = QCoreApplication::applicationDirPath();
@@ -353,13 +285,12 @@ int main(int argc, char *argv[]) {
     spdlog::info("[main] log file={}", qutf8(log_path));
     spdlog::info("[main] cwd={}", qutf8(QDir::currentPath()));
 
-    // 统一存储：SQLite（失败自动降级到注册表）
+    // 统一存储：SQLite（单一后端；打开失败则本次运行不持久化）
     {
         Storage &storage = Storage::instance();
         storage.open();
-        spdlog::info("[main] storage db={} open={} fallback={}",
-                     qutf8(storage.databasePath()), storage.isOpen() ? 1 : 0,
-                     storage.usingFallback() ? 1 : 0);
+        spdlog::info("[main] storage db={} open={}",
+                     qutf8(storage.databasePath()), storage.isOpen() ? 1 : 0);
     }
     spdlog::info("[main] quitOnLastWindowClosed(initial)={}",
                  app.quitOnLastWindowClosed());

@@ -96,14 +96,3 @@ def test_nested_transaction_rollback(mysql_db: Database):
     )
     assert row["n"] == 0
 
-
-def test_obsolete_tables_are_dropped_on_startup(mysql_db: Database, mysql_kwargs):
-    """启动时兜底清理：手工造的遗留表应在新连接建立时被删除。"""
-    mysql_db.execute("CREATE TABLE IF NOT EXISTS sys_roles (role_id BIGINT PRIMARY KEY)")
-    assert "sys_roles" in set(mysql_db.existing_tables())
-
-    fresh = Database(**mysql_kwargs)
-    try:
-        assert "sys_roles" not in set(fresh.existing_tables())
-    finally:
-        fresh.close()

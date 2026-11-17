@@ -97,14 +97,6 @@ bool Codec::is_text_type(MessageType type) {
 
 const char* Codec::type_name(MessageType type) {
     switch (type) {
-        case MessageType::ImgSend:
-            return "img_send";
-        case MessageType::ImgRecv:
-            return "img_recv";
-        case MessageType::AudioSend:
-            return "audio_send";
-        case MessageType::AudioRecv:
-            return "audio_recv";
         case MessageType::TextSend:
             return "text_send";
         case MessageType::TextRecv:
@@ -139,8 +131,6 @@ const char* Codec::type_name(MessageType type) {
 
 std::optional<MessageType> Codec::type_from_name(const std::string& name) {
     static const MessageType kAll[] = {
-        MessageType::ImgSend,        MessageType::ImgRecv,
-        MessageType::AudioSend,      MessageType::AudioRecv,
         MessageType::TextSend,       MessageType::TextRecv,
         MessageType::CreateMeeting,  MessageType::ExitMeeting,
         MessageType::JoinMeeting,    MessageType::CloseCamera,

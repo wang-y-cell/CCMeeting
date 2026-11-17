@@ -1,13 +1,13 @@
 #ifndef CONFIGURE_MEETING_REPOSITORY_H
 #define CONFIGURE_MEETING_REPOSITORY_H
 
-#include "configure/meeting_history.h"
+#include "configure/meeting_record.h"
 
 /**
  * @brief 会议记录的读写接口（界面层唯一可见入口）
  *
  * 背景：页面原先直接调 `MeetingHistory::xxx()` 静态函数，等于把
- * 「SQLite 优先、JSON 回退」这套持久化实现暴露给界面。改成接口后：
+ * 「SQLite 存储细节」暴露给界面。改成接口后：
  *   - 生产实现 `LocalMeetingRepository` 委托给 `MeetingHistory`
  *   - 测试可注入内存实现，不碰真实数据库/文件
  *

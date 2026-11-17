@@ -1,10 +1,11 @@
 #include "ui/dialogs/edit_profile_dialog.h"
 
+#include "ui/foundation/theme_manager.h"
+
 #include "ui/dialogs/avatar_crop_dialog.h"
 #include "avatar_image_loader.h"
 #include "configure/client_config.h"
 #include "configure/user_session.h"
-#include "style_loader.h"
 
 #include <QBuffer>
 #include <QComboBox>
@@ -66,7 +67,7 @@ ui::EditProfileDialog::EditProfileDialog(QWidget *parent)
     setModal(true);
 
     ui.setupUi(this);
-    loadWidgetStyleSheet(
+    ui::ThemeManager::instance().apply_to(
         this, QStringLiteral(":/Style/source/edit_profile_dialog.qss"));
     loadFromSession();
 

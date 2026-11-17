@@ -1,10 +1,11 @@
 #include "ui/pages/login_window.h"
 
+#include "ui/foundation/theme_manager.h"
+
 #include "login_store.h"
 
 #include "configure/client_config.h"
 #include "configure/user_session.h"
-#include "style_loader.h"
 
 #include <QJsonDocument>
 #include <QLabel>
@@ -92,7 +93,7 @@ ui::LoginWindow::LoginWindow(QWidget *parent)
 }
 
 void ui::LoginWindow::set_style() {
-    loadWidgetStyleSheet(this, QStringLiteral(":/Style/source/login.qss"));
+    ui::ThemeManager::instance().apply_to(this, QStringLiteral(":/Style/source/login.qss"));
 }
 
 void ui::LoginWindow::showRegisterPage() {

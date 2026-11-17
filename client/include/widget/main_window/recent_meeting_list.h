@@ -1,7 +1,7 @@
 #ifndef RECENT_MEETING_LIST_H
 #define RECENT_MEETING_LIST_H
 
-#include "meeting_history.h"
+#include "configure/meeting_record.h"
 
 #include <QFrame>
 

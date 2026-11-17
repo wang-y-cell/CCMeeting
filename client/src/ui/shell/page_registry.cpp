@@ -1,4 +1,5 @@
 #include "ui/shell/page_registry.h"
+#include "ui/pages/page.h"
 
 #include <algorithm>
 
@@ -19,7 +20,7 @@ void PageRegistry::add(const PageMeta &meta, Factory factory) {
     m_entries.insert(meta.id, std::move(entry));
 }
 
-QWidget *PageRegistry::create(const QString &id, QWidget *parent) {
+Page *PageRegistry::create(const QString &id, QWidget *parent) {
     auto it = m_entries.find(id);
     if (it == m_entries.end()) {
         spdlog::warn("[PageRegistry] 未登记的页面: {}", id.toUtf8().constData());
@@ -41,7 +42,7 @@ QWidget *PageRegistry::create(const QString &id, QWidget *parent) {
     return it->instance;
 }
 
-QWidget *PageRegistry::find(const QString &id) const {
+Page *PageRegistry::find(const QString &id) const {
     const auto it = m_entries.find(id);
     return (it == m_entries.end()) ? nullptr : it->instance;
 }

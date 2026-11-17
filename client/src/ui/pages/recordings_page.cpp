@@ -1,7 +1,8 @@
 #include "ui/pages/recordings_page.h"
 
+#include "ui/foundation/theme_manager.h"
+
 #include "configure/recording_repository.h"
-#include "style_loader.h"
 
 #include <QDesktopServices>
 #include <QFrame>
@@ -17,7 +18,7 @@
 ui::RecordingsPage::RecordingsPage(QWidget *parent) : Page(parent) {
     setObjectName(QStringLiteral("RecordingsPage"));
     build_ui();
-    loadWidgetStyleSheet(this, QStringLiteral(":/Style/source/stack_recordings.qss"));
+    ui::ThemeManager::instance().apply_to(this, QStringLiteral(":/Style/source/stack_recordings.qss"));
     refresh();
 }
 

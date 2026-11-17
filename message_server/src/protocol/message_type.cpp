@@ -4,14 +4,6 @@ namespace protocol {
 
 std::string get_type_name(MessageType type) {
     switch (type) {
-        case MessageType::ImgSend:
-            return "ImgSend(reserved)";
-        case MessageType::ImgRecv:
-            return "ImgRecv(reserved)";
-        case MessageType::AudioSend:
-            return "AudioSend(reserved)";
-        case MessageType::AudioRecv:
-            return "AudioRecv(reserved)";
         case MessageType::TextSend:
             return "TextSend";
         case MessageType::TextRecv:

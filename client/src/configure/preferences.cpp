@@ -5,7 +5,7 @@
 namespace {
 
 /**
- * @brief 默认实现：委托给 Storage（SQLite → QSettings 降级）
+ * @brief 默认实现：委托给 Storage（SQLite 单一后端）
  *
  * 这里刻意只做转发，不加业务规则：偏好键的语义属于调用方。
  */

@@ -97,9 +97,7 @@ CCMEETING_MYSQL_HOST / _PORT / _USER / _PASSWORD / _DATABASE
 ```
 
 **表结构**：3 张表 —— `sys_users`、`sys_user_profiles`、`sys_user_login_logs`。
-启动时会自动建表（`CREATE TABLE IF NOT EXISTS`），并**兜底删除**历史遗留的
-RBAC 四张表（`sys_roles` / `sys_permissions` / `sys_user_roles` /
-`sys_role_permissions`），因此旧库升级不需要手工清理。
+启动时只做 `CREATE TABLE IF NOT EXISTS`，不会改动库里已有的其他表。
 
 ### 建库（一次性）
 
@@ -128,7 +126,9 @@ FLUSH PRIVILEGES;
 
 迁移完成后 `data/auth.db` 可以归档删除；服务端不再读取它。
 
-### 清理历史遗留表（可选）
+### 清理历史遗留表（手动，可选）
+
+服务端不再自动删除任何表；需要清理旧库里的 RBAC 表时手动执行：
 
 ```powershell
 .\.venv\Scripts\python.exe tools\prune_unused_tables.py --dry-run
@@ -148,7 +148,7 @@ $env:CCMEETING_MYSQL_PASSWORD = "..."
 ```
 
 实测（本地 MySQL 8.0）：建表（无 RBAC 表）、行对象双形态（下标/列名）、
-`datetime('now')` → `NOW()`、嵌套事务回滚、启动时清理遗留表、
+`datetime('now')` → `NOW()`、嵌套事务回滚、
 整条 HTTP 链路（注册 → 登录 → 改资料 → 头像）全部通过。
 ## 4. 切换方式（客户端零改动）
 

@@ -33,12 +33,6 @@ signals:
     void content_kind_changed(bool video);
 
 public:
-    /**
-     * @brief 缩放适配策略（唯一定义在 video_style.h）
-     *
-     * 保留类内别名，历史写法 `VideoGLWidget::DrawMode::X` 仍然可用。
-     */
-    using DrawMode = ::DrawMode;
 
     /**
      * @brief 构造 OpenGL 画面控件

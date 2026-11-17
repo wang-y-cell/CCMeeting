@@ -1,13 +1,14 @@
 #include "main_window.h"
-#include "ui/foundation/icon_provider.h"
+
 #include "ui/foundation/theme_manager.h"
+#include "ui/foundation/icon_provider.h"
 #include "avatar_image_loader.h"
 #include "configure/client_config.h"
 #include "configure/login_store.h"
 #include "configure/meeting_repository.h"
+#include "configure/preferences.h"
 #include "recent_meeting_list.h"
 #include "configure/user_session.h"
-#include "style_loader.h"
 
 #include <QEvent>
 #include <QLabel>
@@ -195,7 +196,6 @@ void main_window::onProfileAvatarUpdated() {
 void main_window::register_pages() {
     // 侧栏顺序 = order 顺序，必须是 create(0) join(1) history(2)
     // recordings(3) settings(4)，与 sideNav 的行号一一对应。
-    // 历史遗留页面暂时仍用具体类型；迁移到 ui/pages/ 时只改工厂这一行。
     m_pages.add({QStringLiteral("create"), tr("创建会议"),
                  QStringLiteral("video"), 0, true},
                 [this](QWidget *) { return new ui::CreateMeetingPage(this); });
@@ -221,7 +221,7 @@ void main_window::register_pages() {
 void main_window::build_pages() {
     // 1) 按注册表创建全部页面，并按注册顺序加入内容栈
     for (const ui::PageMeta &meta : m_pages.all()) {
-        QWidget *page = m_pages.create(meta.id, this);
+        ui::Page *page = m_pages.create(meta.id, this);
         if (page == nullptr) {
             continue;
         }
@@ -321,14 +321,10 @@ void main_window::init_ui() {
     register_pages();
     build_pages();
 
-    connect(setting_widget, &ui::SettingsPage::uiPrefsChanged, this, [this]() {
-        // 预留：主题等后续可在此刷新
-        Q_UNUSED(this);
-    });
 
     {
-        Storage &s = Storage::instance();
-        const int startPage = s.value(QStringLiteral("ui/startPage"), 0).toInt();
+        const int startPage =
+            preferences().value(QStringLiteral("ui/startPage"), 0).toInt();
         if (startPage >= 0 && startPage < ui.sideNav->count()) {
             ui.sideNav->setCurrentRow(startPage);
         }

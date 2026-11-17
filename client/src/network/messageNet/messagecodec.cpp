@@ -147,14 +147,6 @@ bool is_text_type(MSG_TYPE type) {
 
 const char *MessageCodec::type_name(MSG_TYPE type) {
     switch (type) {
-    case IMG_SEND:
-        return "img_send";
-    case IMG_RECV:
-        return "img_recv";
-    case AUDIO_SEND:
-        return "audio_send";
-    case AUDIO_RECV:
-        return "audio_recv";
     case TEXT_SEND:
         return "text_send";
     case TEXT_RECV:
@@ -193,8 +185,6 @@ const char *MessageCodec::type_name(MSG_TYPE type) {
 
 std::optional<MSG_TYPE> MessageCodec::type_from_name(const QString &name) {
     static const MSG_TYPE kAll[] = {
-        IMG_SEND,       IMG_RECV,
-        AUDIO_SEND,     AUDIO_RECV,
         TEXT_SEND,      TEXT_RECV,
         CREATE_MEETING, EXIT_MEETING,
         JOIN_MEETING,   CLOSE_CAMERA,
@@ -255,11 +245,6 @@ MSG_TYPE MessageCodec::to_wire_type(MessageKind kind) {
 
 MessageKind MessageCodec::from_wire_type(MSG_TYPE type) {
     switch (type) {
-    case IMG_SEND:
-    case IMG_RECV:
-    case AUDIO_SEND:
-    case AUDIO_RECV:
-        return MessageKind::OtherNetError;  // reserved legacy media
     case TEXT_SEND:
         return MessageKind::SendText;
     case TEXT_RECV:
@@ -416,13 +401,6 @@ MessagePtr MessageCodec::decode_payload(const QByteArray &payload,
         return decode_join_meeting_response(payload);
     case PARTNER_JOIN2:
         return decode_partner_join2(payload);
-    case IMG_SEND:
-    case IMG_RECV:
-    case AUDIO_SEND:
-    case AUDIO_RECV:
-        spdlog::debug("[MessageCodec] ignore legacy media type={}",
-                      static_cast<int>(msgtype));
-        return nullptr;
     case TEXT_RECV:
         return decode_text_recv(payload, user_id);
     case USER_PROFILE:
