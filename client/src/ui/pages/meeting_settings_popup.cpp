@@ -4,7 +4,7 @@
 
 #include "ui/foundation/window_effects.h"
 
-#include "netheader.h"
+#include "protocol/net_header.h"
 
 #include <QCheckBox>
 #include <QFrame>

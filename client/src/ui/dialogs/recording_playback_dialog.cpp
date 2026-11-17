@@ -2,8 +2,8 @@
 
 #include "ui/foundation/theme_manager.h"
 
-#include "ImgDisplay.h"
-#include "videoglwidget.h"
+#include "media/video/img_display.h"
+#include "media/video/video_gl_widget.h"
 
 #include <QHBoxLayout>
 #include <QImage>

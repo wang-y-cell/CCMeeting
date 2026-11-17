@@ -1,6 +1,6 @@
 #include "ui/pages/meeting_history_page.h"
 
-#include "configure/meeting_repository.h"
+#include "data/meeting_repository.h"
 
 
 #include <QFrame>

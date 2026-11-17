@@ -1,7 +1,7 @@
 #include <QtTest>
 
 #include "features/meeting/meeting_protocol_dispatcher.h"
-#include "message.h"
+#include "protocol/message.h"
 
 #include <memory>
 

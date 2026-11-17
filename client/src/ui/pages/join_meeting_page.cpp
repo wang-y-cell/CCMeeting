@@ -4,7 +4,7 @@
 #include "ui/primitives/field_label.h"
 #include "ui/primitives/page_header.h"
 
-#include "recent_meeting_list.h"
+#include "ui/composites/recent_meeting_list.h"
 
 #include <QFrame>
 #include <QHBoxLayout>

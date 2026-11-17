@@ -1,6 +1,6 @@
 #include <QtTest>
 
-#include "message.h"
+#include "protocol/message.h"
 
 #include <memory>
 #include <string>

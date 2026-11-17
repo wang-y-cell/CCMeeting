@@ -1,6 +1,6 @@
 #include "ui/pages/create_meeting_page.h"
 
-#include "recent_meeting_list.h"
+#include "ui/composites/recent_meeting_list.h"
 
 #include <QLineEdit>
 #include <QMessageBox>

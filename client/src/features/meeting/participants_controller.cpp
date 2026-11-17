@@ -1,10 +1,10 @@
 #include "features/meeting/participants_controller.h"
 
-#include "avatar_image_loader.h"
-#include "meeting_video.h"
-#include "partner.h"
-#include "partner_tile.h"
-#include "videoglwidget.h"
+#include "media/avatar_service.h"
+#include "media/video/meeting_video.h"
+#include "domain/partner.h"
+#include "ui/composites/partner_tile.h"
+#include "media/video/video_gl_widget.h"
 
 #include <QVBoxLayout>
 
@@ -100,7 +100,7 @@ void ParticipantsController::clear() {
 void ParticipantsController::load_avatar(qint64 user_id, const QString &url) {
     const quint64 generation = ++_avatarGen[user_id];
 
-    AvatarImageLoader::instance().load(
+    AvatarService::instance().load(
         url, QSize(kAvatarSourcePx, kAvatarSourcePx), this,
         [this, user_id, generation](const QPixmap &pixmap) {
             if (_avatarGen.value(user_id) != generation) {

@@ -66,15 +66,8 @@ qt_add_executable(CloudMeetingClient
 )
 
 target_include_directories(CloudMeetingClient PRIVATE
+    # 单一 include 根：头文件一律写全路径（core/… / media/… / protocol/… / ui/…）
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/configure"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/message"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/message/video"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/message/text"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/network"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/network/messageNet"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/widget"
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/widget/main_window"
 )
 
 target_link_libraries(CloudMeetingClient
@@ -164,14 +157,6 @@ if(BUILD_UI_PREVIEW)
 
     target_include_directories(UiPreview PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
-        "${CMAKE_CURRENT_SOURCE_DIR}/include/configure"
-        "${CMAKE_CURRENT_SOURCE_DIR}/include/message"
-        "${CMAKE_CURRENT_SOURCE_DIR}/include/message/video"
-        "${CMAKE_CURRENT_SOURCE_DIR}/include/message/text"
-        "${CMAKE_CURRENT_SOURCE_DIR}/include/network"
-        "${CMAKE_CURRENT_SOURCE_DIR}/include/network/messageNet"
-        "${CMAKE_CURRENT_SOURCE_DIR}/include/widget"
-                    "${CMAKE_CURRENT_SOURCE_DIR}/include/widget/main_window"
     )
 
     target_link_libraries(UiPreview

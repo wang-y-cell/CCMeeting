@@ -1,7 +1,7 @@
 #ifndef APP_MEETING_SESSION_H
 #define APP_MEETING_SESSION_H
 
-#include "networkmanager.h"
+#include "protocol/network_manager.h"
 
 #include <QObject>
 #include <memory>

@@ -1,8 +1,8 @@
 #ifndef RECORDING_PLAYBACK_DIALOG_H
 #define RECORDING_PLAYBACK_DIALOG_H
 
-#include "frameless_window.h"
-#include "recording_library.h"
+#include "ui/foundation/frameless_window.h"
+#include "data/recording_library.h"
 
 #include <QWidget>
 

@@ -1,7 +1,7 @@
 #ifndef MEETING_PROTOCOL_DISPATCHER_H
 #define MEETING_PROTOCOL_DISPATCHER_H
 
-#include "message.h"
+#include "protocol/message.h"
 
 #include <QList>
 #include <QObject>

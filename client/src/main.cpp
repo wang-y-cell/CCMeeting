@@ -23,14 +23,14 @@
 #include <spdlog/spdlog.h>
 #include <string>
 
-#include "configure/client_config.h"
-#include "configure/preferences.h"
-#include "configure/storage.h"
-#include "configure/user_session.h"
-#include "avatar_image_loader.h"
+#include "config/client_config.h"
+#include "config/preferences.h"
+#include "core/storage.h"
+#include "config/user_session.h"
+#include "media/avatar_service.h"
 #include "ui/pages/login_window.h"
-#include "main_window.h"
-#include "screen.h"
+#include "ui/shell/main_window.h"
+#include "core/screen.h"
 #include "ui/foundation/font_registry.h"
 #include "ui/foundation/window_effects.h"
 #include "ui/foundation/theme_manager.h"
@@ -359,9 +359,9 @@ int main(int argc, char *argv[]) {
     spdlog::info("[main] ClientConfig::load begin");
     flush_log();
     ClientConfig::instance().load();
-    AvatarImageLoader::instance().initialize();
+    AvatarService::instance().initialize();
     QObject::connect(&app, &QCoreApplication::aboutToQuit, []() {
-        AvatarImageLoader::instance().shutdown();
+        AvatarService::instance().shutdown();
     });
     const auto &auth = ClientConfig::instance().auth();
     const auto &meeting = ClientConfig::instance().meeting_server();

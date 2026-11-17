@@ -1,7 +1,7 @@
 #ifndef CHAT_CONTROLLER_H
 #define CHAT_CONTROLLER_H
 
-#include "chatmessage.h"
+#include "ui/composites/chat_message.h"
 
 #include <QObject>
 #include <QString>

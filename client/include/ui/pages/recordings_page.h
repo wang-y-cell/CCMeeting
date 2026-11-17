@@ -3,7 +3,7 @@
 
 #include "ui/pages/page.h"
 
-#include "recording_library.h"
+#include "data/recording_library.h"
 
 #include <QWidget>
 

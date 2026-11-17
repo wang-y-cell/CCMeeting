@@ -1,7 +1,7 @@
 #include "ui/pages/user_profile_page.h"
 
-#include "avatar_image_loader.h"
-#include "configure/user_session.h"
+#include "media/avatar_service.h"
+#include "config/user_session.h"
 #include "ui/dialogs/edit_profile_dialog.h"
 
 #include <QLabel>
@@ -41,7 +41,7 @@ void ui::UserProfilePage::refreshFromSession() {
     ui.valueEmail->setText(dashIfEmpty(session.email()));
     ui.valueInfo->setText(dashIfEmpty(session.info()));
 
-    AvatarImageLoader::instance().load(
+    AvatarService::instance().load(
         session.avatar(), ui.profileAvatarLarge->size(), this,
         [this, monogram = session.name().left(1)](const QPixmap &pixmap) {
             if (!ui.profileAvatarLarge) {

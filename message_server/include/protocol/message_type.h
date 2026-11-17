@@ -32,7 +32,7 @@ PartnerJoin2 = 24,
     RoomSettingsNotify = 26,  // 房间开关当前值（服务器判定房主后广播/补发）
 };
 
-// ---- 房间开关位（与客户端 client/include/network/messageNet/netheader.h 一致）----
+// ---- 房间开关位（与客户端 client/include/protocol/room_settings_flags.h 一致）----
 constexpr uint32_t kRoomSettingsAllowRecord = 1u << 0;       ///< 允许录制会议
 constexpr uint32_t kRoomSettingsAllowMemberShare = 1u << 1;  ///< 允许普通成员共享屏幕
 constexpr uint32_t kRoomSettingsDefault =
