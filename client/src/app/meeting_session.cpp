@@ -1,6 +1,6 @@
 #include "app/meeting_session.h"
 
-#include "cameravideo.h"
+#include "meeting_video.h"
 #include "features/meeting/chat_controller.h"
 #include "features/meeting/meeting_controller.h"
 #include "features/meeting/meeting_media_controller.h"
@@ -80,7 +80,7 @@ void MeetingSession::create_helpers() {
     _media = new MeetingMediaController(_rtc_observer, _ports.owner, this);
 
     // 成员卡片 / 资料缓存 / 主画面选择
-    _participants = new ParticipantsController(_ports.tiles_layout, _ports.camera,
+    _participants = new ParticipantsController(_ports.tiles_layout, _ports.video,
                                                this);
 
     // 聊天渲染 / @ 补全 / 提示音

@@ -7,7 +7,7 @@
 
 #include <unordered_map>
 
-class CameraVideo;
+class MeetingVideo;
 class Partner;
 class QVBoxLayout;
 class QWidget;
@@ -23,9 +23,9 @@ class ParticipantsController : public QObject {
 public:
     /**
      * @param tiles_layout 成员卡片容器
-     * @param camera       主画面/成员小窗渲染器
+     * @param video        画面路由（主画面 / 成员小窗）
      */
-    ParticipantsController(QVBoxLayout *tiles_layout, CameraVideo *camera,
+    ParticipantsController(QVBoxLayout *tiles_layout, MeetingVideo *video,
                            QObject *parent = nullptr);
 
     /** @brief 加入一位成员（已存在则返回现有对象） */
@@ -48,10 +48,6 @@ public:
 
     /** @brief 选中某位成员为主画面 */
     void select_main(qint64 user_id);
-    /** @brief 当前主画面成员 */
-    qint64 main_user_id() const { return _mainUserId; }
-    /** @brief 外部切换主画面时同步选中态（不重新拉流） */
-    void set_main_user_id(qint64 user_id) { _mainUserId = user_id; }
 
     /** @brief 该成员视频停止：回退到头像 */
     void close_video(qint64 user_id);
@@ -67,9 +63,13 @@ signals:
     void mention_added(QString display_name);
 
 private:
+    /** @brief 加载头像：裁圆后同时交给卡片与画面路由（generation 防过期） */
+    void load_avatar(qint64 user_id, const QString &url);
+
     QVBoxLayout *_tilesLayout = nullptr;
-    CameraVideo *_camera = nullptr;
+    MeetingVideo *_video = nullptr;
     std::unordered_map<qint64, Partner *> _partners;
+    QHash<qint64, quint64> _avatarGen;  ///< userId → 头像加载代数
     qint64 _mainUserId = 0;
 };
 
