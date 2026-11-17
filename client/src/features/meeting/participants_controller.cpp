@@ -1,16 +1,22 @@
 #include "features/meeting/participants_controller.h"
 
-#include "cameravideo.h"
+#include "avatar_image_loader.h"
+#include "meeting_video.h"
 #include "partner.h"
 #include "partner_tile.h"
 #include "videoglwidget.h"
 
 #include <QVBoxLayout>
 
+namespace {
+/// 头像统一按这个尺寸加载：小窗显示 72、主画面显示约 10% 控件高，够用且只下载一次
+constexpr int kAvatarSourcePx = 256;
+}  // namespace
+
 ParticipantsController::ParticipantsController(QVBoxLayout *tiles_layout,
-                                               CameraVideo *camera,
+                                               MeetingVideo *video,
                                                QObject *parent)
-    : QObject(parent), _tilesLayout(tiles_layout), _camera(camera) {}
+    : QObject(parent), _tilesLayout(tiles_layout), _video(video) {}
 
 Partner *ParticipantsController::add(qint64 user_id) {
     const auto found = _partners.find(user_id);
@@ -30,10 +36,12 @@ Partner *ParticipantsController::add(qint64 user_id) {
         _tilesLayout->addWidget(tile);
     }
     if (VideoGLWidget *widget = partner->displayWidget()) {
-        if (_camera) {
-            _camera->addPartnerDisplay(user_id, widget);
+        if (_video) {
+            _video->bind(user_id, widget);
         }
     }
+    // 资料可能比成员事件晚到：先显示默认/已缓存头像，资料到了再刷新
+    load_avatar(user_id, partner->avatarUrl());
     emit count_changed(count());
     return partner;
 }
@@ -46,9 +54,10 @@ void ParticipantsController::remove(qint64 user_id) {
     Partner *partner = it->second;
     disconnect(partner, &Partner::clicked, this,
                &ParticipantsController::member_clicked);
-    if (_camera) {
-        _camera->removePartnerDisplay(user_id);
+    if (_video) {
+        _video->bind(user_id, nullptr);
     }
+    _avatarGen.remove(user_id);
     if (PartnerTile *tile = partner->tile()) {
         if (_tilesLayout) {
             _tilesLayout->removeWidget(tile);
@@ -63,15 +72,16 @@ void ParticipantsController::remove(qint64 user_id) {
 
 void ParticipantsController::clear() {
     if (_partners.empty()) {
+        _avatarGen.clear();
         return;
-    }
-    if (_camera) {
-        _camera->clearAllPartnerDisplays();
     }
     for (auto it = _partners.begin(); it != _partners.end();) {
         Partner *partner = it->second;
         disconnect(partner, &Partner::clicked, this,
                    &ParticipantsController::member_clicked);
+        if (_video) {
+            _video->bind(it->first, nullptr);
+        }
         if (PartnerTile *tile = partner->tile()) {
             if (_tilesLayout) {
                 _tilesLayout->removeWidget(tile);
@@ -82,8 +92,32 @@ void ParticipantsController::clear() {
         partner->deleteLater();
         it = _partners.erase(it);
     }
+    _avatarGen.clear();
     _mainUserId = 0;
     emit count_changed(0);
+}
+
+void ParticipantsController::load_avatar(qint64 user_id, const QString &url) {
+    const quint64 generation = ++_avatarGen[user_id];
+
+    AvatarImageLoader::instance().load(
+        url, QSize(kAvatarSourcePx, kAvatarSourcePx), this,
+        [this, user_id, generation](const QPixmap &pixmap) {
+            if (_avatarGen.value(user_id) != generation) {
+                return;  // 该用户的头像已更新，丢弃过期结果
+            }
+            const auto it = _partners.find(user_id);
+            if (it == _partners.end() || pixmap.isNull()) {
+                return;
+            }
+            const QImage avatar = makeCircularAvatarImage(pixmap.toImage());
+            if (PartnerTile *tile = it->second->tile()) {
+                tile->showAvatar(avatar);
+            }
+            if (_video) {
+                _video->setAvatar(user_id, avatar);
+            }
+        });
 }
 
 void ParticipantsController::apply_profile(qint64 user_id,
@@ -94,17 +128,7 @@ void ParticipantsController::apply_profile(qint64 user_id,
         return;
     }
     partner->setProfile(display_name, avatar_url);
-
-    if (_camera) {
-        _camera->setAvatarUrlForUser(user_id, avatar_url);
-        if (!_camera->hasActiveVideo(user_id)) {
-            _camera->showAvatarForUser(user_id);
-        }
-        if (user_id == _mainUserId && !_camera->hasActiveVideo(user_id)) {
-            _camera->showMainAvatar();
-        }
-    }
-
+    load_avatar(user_id, avatar_url);
     emit mention_added(display_name);
 }
 
@@ -135,8 +159,8 @@ void ParticipantsController::select_main(qint64 user_id) {
         current->second->setSelected(true);
     }
     _mainUserId = user_id;
-    if (_camera) {
-        _camera->refreshMainForUser(_mainUserId);
+    if (_video) {
+        _video->setMainUser(_mainUserId);
     }
     emit main_changed(_mainUserId);
 }
@@ -145,7 +169,7 @@ void ParticipantsController::close_video(qint64 user_id) {
     if (_partners.find(user_id) == _partners.end()) {
         return;
     }
-    if (_camera) {
-        _camera->showAvatarForUser(user_id);
+    if (_video) {
+        _video->clearVideo(user_id);
     }
 }

@@ -13,7 +13,7 @@ void Partner::setProfile(const QString &displayName, const QString &avatarUrl) {
     m_displayName = displayName;
     m_avatarUrl = avatarUrl;
     if (m_tile)
-        m_tile->updateProfile(displayName, avatarUrl);
+        m_tile->updateProfile(displayName);
 }
 
 void Partner::setTile(PartnerTile *tile) {
@@ -28,7 +28,7 @@ void Partner::setTile(PartnerTile *tile) {
 
     if (m_tile) {
         connect(m_tile, &PartnerTile::clicked, this, &Partner::clicked);
-        m_tile->updateProfile(m_displayName, m_avatarUrl);
+        m_tile->updateProfile(m_displayName);
     }
 }
 

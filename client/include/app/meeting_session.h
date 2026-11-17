@@ -6,7 +6,7 @@
 #include <QObject>
 #include <memory>
 
-class CameraVideo;
+class MeetingVideo;
 class ChatController;
 class MeetingController;
 class MeetingMediaController;
@@ -31,7 +31,7 @@ namespace app {
  */
 struct MeetingViewPorts {
     QVBoxLayout *tiles_layout = nullptr;     ///< 成员卡片容器
-    CameraVideo *camera = nullptr;           ///< 主画面/成员小窗渲染器
+    MeetingVideo *video = nullptr;            ///< 画面路由（主画面 / 成员小窗）
     QListWidget *chat_list = nullptr;        ///< 聊天消息列表
     MyTextEdit *chat_input = nullptr;        ///< 聊天输入框
     QWidget *owner = nullptr;                ///< 弹窗/提示的父窗口

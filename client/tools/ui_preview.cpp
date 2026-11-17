@@ -2058,7 +2058,7 @@ int main(int argc, char *argv[]) {
         // 所以先送帧，再显式切到"视频模式"，等价于 I420 帧到达的效果
         ImgDisplay::show(tile->displayWidget(), frame, VideoStyles::video());
         tile->set_video_mode(true);
-        tile->updateProfile(QStringLiteral("李雷"), QString());
+        tile->updateProfile(QStringLiteral("李雷"));
         capture(&panel, QStringLiteral("00b-member-tile-video"), 300, 330);
     }
     // 单个成员卡片：验证头像为 72 方形、名字常驻显示
@@ -2075,7 +2075,7 @@ int main(int argc, char *argv[]) {
         avatar.fill(QColor(QStringLiteral("#4C8DFF")));
         ImgDisplay::show(tile->displayWidget(), makeCircularAvatarImage(avatar),
                                VideoStyles::memberAvatar());
-        tile->updateProfile(QStringLiteral("王宇"), QString());
+        tile->updateProfile(QStringLiteral("王宇"));
         capture(&panel, QStringLiteral("00-member-tile"), 300, 330);
     }
     {

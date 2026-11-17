@@ -218,10 +218,25 @@ QPushButton#joinMeeting_btn {
   因此没有「先 setDrawMode 再 setFrame」的顺序依赖，也没有悬空指针；
 - `VideoGLWidget` 只保留 `setStyle()` 一个样式入口（原 5 个 setter 合并），
   样式与帧互相独立，`setStyle` 有变化才重绘；
-- `CameraVideo` 用 `QPointer<VideoGLWidget>` 记录控件，删除 `detachFromWidgets()`
+- `MeetingVideo`（当时叫 `CameraVideo`）用 `QPointer<VideoGLWidget>` 记录控件，删除 `detachFromWidgets()`
   手工解绑契约；同时删掉没人读的 `setLocalUserId()`；
 - 成员小窗头像「72×72 居中」现在只有 `VideoStyles::memberAvatar()` 一个来源，
-  消除了 `PartnerTile` 与 `CameraVideo` 两套样式互相覆盖的问题。
+  消除了 `PartnerTile` 与本类两套样式互相覆盖的问题。
+
+### 画面路由 API 收敛（2026-11 第四轮回）
+
+- `CameraVideo` 改名 `MeetingVideo`（`message/video/meeting_video.h/.cpp`），
+  公开方法 **13 → 7**：`bindMain` / `bind` / `show` / `setAvatar` /
+  `clearVideo` / `setMainUser` / `clear`；
+- 删除 `setAvatarUrlForUser` / `hasActiveVideo` / `refreshMainForUser` /
+  `showAvatarForUser` / `showMainAvatar` / `showImageForUser` 等重复入口：
+  「有帧重播、否则头像、否则清屏」的规则收进 `setMainUser` / `clearVideo`；
+- 头像下载移到 `ParticipantsController`：一次请求（256px）、裁圆后同时交给
+  卡片与 `MeetingVideo`，消除 `PartnerTile` 再下载一遍的重复请求；
+- `PartnerTile` 不再依赖 `AvatarImageLoader`，新增 `showAvatar(image)`，
+  `updateProfile()` 只改昵称；
+- 删除未使用的 `ParticipantsController::main_user_id()` / `set_main_user_id()`；
+- 行为微调：主画面用户离开时清空主画面（旧实现会继续显示他的默认头像）。
 
 ### 兼容层清理（2026-11 第三轮回）
 

@@ -2,7 +2,6 @@
 
 #include "ui/foundation/theme_manager.h"
 #include "ImgDisplay.h"
-#include "avatar_image_loader.h"
 #include "partner.h"
 #include "videoglwidget.h"
 #include <QColor>
@@ -64,32 +63,20 @@ PartnerTile::PartnerTile(Partner *partner, QWidget *parent)
     m_partner->setTile(this);
 }
 
-void PartnerTile::updateProfile(const QString &displayName,
-                                const QString &avatarUrl) {
+void PartnerTile::updateProfile(const QString &displayName) {
     if (m_nameLabel) {
         m_nameLabel->setText(displayName.isEmpty() ? m_partner->fallbackLabel()
                                                    : displayName);
     }
     setToolTip(displayName.isEmpty() ? m_partner->fallbackLabel() : displayName);
-    loadAvatar(avatarUrl);
 }
 
-void PartnerTile::showAvatarImage(const QImage &image) {
-    if (!m_displayWidget || image.isNull())
+void PartnerTile::showAvatar(const QImage &image) {
+    if (!m_displayWidget || image.isNull()) {
         return;
+    }
     // 单次调用完成"样式 + 画面"，不再有 setDrawMode→setFrame 的顺序依赖
-    ImgDisplay::show(m_displayWidget, makeCircularAvatarImage(image),
-                     VideoStyles::memberAvatar());
-}
-
-void PartnerTile::loadAvatar(const QString &avatarUrl) {
-    const QSize targetSize(VideoStyles::kMemberAvatarSide, VideoStyles::kMemberAvatarSide);
-    AvatarImageLoader::instance().load(
-        avatarUrl, targetSize, this, [this](const QPixmap &pixmap) {
-            if (!pixmap.isNull()) {
-                showAvatarImage(pixmap.toImage());
-            }
-        });
+    ImgDisplay::show(m_displayWidget, image, VideoStyles::memberAvatar());
 }
 
 void PartnerTile::setSelected(bool selected) { applyBorder(selected); }

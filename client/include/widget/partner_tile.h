@@ -19,7 +19,9 @@ public:
     VideoGLWidget *displayWidget() const { return m_displayWidget; }
     QLabel *nameLabel() const { return m_nameLabel; }
 
-    void updateProfile(const QString &displayName, const QString &avatarUrl);
+    void updateProfile(const QString &displayName);
+    /** @brief 显示头像（已裁圆的图像；由成员控制器统一加载） */
+    void showAvatar(const QImage &image);
     void setSelected(bool selected);
 
     /**
@@ -39,8 +41,6 @@ protected:
 private:
     void updateLabelGeometry();
     void applyBorder(bool selected);
-    void loadAvatar(const QString &avatarUrl);
-    void showAvatarImage(const QImage &image);
 
     /// 对应的成员信息
     Partner *m_partner = nullptr;

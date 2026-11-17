@@ -13,7 +13,7 @@
 #include "partner.h"
 #include "partner_tile.h"
 #include "chatmessage.h"
-#include "cameravideo.h"
+#include "meeting_video.h"
 
 #include "features/meeting/meeting_media_controller.h"
 #include "features/meeting/meeting_protocol_dispatcher.h"
@@ -106,7 +106,7 @@ private:
     quint32 _pendingDurationMinutes = 60;
     quint32 _createMaxParticipants = 8;
     quint32 _createDurationMinutes = 60;
-    CameraVideo *_cameraVideo = nullptr;
+    MeetingVideo *_video = nullptr;
     int _roomNo = 0;
     QString _serverAddr;
 
