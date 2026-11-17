@@ -1,6 +1,6 @@
 #include <QtTest>
 
-#include "video_style.h"
+#include "media/video/video_style.h"
 
 /**
  * @brief 画面样式预设的单元测试

@@ -1,7 +1,7 @@
 #ifndef MEETING_CONTROLLER_H
 #define MEETING_CONTROLLER_H
 
-#include "networkmanager.h"
+#include "protocol/network_manager.h"
 #include <QObject>
 #include <QString>
 #include <memory>

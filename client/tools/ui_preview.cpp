@@ -3,33 +3,33 @@
 // 用法：UiPreview.exe <输出目录>
 // 逐个窗口 setAttribute(WA_DontShowOnScreen) 后 show() + grab()，不会真的显示到桌面。
 
-#include "configure/client_config.h"
-#include "configure/meeting_repository.h"
-#include "configure/login_store.h"
-#include "configure/storage.h"
+#include "config/client_config.h"
+#include "data/meeting_repository.h"
+#include "config/login_store.h"
+#include "core/storage.h"
 
 #include <QSqlQuery>
-#include "configure/user_session.h"
-#include "avatar_image_loader.h"
+#include "config/user_session.h"
+#include "media/avatar_service.h"
 #include "ui/dialogs/edit_profile_dialog.h"
 #include "ui/dialogs/avatar_crop_dialog.h"
 #include "ui/pages/login_window.h"
-#include "main_window.h"
+#include "ui/shell/main_window.h"
 #include "ui/foundation/font_registry.h"
 #include "ui/foundation/window_effects.h"
 #include "ui/foundation/theme_manager.h"
-#include "features/meeting/meeting_recorder.h"
+#include "media/recording/meeting_recorder.h"
 #include "ui/pages/meeting_settings_popup.h"
 #include "ui/pages/meeting_window.h"
-#include "screen.h"
-#include "configure/recording_repository.h"
+#include "core/screen.h"
+#include "data/recording_repository.h"
 #include "ui/dialogs/recording_playback_dialog.h"
 #include "ui/pages/meeting_history_page.h"
 #include "ui/pages/recordings_page.h"
 #include "ui/pages/settings_page.h"
-#include "messagecodec.h"
-#include "ImgDisplay.h"
-#include "videoglwidget.h"
+#include "protocol/message_codec.h"
+#include "media/video/img_display.h"
+#include "media/video/video_gl_widget.h"
 #include "ui/pages/user_profile_page.h"
 
 #include <QApplication>
@@ -37,14 +37,14 @@
 #include <QPointer>
 #include <QMouseEvent>
 #include <QToolButton>
-#include "frameless_window.h"
+#include "ui/foundation/frameless_window.h"
 #include <functional>
-#include "mytextedit.h"
+#include "ui/composites/my_text_edit.h"
 #include <QImage>
 #include "ui/foundation/icon_provider.h"
 #include <QRegularExpression>
 #include <QLabel>
-#include "configure.h"
+#include "ui/foundation/resource_paths.h"
 #include <QMovie>
 #include <QAudioDevice>
 #include <QCameraDevice>

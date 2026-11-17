@@ -1,0 +1,100 @@
+#include "protocol/network_manager.h"
+#include "protocol/connection.h"
+#include "protocol/message_hub.h"
+#include <QMetaObject>
+#include <climits>
+
+NetworkManager::NetworkManager(QObject *parent) : QObject(parent) {
+    qRegisterMetaType<MessagePtr>("MessagePtr");
+
+    hub_ = new MessageHub(this);
+    connection_ = new Connection(nullptr);
+    connection_->setMessageHub(hub_);
+
+    /// 只在 Connection 真正断线后通知
+    /// UI，避免提前复位导致旧发送线程与新会话重叠
+    connect(connection_, &Connection::disconnected, this, [this]() {
+        hub_->stop_send_worker_async();
+        emit disconnected();
+    });
+
+    connect(hub_, &MessageHub::request_message_ready, this,
+            &NetworkManager::request_message_ready);
+    connect(hub_, &MessageHub::user_info_message_ready, this,
+            &NetworkManager::user_info_message_ready);
+    connect(hub_, &MessageHub::text_message_ready, this,
+            &NetworkManager::text_message_ready);
+    connect(hub_, &MessageHub::text_send_finished, this,
+            &NetworkManager::send_text_finished);
+
+    hub_->start(connection_);
+}
+
+NetworkManager::~NetworkManager() {
+    stop();
+    delete connection_;
+    connection_ = nullptr;
+}
+
+MessageHub *NetworkManager::message_hub() const { return hub_; }
+
+bool NetworkManager::connect_to_server(const QString &ip, const QString &port,
+                                       QWidget *validate_parent) {
+    if (!connection_) //如果没有连接对象，则返回false
+        return false;
+    if (validate_parent && //如果验证父窗口不为空，则验证ip和端口
+        !Connection::validateIpPort(validate_parent, ip, port))
+        return false;
+    /// 新连接前确保旧发送线程已退出，再启动新世代发送线程
+    if (hub_) //如果消息中心不为空，则停止发送线程
+        hub_->stop_send_worker();
+    const bool ok = connection_->connectToServer(ip, port); //连接到服务器
+    if (ok && hub_) //如果连接成功，则启动发送线程
+        hub_->start_send_worker();
+    return ok;
+}
+
+void NetworkManager::disconnect_from_host() {
+    if (hub_)
+        hub_->stop_send_worker_async();
+    if (connection_)
+        connection_->disconnectFromHost();
+    /// 不再提前 emit disconnected：等 Connection::disconnectOnIoThread
+    /// 完成后再通知， 否则 UI 会过早允许重连，旧发送线程仍可能抢走创建会议包。
+}
+
+void NetworkManager::send_create_meeting(std::uint32_t max_participants,
+                                         std::uint32_t duration_minutes) {
+    hub_->enqueue_send(std::make_shared<CreateMeetingMessage>(
+        max_participants, duration_minutes));
+}
+
+void NetworkManager::send_join_meeting(const std::string &room_no) {
+    hub_->enqueue_send(std::make_shared<JoinMeetingMessage>(room_no));
+}
+
+void NetworkManager::send_text(const std::string &text) {
+    hub_->enqueue_send(std::make_shared<SendTextMessage>(text));
+}
+
+void NetworkManager::send_close_camera() {
+    hub_->enqueue_send(std::make_shared<CloseCameraMessage>());
+}
+
+void NetworkManager::send_user_profile(qint64 user_id,
+                                       const std::string &display_name,
+                                       const std::string &avatar_url) {
+    hub_->enqueue_send(std::make_shared<SendUserProfileMessage>(
+        user_id, display_name, avatar_url));
+}
+
+void NetworkManager::send_room_settings(std::uint32_t flags) {
+    hub_->enqueue_send(std::make_shared<RoomSettingsMessage>(flags));
+}
+
+void NetworkManager::stop() {
+    if (hub_)
+        hub_->stop();
+    if (connection_)
+        connection_->stopImmediately();
+}

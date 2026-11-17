@@ -13,7 +13,7 @@
 #include <QSpacerItem>
 #include <QVBoxLayout>
 
-#include "recent_meeting_list.h"
+#include "ui/composites/recent_meeting_list.h"
 
 void ui::CreateMeetingPageUi::setupUi(QWidget *parent) {
     parent->setObjectName(QStringLiteral("CreateMeetingPage"));

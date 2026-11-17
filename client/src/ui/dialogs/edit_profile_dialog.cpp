@@ -3,9 +3,9 @@
 #include "ui/foundation/theme_manager.h"
 
 #include "ui/dialogs/avatar_crop_dialog.h"
-#include "avatar_image_loader.h"
-#include "configure/client_config.h"
-#include "configure/user_session.h"
+#include "media/avatar_service.h"
+#include "config/client_config.h"
+#include "config/user_session.h"
 
 #include <QBuffer>
 #include <QComboBox>
@@ -114,7 +114,7 @@ void ui::EditProfileDialog::loadFromSession() {
     }
     refreshAgeLabel();
 
-    AvatarImageLoader::instance().load(
+    AvatarService::instance().load(
         session.avatar(), ui.avatarPreview->size(), this,
         [this](const QPixmap &pixmap) { ui.avatarPreview->setPixmap(pixmap); });
 }
@@ -205,7 +205,7 @@ void ui::EditProfileDialog::uploadPendingAvatar() {
         return;
     }
 
-    auto *nam = AvatarImageLoader::instance().networkManager();
+    auto *nam = AvatarService::instance().networkManager();
     if (!nam) {
         setBusy(false);
         QMessageBox::warning(this, tr("修改资料"), tr("网络模块未初始化"));
@@ -273,14 +273,14 @@ void ui::EditProfileDialog::onAvatarUploadFinished() {
         return;
     }
 
-    AvatarImageLoader::instance().invalidate(UserSession::instance().avatar());
+    AvatarService::instance().invalidate(UserSession::instance().avatar());
     UserSession::instance().setAvatar(newAvatar);
     m_pendingAvatar = QImage();
     submitProfileUpdate();
 }
 
 void ui::EditProfileDialog::submitProfileUpdate() {
-    auto *nam = AvatarImageLoader::instance().networkManager();
+    auto *nam = AvatarService::instance().networkManager();
     if (!nam) {
         setBusy(false);
         QMessageBox::warning(this, tr("修改资料"), tr("网络模块未初始化"));

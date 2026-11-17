@@ -1,10 +1,10 @@
 #include "features/meeting/meeting_media_controller.h"
 
-#include "configure/client_config.h"
-#include "configure/user_session.h"
+#include "config/client_config.h"
+#include "config/user_session.h"
 #include "features/meeting/meeting_rtc_observer.h"
 
-#include "configure/preferences.h"
+#include "config/preferences.h"
 
 #include <spdlog/spdlog.h>
 

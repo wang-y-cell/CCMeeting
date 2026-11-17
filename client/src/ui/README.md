@@ -1,35 +1,51 @@
 # client/src/ui —— UI 层目录约定
 
-UI 代码集中在这里，按"依赖单向"分层。新增界面时按下面的规则放文件，
-不要往 `src/widget/` 里再加东西（那是旧目录，正在逐步迁出）。
+UI 代码集中在这里，按"依赖单向"分层。新增界面时按下面的规则放文件；
+旧的 `src/widget/` 已并入 `ui/`（`foundation` / `composites` / `shell`），不要再建。
 
-## 客户端整体分层（会议会话重构后）
+## 客户端整体分层
 
-客户端按「能力 → 装配 → 界面」单向分层，`ui/` 不再自己 new 网络与线程：
+客户端按「基础设施 → 配置/数据 → 能力 → 装配 → 界面」单向分层：
 
 ```
-ui/foundation → ui/primitives → ui/pages / ui/shell
-                                     │
-                                     ▼
-                           app/MeetingSession        ← 唯一装配点
-                             │        │        │
-                    network/*    features/*   configure/*（接口）
-                                                  │
-                                        configure/storage（实现）
+ui（foundation → primitives → composites → pages → shell）
+                        │
+                        ▼
+                  app/MeetingSession            ← 唯一装配点
+                        │
+        ┌───────────────┼───────────────┐
+        ▼               ▼               ▼
+  features/meeting   media/*        protocol/*
+        │               │               │
+        └───────────────┴───────────────┘
+                        │
+                 data/*  config/*  core/*
 ```
 
-- `app/MeetingSession`（`client/include/app/meeting_session.h`）：
-  创建并持有 `NetworkManager`、工作线程、`MeetingController`、协议分发，以及
-  成员/聊天/房间设置/媒体/录制 5 个控制器；`stop_workers()` 统一收尾。
-  窗口只负责「视图 + 视图事件连接」，不再 `new`/`moveToThread`。
-- `configure/preferences.h`：界面读写偏好只走 `preferences()` 接口，
-  不直接 `Storage::instance()`。
-- `configure/meeting_repository.h`、`configure/recording_repository.h`：
-  页面读写会议记录 / 录制库走 `meeting_repository()`、`recording_repository()`。
+各层职责：
+
+| 目录 | 放什么 | 不允许 |
+|---|---|---|
+| `core/` | 平台与存储基础设施：`screen`、`storage`（SQLite 单一后端） | 认识任何业务概念 |
+| `config/` | 配置与会话：`client_config`、`auth_config`、`user_session`、`login_store`、`preferences`、`stdtypes` | include `ui/` |
+| `data/` | 业务数据：`meeting_record`、`meeting_repository`、`meeting_history`（实现）、`recording_repository`、`recording_library`（实现） | 弹窗、控件 |
+| `domain/` | 纯业务模型：`partner` | 依赖 UI |
+| `protocol/` | 线上协议与传输：`connection`、`message(_hub/_codec)`、`net_header`、`network_manager`、`room_settings_flags` | include `ui/`、`media/` |
+| `media/` | 图像/视频资源：`avatar_service`、`media/video/*`（样式/渲染/路由）、`media/recording/*` | 依赖 `ui/` 或 `protocol/` |
+| `features/meeting/` | 8 个 controller（会议、聊天、成员、媒体、协议分发、RTC 观察、房间设置） | 自己 new 线程/网络 |
+| `app/` | `MeetingSession`：创建并持有网络、工作线程、控制器、协议分发；`stop_workers()` 收尾 | 依赖具体页面 |
+| `ui/` | 界面：foundation → primitives → composites → pages → shell / dialogs | include `core/storage.h`、`protocol/*`，或自己 new `NetworkManager`/`QThread` |
+
+- 界面读写偏好只走 `config/preferences.h` 的 `preferences()`，不直接 `Storage::instance()`；
+- 页面读写会议记录 / 录制库只走 `data/meeting_repository.h`、`data/recording_repository.h`；
 - 三个接口都提供 `set_xxx(nullptr)` 形式的注入点，测试可替换成内存实现。
 
-依赖约束：`ui/` 可以依赖 `app/` 与 `configure/` 的**接口**，但不得直接 include
-`configure/storage.h`（实现细节），也不得自己创建 `NetworkManager` / `QThread`。
+**头文件一律写全路径**（只有一个 include 根 `client/include/`）：
+
+```cpp
+#include "media/video/meeting_video.h"
+#include "protocol/network_manager.h"
+```
 
 ## 目录结构
 
@@ -37,17 +53,25 @@ ui/foundation → ui/primitives → ui/pages / ui/shell
 include/ui/                      源文件镜像（保持项目 include/ + src/ 分离的习惯）
 ├── foundation/                  ① 设计底座（不依赖任何上层）
 │   ├── design_tokens.h          颜色/圆角/间距/控件尺寸/字号（唯一常量来源）
-│   └── theme_manager.h          令牌替换 + QSS 加载（@primary 这类占位符）
-├── pages/                       ③ 页面（有业务语义）
+│   ├── theme_manager.h          令牌替换 + QSS 加载（@primary 这类占位符）
+│   ├── frameless_window.h       无边框窗口模板（原 widget/）
+│   ├── window_effects.h         Win11 DWM 圆角 / Win10 遮罩回退
+│   └── resource_paths.h         资源路径常量（Source::at_sound 等，原 configure.h）
+├── primitives/                  ② 原子控件（PageHeader / Card / field_label）
+├── composites/                  ③ 组合控件（无独立页面语义）
+│   ├── partner_tile.h           成员卡片
+│   ├── recent_meeting_list.h    最近会议列表
+│   ├── chat_message.h           聊天气泡（原 message/text）
+│   └── my_text_edit.h           带 @ 补全的输入框（原 message/text）
+├── pages/                       ④ 页面（有业务语义）
 │   ├── page.h                   页面接口：page_id/title/icon/nav_order/on_show/on_hide
-│   └── join_meeting_page.h      已迁移示例
-└── shell/                       ④ 外壳（窗口与导航）
+│   └── join_meeting_page.h      示例页面
+├── dialogs/                     对话框（编辑资料 / 头像裁剪 / 录制回放）
+└── shell/                       ⑤ 外壳（窗口与导航）
+    ├── main_window.h            主窗口（原 widget/main_window）
     └── page_registry.h          页面注册表：元数据 + 懒创建 + 排序
 
-src/ui/
-├── foundation/theme_manager.cpp
-├── pages/join_meeting_page.cpp
-├── shell/page_registry.cpp
+src/ui/                          与 include/ui/ 完全镜像，另有：
 └── theme/*.qss                  样式源码（通过 resource.qrc 的 alias 暴露为
                                  :/Style/source/xxx.qss，调用点无需改路径）
 ```
@@ -119,7 +143,7 @@ QPushButton#joinMeeting_btn {
 - [ ] 控件 objectName 与旧实现保持一致（QSS 选择器依赖它）
 - [ ] 信号改名后更新 `main_window` 的连接
 - [ ] `main_window` 里不再保留该页的类型指针（除非需要业务装配）
-- [ ] 删除旧文件：`include/widget/...`、`src/widget/...`、`src/widget/ui/` 下的 `*_ui.cpp`
+- [x] 旧目录已并入 `ui/{foundation,composites,shell}`（2026-11 完成）
 - [ ] `cmake --build` + `UiPreview.exe` 截图对比（同名场景，例如 `03-main-join`）
 
 ## 已完成 / 待迁
@@ -210,7 +234,7 @@ QPushButton#joinMeeting_btn {
 
 ### 画面渲染（2026-11 第二轮回）
 
-- 样式收敛到 `message/video/video_style.h`：`DrawMode` 唯一定义、`VideoStyle` 值对象、
+- 样式收敛到 `media/video/video_style.h`：`DrawMode` 唯一定义、`VideoStyle` 值对象、
   具名预设 `VideoStyles::video() / memberAvatar() / mainAvatar()`（原来枚举被定义两遍，
   靠 `static_cast<int>` 互转）；
 - `ImgDisplay` 改为**无状态**入口：`ImgDisplay::show(widget, image, style)` /
@@ -225,7 +249,7 @@ QPushButton#joinMeeting_btn {
 
 ### 画面路由 API 收敛（2026-11 第四轮回）
 
-- `CameraVideo` 改名 `MeetingVideo`（`message/video/meeting_video.h/.cpp`），
+- `CameraVideo` 改名 `MeetingVideo`（`media/video/meeting_video.h/.cpp`），
   公开方法 **13 → 7**：`bindMain` / `bind` / `show` / `setAvatar` /
   `clearVideo` / `setMainUser` / `clear`；
 - 删除 `setAvatarUrlForUser` / `hasActiveVideo` / `refreshMainForUser` /
@@ -248,7 +272,7 @@ QPushButton#joinMeeting_btn {
   `login/*` 残留清理、空实现 `sync()`；打开失败时本次运行不持久化；
 - 删除旧数据目录迁移（`%LOCALAPPDATA%\CloudMeeting` → `CCMeeting`）；
 - `MeetingHistory` 删除 JSON 存储路径与一次性导入，只剩 SQLite；
-  记录类型拆到 `configure/meeting_record.h`，工具/页面统一走 `meeting_repository()`；
+  记录类型拆到 `data/meeting_record.h`，工具/页面统一走 `meeting_repository()`；
 - 协议删除 0–3 号旧媒体类型（`img_send` / `img_recv` / `audio_send` /
   `audio_recv`），客户端与服务端同步删除；
 - `PageRegistry` 只接受 `ui::Page`，不再接受任意 QWidget；
@@ -260,6 +284,5 @@ H.264 不可用时回退 MJPEG/Matroska、OpenGL 用 R8 单通道纹理。
 
 仍待处理：
 
-- `client/src/widget/main_window.*` 仍是外壳实现，文件名与 `ui/shell/` 不一致（迁移中）；
-- `screen.*` 还放在 `client/` 根目录，未归入 `ui/foundation` 或独立的 `media/` 层；
-- 设置 / 会议记录 / 录制 / 资料四个页面仍是手写布局，尚未改用 `ui/primitives`。
+- 设置 / 会议记录 / 录制 / 资料四个页面仍是手写布局，尚未改用 `ui/primitives`；
+- `ui/foundation` 里仍有少量历史命名（如 `frameless_window` 模板参数风格），可后续统一。

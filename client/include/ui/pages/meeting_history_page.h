@@ -3,7 +3,7 @@
 
 #include "ui/pages/page.h"
 
-#include "configure/meeting_record.h"
+#include "data/meeting_record.h"
 
 #include <QWidget>
 

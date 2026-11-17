@@ -5,8 +5,8 @@
 
 #include "ui/foundation/theme_manager.h"
 
-#include "text/mytextedit.h"
-#include "videoglwidget.h"
+#include "ui/composites/my_text_edit.h"
+#include "media/video/video_gl_widget.h"
 
 #include <QAbstractScrollArea>
 #include <QFormLayout>

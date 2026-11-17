@@ -1,9 +1,9 @@
 #ifndef EDIT_PROFILE_DIALOG_H
 #define EDIT_PROFILE_DIALOG_H
 
-#include "frameless_window.h"
+#include "ui/foundation/frameless_window.h"
 #include "ui/dialogs/edit_profile_dialog_ui.h"
-#include "configure/user_session.h"
+#include "config/user_session.h"
 
 #include <QDialog>
 #include <QImage>

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "frameless_window.h"
+#include "ui/foundation/frameless_window.h"
 
 #include <QDialog>
 #include <QImage>

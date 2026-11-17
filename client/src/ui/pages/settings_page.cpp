@@ -1,8 +1,8 @@
 #include "ui/pages/settings_page.h"
 
-#include "configure/recording_repository.h"
+#include "data/recording_repository.h"
 
-#include "configure/client_config.h"
+#include "config/client_config.h"
 #include "ui/pages/settings_page_ui.h"
 
 #include <QAudioDevice>
@@ -34,7 +34,7 @@
 #include <QSignalBlocker>
 #include <QRadioButton>
 #include <QStyle>
-#include "configure/preferences.h"
+#include "config/preferences.h"
 #include "ui/foundation/theme_manager.h"
 #include <QSize>
 #include <QStackedWidget>

@@ -2,10 +2,10 @@
 
 #include "ui/foundation/theme_manager.h"
 
-#include "login_store.h"
+#include "config/login_store.h"
 
-#include "configure/client_config.h"
-#include "configure/user_session.h"
+#include "config/client_config.h"
+#include "config/user_session.h"
 
 #include <QJsonDocument>
 #include <QLabel>

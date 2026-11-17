@@ -1,14 +1,14 @@
 #include "features/meeting/chat_controller.h"
 
-#include "chatmessage.h"
-#include "configure/user_session.h"
-#include "mytextedit.h"
+#include "ui/composites/chat_message.h"
+#include "config/user_session.h"
+#include "ui/composites/my_text_edit.h"
 
 #include <QCompleter>
 #include <QDateTime>
 #include <QEvent>
 #include <QListWidget>
-#include "configure/preferences.h"
+#include "config/preferences.h"
 #include <QSoundEffect>
 #include <QUrl>
 #include <QWidget>

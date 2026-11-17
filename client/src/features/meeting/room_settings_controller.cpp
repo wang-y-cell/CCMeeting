@@ -1,8 +1,8 @@
 #include "features/meeting/room_settings_controller.h"
 
-#include "features/meeting/meeting_recorder.h"
+#include "media/recording/meeting_recorder.h"
 #include "ui/pages/meeting_settings_popup.h"
-#include "room_settings_flags.h"
+#include "protocol/room_settings_flags.h"
 
 #include <QMessageBox>
 #include <QPushButton>

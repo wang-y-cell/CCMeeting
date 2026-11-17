@@ -2,7 +2,7 @@
 
 #include "ui/foundation/theme_manager.h"
 
-#include "configure/recording_repository.h"
+#include "data/recording_repository.h"
 
 #include <QDesktopServices>
 #include <QFrame>

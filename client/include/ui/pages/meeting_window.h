@@ -1,19 +1,19 @@
 #ifndef MEETING_WIDGET_H
 #define MEETING_WIDGET_H
 
-#include "frameless_window.h"
+#include "ui/foundation/frameless_window.h"
 #include "features/meeting/chat_controller.h"
-#include "features/meeting/meeting_recorder.h"
+#include "media/recording/meeting_recorder.h"
 #include "features/meeting/room_settings_controller.h"
 #include "ui/pages/meeting_settings_popup.h"
-#include "room_settings_flags.h"
+#include "protocol/room_settings_flags.h"
 #include "features/meeting/meeting_controller.h"
-#include "networkmanager.h"
-#include "message.h"
-#include "partner.h"
-#include "partner_tile.h"
-#include "chatmessage.h"
-#include "meeting_video.h"
+#include "protocol/network_manager.h"
+#include "protocol/message.h"
+#include "domain/partner.h"
+#include "ui/composites/partner_tile.h"
+#include "ui/composites/chat_message.h"
+#include "media/video/meeting_video.h"
 
 #include "features/meeting/meeting_media_controller.h"
 #include "features/meeting/meeting_protocol_dispatcher.h"

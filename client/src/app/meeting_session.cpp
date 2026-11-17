@@ -1,15 +1,15 @@
 #include "app/meeting_session.h"
 
-#include "meeting_video.h"
+#include "media/video/meeting_video.h"
 #include "features/meeting/chat_controller.h"
 #include "features/meeting/meeting_controller.h"
 #include "features/meeting/meeting_media_controller.h"
 #include "features/meeting/meeting_protocol_dispatcher.h"
-#include "features/meeting/meeting_recorder.h"
+#include "media/recording/meeting_recorder.h"
 #include "features/meeting/meeting_rtc_observer.h"
 #include "features/meeting/participants_controller.h"
 #include "features/meeting/room_settings_controller.h"
-#include "message.h"
+#include "protocol/message.h"
 
 #include <QListWidget>
 #include <QThread>

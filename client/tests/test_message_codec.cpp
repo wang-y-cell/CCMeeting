@@ -1,8 +1,8 @@
 #include <QtTest>
 
-#include "message.h"
-#include "messagecodec.h"
-#include "netheader.h"
+#include "protocol/message.h"
+#include "protocol/message_codec.h"
+#include "protocol/net_header.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
