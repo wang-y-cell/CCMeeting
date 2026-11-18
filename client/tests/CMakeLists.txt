@@ -27,7 +27,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
     set(CCMEETING_TESTS_STANDALONE ON)
 
-    find_package(Qt6 REQUIRED COMPONENTS Core Test)
+    find_package(Qt6 REQUIRED COMPONENTS Core Gui Multimedia Test)
 
     if(NOT TARGET spdlog::spdlog)
         include(FetchContent)
@@ -45,7 +45,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     enable_testing()
 else()
     # 作为 client/ 的子目录：Qt / spdlog / 编译选项由父工程提供
-    find_package(Qt6 REQUIRED COMPONENTS Test)
+    find_package(Qt6 REQUIRED COMPONENTS Gui Multimedia Test)
 endif()
 
 set(CCMEETING_TEST_LIB_SOURCES
@@ -95,3 +95,9 @@ ccmeeting_add_test(test_protocol_dispatcher
 # 画面样式预设：头像 72×72、主画面头像 10% 高度、视频等比铺满
 ccmeeting_add_test(test_video_style
     test_video_style.cpp)
+
+# 设备目录：偏好键、未知/空设备、无格式时的回落（不枚举真实设备）
+ccmeeting_add_test(test_device_catalog
+    test_device_catalog.cpp
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/media/devices/device_catalog.cpp")
+target_link_libraries(test_device_catalog PRIVATE Qt6::Multimedia)
