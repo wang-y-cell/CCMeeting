@@ -1,6 +1,8 @@
 #include "ui/pages/settings_page.h"
 
 #include "data/recording_repository.h"
+#include "media/devices/camera_preview_service.h"
+#include "media/devices/mic_test_service.h"
 
 #include "config/client_config.h"
 #include "ui/pages/settings_page_ui.h"
@@ -24,7 +26,6 @@
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMediaCaptureSession>
-#include <QMediaDevices>
 #include <QMessageBox>
 #include <QPixmap>
 #include <QProgressBar>
@@ -47,7 +48,6 @@
 #include <climits>
 #include <cmath>
 #include <cstdint>
-#include <set>
 
 #include <spdlog/spdlog.h>
 
@@ -66,50 +66,6 @@ void clearPreviewLabel(QLabel *label) {
     label->setText(QObject::tr("预览未启动"));
 }
 
-QCameraDevice findCameraById(const QString &id) {
-    const auto cameras = QMediaDevices::videoInputs();
-    for (const QCameraDevice &cam : cameras) {
-        if (QString::fromUtf8(cam.id()) == id) {
-            return cam;
-        }
-    }
-    return {};
-}
-
-QAudioDevice findMicById(const QString &id) {
-    const auto mics = QMediaDevices::audioInputs();
-    for (const QAudioDevice &mic : mics) {
-        if (QString::fromUtf8(mic.id()) == id) {
-            return mic;
-        }
-    }
-    return {};
-}
-
-int pcmLevelPercent(const QByteArray &raw, const QAudioFormat &fmt) {
-    if (raw.isEmpty() || fmt.sampleFormat() != QAudioFormat::Int16) {
-        return 0;
-    }
-    const auto *samples =
-        reinterpret_cast<const int16_t *>(raw.constData());
-    const int count = raw.size() / static_cast<int>(sizeof(int16_t));
-    if (count <= 0) {
-        return 0;
-    }
-    double sumSq = 0.0;
-    int peak = 0;
-    for (int i = 0; i < count; ++i) {
-        const int v = samples[i];
-        const int a = v >= 0 ? v : -v;
-        if (a > peak) {
-            peak = a;
-        }
-        sumSq += static_cast<double>(v) * static_cast<double>(v);
-    }
-    const double rms = std::sqrt(sumSq / static_cast<double>(count));
-    const double mixed = 0.7 * rms + 0.3 * static_cast<double>(peak);
-    return std::clamp(static_cast<int>(mixed / 32768.0 * 100.0 * 1.8), 0, 100);
-}
 
 }  // namespace
 
@@ -117,10 +73,25 @@ ui::SettingsPage::SettingsPage(QWidget *parent) : Page(parent) {
     ui = std::make_unique<SettingsPageUi>();
     ui->setupUi(this);
 
-    preview_start_timer_ = new QTimer(this);
-    preview_start_timer_->setSingleShot(true);
-    connect(preview_start_timer_, &QTimer::timeout, this,
-            &ui::SettingsPage::beginVideoPreviewAsync);
+    preview_ = new CameraPreviewService(this);
+    connect(preview_, &CameraPreviewService::frameReady, this,
+            [this](const QImage &image) {
+                if (!ui || !ui->videoPreview) {
+                    return;
+                }
+                const QPixmap pix = QPixmap::fromImage(image).scaled(
+                    ui->videoPreview->size(), Qt::KeepAspectRatio,
+                    Qt::FastTransformation);
+                ui->videoPreview->setText(QString());
+                ui->videoPreview->setPixmap(pix);
+            });
+    connect(preview_, &CameraPreviewService::errorOccurred, this,
+            [this](const QString &message) {
+                QMessageBox::warning(
+                    this, tr("摄像头"),
+                    tr("无法打开摄像头预览：%1").arg(message));
+                stopVideoPreview(true);
+            });
 
     connect(ui->categoryList, &QListWidget::currentRowChanged, this,
             &ui::SettingsPage::onCategoryChanged);
@@ -199,11 +170,8 @@ ui::SettingsPage::SettingsPage(QWidget *parent) : Page(parent) {
 }
 
 ui::SettingsPage::~SettingsPage() {
-    preview_generation_.fetch_add(1);
-    if (preview_start_timer_) {
-        preview_start_timer_->stop();
-    }
-    stopMicTest();
+    if (mic_) { mic_->stop(); }
+    update_mic_ui();
     stopVideoPreview(false);  // 析构必须同步释放
 }
 
@@ -236,11 +204,8 @@ void ui::SettingsPage::on_show() {
 }
 
 void ui::SettingsPage::on_hide() {
-    preview_generation_.fetch_add(1);
-    if (preview_start_timer_) {
-        preview_start_timer_->stop();
-    }
-    stopMicTest();
+    if (mic_) { mic_->stop(); }
+    update_mic_ui();
     // 先返回让侧栏切页画完，摄像头 stop 放到下一拍
     stopVideoPreview(true);
 }
@@ -258,7 +223,10 @@ void ui::SettingsPage::onCategoryChanged(int row) {
 
 void ui::SettingsPage::syncPreviewForCategory(int row) {
     if (row == 0) {
-        stopMicTest();
+        if (mic_) {
+            mic_->stop();
+        }
+        update_mic_ui();
         if (video_preview_enabled_) {
             scheduleVideoPreview();
         } else {
@@ -268,7 +236,10 @@ void ui::SettingsPage::syncPreviewForCategory(int row) {
     } else if (row == 1) {
         stopVideoPreview();
     } else {
-        stopMicTest();
+        if (mic_) {
+            mic_->stop();
+        }
+        update_mic_ui();
         stopVideoPreview();
     }
 }
@@ -278,14 +249,12 @@ void ui::SettingsPage::refreshVideoDevices() {
         return;
     }
 
-    IPreferences &s = preferences();
-    const QString savedId =
-        s.value(QStringLiteral("video/deviceId")).toString();
+    const QString savedId = catalog_.saved_video_device_id();
 
     block_video_signals_ = true;
     ui->videoDeviceCombo->clear();
 
-    const auto cameras = QMediaDevices::videoInputs();
+    const auto cameras = catalog_.video_devices();
     spdlog::info("[SettingsPage] Qt cameras={}", cameras.size());
     int select = 0;
     for (int i = 0; i < cameras.size(); ++i) {
@@ -316,12 +285,10 @@ void ui::SettingsPage::refreshAudioDevices() {
         return;
     }
 
-    IPreferences &s = preferences();
-    const QString savedId =
-        s.value(QStringLiteral("audio/deviceId")).toString();
+    const QString savedId = catalog_.saved_audio_device_id();
 
     ui->audioDeviceCombo->clear();
-    const auto mics = QMediaDevices::audioInputs();
+    const auto mics = catalog_.audio_devices();
     spdlog::info("[SettingsPage] Qt mics={}", mics.size());
     int select = 0;
     for (int i = 0; i < mics.size(); ++i) {
@@ -351,18 +318,8 @@ void ui::SettingsPage::rebuildResolutionList() {
         return;
     }
 
-    video_caps_.clear();
-    const QCameraDevice device = findCameraById(currentVideoDeviceId());
-    if (!device.isNull()) {
-        for (const QCameraFormat &fmt : device.videoFormats()) {
-            const QSize res = fmt.resolution();
-            const int fps = static_cast<int>(std::lround(fmt.maxFrameRate()));
-            if (res.width() <= 0 || res.height() <= 0 || fps <= 0) {
-                continue;
-            }
-            video_caps_.push_back({res.width(), res.height(), fps});
-        }
-    }
+    const QCameraDevice device = catalog_.find_camera(currentVideoDeviceId());
+    const QList<QSize> resolutions = catalog_.resolutions(device);
 
     const auto &cfg = ClientConfig::instance().webrtc().video;
     IPreferences &s = preferences();
@@ -374,18 +331,12 @@ void ui::SettingsPage::rebuildResolutionList() {
     block_video_signals_ = true;
     ui->videoResolution->clear();
 
-    std::set<std::pair<int, int>> seen;
     int select = 0;
-    for (const auto &cap : video_caps_) {
-        const auto key = std::make_pair(cap.width, cap.height);
-        if (!seen.insert(key).second) {
-            continue;
-        }
+    for (const QSize &res : resolutions) {
         const int idx = ui->videoResolution->count();
         ui->videoResolution->addItem(
-            QStringLiteral("%1 × %2").arg(cap.width).arg(cap.height),
-            QSize(cap.width, cap.height));
-        if (cap.width == preferW && cap.height == preferH) {
+            QStringLiteral("%1 × %2").arg(res.width()).arg(res.height()), res);
+        if (res.width() == preferW && res.height() == preferH) {
             select = idx;
         }
     }
@@ -416,20 +367,12 @@ void ui::SettingsPage::rebuildFpsList() {
     block_video_signals_ = true;
     ui->videoFps->clear();
 
-    std::set<int> fpsSet;
-    for (const auto &cap : video_caps_) {
-        if (cap.width == res.width() && cap.height == res.height() &&
-            cap.fps > 0) {
-            fpsSet.insert(cap.fps);
-        }
-    }
-    if (fpsSet.empty()) {
-        fpsSet = {15, 24, 30};
-    }
+    const QList<int> rates = catalog_.frame_rates(
+        catalog_.find_camera(currentVideoDeviceId()), res);
 
     int select = 0;
     int i = 0;
-    for (int fps : fpsSet) {
+    for (int fps : rates) {
         ui->videoFps->addItem(QStringLiteral("%1 fps").arg(fps), fps);
         if (fps == preferFps) {
             select = i;
@@ -474,155 +417,15 @@ void ui::SettingsPage::scheduleVideoPreview() {
         // 默认不占用摄像头：进入设置页立刻返回，避免开关硬件造成的点击延迟
         return;
     }
-    preview_generation_.fetch_add(1);
-    if (preview_start_timer_) {
-        preview_start_timer_->stop();
-    }
-    // 旧摄像头异步停，避免换设备/重开时卡 UI
-    releasePreviewHardware(true);
     if (ui && ui->videoPreview) {
         ui->videoPreview->setPixmap(QPixmap());
         ui->videoPreview->setText(tr("正在打开摄像头…"));
     }
-    preview_start_timer_->start(16);
+    preview_->start(currentVideoDeviceId(), currentResolution(), currentFps());
 }
 
-void ui::SettingsPage::beginVideoPreviewAsync() {
-    if (!isVisible() || !ui->categoryList ||
-        ui->categoryList->currentRow() != 0) {
-        return;
-    }
 
-    const int gen = preview_generation_.load();
-    const QString deviceId = currentVideoDeviceId();
-    const QSize res = currentResolution();
-    const int fps = currentFps();
-    if (deviceId.isEmpty()) {
-        clearPreviewLabel(ui->videoPreview);
-        return;
-    }
 
-    spdlog::info("[SettingsPage] async prepare preview cam={} {}x{}@{}",
-                 deviceId.toStdString(), res.width(), res.height(), fps);
-
-    QThreadPool::globalInstance()->start(
-        [this, gen, deviceId, res, fps]() {
-            const QCameraDevice device = findCameraById(deviceId);
-            QCameraFormat best;
-            if (!device.isNull()) {
-                int bestScore = INT_MAX;
-                for (const QCameraFormat &fmt : device.videoFormats()) {
-                    const QSize fr = fmt.resolution();
-                    const int ff =
-                        static_cast<int>(std::lround(fmt.maxFrameRate()));
-                    const int score = std::abs(fr.width() - res.width()) +
-                                      std::abs(fr.height() - res.height()) +
-                                      std::abs(ff - fps) * 10;
-                    if (score < bestScore) {
-                        bestScore = score;
-                        best = fmt;
-                    }
-                }
-            }
-
-            QMetaObject::invokeMethod(
-                this,
-                [this, gen, device, best]() {
-                    if (gen != preview_generation_.load() || !isVisible()) {
-                        return;
-                    }
-                    if (!ui->categoryList ||
-                        ui->categoryList->currentRow() != 0) {
-                        return;
-                    }
-                    applyVideoPreview(device, best);
-                },
-                Qt::QueuedConnection);
-        });
-}
-
-void ui::SettingsPage::applyVideoPreview(const QCameraDevice &device,
-                                      const QCameraFormat &format) {
-    releasePreviewHardware(true);
-
-    if (device.isNull()) {
-        clearPreviewLabel(ui->videoPreview);
-        return;
-    }
-
-    camera_ = new QCamera(device, this);
-    capture_session_ = new QMediaCaptureSession(this);
-    video_sink_ = new QVideoSink(this);
-    capture_session_->setCamera(camera_);
-    capture_session_->setVideoSink(video_sink_);
-    if (!format.isNull()) {
-        camera_->setCameraFormat(format);
-    }
-
-    connect(video_sink_, &QVideoSink::videoFrameChanged, this,
-            &ui::SettingsPage::onVideoFrame);
-    connect(camera_, &QCamera::errorOccurred, this,
-            [this](QCamera::Error, const QString &errorString) {
-                spdlog::warn("[SettingsPage] camera error: {}",
-                             errorString.toStdString());
-                QMessageBox::warning(
-                    this, tr("摄像头"),
-                    tr("无法打开摄像头预览：%1").arg(errorString));
-                stopVideoPreview(true);
-            });
-
-    last_preview_paint_ms_ = 0;
-    camera_->start();
-}
-
-void ui::SettingsPage::releasePreviewHardware(bool deferHardware) {
-    QCamera *cam = camera_;
-    QMediaCaptureSession *session = capture_session_;
-    QVideoSink *sink = video_sink_;
-    camera_ = nullptr;
-    capture_session_ = nullptr;
-    video_sink_ = nullptr;
-
-    if (!cam && !session && !sink) {
-        return;
-    }
-
-    if (sink) {
-        QObject::disconnect(sink, nullptr, this, nullptr);
-    }
-    if (cam) {
-        QObject::disconnect(cam, nullptr, this, nullptr);
-    }
-
-    auto cleanup = [cam, session, sink]() {
-        if (cam) {
-            cam->stop();
-            cam->deleteLater();
-        }
-        if (session) {
-            session->deleteLater();
-        }
-        if (sink) {
-            sink->deleteLater();
-        }
-    };
-
-    if (deferHardware) {
-        // 脱离本页生命周期，避免 hide/析构时同步卡在 stop()
-        if (cam) {
-            cam->setParent(nullptr);
-        }
-        if (session) {
-            session->setParent(nullptr);
-        }
-        if (sink) {
-            sink->setParent(nullptr);
-        }
-        QTimer::singleShot(0, qApp, cleanup);
-    } else {
-        cleanup();
-    }
-}
 
 void ui::SettingsPage::onVideoPreviewToggleClicked() {
     video_preview_enabled_ = !video_preview_enabled_;
@@ -677,114 +480,15 @@ void ui::SettingsPage::update_preview_toggle_ui() {
 }
 
 void ui::SettingsPage::stopVideoPreview(bool deferHardware) {
-    preview_generation_.fetch_add(1);
-    if (preview_start_timer_) {
-        preview_start_timer_->stop();
+    if (preview_) {
+        preview_->stop(deferHardware);
     }
-    releasePreviewHardware(deferHardware);
     if (ui && ui->videoPreview) {
         clearPreviewLabel(ui->videoPreview);
         if (!video_preview_enabled_) {
             ui->videoPreview->setText(tr("摄像头预览已关闭"));
         }
     }
-}
-
-void ui::SettingsPage::startMicTest() {
-    stopMicTest();
-    const QAudioDevice device = findMicById(currentAudioDeviceId());
-    if (device.isNull()) {
-        QMessageBox::warning(this, tr("麦克风"), tr("未找到麦克风设备。"));
-        return;
-    }
-
-    QAudioFormat format = device.preferredFormat();
-    if (format.sampleFormat() != QAudioFormat::Int16) {
-        format.setSampleFormat(QAudioFormat::Int16);
-    }
-    if (!device.isFormatSupported(format)) {
-        format = device.preferredFormat();
-    }
-
-    audio_source_ = new QAudioSource(device, format, this);
-    audio_io_ = audio_source_->start();
-    if (!audio_io_) {
-        QMessageBox::warning(this, tr("麦克风"), tr("无法麦克风测试。"));
-        delete audio_source_;
-        audio_source_ = nullptr;
-        return;
-    }
-
-    mic_timer_ = new QTimer(this);
-    mic_timer_->setInterval(50);
-    connect(mic_timer_, &QTimer::timeout, this, &ui::SettingsPage::onMicTimer);
-    mic_timer_->start();
-
-    mic_testing_ = true;
-    ui->micTestBtn->setText(tr("停止测试"));
-    if (ui->micLevelBar) {
-        ui->micLevelBar->setValue(0);
-    }
-}
-
-void ui::SettingsPage::stopMicTest() {
-    if (mic_timer_) {
-        mic_timer_->stop();
-        mic_timer_->deleteLater();
-        mic_timer_ = nullptr;
-    }
-    if (audio_source_) {
-        audio_source_->stop();
-        audio_source_->deleteLater();
-        audio_source_ = nullptr;
-    }
-    audio_io_ = nullptr;
-    mic_testing_ = false;
-    if (ui && ui->micTestBtn) {
-        ui->micTestBtn->setText(tr("麦克风测试"));
-    }
-    if (ui && ui->micLevelBar) {
-        ui->micLevelBar->setValue(0);
-    }
-}
-
-void ui::SettingsPage::onVideoFrame(const QVideoFrame &frame) {
-    if (!ui || !ui->videoPreview || !frame.isValid()) {
-        return;
-    }
-    // 预览 UI 限到约 15fps，避免每帧 toImage/scaled 堵主线程
-    const qint64 now = QDateTime::currentMSecsSinceEpoch();
-    if (last_preview_paint_ms_ > 0 && now - last_preview_paint_ms_ < 66) {
-        return;
-    }
-    last_preview_paint_ms_ = now;
-
-    QVideoFrame copy = frame;
-    if (!copy.map(QVideoFrame::ReadOnly)) {
-        return;
-    }
-    const QImage image = copy.toImage();
-    copy.unmap();
-    if (image.isNull()) {
-        return;
-    }
-    const QPixmap pix = QPixmap::fromImage(image).scaled(
-        ui->videoPreview->size(), Qt::KeepAspectRatio,
-        Qt::FastTransformation);
-    ui->videoPreview->setText(QString());
-    ui->videoPreview->setPixmap(pix);
-}
-
-void ui::SettingsPage::onMicTimer() {
-    if (!audio_io_ || !audio_source_ || !ui->micLevelBar) {
-        return;
-    }
-    const QByteArray data = audio_io_->readAll();
-    if (data.isEmpty()) {
-        return;
-    }
-    ui->micLevelBar->setValue(
-        pcmLevelPercent(data, audio_source_->format()));
 }
 
 void ui::SettingsPage::onVideoDeviceChanged(int) {
@@ -817,10 +521,27 @@ void ui::SettingsPage::onVideoFpsChanged(int) {
 }
 
 void ui::SettingsPage::onMicTestClicked() {
-    if (mic_testing_) {
-        stopMicTest();
+    if (!mic_) {
+        return;
+    }
+    if (mic_->running()) {
+        mic_->stop();
     } else {
-        startMicTest();
+        mic_->start(currentAudioDeviceId());
+    }
+    update_mic_ui();
+}
+
+void ui::SettingsPage::update_mic_ui() {
+    if (!ui) {
+        return;
+    }
+    const bool running = mic_ && mic_->running();
+    if (ui->micTestBtn) {
+        ui->micTestBtn->setText(running ? tr("停止测试") : tr("麦克风测试"));
+    }
+    if (ui->micLevelBar) {
+        ui->micLevelBar->setValue(0);
     }
 }
 
@@ -890,12 +611,12 @@ void ui::SettingsPage::saveUiPrefs() const {
                ui->videoAutoPreview->isChecked());
 
     if (ui->videoDeviceCombo && ui->videoDeviceCombo->isEnabled()) {
-        s.set_value(QStringLiteral("video/deviceId"),
-                   ui->videoDeviceCombo->currentData().toString());
+        catalog_.save_video_device_id(
+            ui->videoDeviceCombo->currentData().toString());
     }
     if (ui->audioDeviceCombo && ui->audioDeviceCombo->isEnabled()) {
-        s.set_value(QStringLiteral("audio/deviceId"),
-                   ui->audioDeviceCombo->currentData().toString());
+        catalog_.save_audio_device_id(
+            ui->audioDeviceCombo->currentData().toString());
     }
     const QSize res = currentResolution();
     s.set_value(QStringLiteral("video/width"), res.width());
@@ -944,7 +665,8 @@ void ui::SettingsPage::onResetClicked() {
         return;
     }
 
-    stopMicTest();
+    if (mic_) { mic_->stop(); }
+    update_mic_ui();
     stopVideoPreview();
     ui->audioMuteOnJoin->setChecked(false);
     ui->audioEchoCancel->setChecked(true);
