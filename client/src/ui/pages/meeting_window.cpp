@@ -3,6 +3,8 @@
 #include "ui/foundation/theme_manager.h"
 
 #include "app/meeting_session.h"
+#include "features/meeting/connect_coordinator.h"
+#include "features/meeting/device_menu_controller.h"
 #include "ui/foundation/icon_provider.h"
 #include "config/preferences.h"
 #include "media/recording/meeting_recorder.h"
@@ -52,19 +54,6 @@
 #include <qnamespace.h>
 #include <spdlog/spdlog.h>
 
-namespace {
-
-QString deviceName(const xrtc::XRTCDeviceInfo &info) {
-    if (!info.device_name.empty()) {
-        return QString::fromUtf8(info.device_name.data(),
-                                 static_cast<int>(info.device_name.size()));
-    }
-    return QString::fromUtf8(info.device_id.data(),
-                             static_cast<int>(info.device_id.size()));
-}
-
-}  // namespace
-
 QRect ui::MeetingWindow::pos = QRect(-1, -1, -1, -1);
 
 namespace {
@@ -93,34 +82,6 @@ void apply_toggle_icon(QToolButton *button, const QString &icon_on,
 }
 
 }  // namespace
-namespace {
-
-/**
- * @brief 弹出设备选择菜单：再次点击小箭头即关闭（QMenu 的默认行为）
- *
- * 只做两件事：
- * 1) 箭头方向：菜单打开时朝下，关闭后回到朝上；
- * 2) 不拦截任何鼠标事件 —— 菜单开着时再点小箭头，QMenu 自己会收起。
- */
-void popup_device_menu(QMenu *menu, QToolButton *button, QWidget *owner) {
-    if (menu == nullptr || button == nullptr) {
-        return;
-    }
-    auto &theme = ui::ThemeManager::instance();
-    const QColor color = theme.color(QStringLiteral("textMuted"));
-    auto &icons = ui::IconProvider::instance();
-
-    button->setIcon(icons.icon(QStringLiteral("chevron-down"), color, 12));
-
-    QObject::connect(menu, &QMenu::aboutToHide, owner, [button, color]() {
-        button->setIcon(ui::IconProvider::instance().icon(
-            QStringLiteral("chevron-up"), color, 12));
-    });
-    menu->popup(menu->pos().isNull() ? QCursor::pos() : menu->pos());
-}
-
-}  // namespace
-
 // ---- 会话对象访问器 ----
 // 统一在这里做空判断：_session 在构造后期才创建，而 init_ui()/析构清理
 // 等路径可能在它创建之前或销毁之后访问这些对象。
@@ -190,6 +151,11 @@ ui::MeetingWindow::MeetingWindow(QWidget *parent)
     _session = std::make_unique<app::MeetingSession>(ports);
     spdlog::info("[MeetingWindow] create MeetingSession done");
     spdlog::default_logger()->flush();
+
+    // 连接协调器与设备菜单：原本是窗口内的 6 个 pending 成员 + 2 个 100 行方法
+    _connect = std::make_unique<ConnectCoordinator>(this);
+    _deviceMenu = std::make_unique<DeviceMenuController>(media(), this);
+    _deviceMenu->bind_buttons(ui.audioDeviceBtn, ui.videoDeviceBtn);
 
     // 延迟创建 QSoundEffect：构造时加载 Qt Multimedia(FFmpeg) 会与 WebRTC
     // 摄像头枚举冲突，导致设置页一点开就崩。
@@ -279,6 +245,19 @@ void ui::MeetingWindow::init_connect() {
     connect(net, &NetworkManager::disconnected, this,
             &ui::MeetingWindow::on_network_disconnected_slot, Qt::QueuedConnection);
 
+    // 连接协调器：窗口不再自己维护 pending/connecting 状态
+    connect(_connect.get(), &ConnectCoordinator::connect_requested, this,
+            &ui::MeetingWindow::request_connect_signal, Qt::QueuedConnection);
+    connect(_connect.get(), &ConnectCoordinator::connect_finished, this,
+            &ui::MeetingWindow::apply_connect_result);
+    connect(_connect.get(), &ConnectCoordinator::create_requested, this,
+            [this](quint32 max_participants, quint32 duration_minutes) {
+                emit create_meeting_requested_signal(max_participants,
+                                                     duration_minutes);
+            });
+    connect(_connect.get(), &ConnectCoordinator::join_requested, this,
+            &ui::MeetingWindow::on_join_meet_btn_slot);
+
     connect(this, &ui::MeetingWindow::request_connect_signal, ctrl,
             &MeetingController::connect_to_server_slot, Qt::QueuedConnection);
     connect(ctrl, &MeetingController::connect_finished_signal, this,
@@ -318,7 +297,7 @@ void ui::MeetingWindow::init_settings_popup() {
     // 房间设置面板与录制控制（对象由 MeetingSession 创建，这里只做视图装配）
     RoomSettingsController *settings_panel = room_settings();
     settings_panel->init_popup(ui.btnMeetingSettings);
-    settings_panel->set_room_no(_roomNo);
+    settings_panel->set_room_no(_state._roomNo);
 
     connect(room_settings(), &RoomSettingsController::settings_edited, this,
             [this](std::uint32_t flags) {
@@ -337,7 +316,7 @@ void ui::MeetingWindow::init_settings_popup() {
     connect(room_settings(), &RoomSettingsController::copy_room_no_requested,
             this, [this]() {
                 const QString text =
-                    _roomNo > 0 ? QString::number(_roomNo) : QString();
+                    _state._roomNo > 0 ? QString::number(_state._roomNo) : QString();
                 if (!text.isEmpty()) {
                     QGuiApplication::clipboard()->setText(text);
                     spdlog::info("[MeetingWindow] room no copied: {}",
@@ -511,7 +490,9 @@ void ui::MeetingWindow::closeEvent(QCloseEvent *event) {
 void ui::MeetingWindow::close_meeting_window() {
     releaseMouse();
     unsetCursor();
-    _state._hasPendingConnect = false;
+    if (_connect) {
+        _connect->cancel_pending();
+    }
     if (!_state._sessionEnding)
         end_meeting_session();
     if (isVisible())
@@ -520,28 +501,26 @@ void ui::MeetingWindow::close_meeting_window() {
 
 void ui::MeetingWindow::on_network_disconnected_slot() {
     _state._sessionActive = false;
-    _state._sessionEnding = false;
-    _state._connecting = false;
+    set_session_ending(false);
+    if (_connect) {
+        _connect->on_disconnected();
+    }
     update_meeting_info();
     flush_pending_connect();
 }
 
 void ui::MeetingWindow::flush_pending_connect() {
-    if (!_state._hasPendingConnect)
-        return;
-    const QString ip = _pendingConnectIp;
-    const QString port = _pendingConnectPort;
-    const ConnectAction action = _pendingConnectAction;
-    const QString roomNo = _pendingConnectRoomNo;
-    const quint32 max_participants = _pendingMaxParticipants;
-    const quint32 duration_minutes = _pendingDurationMinutes;
-    _state._hasPendingConnect = false;
-    _pendingConnectIp.clear();
-    _pendingConnectPort.clear();
-    _pendingConnectRoomNo.clear();
-    _pendingConnectAction = ConnectAction::CreateMeeting;
-    request_connect_to_server_slot(ip, port, action, roomNo, max_participants,
-                                   duration_minutes);
+    // 挂起逻辑已迁到 ConnectCoordinator，这里只做转调
+    if (_connect) {
+        _connect->flush_pending();
+    }
+}
+
+void ui::MeetingWindow::set_session_ending(bool ending) {
+    _state._sessionEnding = ending;
+    if (_connect) {
+        _connect->set_session_ending(ending);
+    }
 }
 
 void ui::MeetingWindow::reset_meeting_ui() {
@@ -560,12 +539,12 @@ void ui::MeetingWindow::reset_meeting_ui() {
             [this]() { show_meeting_info_popup(); });
 
     ui.topMainTitle->setText(QStringLiteral("主屏幕"));
-    _roomNo = 0;
-    _serverAddr.clear();
-    _startupBeginMs = 0;
-    _startupJoinedMs = 0;
-    _startupFirstFrameMs = 0;
-    _sessionStartMs = 0;
+    _state._roomNo = 0;
+    _state._serverAddr.clear();
+    _state._startupBeginMs = 0;
+    _state._startupJoinedMs = 0;
+    _state._startupFirstFrameMs = 0;
+    _state._sessionStartMs = 0;
     if (_durationTimer) {
         _durationTimer->stop();
     }
@@ -655,7 +634,7 @@ void ui::MeetingWindow::show_meeting_info_popup() {
         label->setText(self_name.isEmpty() ? tr("会议") : tr("%1的会议").arg(self_name));
     }
     if (auto *label = _infoPopup->findChild<QLabel *>(QStringLiteral("infoPopupRoomNo"))) {
-        label->setText(_roomNo > 0 ? QString::number(_roomNo) : QStringLiteral("-"));
+        label->setText(_state._roomNo > 0 ? QString::number(_state._roomNo) : QStringLiteral("-"));
     }
     if (auto *label = _infoPopup->findChild<QLabel *>(QStringLiteral("infoPopupHost"))) {
         label->setText(is_host ? self_name : tr("房主"));
@@ -664,8 +643,8 @@ void ui::MeetingWindow::show_meeting_info_popup() {
         label->setText(self_name.isEmpty() ? QStringLiteral("-") : self_name);
     }
     if (auto *label = _infoPopup->findChild<QLabel *>(QStringLiteral("infoPopupDuration"))) {
-        const qint64 seconds = _sessionStartMs > 0
-                                   ? (QDateTime::currentMSecsSinceEpoch() - _sessionStartMs) / 1000
+        const qint64 seconds = _state._sessionStartMs > 0
+                                   ? (QDateTime::currentMSecsSinceEpoch() - _state._sessionStartMs) / 1000
                                    : 0;
         label->setText(format_duration_hms(seconds));
     }
@@ -681,11 +660,11 @@ void ui::MeetingWindow::refresh_duration_chip() {
         return;
     }
     const bool inMeeting = (_state._createmeet || _state._joinmeet) &&
-                           _sessionStartMs > 0;
+                           _state._sessionStartMs > 0;
     QString text;
     if (inMeeting) {
         const qint64 seconds =
-            (QDateTime::currentMSecsSinceEpoch() - _sessionStartMs) / 1000;
+            (QDateTime::currentMSecsSinceEpoch() - _state._sessionStartMs) / 1000;
         text = format_duration_hms(seconds);
     } else {
         text = tr("--:--:--");
@@ -702,13 +681,13 @@ void ui::MeetingWindow::refresh_duration_chip() {
 }
 
 void ui::MeetingWindow::mark_startup_first_frame() {
-    if (_startupBeginMs <= 0 || _startupFirstFrameMs > 0) {
+    if (_state._startupBeginMs <= 0 || _state._startupFirstFrameMs > 0) {
         return;
     }
-    _startupFirstFrameMs = QDateTime::currentMSecsSinceEpoch() - _startupBeginMs;
+    _state._startupFirstFrameMs = QDateTime::currentMSecsSinceEpoch() - _state._startupBeginMs;
     spdlog::info("[MeetingWindow] startup: first frame in {}ms (rtc join {}ms)",
-                 static_cast<long long>(_startupFirstFrameMs),
-                 static_cast<long long>(_startupJoinedMs));
+                 static_cast<long long>(_state._startupFirstFrameMs),
+                 static_cast<long long>(_state._startupJoinedMs));
 }
 
 void ui::MeetingWindow::update_meeting_info() {
@@ -735,7 +714,7 @@ void ui::MeetingWindow::update_meeting_info() {
         ui.canvasHint->setVisible(!inMeeting);
 
     const QString roomText =
-        _roomNo > 0 ? QString::number(_roomNo) : QStringLiteral("-");
+        _state._roomNo > 0 ? QString::number(_state._roomNo) : QStringLiteral("-");
     ui.labelRoomNo->setText(roomText);
     ui.topRoomChip->setText(tr("房间 %1").arg(roomText));
 
@@ -748,8 +727,8 @@ void ui::MeetingWindow::update_meeting_info() {
                                   ? QString::number(local_user_id())
                                   : display);
 
-    if (_state._sessionActive && !_serverAddr.isEmpty())
-        ui.labelServer->setText(_serverAddr);
+    if (_state._sessionActive && !_state._serverAddr.isEmpty())
+        ui.labelServer->setText(_state._serverAddr);
     else if (_state._sessionActive)
         ui.labelServer->setText(tr("已连接"));
     else
@@ -775,18 +754,20 @@ void ui::MeetingWindow::update_speaker_label() {
 
 void ui::MeetingWindow::end_meeting_session() {
     // 先结算本次时长，再拆媒体（结束信号给主窗口写会议记录用）
-    if (_sessionStartMs > 0) {
+    if (_state._sessionStartMs > 0) {
         const qint64 duration =
-            QDateTime::currentMSecsSinceEpoch() - _sessionStartMs;
-        _sessionStartMs = 0;
+            QDateTime::currentMSecsSinceEpoch() - _state._sessionStartMs;
+        _state._sessionStartMs = 0;
         emit meeting_closed_signal(duration);
     }
     stop_meeting_media();
 
     _state._createmeet = false;
     _state._joinmeet = false;
-    const bool wasConnecting = _state._connecting;
-    _state._connecting = false;
+    const bool wasConnecting = _connect ? _connect->connecting() : false;
+    if (_connect) {
+        _connect->on_disconnected();
+    }
 
     if (participants()) { participants()->clear(); }
     reset_meeting_ui();
@@ -794,7 +775,7 @@ void ui::MeetingWindow::end_meeting_session() {
     NetworkManager *net = network();
     MeetingController *ctrl = controller();
     if (net && (_state._sessionActive || wasConnecting)) {
-        _state._sessionEnding = true;
+        set_session_ending(true);
         if (ctrl) {
             QMetaObject::invokeMethod(
                 ctrl, &MeetingController::disconnect_from_host_slot,
@@ -806,9 +787,11 @@ void ui::MeetingWindow::end_meeting_session() {
         QTimer::singleShot(800, this, [this]() {
             if (!_state._sessionEnding)
                 return;
-            _state._sessionEnding = false;
+            set_session_ending(false);
             _state._sessionActive = false;
-            _state._connecting = false;
+            if (_connect) {
+                _connect->on_disconnected();
+            }
             update_meeting_info();
             flush_pending_connect();
         });
@@ -899,7 +882,7 @@ void ui::MeetingWindow::handle_rtc_session_lost(const QString &reason) {
 }
 
 void ui::MeetingWindow::start_meeting_media() {
-    if (_roomNo <= 0 || !media()) {
+    if (_state._roomNo <= 0 || !media()) {
         return;
     }
     _state._rtcJoined = false;
@@ -909,9 +892,9 @@ void ui::MeetingWindow::start_meeting_media() {
     sync_av_button_ui();
 
     MeetingMediaController::StartOptions options;
-    options.room_no = _roomNo;
+    options.room_no = _state._roomNo;
     options.create_room = _state._createmeet;
-    options.max_participants = _createMaxParticipants;
+    options.max_participants = (_connect ? _connect->max_participants() : 8u);
     media()->start(options);
     send_local_user_profile();
 }
@@ -962,10 +945,10 @@ void ui::MeetingWindow::on_remote_frame(qint64 user_id, xrtc::XRTCVideoFrame fra
 
 void ui::MeetingWindow::on_rtc_joined() {
     _state._rtcJoined = true;
-    if (_startupBeginMs > 0 && _startupJoinedMs == 0) {
-        _startupJoinedMs = QDateTime::currentMSecsSinceEpoch() - _startupBeginMs;
+    if (_state._startupBeginMs > 0 && _state._startupJoinedMs == 0) {
+        _state._startupJoinedMs = QDateTime::currentMSecsSinceEpoch() - _state._startupBeginMs;
         spdlog::info("[MeetingWindow] startup: rtc joined in {}ms",
-                     static_cast<long long>(_startupJoinedMs));
+                     static_cast<long long>(_state._startupJoinedMs));
     }
     if (media()) {
         media()->set_joined(true);
@@ -1031,8 +1014,8 @@ void ui::MeetingWindow::on_create_meet_btn_clicked_slot() {
     if (!_state._createmeet) {
         ui.openAudio->setDisabled(true);
         ui.openVedio->setDisabled(true);
-        emit create_meeting_requested_signal(_createMaxParticipants,
-                                             _createDurationMinutes);
+        emit create_meeting_requested_signal((_connect ? _connect->max_participants() : 8u),
+                                             (_connect ? _connect->duration_minutes() : 60u));
     }
 }
 
@@ -1049,11 +1032,15 @@ void ui::MeetingWindow::on_open_audio_clicked_slot() {
 }
 
 void ui::MeetingWindow::on_audio_device_btn_clicked_slot() {
-    show_audio_device_menu();
+    if (_deviceMenu) {
+        _deviceMenu->show_audio_menu();
+    }
 }
 
 void ui::MeetingWindow::on_video_device_btn_clicked_slot() {
-    show_video_device_menu();
+    if (_deviceMenu) {
+        _deviceMenu->show_video_menu();
+    }
 }
 
 void ui::MeetingWindow::on_share_screen_clicked_slot() {
@@ -1104,117 +1091,13 @@ void ui::MeetingWindow::on_toggle_panel_clicked_slot(bool checked) {
     ui.tabWidget->setVisible(checked);
 }
 
-void ui::MeetingWindow::show_audio_device_menu() {
-    if (!media())
-        return;
-
-    auto *menu = new QMenu(this);
-    menu->setObjectName(QStringLiteral("deviceSelectMenu"));
-    menu->setAttribute(Qt::WA_DeleteOnClose);
-
-    auto *speakerTitle = menu->addAction(tr("选择扬声器"));
-    speakerTitle->setEnabled(false);
-    auto *speakerGroup = new QActionGroup(menu);
-    speakerGroup->setExclusive(true);
-    const auto speakers = media()->playout_devices();
-    if (speakers.empty()) {
-        auto *empty = menu->addAction(tr("（无可用扬声器）"));
-        empty->setEnabled(false);
-    } else {
-        std::string current = media()->playout_device_id();
-        if (current.empty())
-            current = speakers.front().device_id;
-        for (const auto &dev : speakers) {
-            auto *act = menu->addAction(deviceName(dev));
-            act->setCheckable(true);
-            act->setChecked(dev.device_id == current);
-            act->setData(QVariant::fromValue(
-                QString::fromStdString(dev.device_id)));
-            speakerGroup->addAction(act);
-            connect(act, &QAction::triggered, this, [this, id = dev.device_id]() {
-                media()->select_playout_device(id);
-            });
-        }
-    }
-
-    menu->addSeparator();
-    auto *micTitle = menu->addAction(tr("选择麦克风"));
-    micTitle->setEnabled(false);
-    auto *micGroup = new QActionGroup(menu);
-    micGroup->setExclusive(true);
-    const auto mics = media()->audio_devices();
-    if (mics.empty()) {
-        auto *empty = menu->addAction(tr("（无可用麦克风）"));
-        empty->setEnabled(false);
-    } else {
-        std::string current = media()->audio_device_id();
-        if (current.empty())
-            current = mics.front().device_id;
-        for (const auto &dev : mics) {
-            auto *act = menu->addAction(deviceName(dev));
-            act->setCheckable(true);
-            act->setChecked(dev.device_id == current);
-            act->setData(QVariant::fromValue(
-                QString::fromStdString(dev.device_id)));
-            micGroup->addAction(act);
-            connect(act, &QAction::triggered, this, [this, id = dev.device_id]() {
-                media()->select_audio_device(id);
-            });
-        }
-    }
-
-    const QPoint pos = ui.audioDeviceBtn->mapToGlobal(
-        QPoint(0, -menu->sizeHint().height()));
-    menu->move(pos);
-    popup_device_menu(menu, ui.audioDeviceBtn, this);
-}
-
-void ui::MeetingWindow::show_video_device_menu() {
-    if (!media())
-        return;
-
-    auto *menu = new QMenu(this);
-    menu->setObjectName(QStringLiteral("deviceSelectMenu"));
-    menu->setAttribute(Qt::WA_DeleteOnClose);
-
-    auto *camTitle = menu->addAction(tr("选择摄像头"));
-    camTitle->setEnabled(false);
-    auto *camGroup = new QActionGroup(menu);
-    camGroup->setExclusive(true);
-    const auto cameras = media()->video_devices();
-    if (cameras.empty()) {
-        auto *empty = menu->addAction(tr("（无可用摄像头）"));
-        empty->setEnabled(false);
-    } else {
-        std::string current = media()->video_device_id();
-        if (current.empty())
-            current = cameras.front().device_id;
-        for (const auto &dev : cameras) {
-            auto *act = menu->addAction(deviceName(dev));
-            act->setCheckable(true);
-            act->setChecked(dev.device_id == current);
-            act->setData(QVariant::fromValue(
-                QString::fromStdString(dev.device_id)));
-            camGroup->addAction(act);
-            connect(act, &QAction::triggered, this, [this, id = dev.device_id]() {
-                media()->select_video_device(id);
-            });
-        }
-    }
-
-    const QPoint pos = ui.videoDeviceBtn->mapToGlobal(
-        QPoint(0, -menu->sizeHint().height()));
-    menu->move(pos);
-    popup_device_menu(menu, ui.videoDeviceBtn, this);
-}
-
 void ui::MeetingWindow::on_create_meeting_result(int roomno) {
     spdlog::info("[MeetingWindow] CREATE_MEETING_RESPONSE roomno={}", roomno);
     if (spdlog::default_logger())
         spdlog::default_logger()->flush();
 
     if (roomno != 0) {
-        _roomNo = roomno;
+        _state._roomNo = roomno;
         _state._createmeet = true;
         ui.sendmsg->setDisabled(false);
 
@@ -1232,7 +1115,7 @@ void ui::MeetingWindow::on_create_meeting_result(int roomno) {
         if (spdlog::default_logger())
             spdlog::default_logger()->flush();
         update_meeting_info();
-        _sessionStartMs = QDateTime::currentMSecsSinceEpoch();
+        _state._sessionStartMs = QDateTime::currentMSecsSinceEpoch();
         if (_durationTimer) {
             _durationTimer->start();
         }
@@ -1273,18 +1156,18 @@ void ui::MeetingWindow::on_join_meeting_result(int c) {
         _state._joinmeet = true;
         start_meeting_media();
         update_meeting_info();
-        _sessionStartMs = QDateTime::currentMSecsSinceEpoch();
+        _state._sessionStartMs = QDateTime::currentMSecsSinceEpoch();
         if (_durationTimer) {
             _durationTimer->start();
         }
         refresh_duration_chip();
         spdlog::info("[MeetingWindow] duration timer started (join)");
         if (room_settings()) {
-            room_settings()->set_room_no(_roomNo);
+            room_settings()->set_room_no(_state._roomNo);
             room_settings()->set_host(false);
             room_settings()->set_session_active(true);
         }
-        emit meeting_confirmed_signal(false, _roomNo);
+        emit meeting_confirmed_signal(false, _state._roomNo);
         QMessageBox::information(this, tr("Meeting information"), tr("加入成功"));
     }
 }
@@ -1387,7 +1270,7 @@ void ui::MeetingWindow::on_join_meet_btn_slot(QString room_no) {
     if (roomvalidate.validate(room_no, pos) != QValidator::Acceptable) {
         QMessageBox::warning(this, tr("RoomNo Error"), tr("房间号不合法"));
     } else {
-        _roomNo = room_no.toInt();
+        _state._roomNo = room_no.toInt();
         emit join_meeting_requested_signal(room_no);
         update_meeting_info();
     }
@@ -1396,37 +1279,38 @@ void ui::MeetingWindow::on_join_meet_btn_slot(QString room_no) {
 void ui::MeetingWindow::request_connect_to_server_slot(
     QString ip, QString port, ConnectAction action, QString room_no,
     quint32 max_participants, quint32 duration_minutes) {
-    // 启动耗时计时起点：用户点下创建/加入的那一刻（只写日志，界面显示的是会议时长）
-    _startupBeginMs = QDateTime::currentMSecsSinceEpoch();
-    _startupJoinedMs = 0;
-    _startupFirstFrameMs = 0;
-    if (_state._sessionEnding || _state._connecting) {
-        _state._hasPendingConnect = true;
-        _pendingConnectIp = ip;
-        _pendingConnectPort = port;
-        _pendingConnectAction = action;
-        _pendingConnectRoomNo = room_no;
-        _pendingMaxParticipants = max_participants;
-        _pendingDurationMinutes = duration_minutes;
+    // 启动耗时计时起点：用户点下创建/加入的那一刻（界面显示的是会议时长）
+    _state._startupBeginMs = QDateTime::currentMSecsSinceEpoch();
+    _state._startupJoinedMs = 0;
+    _state._startupFirstFrameMs = 0;
+    if (!_connect) {
         return;
     }
-    _state._connecting = true;
-    _serverAddr = ip + QStringLiteral(":") + port;
-    _createMaxParticipants = max_participants;
-    _createDurationMinutes = duration_minutes;
-    emit request_connect_signal(ip, port, action, room_no);
+    _state._serverAddr = ip + QStringLiteral(":") + port;
+    _connect->request(ip, port, action, room_no, max_participants,
+                      duration_minutes);
 }
 
 void ui::MeetingWindow::on_connect_finished_slot(bool ok, QString ip, QString port,
                                              ConnectAction action,
                                              QString room_no) {
+    Q_UNUSED(room_no);
+    // 结果交给协调器：它负责串行化，并在成功后决定发建会还是入会请求
+    if (_connect) {
+        _connect->on_connected(ok, ip, port, action);
+    }
+}
+
+void ui::MeetingWindow::apply_connect_result(bool ok, QString ip, QString port,
+                                             ConnectAction action,
+                                             QString room_no) {
+    Q_UNUSED(room_no);
     spdlog::info("[MeetingWindow] on_connect_finished ok={} action={} {}:{}",
                  ok, static_cast<int>(action), ip.toUtf8().constData(),
                  port.toUtf8().constData());
     if (spdlog::default_logger())
         spdlog::default_logger()->flush();
 
-    _state._connecting = false;
     emit connect_server_finished_signal(ok, ip, port, action);
     if (!ok) {
         spdlog::warn("[MeetingWindow] connect failed");
@@ -1435,18 +1319,6 @@ void ui::MeetingWindow::on_connect_finished_slot(bool ok, QString ip, QString po
     }
     _state._sessionActive = true;
     update_meeting_info();
-    if (action == ConnectAction::CreateMeeting) {
-        spdlog::info("[MeetingWindow] request create_meeting max={} duration={}",
-                     _createMaxParticipants, _createDurationMinutes);
-        if (spdlog::default_logger())
-            spdlog::default_logger()->flush();
-        emit create_meeting_requested_signal(_createMaxParticipants,
-                                             _createDurationMinutes);
-    } else if (action == ConnectAction::JoinMeeting) {
-        spdlog::info("[MeetingWindow] request join_meeting room={}",
-                     room_no.toUtf8().constData());
-        on_join_meet_btn_slot(room_no);
-    }
 }
 
 void ui::MeetingWindow::on_send_msg_clicked_slot() {
