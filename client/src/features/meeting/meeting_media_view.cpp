@@ -102,9 +102,6 @@ void MeetingMediaView::refresh_buttons() {
     ui::apply_toggle_icon(ui.openVedio, QStringLiteral("camera"),
                           QStringLiteral("camera-off"), state._localVideoOn);
 
-    if (_topBar) {
-        _topBar->refresh_speaker();
-    }
 }
 
 void MeetingMediaView::set_video_on(bool on) {

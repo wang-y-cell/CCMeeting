@@ -33,7 +33,7 @@ MeetingWindow（装配根，572 行）
 ├── 持有各功能模块指针：
 │   ├── ConnectCoordinator        连接挂起/串行化
 │   ├── DeviceMenuController      设备选择菜单
-│   ├── MeetingTopBarController   顶栏状态/时长/详情弹窗/标签栏
+│   ├── MeetingTopBarController   时长/未入会占位/详情弹窗/标签栏
 │   ├── MeetingMediaView          媒体按钮/媒体生命周期/帧路由
 │   └── MeetingSessionController  建会入会结果/结束/复位
 ├── 实现 IMeetingWindowHost（给控制器读状态与装配对象）
@@ -57,11 +57,13 @@ MeetingWindow（装配根，572 行）
 
 ### 3.3 MeetingTopBarController
 
-- `refresh_meeting_info()`：状态胶囊、房间号、人数、服务端地址。
+- `refresh_meeting_info()`：未入会时画布占位提示的显隐。
 - `refresh_duration()/start_duration()/stop_duration()`：每秒刷新的会议时长。
-- `refresh_speaker()`：讲话者标签。
 - `show_info_popup()`：「会议详情」弹层（懒创建）。
-- `apply_tab_bar_visibility()`、`set_main_screen_title()`。
+- `apply_tab_bar_visibility()`：右侧标签栏显隐。
+
+> 顶栏原有的房间号/人数/状态/讲话者/主画面标题标签，以及从未挂到
+> `QTabWidget` 的「信息」页和工具栏「信息」按钮，已彻底删除（此前只是 hide）。
 - `format_duration_hms()` 静态纯函数（单测入口）。
 
 ### 3.4 MeetingMediaView

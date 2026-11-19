@@ -9,7 +9,6 @@
 #include "media/video/video_gl_widget.h"
 
 #include <QAbstractScrollArea>
-#include <QFormLayout>
 #include <QFrame>
 #include <QGridLayout>
 #include <QGroupBox>
@@ -54,7 +53,6 @@ QToolButton *makeToolButton(const QString &objectName, const QString &text,
     static const QHash<QString, QString> kIconByName = {
         {QStringLiteral("btnSideMembers"), QStringLiteral("users")},
         {QStringLiteral("btnSideChat"), QStringLiteral("chat")},
-        {QStringLiteral("btnSideInfo"), QStringLiteral("info")},
         {QStringLiteral("openAudio"), QStringLiteral("mic")},
         {QStringLiteral("openVedio"), QStringLiteral("camera")},
         {QStringLiteral("shareScreenBtn"), QStringLiteral("screen-share")},
@@ -127,8 +125,8 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
 
     verticalLayout = new QVBoxLayout(parent);
     verticalLayout->setObjectName(QStringLiteral("verticalLayout"));
-    verticalLayout->setSpacing(0);
-    verticalLayout->setContentsMargins(0, 0, 0, 0);
+    verticalLayout->setSpacing(0);// 控件之间间距为0
+    verticalLayout->setContentsMargins(0, 0, 0, 0); //布局四周内边距为0
 
     // ---- 顶栏 ----
     topStatusBar = new QWidget(parent);
@@ -142,23 +140,10 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
     topStatusLayout->setContentsMargins(16, 4, 16, 4);
 
 
-    topMainTitle =
-        makeLabel(QStringLiteral("topMainTitle"), QObject::tr("主屏幕"),
-                  topStatusBar);
-    topRoomChip = makeLabel(QStringLiteral("topRoomChip"),
-                            QObject::tr("房间 -"), topStatusBar);
-    topMemberChip = makeLabel(QStringLiteral("topMemberChip"),
-                              QObject::tr("0 人"), topStatusBar);
-    // 会议时长：人数右边，每秒走动（未入会显示占位）
+    // 会议时长：每秒走动（未入会显示占位）
     topDurationChip = makeLabel(QStringLiteral("topDurationChip"),
-                               QObject::tr("--:--:--"), topStatusBar);
+                                QObject::tr("--:--:--"), topStatusBar);
     topDurationChip->setToolTip(QObject::tr("本次会议已进行时长"));
-    topSpeakerLabel =
-        makeLabel(QStringLiteral("topSpeakerLabel"),
-                  QObject::tr("正在讲话: -"), topStatusBar);
-    topMeetStatus =
-        makeLabel(QStringLiteral("topMeetStatus"), QObject::tr("未加入会议"),
-                  topStatusBar);
 
     // 顶栏右侧：会议设置入口（点开后是锚定在按钮下方的弹出面板）
     btnMeetingSettings = new QPushButton(QObject::tr("会议设置"), topStatusBar);
@@ -181,13 +166,6 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
         ui::ThemeManager::instance().color(QStringLiteral("textMuted")), 14));
     topStatusLayout->addWidget(btnMeetingInfo);
 
-    // 顶栏只保留：会议详情 + 会议时长（房间号/人数/状态/发言人都收进弹窗或被移除）
-    topMainTitle->hide();
-    topRoomChip->hide();
-    topMemberChip->hide();
-    topSpeakerLabel->hide();
-    topMeetStatus->hide();
-    topStatusLayout->addWidget(topMemberChip);
     topStatusLayout->addWidget(topDurationChip);
     topStatusLayout->addItem(
         new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum));
@@ -318,69 +296,6 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
     verticalLayout_6->addWidget(sendmsg);
     tabWidget->addTab(tab_6, QObject::tr("聊天"));
 
-    // 信息
-    auto *tab_meetInfo = new QWidget();
-    tab_meetInfo->setObjectName(QStringLiteral("tab_meetInfo"));
-    auto *verticalLayout_meetInfo = new QVBoxLayout(tab_meetInfo);
-    verticalLayout_meetInfo->setObjectName(
-        QStringLiteral("verticalLayout_meetInfo"));
-    verticalLayout_meetInfo->setSpacing(12);
-    verticalLayout_meetInfo->setContentsMargins(12, 12, 12, 12);
-
-    auto *formLayout_meetInfo = new QFormLayout();
-    formLayout_meetInfo->setObjectName(QStringLiteral("formLayout_meetInfo"));
-    formLayout_meetInfo->setHorizontalSpacing(12);
-    formLayout_meetInfo->setVerticalSpacing(10);
-
-    labelMeetStatus =
-        makeLabel(QStringLiteral("labelMeetStatus"), QObject::tr("未加入会议"),
-                  tab_meetInfo);
-    labelRoomNo =
-        makeLabel(QStringLiteral("labelRoomNo"), QStringLiteral("-"),
-                  tab_meetInfo);
-    labelMemberCount =
-        makeLabel(QStringLiteral("labelMemberCount"), QStringLiteral("0"),
-                  tab_meetInfo);
-    labelLocalIp =
-        makeLabel(QStringLiteral("labelLocalIp"), QStringLiteral("-"),
-                  tab_meetInfo);
-    labelServer =
-        makeLabel(QStringLiteral("labelServer"), QObject::tr("未连接"),
-                  tab_meetInfo);
-    labelSpeaker =
-        makeLabel(QStringLiteral("labelSpeaker"), QStringLiteral("-"),
-                  tab_meetInfo);
-
-    formLayout_meetInfo->addRow(
-        makeLabel(QStringLiteral("labelMeetStatusTitle"),
-                  QObject::tr("会议状态"), tab_meetInfo),
-        labelMeetStatus);
-    formLayout_meetInfo->addRow(
-        makeLabel(QStringLiteral("labelRoomNoTitle"), QObject::tr("房间号: "),
-                  tab_meetInfo),
-        labelRoomNo);
-    formLayout_meetInfo->addRow(
-        makeLabel(QStringLiteral("labelMemberCountTitle"), QObject::tr("人数: "),
-                  tab_meetInfo),
-        labelMemberCount);
-    formLayout_meetInfo->addRow(
-        makeLabel(QStringLiteral("labelLocalIpTitle"), QObject::tr("本机: "),
-                  tab_meetInfo),
-        labelLocalIp);
-    formLayout_meetInfo->addRow(
-        makeLabel(QStringLiteral("labelServerTitle"), QObject::tr("服务器: "),
-                  tab_meetInfo),
-        labelServer);
-    formLayout_meetInfo->addRow(
-        makeLabel(QStringLiteral("labelSpeakerTitle"), QObject::tr("当前说话: "),
-                  tab_meetInfo),
-        labelSpeaker);
-
-    verticalLayout_meetInfo->addLayout(formLayout_meetInfo);
-    verticalLayout_meetInfo->addItem(
-        new QSpacerItem(20, 40, QSizePolicy::Minimum, QSizePolicy::Expanding));
-    // 需求：不再提供"信息"标签页（内容已移到顶栏的"会议详情"弹窗）
-    tab_meetInfo->hide();
     tabWidget->setCurrentIndex(0);
 
     main_box_layout->addWidget(tabWidget);
@@ -411,12 +326,6 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
     btnSideChat =
         makeToolButton(QStringLiteral("btnSideChat"), QObject::tr("聊天"),
                        QSize(64, 48), controlPill, QObject::tr("打开聊天"));
-    // "信息"页已并入左上角「会议详情」弹窗，工具栏不再保留该按钮
-    btnSideInfo =
-        makeToolButton(QStringLiteral("btnSideInfo"), QObject::tr("信息"),
-                       QSize(64, 48), controlPill, QObject::tr("会议信息"));
-    btnSideInfo->hide();
-
     openAudio =
         makeToolButton(QStringLiteral("openAudio"), QObject::tr("开启音频"),
                        QSize(88, 48), controlPill);
