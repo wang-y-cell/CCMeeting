@@ -154,10 +154,6 @@ void MeetingSessionController::on_create_result(int room_no) {
                                     UserSession::instance().avatar());
         participants->add(self_id);
     }
-    if (_topBar) {
-        _topBar->set_main_screen_title(participants ? participants->main_user_id()
-                                                    : 0);
-    }
 
     spdlog::info("[MeetingWindow] start_meeting_media begin");
     if (spdlog::default_logger()) {
@@ -218,10 +214,6 @@ void MeetingSessionController::on_join_result(int code) {
                                     UserSession::instance().avatar());
         participants->add(self_id);
     }
-    if (_topBar) {
-        _topBar->set_main_screen_title(participants ? participants->main_user_id()
-                                                    : 0);
-    }
     ui.sendmsg->setDisabled(false);
     state._joinmeet = true;
 
@@ -266,7 +258,6 @@ void MeetingSessionController::reset_ui() {
         _topBar->apply_tab_bar_visibility();
     }
 
-    ui.topMainTitle->setText(QStringLiteral("主屏幕"));
     state._roomNo = 0;
     state._serverAddr.clear();
     state._startupBeginMs = 0;

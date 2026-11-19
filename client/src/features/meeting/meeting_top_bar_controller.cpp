@@ -56,52 +56,10 @@ void MeetingTopBarController::refresh_meeting_info() {
     const meeting::MeetingState &state = _host->state();
 
     const bool in_meeting = state._createmeet || state._joinmeet;
-    QString status_text;
-    if (state._createmeet) {
-        status_text = tr("已创建会议");
-    } else if (state._joinmeet) {
-        status_text = tr("已加入会议");
-    } else {
-        status_text = tr("未加入会议");
-    }
-    ui.labelMeetStatus->setText(status_text);
-    ui.topMeetStatus->setText(status_text);
-
-    // 入会状态胶囊换色（dynamic property，见 meeting_widget.qss）
-    if (ui.topMeetStatus->property("joined").toBool() != in_meeting) {
-        ui.topMeetStatus->setProperty("joined", in_meeting);
-        ui.topMeetStatus->style()->unpolish(ui.topMeetStatus);
-        ui.topMeetStatus->style()->polish(ui.topMeetStatus);
-    }
-    // 未入会时在画布居中显示占位提示
+    // 未入会时在画布居中显示占位提示（顶栏其余信息已移入「会议详情」弹窗）
     if (ui.canvasHint) {
         ui.canvasHint->setVisible(!in_meeting);
     }
-
-    const QString room_text =
-        state._roomNo > 0 ? QString::number(state._roomNo) : QStringLiteral("-");
-    ui.labelRoomNo->setText(room_text);
-    ui.topRoomChip->setText(tr("房间 %1").arg(room_text));
-
-    const int member_count =
-        _host->participants() ? _host->participants()->count() : 0;
-    ui.labelMemberCount->setText(QString::number(member_count));
-    ui.topMemberChip->setText(tr("%1 人").arg(member_count));
-
-    const QString display = UserSession::instance().name();
-    ui.labelLocalIp->setText(display.isEmpty()
-                                 ? QString::number(_host->local_user_id())
-                                 : display);
-
-    if (state._sessionActive && !state._serverAddr.isEmpty()) {
-        ui.labelServer->setText(state._serverAddr);
-    } else if (state._sessionActive) {
-        ui.labelServer->setText(tr("已连接"));
-    } else {
-        ui.labelServer->setText(tr("未连接"));
-    }
-
-    refresh_speaker();
 }
 
 void MeetingTopBarController::refresh_duration() {
@@ -129,35 +87,6 @@ void MeetingTopBarController::refresh_duration() {
         ui.topDurationChip->style()->unpolish(ui.topDurationChip);
         ui.topDurationChip->style()->polish(ui.topDurationChip);
     }
-}
-
-void MeetingTopBarController::refresh_speaker() {
-    ui::MeetingWindowUi &ui = _host->ui();
-    const meeting::MeetingState &state = _host->state();
-
-    QString speaker = QStringLiteral("-");
-    if (state._createmeet || state._joinmeet) {
-        if (state._localAudioOn) {
-            QString name = UserSession::instance().name();
-            if (name.isEmpty() && _host->participants()) {
-                name = _host->participants()->display_name(_host->local_user_id());
-            }
-            if (!name.isEmpty()) {
-                speaker = name;
-            }
-        }
-    }
-    ui.labelSpeaker->setText(speaker);
-    ui.topSpeakerLabel->setText(tr("正在讲话: %1").arg(speaker));
-}
-
-void MeetingTopBarController::set_main_screen_title(qint64 user_id) {
-    ui::MeetingWindowUi &ui = _host->ui();
-    ui.groupBox_2->setTitle(QString());
-    ui.topMainTitle->setText(
-        user_id > 0 && _host->participants()
-            ? _host->participants()->display_name(user_id)
-            : QString());
 }
 
 void MeetingTopBarController::start_duration() {

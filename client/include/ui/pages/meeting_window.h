@@ -106,7 +106,6 @@ public slots:
     void on_leave_meeting_clicked_slot();
     void on_side_members_clicked_slot();
     void on_side_chat_clicked_slot();
-    void on_side_info_clicked_slot();
     void on_toggle_panel_clicked_slot(bool checked);
     void request_connect_to_server_slot(QString ip, QString port,
                                         ConnectAction action,

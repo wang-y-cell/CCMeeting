@@ -205,8 +205,6 @@ void ui::MeetingWindow::init_controllers_wiring() {
     auto *tiles = participants();
     connect(tiles, &ParticipantsController::member_clicked, this,
             &ui::MeetingWindow::on_recv_user_slot);
-    connect(tiles, &ParticipantsController::main_changed, this,
-            [this](qint64 userId) { _topBar->set_main_screen_title(userId); });
     connect(tiles, &ParticipantsController::mention_added, this,
             [this](const QString &name) {
                 if (chat() && !name.isEmpty()) {
@@ -219,7 +217,7 @@ void ui::MeetingWindow::init_controllers_wiring() {
                     ui_.openAudio->setDisabled(false);
                     ui_.sendmsg->setDisabled(false);
                 }
-                _topBar->refresh_speaker();
+
             });
 
     // 协议层：网络消息 → 语义信号（窗口只处理"发生了什么"）
@@ -325,8 +323,6 @@ void ui::MeetingWindow::init_connect() {
             &ui::MeetingWindow::on_side_members_clicked_slot);
     connect(ui_.btnSideChat, &QAbstractButton::clicked, this,
             &ui::MeetingWindow::on_side_chat_clicked_slot);
-    connect(ui_.btnSideInfo, &QAbstractButton::clicked, this,
-            &ui::MeetingWindow::on_side_info_clicked_slot);
     connect(ui_.btnTogglePanel, &QAbstractButton::toggled, this,
             &ui::MeetingWindow::on_toggle_panel_clicked_slot);
     connect(ui_.sendmsg, &QPushButton::clicked, this,
@@ -500,8 +496,6 @@ void ui::MeetingWindow::on_side_members_clicked_slot() {
 
 void ui::MeetingWindow::on_side_chat_clicked_slot() { show_side_panel_tab(1); }
 
-void ui::MeetingWindow::on_side_info_clicked_slot() { show_side_panel_tab(2); }
-
 void ui::MeetingWindow::on_toggle_panel_clicked_slot(bool checked) {
     ui_.tabWidget->setVisible(checked);
 }
@@ -541,7 +535,6 @@ void ui::MeetingWindow::on_user_profile(qint64 user_id,
                                         const QString &display_name,
                                         const QString &avatar_url) {
     participants()->apply_profile(user_id, display_name, avatar_url);
-    _topBar->set_main_screen_title(participants()->main_user_id());
 }
 
 void ui::MeetingWindow::on_text_received(qint64 user_id, const QString &str) {

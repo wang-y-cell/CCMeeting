@@ -26,12 +26,8 @@ public:
     void refresh_meeting_info();
     /** @brief 刷新顶栏时长 chip（每秒调用一次） */
     void refresh_duration();
-    /** @brief 刷新「正在讲话」标签 */
-    void refresh_speaker();
     /** @brief 按设置决定右侧标签栏是否显示 */
     void apply_tab_bar_visibility();
-    /** @brief 刷新主画面标题（成员名） */
-    void set_main_screen_title(qint64 user_id);
     /** @brief 弹出「会议详情」面板（懒创建） */
     void show_info_popup();
 
