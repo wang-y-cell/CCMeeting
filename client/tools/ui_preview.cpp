@@ -1763,8 +1763,9 @@ int run_device_menu_selftest() {
     QThread::msleep(60);
     QCoreApplication::processEvents();
 
+    // 设备菜单已迁到 DeviceMenuController，通过按钮槽触发（与真实点击一致）
     const bool opened = QMetaObject::invokeMethod(
-        &window, "show_audio_device_menu", Qt::DirectConnection);
+        &window, "on_audio_device_btn_clicked_slot", Qt::DirectConnection);
     QCoreApplication::processEvents();
     QThread::msleep(60);
     QCoreApplication::processEvents();

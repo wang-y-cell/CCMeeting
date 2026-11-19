@@ -13,6 +13,7 @@
 #include "ui/composites/chat_message.h"
 #include "media/video/meeting_video.h"
 
+#include "features/meeting/connect_coordinator.h"
 #include "features/meeting/meeting_media_controller.h"
 #include "features/meeting/meeting_protocol_dispatcher.h"
 #include "features/meeting/participants_controller.h"
@@ -36,6 +37,8 @@
 class QAction;
 class QListWidgetItem;
 class QMenu;
+class ConnectCoordinator;
+class DeviceMenuController;
 
 namespace app {
 class MeetingSession;
@@ -48,6 +51,9 @@ namespace ui {
  *
  * 原先是不在命名空间里的全局 `struct state`，与 Qt/系统头里的同名符号
  * 容易撞名；现在收进 ui 命名空间并改成有意义的类型名。
+ *
+ * 「连接挂起/串行化」相关字段（pending 连接参数、connecting 标记）已经
+ * 迁到 ConnectCoordinator；这里只保留界面与会话本身需要的状态。
  */
 struct MeetingState {
     bool _createmeet = false; //是否创建会议
@@ -63,8 +69,13 @@ struct MeetingState {
     bool _sessionActive = false; //会议是否活跃
     bool _sessionEnding = false; //会议是否结束
 
-    bool _connecting = false; //是否连接中
-    bool _hasPendingConnect = false; //是否有未处理的连接请求
+    // ---- 本次连接/会议的身份与计时（由窗口拥有；连接协调只管"何时连"） ----
+    int _roomNo = 0;                 ///< 当前房间号
+    QString _serverAddr;             ///< "ip:port"，顶栏/信息面板显示用
+    qint64 _sessionStartMs = 0;      ///< 本次会议开始时刻（用于统计时长），0 表示未开始
+    qint64 _startupBeginMs = 0;      ///< 会议启动计时起点（点创建/加入的时刻）
+    qint64 _startupJoinedMs = 0;     ///< 到 xrtc 进房成功的耗时（毫秒）
+    qint64 _startupFirstFrameMs = 0; ///< 到首帧画面的耗时（毫秒）
 };
 
 class MeetingWindow : public FramelessWindow<QWidget> {
@@ -79,35 +90,13 @@ public:
 private:
     static QRect pos;
     MeetingState _state; //维护会议状态
-    /** 房间开关位掩码（房主修改，服务端广播） */
-    /** 本地录制器（录制当前主画面） */
 
-    /** 仅用于首次记录本地预览分辨率（诊断用） */
-    /** 本次会议开始时刻（用于统计时长），0 表示未开始 */
-    qint64 _sessionStartMs = 0;
-    /** 会议启动计时：起点（点创建/加入的时刻），0 表示未开始计时 */
-    qint64 _startupBeginMs = 0;
-    /** 到 xrtc 进房成功的耗时（毫秒），0 表示未到 */
-    qint64 _startupJoinedMs = 0;
-    /** 到首帧画面的耗时（毫秒），0 表示还没出画面 */
-    qint64 _startupFirstFrameMs = 0;
     /** 会议时长每秒刷新（未入会时停止） */
     QTimer *_durationTimer = nullptr;
     /** 会议详情弹窗（懒创建） */
     QWidget *_infoPopup = nullptr;
-    QString _pendingConnectIp;
-    QString _pendingConnectPort;
-    ConnectAction _pendingConnectAction = ConnectAction::CreateMeeting;
-    QString _pendingConnectRoomNo;
-    quint32 _pendingMaxParticipants = 8;
-    quint32 _pendingDurationMinutes = 60;
-    quint32 _createMaxParticipants = 8;
-    quint32 _createDurationMinutes = 60;
     MeetingVideo *_video = nullptr;
-    int _roomNo = 0;
-    QString _serverAddr;
 
-    /// WebRTC 引擎
     bool preview_scheduled_ = false;
     bool remote_scheduled_ = false;
 
@@ -119,10 +108,13 @@ private:
     /** @brief 创建房间设置面板与录制控制器 */
     void init_settings_popup();
     void end_meeting_session();
+    /** @brief 统一维护"会话正在结束"标记（同时同步连接协调器） */
+    void set_session_ending(bool ending);
     /** 结束会议会话并隐藏会议窗口（加入失败 / 断线 / 超时等） */
     void close_meeting_window();
     void reset_meeting_ui();
     void update_meeting_info();
+    void refresh_duration_chip();
 
     // ---- 会话对象访问器（空安全）----
     // init_ui() 在 _session 创建之前就会调用 update_meeting_info() 等函数，
@@ -136,8 +128,6 @@ private:
     MeetingMediaController *media() const;
     MeetingRtcObserver *rtc_observer() const;
     MeetingRecorder *recorder() const;
-    /** @brief 刷新顶栏「会议时长」chip（每秒调用） */
-    void refresh_duration_chip();
 
     /** @brief 弹出"会议详情"面板（主题/房间号/发起人/我的名称/时长） */
     void show_meeting_info_popup();
@@ -146,14 +136,10 @@ private:
     /** @brief 首帧到达时结算启动耗时（只结算一次） */
     void mark_startup_first_frame();
 
-
     /** @brief 应用服务端下发的房间开关（转交 RoomSettingsController） */
     void apply_room_settings(std::uint32_t flags);
     void update_speaker_label();
     void shutdown_all_workers();
-
-
-
 
     // ---- 协议语义事件（由 MeetingProtocolDispatcher 投递）----
     void on_create_meeting_result(int roomno);
@@ -180,17 +166,13 @@ private:
      * @param screen_id 目标显示器 id，空则用已选显示器或主屏
      */
     void set_local_screen_on(bool on, const std::string &screen_id = std::string());
-    /** @brief 解析本次要共享的显示器：已选且仍存在 > 主屏 > 第一个 */
     void sync_av_button_ui();
     /** WebRTC 会话异常结束（ICE failed / leave）时复位并关会 */
     void handle_rtc_session_lost(const QString &reason);
     void send_local_user_profile();
     void update_main_screen_title(qint64 userId);
-    Q_INVOKABLE void show_audio_device_menu();
-    Q_INVOKABLE void show_video_device_menu();
     void show_side_panel_tab(int index);
     qint64 local_user_id() const;
-
 
 public:
     explicit MeetingWindow(QWidget *parent = nullptr);
@@ -208,7 +190,6 @@ public slots:
     void on_share_screen_clicked_slot();
     /** @brief 顶栏「会议设置」：弹出房间设置面板 */
     void on_meeting_settings_clicked_slot();
-    /** @brief 顶栏「会议设置」按钮：弹出房间设置面板 */
     void on_leave_meeting_clicked_slot();
     void on_side_members_clicked_slot();
     void on_side_chat_clicked_slot();
@@ -236,9 +217,12 @@ private slots:
     void on_rtc_connection_lost(int state);
     /** @brief 远端用户离开（已解析 userId） */
     void on_rtc_remote_user_left(qint64 user_id);
-    ///连接上服务器后的处理
+    /** @brief 连接结果回调：转交 ConnectCoordinator，由它决定后续建会/入会 */
     void on_connect_finished_slot(bool ok, QString ip, QString port,
-                                ConnectAction action, QString room_no);
+                                  ConnectAction action, QString room_no);
+    /** @brief 连接协调器回报结果后的界面处理（更新状态/失败关会） */
+    void apply_connect_result(bool ok, QString ip, QString port,
+                              ConnectAction action, QString room_no);
     void on_request_message_slot(MessagePtr msg);
     void on_user_info_message_slot(MessagePtr msg);
     void on_text_message_slot(MessagePtr msg);
@@ -268,6 +252,11 @@ signals:
 
 private:
     MeetingWindowUi ui;
+
+    /** @brief 连接挂起/串行化（原窗口里的 pending/connecting 逻辑） */
+    std::unique_ptr<ConnectCoordinator> _connect;
+    /** @brief 设备选择菜单（原窗口里的两个大方法） */
+    std::unique_ptr<DeviceMenuController> _deviceMenu;
 
     /**
      * @brief 会话装配层：网络、工作线程、控制器与协议分发的唯一持有者
