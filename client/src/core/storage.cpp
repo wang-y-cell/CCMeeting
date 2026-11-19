@@ -3,6 +3,7 @@
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
+#include <QCoreApplication>
 #include <QSqlDatabase>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -61,6 +62,11 @@ Storage &Storage::instance() {
 }
 
 Storage::~Storage() {
+    // 进程退出阶段 QApplication 已销毁：此时再访问 QSqlDatabase 会触发
+    // "QSqlDatabase requires a QCoreApplication" 警告，连接交由进程退出回收。
+    if (QCoreApplication::instance() == nullptr) {
+        return;
+    }
     if (QSqlDatabase::contains(QString::fromLatin1(kConnection))) {
         {
             QSqlDatabase db =

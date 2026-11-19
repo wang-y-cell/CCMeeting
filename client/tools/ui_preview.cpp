@@ -425,6 +425,11 @@ namespace {
 
 int run_meeting_history_selftest() {
     QStandardPaths::setTestModeEnabled(true);
+    QCoreApplication::setApplicationName(QStringLiteral("CCMeeting"));
+    if (!Storage::instance().open() || !Storage::instance().isOpen()) {
+        std::printf("[hist-test] 存储不可用，无法验证会议记录\n");
+        return 1;
+    }
     meeting_repository().clear();
     std::printf("[hist-test] 存储路径 %s\n",
                 meeting_repository().storage_path().toUtf8().constData());
@@ -708,7 +713,15 @@ qint64 record_for_seconds(int seconds) {
 }
 
 int run_general_settings_selftest() {
+    // 隔离到 qttest 目录并确保存储已打开：Storage 未 open 时写入会被忽略，
+    // 导致"设置没生效"的假失败。
+    QStandardPaths::setTestModeEnabled(true);
+    QCoreApplication::setApplicationName(QStringLiteral("CCMeeting"));
     Storage &settings = Storage::instance();
+    if (!settings.open() || !settings.isOpen()) {
+        std::printf("[general-test] 存储不可用，无法验证设置生效\n");
+        return 1;
+    }
     const QVariant oldDir = settings.value(QStringLiteral("record/saveDir"));
     const QVariant oldFps = settings.value(QStringLiteral("record/fps"));
 
@@ -864,6 +877,11 @@ int run_login_store_selftest() {
     const QString user = QStringLiteral("selftest_user");
     const QString pass = QStringLiteral("Pass@2026!");
 
+    if (!Storage::instance().open() || !Storage::instance().isOpen()) {
+        std::printf("[login-store] 存储不可用，无法验证凭据保存\n");
+        return 1;
+    }
+
     LoginStore::clear();
     const bool empty_before = !LoginStore::has_credentials();
 
@@ -871,10 +889,12 @@ int run_login_store_selftest() {
     const bool has_after = LoginStore::has_credentials();
     const LoginStore::Credentials creds = LoginStore::load();
 
-    // 直接看注册表里存的是不是密文
+    // 直接看凭据表里存的是不是密文（旧实现读 QSettings 的 login/password，
+    // 统一存储改造后凭据在 credentials 表，需通过 Storage 读取）
     Storage &settings = Storage::instance();
+    Storage::Credentials stored_creds;
     const QString stored =
-        settings.value(QStringLiteral("login/password")).toString();
+        settings.loadCredentials(stored_creds) ? stored_creds.secret : QString();
 
     const bool roundtrip = creds.username == user && creds.password == pass;
     const bool encrypted = !stored.isEmpty() && !stored.contains(pass) &&
