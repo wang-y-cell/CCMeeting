@@ -24,7 +24,7 @@ int FontRegistry::load_bundled() {
     }
 
     const QStringList files =
-        dir.entryList({QStringLiteral("*.ttf"), QStringLiteral("*.otf")}, QDir::Files);
+        dir.entryList({QStringLiteral("*.ttf"), QStringLiteral("*.otf")}, QDir::Files | QDir::NoDotAndDotDot);
     if (files.isEmpty()) {
         spdlog::info("[FontRegistry] 字体目录为空，使用系统字体");
         return 0;

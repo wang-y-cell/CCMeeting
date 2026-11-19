@@ -344,5 +344,15 @@ void MeetingSessionController::end_session(bool was_connecting) {
             }
             emit session_ending_finished();
         });
+        return;
     }
+
+    // 没有网络/连接可断（如构造期析构、离线预览）：直接复位，
+    // 否则窗口的 ConnectCoordinator 会一直停在 sessionEnding，后续连接被永久挂起。
+    _host->state()._sessionEnding = false;
+    _host->state()._sessionActive = false;
+    if (_topBar) {
+        _topBar->refresh_meeting_info();
+    }
+    emit session_ending_finished();
 }
