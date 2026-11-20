@@ -12,10 +12,12 @@
 #include "ui/foundation/icon_provider.h"
 #include "ui/foundation/theme_manager.h"
 #include "ui/foundation/window_effects.h"
+#include <QElapsedTimer>
 #include <QHideEvent>
 #include <QScreen>
 #include <QGuiApplication>
 #include <QShowEvent>
+#include <QTimer>
 #include <QWidget>
 #include <type_traits>
 
@@ -76,6 +78,14 @@ public:
         Base::setMouseTracking(true);
         /// 启用 Hover 事件（配合 event() 里处理 HoverMove）
         Base::setAttribute(Qt::WA_Hover, true);
+
+        // 拖动/缩放几何节流定时器（默认 16ms，可用 setGeometryUpdateInterval 调整）
+        m_geometryTimer = new QTimer(this);
+        m_geometryTimer->setSingleShot(true);
+        m_geometryTimer->setInterval(m_geometryIntervalMs);
+        QObject::connect(m_geometryTimer, &QTimer::timeout, this,
+                         [this]() { flush_geometry_update(); });
+
         setupTitleButtons();
     }
 
@@ -142,6 +152,25 @@ public:
         m_borderWidth = qBound(2, pixels, 16);
     }
     int resizeBorderWidth() const { return m_borderWidth; }
+
+    /**
+     * @brief 设置拖动/缩放时窗口几何的最小更新间隔（毫秒，0 表示不节流）
+     *
+     * 默认 16ms（约 60Hz）。高回报率鼠标（125~1000Hz）下，如果每个 move
+     * 事件都 SetWindowPos，会把 UI 线程压满；节流后只应用"最新目标位置"。
+     */
+    void setGeometryUpdateInterval(int ms) {
+        m_geometryIntervalMs = qBound(0, ms, 100);
+        if (m_geometryTimer && m_geometryIntervalMs == 0) {
+            m_geometryTimer->stop();
+        }
+    }
+    int geometryUpdateInterval() const { return m_geometryIntervalMs; }
+
+    /** @brief 自检用：几何更新被节流合并的次数 */
+    std::uint32_t geometry_throttle_count() const {
+        return m_geometryThrottleCount;
+    }
 
     /** @brief 标题按钮摆放次数（自检/性能诊断用） */
     std::uint32_t title_geometry_update_count() const {
@@ -228,7 +257,10 @@ protected:
             if ((globalPos - m_dragGlobalPos).manhattanLength() > 2) {
                 m_dragMoved = true;
             }
-            Base::move(globalPos - m_dragOffset);
+            // 只记录最新目标位置，由 schedule_geometry_update() 合并应用
+            m_pendingDragPos = globalPos - m_dragOffset;
+            m_hasPendingDrag = true;
+            schedule_geometry_update();
             event->accept();
             return;
         }
@@ -248,6 +280,8 @@ protected:
         if (event->button() == Qt::LeftButton) {
             if (m_dragging || m_resizing) {
                 const bool was_dragging = m_dragging;
+                // 释放前先应用最后一次挂起的几何，避免停在上一帧位置
+                flush_geometry_update();
                 if (m_resizing) {
                     Base::releaseMouse();
                 }
@@ -782,7 +816,53 @@ private:
             }
         }
 
-        Base::setGeometry(x, y, w, h);
+        m_pendingResizeGeometry = QRect(x, y, w, h);
+        m_hasPendingResize = true;
+        schedule_geometry_update();
+    }
+
+    /** @brief 立即应用挂起的几何更新（拖动位置 / 缩放矩形） */
+    void flush_geometry_update() {
+        if (m_geometryTimer) {
+            m_geometryTimer->stop();
+        }
+        if (m_hasPendingDrag) {
+            m_hasPendingDrag = false;
+            Base::move(m_pendingDragPos);
+            m_geometryApplied.start();
+        }
+        if (m_hasPendingResize) {
+            m_hasPendingResize = false;
+            Base::setGeometry(m_pendingResizeGeometry);
+            m_geometryApplied.start();
+        }
+    }
+
+    /**
+     * @brief 调度几何更新（节流到 m_geometryIntervalMs）
+     *
+     * - 距上次应用已超过间隔：立即应用（保证拖动跟手）
+     * - 否则：挂起，由定时器在剩余时间后应用"最新目标"
+     */
+    void schedule_geometry_update() {
+        const int interval = m_geometryIntervalMs;
+        if (interval <= 0 || m_geometryTimer == nullptr) {
+            flush_geometry_update();
+            return;
+        }
+        if (m_geometryTimer->isActive()) {
+            ++m_geometryThrottleCount;
+            return;
+        }
+        const qint64 elapsed = m_geometryApplied.isValid()
+                                   ? m_geometryApplied.elapsed()
+                                   : interval;
+        if (elapsed >= interval) {
+            flush_geometry_update();
+            return;
+        }
+        ++m_geometryThrottleCount;
+        m_geometryTimer->start(static_cast<int>(interval - elapsed));
     }
 
     /**
@@ -825,11 +905,26 @@ private:
         m_resizing = false;
         m_resizeRegion = ResizeRegion::None;
         m_lastCursorRegion = ResizeRegion::None;
+        m_hasPendingDrag = false;
+        m_hasPendingResize = false;
+        if (m_geometryTimer) {
+            m_geometryTimer->stop();
+        }
     }
 
     /// ----- 交互状态 -----
     bool m_dragging = false;              ///< 是否正在拖动移动窗口
     bool m_dragMoved = false;             ///< 本次拖动是否真的移动过（吸附只对拖动生效）
+
+    /// ----- 几何更新节流 -----
+    QTimer *m_geometryTimer = nullptr;   ///< 单次定时器：合并高频 move
+    QElapsedTimer m_geometryApplied;     ///< 上次应用几何的时刻
+    QPoint m_pendingDragPos;             ///< 挂起的拖动目标位置
+    QRect m_pendingResizeGeometry;       ///< 挂起的缩放目标矩形
+    bool m_hasPendingDrag = false;
+    bool m_hasPendingResize = false;
+    int m_geometryIntervalMs = 16;       ///< 最小更新间隔（ms），0 表示不节流
+    std::uint32_t m_geometryThrottleCount = 0; ///< 被合并的更新次数（自检用）
     bool m_resizing = false;              ///< 是否正在拖边缩放
     bool m_resizable = true;              ///< 是否允许边缘缩放
     bool m_maximizable = true;            ///< 是否允许最大化（按钮/双击）
