@@ -595,7 +595,7 @@ void ui::SettingsPage::loadUiPrefs() {
         s.value(QStringLiteral("meeting/showTabs"), false).toBool());
     // 窗口行为开关（默认开启，读不到偏好时按 true 显示）
     ui->nativeMoveCheck->setChecked(ui::WindowBehavior::native_move_enabled());
-    ui->freezeOnDragCheck->setChecked(ui::WindowBehavior::freeze_content_on_drag());
+    ui->nativeResizeCheck->setChecked(ui::WindowBehavior::native_resize_enabled());
 }
 
 void ui::SettingsPage::saveUiPrefs() const {
@@ -610,7 +610,7 @@ void ui::SettingsPage::saveUiPrefs() const {
                ui->uiShowPageDesc->isChecked());
     s.set_value(QStringLiteral("meeting/showTabs"), ui->meetingShowTabs->isChecked());
     ui::WindowBehavior::set_native_move_enabled(ui->nativeMoveCheck->isChecked());
-    ui::WindowBehavior::set_freeze_content_on_drag(ui->freezeOnDragCheck->isChecked());
+    ui::WindowBehavior::set_native_resize_enabled(ui->nativeResizeCheck->isChecked());
     s.set_value(QStringLiteral("record/fps"), ui->recordFps->currentData().toInt());
     s.set_value(QStringLiteral("ui/soundEnabled"), ui->soundEnabled->isChecked());
     s.set_value(QStringLiteral("video/autoPreview"),
@@ -680,7 +680,7 @@ void ui::SettingsPage::onResetClicked() {
     ui->uiShowPageDesc->setChecked(true);
     ui->meetingShowTabs->setChecked(false);
     ui->nativeMoveCheck->setChecked(true);
-    ui->freezeOnDragCheck->setChecked(true);
+    ui->nativeResizeCheck->setChecked(true);
     ui->recordFps->setCurrentIndex(0);  // 15 fps
     ui->soundEnabled->setChecked(true);
     ui->videoAutoPreview->setChecked(false);

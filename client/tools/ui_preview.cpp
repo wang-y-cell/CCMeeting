@@ -1785,31 +1785,16 @@ int run_window_behavior_selftest() {
 
     ui::WindowBehavior::reset_to_defaults();
     check("默认：原生拖动开启", ui::WindowBehavior::native_move_enabled());
-    check("默认：拖动冻结开启", ui::WindowBehavior::freeze_content_on_drag());
+    check("默认：原生缩放开启", ui::WindowBehavior::native_resize_enabled());
 
     ui::WindowBehavior::set_native_move_enabled(false);
-    ui::WindowBehavior::set_freeze_content_on_drag(false);
+    ui::WindowBehavior::set_native_resize_enabled(false);
     check("可关闭：原生拖动", !ui::WindowBehavior::native_move_enabled());
-    check("可关闭：拖动冻结", !ui::WindowBehavior::freeze_content_on_drag());
+    check("可关闭：原生缩放", !ui::WindowBehavior::native_resize_enabled());
 
     ui::WindowBehavior::reset_to_defaults();
     check("恢复默认：原生拖动", ui::WindowBehavior::native_move_enabled());
-    check("恢复默认：拖动冻结", ui::WindowBehavior::freeze_content_on_drag());
-
-    // 拖动状态广播
-    auto &notifier = ui::DragStateNotifier::instance();
-    int emitted = 0;
-    bool last = false;
-    const QMetaObject::Connection conn = QObject::connect(
-        &notifier, &ui::DragStateNotifier::dragging_changed,
-        [&](bool dragging) { ++emitted; last = dragging; });
-    notifier.set_dragging(true);
-    notifier.set_dragging(true);   // 重复值不应重复发信号
-    const bool on_ok = notifier.dragging() && emitted == 1 && last;
-    notifier.set_dragging(false);
-    const bool off_ok = !notifier.dragging() && emitted == 2 && !last;
-    QObject::disconnect(conn);
-    check("拖动状态广播", on_ok && off_ok);
+    check("恢复默认：原生缩放", ui::WindowBehavior::native_resize_enabled());
 
     std::printf("[win-behavior] 结论: %s\n", all_ok ? "PASS" : "FAIL");
     return all_ok ? 0 : 1;

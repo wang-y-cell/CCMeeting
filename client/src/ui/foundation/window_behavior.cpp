@@ -6,7 +6,7 @@ namespace ui {
 
 namespace {
 constexpr const char *kNativeMoveKey = "ui/nativeMove";
-constexpr const char *kFreezeOnDragKey = "ui/freezeOnDrag";
+constexpr const char *kNativeResizeKey = "ui/nativeResize";
 }  // namespace
 
 bool WindowBehavior::native_move_enabled() {
@@ -17,34 +17,21 @@ void WindowBehavior::set_native_move_enabled(bool enabled) {
     preferences().set_value(QString::fromLatin1(kNativeMoveKey), enabled);
 }
 
-bool WindowBehavior::freeze_content_on_drag() {
+bool WindowBehavior::native_resize_enabled() {
     return preferences()
-        .value(QString::fromLatin1(kFreezeOnDragKey), true)
+        .value(QString::fromLatin1(kNativeResizeKey), true)
         .toBool();
 }
 
-void WindowBehavior::set_freeze_content_on_drag(bool enabled) {
-    preferences().set_value(QString::fromLatin1(kFreezeOnDragKey), enabled);
+void WindowBehavior::set_native_resize_enabled(bool enabled) {
+    preferences().set_value(QString::fromLatin1(kNativeResizeKey), enabled);
 }
 
 void WindowBehavior::reset_to_defaults() {
     preferences().remove(QString::fromLatin1(kNativeMoveKey));
-    preferences().remove(QString::fromLatin1(kFreezeOnDragKey));
-}
-
-DragStateNotifier::DragStateNotifier(QObject *parent) : QObject(parent) {}
-
-DragStateNotifier &DragStateNotifier::instance() {
-    static DragStateNotifier notifier;
-    return notifier;
-}
-
-void DragStateNotifier::set_dragging(bool dragging) {
-    if (m_dragging == dragging) {
-        return;
-    }
-    m_dragging = dragging;
-    emit dragging_changed(dragging);
+    preferences().remove(QString::fromLatin1(kNativeResizeKey));
+    // 兼容旧版本残留：拖动冻结已移除，顺手清掉
+    preferences().remove(QStringLiteral("ui/freezeOnDrag"));
 }
 
 }  // namespace ui
