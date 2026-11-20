@@ -25,6 +25,7 @@ jobs:
         with:
           version: '6.8.3'
           arch: win64_msvc2022_64
+          modules: 'qtmultimedia qtnetworkauth qtsvg'
           cache: true
 
       - name: 配置 MSVC 环境
