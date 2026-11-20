@@ -1762,6 +1762,65 @@ int run_title_button_selftest() {
     return all_ok ? 0 : 1;
 }
 
+// ---------------------------------------------------------------------------
+// 拖动节流自检：连续 200 个 move 事件应被合并，最终位置准确
+// 用法：UiPreview.exe --move-throttle-selftest
+// ---------------------------------------------------------------------------
+namespace {
+
+int run_move_throttle_selftest() {
+    ui::MeetingWindow window;
+    window.setAttribute(Qt::WA_DontShowOnScreen, true);
+    window.setGeometry(100, 100, 1200, 800);
+    window.show();
+    QCoreApplication::processEvents();
+    QThread::msleep(60);
+    QCoreApplication::processEvents();
+
+    const QPoint local(600, 20);
+    const QPoint press_global = window.mapToGlobal(local);
+    QMouseEvent press(QEvent::MouseButtonPress, QPointF(local),
+                      QPointF(press_global), Qt::LeftButton, Qt::LeftButton,
+                      Qt::NoModifier);
+    QCoreApplication::sendEvent(&window, &press);
+
+    const QPoint start_pos = window.pos();
+    constexpr int kSteps = 200;
+    for (int i = 1; i <= kSteps; ++i) {
+        const QPoint global = press_global + QPoint(i * 2, i);
+        QMouseEvent move(QEvent::MouseMove, QPointF(local), QPointF(global),
+                         Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+        QCoreApplication::sendEvent(&window, &move);
+        if (i % 10 == 0) {
+            QCoreApplication::processEvents();
+        }
+    }
+    QMouseEvent release(QEvent::MouseButtonRelease, QPointF(local),
+                        QPointF(press_global + QPoint(kSteps * 2, kSteps)),
+                        Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+    QCoreApplication::sendEvent(&window, &release);
+    QCoreApplication::processEvents();
+
+    const QPoint expected = start_pos + QPoint(kSteps * 2, kSteps);
+    const int dx = window.pos().x() - expected.x();
+    const int dy = window.pos().y() - expected.y();
+    const bool pos_ok = qAbs(dx) <= 2 && qAbs(dy) <= 2;
+    const std::uint32_t merged = window.geometry_throttle_count();
+    const bool throttled = merged > 0;
+
+    std::printf("[move-throttle] 最终位置=(%d,%d) 期望=(%d,%d) 误差=(%d,%d) %s\n",
+                window.pos().x(), window.pos().y(), expected.x(), expected.y(),
+                dx, dy, pos_ok ? "OK" : "FAIL");
+    std::printf("[move-throttle] 合并次数=%u %s\n",
+                static_cast<unsigned>(merged), throttled ? "OK" : "FAIL");
+    window.hide();
+    const bool all_ok = pos_ok && throttled;
+    std::printf("[move-throttle] 结论: %s\n", all_ok ? "PASS" : "FAIL");
+    return all_ok ? 0 : 1;
+}
+
+}  // namespace
+
 }  // namespace
 // ---------------------------------------------------------------------------
 // 设备菜单交互自检：菜单打开后再点小箭头，不应关闭（也不应闪烁重开）
@@ -1922,6 +1981,10 @@ int main(int argc, char *argv[]) {
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--title-button-selftest")) {
         return run_title_button_selftest();
+    }
+    if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
+                        QStringLiteral("--move-throttle-selftest")) {
+        return run_move_throttle_selftest();
     }
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--device-menu-selftest")) {
