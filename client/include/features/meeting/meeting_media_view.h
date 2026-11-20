@@ -61,6 +61,8 @@ private:
 
     IMeetingWindowHost *_host = nullptr;
     MeetingTopBarController *_topBar = nullptr;
+    /// 拖动窗口期间暂停画面刷新（由 DragStateNotifier 控制）
+    bool m_frozen = false;
 };
 
 #endif  // MEETING_MEDIA_VIEW_H

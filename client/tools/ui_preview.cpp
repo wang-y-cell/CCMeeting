@@ -18,6 +18,7 @@
 #include "ui/foundation/font_registry.h"
 #include "ui/foundation/window_effects.h"
 #include "ui/foundation/theme_manager.h"
+#include "ui/foundation/window_behavior.h"
 #include "media/recording/meeting_recorder.h"
 #include "ui/pages/meeting_settings_popup.h"
 #include "ui/pages/meeting_window.h"
@@ -1763,6 +1764,58 @@ int run_title_button_selftest() {
 }
 
 // ---------------------------------------------------------------------------
+// 窗口行为开关自检：原生拖动 / 拖动冻结 的默认值与读写、拖动状态广播
+// 用法：UiPreview.exe --window-behavior-selftest
+// ---------------------------------------------------------------------------
+namespace {
+
+int run_window_behavior_selftest() {
+    QStandardPaths::setTestModeEnabled(true);
+    QCoreApplication::setApplicationName(QStringLiteral("CCMeeting"));
+    if (!Storage::instance().open() || !Storage::instance().isOpen()) {
+        std::printf("[win-behavior] 存储不可用\n");
+        return 1;
+    }
+
+    bool all_ok = true;
+    auto check = [&](const char *name, bool ok) {
+        all_ok = all_ok && ok;
+        std::printf("[win-behavior] %-28s %s\n", name, ok ? "OK" : "FAIL");
+    };
+
+    ui::WindowBehavior::reset_to_defaults();
+    check("默认：原生拖动开启", ui::WindowBehavior::native_move_enabled());
+    check("默认：拖动冻结开启", ui::WindowBehavior::freeze_content_on_drag());
+
+    ui::WindowBehavior::set_native_move_enabled(false);
+    ui::WindowBehavior::set_freeze_content_on_drag(false);
+    check("可关闭：原生拖动", !ui::WindowBehavior::native_move_enabled());
+    check("可关闭：拖动冻结", !ui::WindowBehavior::freeze_content_on_drag());
+
+    ui::WindowBehavior::reset_to_defaults();
+    check("恢复默认：原生拖动", ui::WindowBehavior::native_move_enabled());
+    check("恢复默认：拖动冻结", ui::WindowBehavior::freeze_content_on_drag());
+
+    // 拖动状态广播
+    auto &notifier = ui::DragStateNotifier::instance();
+    int emitted = 0;
+    bool last = false;
+    const QMetaObject::Connection conn = QObject::connect(
+        &notifier, &ui::DragStateNotifier::dragging_changed,
+        [&](bool dragging) { ++emitted; last = dragging; });
+    notifier.set_dragging(true);
+    notifier.set_dragging(true);   // 重复值不应重复发信号
+    const bool on_ok = notifier.dragging() && emitted == 1 && last;
+    notifier.set_dragging(false);
+    const bool off_ok = !notifier.dragging() && emitted == 2 && !last;
+    QObject::disconnect(conn);
+    check("拖动状态广播", on_ok && off_ok);
+
+    std::printf("[win-behavior] 结论: %s\n", all_ok ? "PASS" : "FAIL");
+    return all_ok ? 0 : 1;
+}
+
+}  // namespace// ---------------------------------------------------------------------------
 // 拖动节流自检：连续 200 个 move 事件应被合并，最终位置准确
 // 用法：UiPreview.exe --move-throttle-selftest
 // ---------------------------------------------------------------------------
@@ -1994,6 +2047,10 @@ int main(int argc, char *argv[]) {
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--move-throttle-selftest")) {
         return run_move_throttle_selftest();
+    }
+    if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
+                        QStringLiteral("--window-behavior-selftest")) {
+        return run_window_behavior_selftest();
     }
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--device-menu-selftest")) {

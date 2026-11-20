@@ -52,6 +52,9 @@ public:
     QComboBox *uiStartPage = nullptr;
     QCheckBox *uiShowPageDesc = nullptr;
     QCheckBox *meetingShowTabs = nullptr;
+    /// 窗口行为（默认开启）：系统原生拖动 / 拖动时暂停画面刷新
+    QCheckBox *nativeMoveCheck = nullptr;
+    QCheckBox *freezeOnDragCheck = nullptr;
 
     // 主题（system / light / dark）
     QRadioButton *themeSystem = nullptr;

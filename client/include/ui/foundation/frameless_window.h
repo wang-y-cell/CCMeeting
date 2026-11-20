@@ -12,6 +12,7 @@
 
 #include "ui/foundation/icon_provider.h"
 #include "ui/foundation/theme_manager.h"
+#include "ui/foundation/window_behavior.h"
 #include "ui/foundation/window_effects.h"
 #include <QElapsedTimer>
 #include <QHideEvent>
@@ -20,6 +21,7 @@
 #include <QShowEvent>
 #include <QTimer>
 #include <QWidget>
+#include <QWindow>
 #include <type_traits>
 
 /**
@@ -148,6 +150,20 @@ public:
     }
     bool isMinimizable() const { return m_minimizable; }
 
+    /**
+     * @brief 窗口级覆盖：是否使用系统原生拖动
+     * @param enabled true/false 覆盖全局开关；传入 -1 恢复跟随全局设置
+     */
+    void setNativeMoveEnabled(int enabled) {
+        m_nativeMoveOverride = (enabled < 0) ? -1 : (enabled ? 1 : 0);
+    }
+    bool nativeMoveEnabled() const {
+        if (m_nativeMoveOverride >= 0) {
+            return m_nativeMoveOverride != 0;
+        }
+        return ui::WindowBehavior::native_move_enabled();
+    }
+
     /** @brief 设置边缘缩放热区厚度（像素，2~16） */
     void setResizeBorderWidth(int pixels) {
         m_borderWidth = qBound(2, pixels, 16);
@@ -237,6 +253,23 @@ protected:
         /// ---------- 2) 标题栏拖动 ----------
         if (isInTitleBar(pos) && !isOverTitleButton(pos)) {
             const QPoint globalPos = event->globalPosition().toPoint();
+            // 方案 A：交给系统拖动循环（DWM 搬移已合成表面，不触发内容重绘）。
+            // startSystemMove 在 Windows 上是模态的：函数返回即拖动结束。
+            // 自测窗口（WA_DontShowOnScreen）跳过，避免测试卡在模态循环里。
+            if (nativeMoveEnabled() &&
+                !Base::testAttribute(Qt::WA_DontShowOnScreen)) {
+                if (QWindow *window = Base::windowHandle()) {
+                    ui::DragStateNotifier::instance().set_dragging(true);
+                    const bool moved = window->startSystemMove();
+                    ui::DragStateNotifier::instance().set_dragging(false);
+                    if (moved) {
+                        event->accept();
+                        return;
+                    }
+                }
+            }
+
+            // 回退：自绘拖动
             if (Base::isMaximized() && m_maximizable) {
                 /// 最大化下拖动：先按鼠标水平相对位置还原，再进入拖动
                 restoreFromMaximizedAt(globalPos, pos);
@@ -248,6 +281,7 @@ protected:
                 /// 偏移 = 鼠标全局坐标 - 窗口左上角，后续 move(global - offset)
                 m_dragOffset = globalPos - Base::frameGeometry().topLeft();
             }
+            ui::DragStateNotifier::instance().set_dragging(true);
             event->accept();
             return;
         }
@@ -306,6 +340,7 @@ protected:
                 m_dragging = false;
                 m_resizing = false;
                 m_resizeRegion = ResizeRegion::None;
+                ui::DragStateNotifier::instance().set_dragging(false);
                 if (was_dragging && m_dragMoved) {
                     snap_after_drag(event->globalPosition().toPoint());
                 }
@@ -923,6 +958,7 @@ private:
         m_resizing = false;
         m_resizeRegion = ResizeRegion::None;
         m_lastCursorRegion = ResizeRegion::None;
+        ui::DragStateNotifier::instance().set_dragging(false);
         m_hasPendingDrag = false;
         m_hasPendingResize = false;
         if (m_geometryTimer) {
@@ -947,6 +983,7 @@ private:
     bool m_resizable = true;              ///< 是否允许边缘缩放
     bool m_maximizable = true;            ///< 是否允许最大化（按钮/双击）
     bool m_minimizable = false;           ///< 是否允许最小化（对话框默认 false）
+    int m_nativeMoveOverride = -1;        ///< 原生拖动覆盖：-1 跟随全局、0 关、1 开
 
     /// ----- 拖动 / 缩放锚点 -----
     QPoint m_dragOffset;                  ///< 拖动时：鼠标相对窗口左上角的偏移
