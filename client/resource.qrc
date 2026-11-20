@@ -36,6 +36,10 @@
         <file alias="chevron-down.svg">resources/icons/chevron-down.svg</file>
         <file alias="slash.svg">resources/icons/slash.svg</file>
         <file alias="chevron-up.svg">resources/icons/chevron-up.svg</file>
+        <file alias="minimize.svg">resources/icons/minimize.svg</file>
+        <file alias="maximize.svg">resources/icons/maximize.svg</file>
+        <file alias="restore.svg">resources/icons/restore.svg</file>
+        <file alias="close.svg">resources/icons/close.svg</file>
     </qresource>
 
     <qresource prefix="/ui/audio">

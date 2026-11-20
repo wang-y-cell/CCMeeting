@@ -387,7 +387,8 @@ QLabel {
 /* ---------- 无边框窗口标题栏按钮 ---------- */
 
 QPushButton#framelessCloseBtn,
-QPushButton#framelessMaxBtn {
+QPushButton#framelessMaxBtn,
+QPushButton#framelessMinBtn {
     background-color: transparent;
     border: none;
     color: @textFaint;
@@ -406,6 +407,11 @@ QPushButton#framelessMaxBtn:hover {
     background-color: @raised;
     color: @text;
 }
+QPushButton#framelessMinBtn:hover {
+    background-color: @raised;
+    color: @text;
+}
+
 /* ---------- 顶栏「会议设置」按钮 ---------- */
 
 QPushButton#btnMeetingInfo {
