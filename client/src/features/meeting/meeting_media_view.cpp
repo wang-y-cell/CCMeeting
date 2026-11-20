@@ -13,7 +13,6 @@
 #include "protocol/network_manager.h"
 #include "protocol/net_header.h"
 #include "ui/composites/meeting_toggle_icon.h"
-#include "ui/foundation/window_behavior.h"
 #include "ui/pages/meeting_window_ui.h"
 
 #include <QDateTime>
@@ -27,13 +26,7 @@ MeetingMediaView::MeetingMediaView(IMeetingWindowHost *host,
                                    MeetingTopBarController *top_bar,
                                    QObject *parent)
     : QObject(parent), _host(host), _topBar(top_bar) {
-    // 拖动期间暂停画面刷新：由系统拖动循环（或自绘拖动）广播
-    connect(&ui::DragStateNotifier::instance(),
-            &ui::DragStateNotifier::dragging_changed, this,
-            [this](bool dragging) {
-                m_frozen = dragging &&
-                           ui::WindowBehavior::freeze_content_on_drag();
-            });
+
 }
 
 void MeetingMediaView::attach() {

@@ -164,6 +164,17 @@ public:
         return ui::WindowBehavior::native_move_enabled();
     }
 
+    /** @brief 窗口级覆盖：是否使用系统原生缩放（-1 跟随全局） */
+    void setNativeResizeEnabled(int enabled) {
+        m_nativeResizeOverride = (enabled < 0) ? -1 : (enabled ? 1 : 0);
+    }
+    bool nativeResizeEnabled() const {
+        if (m_nativeResizeOverride >= 0) {
+            return m_nativeResizeOverride != 0;
+        }
+        return ui::WindowBehavior::native_resize_enabled();
+    }
+
     /** @brief 设置边缘缩放热区厚度（像素，2~16） */
     void setResizeBorderWidth(int pixels) {
         m_borderWidth = qBound(2, pixels, 16);
@@ -241,6 +252,19 @@ protected:
         if (m_resizable && !Base::isMaximized()) {
             m_resizeRegion = hitTest(pos);
             if (m_resizeRegion != ResizeRegion::None) {
+                // 方案 A：交给系统缩放循环（左上角同时改位置+尺寸也不抖）。
+                // startSystemResize 在 Windows 上模态：返回即缩放结束。
+                if (nativeResizeEnabled() &&
+                    !Base::testAttribute(Qt::WA_DontShowOnScreen)) {
+                    if (QWindow *window = Base::windowHandle()) {
+                        if (window->startSystemResize(
+                                to_qt_edges(m_resizeRegion))) {
+                            m_resizeRegion = ResizeRegion::None;
+                            event->accept();
+                            return;
+                        }
+                    }
+                }
                 m_resizing = true;
                 m_dragGlobalPos = event->globalPosition().toPoint(); ///< 按下时屏幕坐标
                 m_dragGeometry = Base::geometry();                  ///< 按下时窗口矩形（锚点）
@@ -259,10 +283,7 @@ protected:
             if (nativeMoveEnabled() &&
                 !Base::testAttribute(Qt::WA_DontShowOnScreen)) {
                 if (QWindow *window = Base::windowHandle()) {
-                    ui::DragStateNotifier::instance().set_dragging(true);
-                    const bool moved = window->startSystemMove();
-                    ui::DragStateNotifier::instance().set_dragging(false);
-                    if (moved) {
+                    if (window->startSystemMove()) {
                         event->accept();
                         return;
                     }
@@ -281,7 +302,6 @@ protected:
                 /// 偏移 = 鼠标全局坐标 - 窗口左上角，后续 move(global - offset)
                 m_dragOffset = globalPos - Base::frameGeometry().topLeft();
             }
-            ui::DragStateNotifier::instance().set_dragging(true);
             event->accept();
             return;
         }
@@ -340,7 +360,6 @@ protected:
                 m_dragging = false;
                 m_resizing = false;
                 m_resizeRegion = ResizeRegion::None;
-                ui::DragStateNotifier::instance().set_dragging(false);
                 if (was_dragging && m_dragMoved) {
                     snap_after_drag(event->globalPosition().toPoint());
                 }
@@ -471,6 +490,25 @@ private:
         BottomLeft = Bottom | Left,
         BottomRight = Bottom | Right,
     };
+
+    /** @brief 命中区域 -> Qt 系统缩放的边缘集合 */
+    static Qt::Edges to_qt_edges(ResizeRegion region) {
+        Qt::Edges edges;
+        const int value = static_cast<int>(region);
+        if (value & static_cast<int>(ResizeRegion::Left)) {
+            edges |= Qt::LeftEdge;
+        }
+        if (value & static_cast<int>(ResizeRegion::Right)) {
+            edges |= Qt::RightEdge;
+        }
+        if (value & static_cast<int>(ResizeRegion::Top)) {
+            edges |= Qt::TopEdge;
+        }
+        if (value & static_cast<int>(ResizeRegion::Bottom)) {
+            edges |= Qt::BottomEdge;
+        }
+        return edges;
+    }
 
     static constexpr int kBorderWidth = 6; ///< 边缘可拖缩放的热区厚度（像素）
     static constexpr int kBtnMargin = 6;   ///< 标题按钮距窗口右上边缘的边距
@@ -958,7 +996,6 @@ private:
         m_resizing = false;
         m_resizeRegion = ResizeRegion::None;
         m_lastCursorRegion = ResizeRegion::None;
-        ui::DragStateNotifier::instance().set_dragging(false);
         m_hasPendingDrag = false;
         m_hasPendingResize = false;
         if (m_geometryTimer) {
@@ -984,6 +1021,7 @@ private:
     bool m_maximizable = true;            ///< 是否允许最大化（按钮/双击）
     bool m_minimizable = false;           ///< 是否允许最小化（对话框默认 false）
     int m_nativeMoveOverride = -1;        ///< 原生拖动覆盖：-1 跟随全局、0 关、1 开
+    int m_nativeResizeOverride = -1;      ///< 原生缩放覆盖：-1 跟随全局、0 关、1 开
 
     /// ----- 拖动 / 缩放锚点 -----
     QPoint m_dragOffset;                  ///< 拖动时：鼠标相对窗口左上角的偏移

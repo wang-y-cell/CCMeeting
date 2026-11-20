@@ -320,10 +320,10 @@ void ui::SettingsPageUi::setupUi(QWidget *parent) {
     nativeMoveCheck->setObjectName(QStringLiteral("nativeMoveCheck"));
     uiForm->addRow(QString(), nativeMoveCheck);
 
-    freezeOnDragCheck = new QCheckBox(
-        QObject::tr("拖动窗口时暂停画面刷新（降低占用）"), uiPage);
-    freezeOnDragCheck->setObjectName(QStringLiteral("freezeOnDragCheck"));
-    uiForm->addRow(QString(), freezeOnDragCheck);
+    nativeResizeCheck = new QCheckBox(
+        QObject::tr("缩放窗口时交给系统原生缩放（更顺滑）"), uiPage);
+    nativeResizeCheck->setObjectName(QStringLiteral("nativeResizeCheck"));
+    uiForm->addRow(QString(), nativeResizeCheck);
 
     pageStack->addWidget(makeScrollPage(body, uiPage));
 
