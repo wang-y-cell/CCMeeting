@@ -196,6 +196,8 @@ protected:
                 m_dragging = true;
             } else if (!Base::isMaximized()) {
                 m_dragging = true;
+                m_dragMoved = false;
+                m_dragGlobalPos = globalPos;
                 /// 偏移 = 鼠标全局坐标 - 窗口左上角，后续 move(global - offset)
                 m_dragOffset = globalPos - Base::frameGeometry().topLeft();
             }
@@ -223,6 +225,9 @@ protected:
         }
 
         if (m_dragging && (event->buttons() & Qt::LeftButton)) {
+            if ((globalPos - m_dragGlobalPos).manhattanLength() > 2) {
+                m_dragMoved = true;
+            }
             Base::move(globalPos - m_dragOffset);
             event->accept();
             return;
@@ -249,9 +254,10 @@ protected:
                 m_dragging = false;
                 m_resizing = false;
                 m_resizeRegion = ResizeRegion::None;
-                if (was_dragging) {
+                if (was_dragging && m_dragMoved) {
                     snap_after_drag(event->globalPosition().toPoint());
                 }
+                m_dragMoved = false;
                 event->accept();
                 return;
             }
@@ -815,6 +821,7 @@ private:
             Base::releaseMouse();
         }
         m_dragging = false;
+        m_dragMoved = false;
         m_resizing = false;
         m_resizeRegion = ResizeRegion::None;
         m_lastCursorRegion = ResizeRegion::None;
@@ -822,6 +829,7 @@ private:
 
     /// ----- 交互状态 -----
     bool m_dragging = false;              ///< 是否正在拖动移动窗口
+    bool m_dragMoved = false;             ///< 本次拖动是否真的移动过（吸附只对拖动生效）
     bool m_resizing = false;              ///< 是否正在拖边缩放
     bool m_resizable = true;              ///< 是否允许边缘缩放
     bool m_maximizable = true;            ///< 是否允许最大化（按钮/双击）
