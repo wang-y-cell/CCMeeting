@@ -7,6 +7,7 @@
 #include <QMouseEvent>
 #include <QPushButton>
 #include <QResizeEvent>
+#include <cmath>
 #include <cstdint>
 
 #include "ui/foundation/icon_provider.h"
@@ -82,7 +83,7 @@ public:
         // 拖动/缩放几何节流定时器（默认 16ms，可用 setGeometryUpdateInterval 调整）
         m_geometryTimer = new QTimer(this);
         m_geometryTimer->setSingleShot(true);
-        m_geometryTimer->setInterval(m_geometryIntervalMs);
+        m_geometryTimer->setTimerType(Qt::PreciseTimer);
         QObject::connect(m_geometryTimer, &QTimer::timeout, this,
                          [this]() { flush_geometry_update(); });
 
@@ -154,18 +155,35 @@ public:
     int resizeBorderWidth() const { return m_borderWidth; }
 
     /**
-     * @brief 设置拖动/缩放时窗口几何的最小更新间隔（毫秒，0 表示不节流）
+     * @brief 设置拖动/缩放时窗口几何的最小更新间隔
+     * @param ms -1 = 自动跟随显示器刷新率（默认）；0 = 不节流；>0 = 固定毫秒
      *
-     * 默认 16ms（约 60Hz）。高回报率鼠标（125~1000Hz）下，如果每个 move
-     * 事件都 SetWindowPos，会把 UI 线程压满；节流后只应用"最新目标位置"。
+     * 默认"自动"：按窗口所在屏幕的 refreshRate() 计算（144Hz≈7ms、165Hz≈6ms），
+     * 避免固定 60Hz 在高刷屏上显得"帧率低"。高回报率鼠标（125~1000Hz）下，
+     * 如果不节流，每个 move 事件都 SetWindowPos 会把 UI 线程压满。
      */
     void setGeometryUpdateInterval(int ms) {
-        m_geometryIntervalMs = qBound(0, ms, 100);
+        m_geometryIntervalMs = (ms < 0) ? -1 : qBound(0, ms, 100);
         if (m_geometryTimer && m_geometryIntervalMs == 0) {
             m_geometryTimer->stop();
         }
     }
+    /** @brief 返回配置值（-1 表示自动） */
     int geometryUpdateInterval() const { return m_geometryIntervalMs; }
+
+    /** @brief 当前实际使用的间隔（自动模式下按屏幕刷新率换算） */
+    int effective_geometry_interval() const {
+        if (m_geometryIntervalMs >= 0) {
+            return m_geometryIntervalMs;
+        }
+        const QScreen *screen = Base::screen();
+        qreal hz = (screen != nullptr) ? screen->refreshRate() : 60.0;
+        if (!(hz > 1.0)) {
+            hz = 60.0;   // 未知刷新率：按 60Hz 兜底
+        }
+        // 2ms 下限防止异常高刷新率；33ms 上限避免低刷屏上太慢
+        return qBound(2, static_cast<int>(std::ceil(1000.0 / hz)), 33);
+    }
 
     /** @brief 自检用：几何更新被节流合并的次数 */
     std::uint32_t geometry_throttle_count() const {
@@ -845,7 +863,7 @@ private:
      * - 否则：挂起，由定时器在剩余时间后应用"最新目标"
      */
     void schedule_geometry_update() {
-        const int interval = m_geometryIntervalMs;
+        const int interval = effective_geometry_interval();
         if (interval <= 0 || m_geometryTimer == nullptr) {
             flush_geometry_update();
             return;
@@ -923,7 +941,7 @@ private:
     QRect m_pendingResizeGeometry;       ///< 挂起的缩放目标矩形
     bool m_hasPendingDrag = false;
     bool m_hasPendingResize = false;
-    int m_geometryIntervalMs = 16;       ///< 最小更新间隔（ms），0 表示不节流
+    int m_geometryIntervalMs = -1;       ///< 最小更新间隔（ms）：-1 自动、0 关闭、>0 固定
     std::uint32_t m_geometryThrottleCount = 0; ///< 被合并的更新次数（自检用）
     bool m_resizing = false;              ///< 是否正在拖边缩放
     bool m_resizable = true;              ///< 是否允许边缘缩放
