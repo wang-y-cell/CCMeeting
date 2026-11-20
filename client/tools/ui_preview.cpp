@@ -1801,6 +1801,15 @@ int run_move_throttle_selftest() {
     QCoreApplication::sendEvent(&window, &release);
     QCoreApplication::processEvents();
 
+    // 打印刷新率与节流间隔，确认"跟随显示器"而不是固定 60Hz
+    const QScreen *screen = window.screen();
+    const qreal hz = (screen != nullptr) ? screen->refreshRate() : 0.0;
+    std::printf("[move-throttle] 屏幕刷新率=%.1fHz 配置间隔=%dms 实际间隔=%dms\n",
+                hz, window.geometryUpdateInterval(),
+                window.effective_geometry_interval());
+    const bool interval_ok = window.effective_geometry_interval() >= 2 &&
+                             window.effective_geometry_interval() <= 33;
+
     const QPoint expected = start_pos + QPoint(kSteps * 2, kSteps);
     const int dx = window.pos().x() - expected.x();
     const int dy = window.pos().y() - expected.y();
@@ -1814,7 +1823,7 @@ int run_move_throttle_selftest() {
     std::printf("[move-throttle] 合并次数=%u %s\n",
                 static_cast<unsigned>(merged), throttled ? "OK" : "FAIL");
     window.hide();
-    const bool all_ok = pos_ok && throttled;
+    const bool all_ok = pos_ok && throttled && interval_ok;
     std::printf("[move-throttle] 结论: %s\n", all_ok ? "PASS" : "FAIL");
     return all_ok ? 0 : 1;
 }
