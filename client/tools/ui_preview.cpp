@@ -1748,6 +1748,9 @@ int run_title_button_selftest() {
                     (at_right && visible) ? "OK" : "FAIL(不在右上角)");
     };
 
+    if (auto *min_btn = window.minimizeButton()) {
+        check("最小化", min_btn->geometry(), window.width());
+    }
     if (auto *max_btn = window.maximizeButton()) {
         check("最大化", max_btn->geometry(), window.width());
     }

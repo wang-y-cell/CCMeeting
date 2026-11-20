@@ -9,7 +9,10 @@
 #include <QResizeEvent>
 #include <cstdint>
 
+#include "ui/foundation/icon_provider.h"
+#include "ui/foundation/theme_manager.h"
 #include "ui/foundation/window_effects.h"
+#include <QHideEvent>
 #include <QScreen>
 #include <QGuiApplication>
 #include <QShowEvent>
@@ -38,7 +41,15 @@
  * 常用配置：
  * - setResizable(false)    禁止拖边缩放（如登录框固定尺寸）
  * - setMaximizable(false)  禁止最大化按钮与双击放大
+ * - setMinimizable(false)  禁止最小化按钮（对话框默认就是 false）
  * - setTitleBarHeight(36)  可拖动的标题栏高度（像素）
+ * - setResizeBorderWidth(8) 边缘缩放热区厚度（像素）
+ *
+ * 子类注意事项：
+ * - 本类重写了 mousePress/Move/Release/DoubleClick、resize、show、hide、change、
+ *   event 等事件。子类若也要重写同一事件，必须先调用 FramelessWindow<Base>::xxx()
+ *   （或至少调用 QWidget 版本），否则拖拽/缩放/标题按钮会失效。
+ * - 模板类不能带 Q_OBJECT：需要信号槽的子类请自己声明 Q_OBJECT。
  */
 
 template <typename Base>
@@ -51,6 +62,12 @@ public:
      * @brief 构造无边框窗口
      * @param parent 父控件，顶层窗口一般传 nullptr
      */
+    ~FramelessWindow() override {
+        if (m_resizing || m_dragging) {
+            release_drag_state();
+        }
+    }
+
     explicit FramelessWindow(QWidget *parent = nullptr)
         : Base(parent) {
         /// FramelessWindowHint：去掉系统边框与标题栏
@@ -102,6 +119,29 @@ public:
     }
     /** @brief 获得是否允许最大化的bool值,true表示允许,false表示不允许 */
     bool isMaximizable() const { return m_maximizable; }
+
+    /** @brief 获取最小化按钮（对话框等不允许最小化的窗口为隐藏状态） */
+    QPushButton *minimizeButton() const { return m_minBtn; }
+
+    /**
+     * @brief 设置是否允许最小化
+     * @details 为 false 时隐藏最小化按钮。对话框（QDialog）默认 false。
+     */
+    void setMinimizable(bool enabled) {
+        m_minimizable = enabled;
+        if (m_minBtn) {
+            m_minBtn->setVisible(enabled);
+            m_last_title_geometry_width = -1;   // 可见性变了：强制重新摆放
+            updateTitleButtonsGeometry();
+        }
+    }
+    bool isMinimizable() const { return m_minimizable; }
+
+    /** @brief 设置边缘缩放热区厚度（像素，2~16） */
+    void setResizeBorderWidth(int pixels) {
+        m_borderWidth = qBound(2, pixels, 16);
+    }
+    int resizeBorderWidth() const { return m_borderWidth; }
 
     /** @brief 标题按钮摆放次数（自检/性能诊断用） */
     std::uint32_t title_geometry_update_count() const {
@@ -202,17 +242,54 @@ protected:
     void mouseReleaseEvent(QMouseEvent *event) override {
         if (event->button() == Qt::LeftButton) {
             if (m_dragging || m_resizing) {
+                const bool was_dragging = m_dragging;
                 if (m_resizing) {
                     Base::releaseMouse();
                 }
                 m_dragging = false;
                 m_resizing = false;
                 m_resizeRegion = ResizeRegion::None;
+                if (was_dragging) {
+                    snap_after_drag(event->globalPosition().toPoint());
+                }
                 event->accept();
                 return;
             }
         }
         Base::mouseReleaseEvent(event);
+    }
+
+    /**
+     * @brief 拖动释放时贴边吸附（Windows Aero Snap 的简化版）
+     *
+     * - 顶边：最大化
+     * - 左边/右边：占当前屏幕工作区的左半/右半
+     * 只在允许最大化、且当前不是最大化状态时处理。
+     */
+    void snap_after_drag(const QPoint &global_pos) {
+        if (!m_maximizable || Base::isMaximized()) {
+            return;
+        }
+        QScreen *screen = QGuiApplication::screenAt(global_pos);
+        if (screen == nullptr) {
+            return;
+        }
+        constexpr int kSnapThreshold = 8;
+        const QRect avail = screen->availableGeometry();
+
+        if (global_pos.y() <= avail.top() + kSnapThreshold) {
+            toggleMaximize();
+            return;
+        }
+        if (qAbs(global_pos.x() - avail.left()) <= kSnapThreshold) {
+            Base::setGeometry(avail.left(), avail.top(), avail.width() / 2,
+                              avail.height());
+        } else if (qAbs(global_pos.x() - (avail.left() + avail.width() - 1)) <=
+                   kSnapThreshold) {
+            const int half = avail.width() / 2;
+            Base::setGeometry(avail.left() + avail.width() - half, avail.top(),
+                              half, avail.height());
+        }
     }
 
     /**
@@ -245,23 +322,17 @@ protected:
         updateTitleButtonsGeometry();
         updateMaximizeButtonIcon();
         // Win11 DWM 圆角：让无边框窗口（主窗口/会议/回放/对话框）四角一致
-        if (!rounded_corners_applied_) {
-            rounded_corners_applied_ = true;
+        if (!m_roundedCornersApplied) {
+            m_roundedCornersApplied = true;
             ui::enable_rounded_corners(this);
         }
     }
 
-    /** @brief 是否已申请过系统圆角 */
-    bool rounded_corners_applied_ = false;
-
-    /** 最近一次摆放标题按钮时的窗口宽度（宽度不变则跳过重排） */
-    int m_last_title_geometry_width = -1;
-    /** 最近一次刷新最大化图标时的状态 */
-    bool m_last_maximized_state = false;
-    bool m_maximize_icon_initialized = false;
-    /** 自检/性能诊断计数 */
-    std::uint32_t m_title_geometry_updates = 0;
-    std::uint32_t m_maximize_icon_updates = 0;
+    /** @brief 隐藏/关闭时若仍抓着鼠标（拖边过程中关窗）必须释放 */
+    void hideEvent(QHideEvent *event) override {
+        release_drag_state();
+        Base::hideEvent(event);
+    }
 
     /** @brief 窗口状态变化（如最大化）时同步按钮外观 */
     void changeEvent(QEvent *event) override {
@@ -319,24 +390,37 @@ private:
      * @note objectName 供 QSS 选择：#framelessMaxBtn / #framelessCloseBtn
      */
     void setupTitleButtons() {
+        /// 对话框默认不提供最小化（模态框最小化没有意义）
+        m_minimizable = !std::is_base_of_v<QDialog, Base>;
+
+        const auto make_button = [this](const QString &object_name,
+                                        const QString &tooltip) {
+            auto *button = new QPushButton(this);
+            button->setObjectName(object_name);
+            button->setFixedSize(32, 32);
+            button->setCursor(Qt::PointingHandCursor);
+            button->setFocusPolicy(Qt::NoFocus);
+            button->setToolTip(tooltip);
+            button->setIconSize(QSize(12, 12));
+            return button;
+        };
+
+        /// ----- 最小化按钮 -----
+        m_minBtn = make_button(QStringLiteral("framelessMinBtn"),
+                               QStringLiteral("最小化"));
+        m_minBtn->setVisible(m_minimizable);
+        QObject::connect(m_minBtn, &QPushButton::clicked, this,
+                         [this]() { Base::showMinimized(); });
+
         /// ----- 最大化按钮 -----
-        m_maxBtn = new QPushButton(this);
-        m_maxBtn->setObjectName(QStringLiteral("framelessMaxBtn"));
-        m_maxBtn->setFixedSize(32, 32); //设置按钮的高度和宽度为固定值
-        m_maxBtn->setCursor(Qt::PointingHandCursor); //设置鼠标光标为手形
-        m_maxBtn->setFocusPolicy(Qt::NoFocus); ///< 避免抢输入框焦点
-        m_maxBtn->setToolTip(QStringLiteral("最大化")); //设置按钮悬浮的提示信息
-        QObject::connect(m_maxBtn, &QPushButton::clicked, this, [this]() {
-            toggleMaximize(); //点击按钮时切换窗口的最大化和普通状态
-        });
+        m_maxBtn = make_button(QStringLiteral("framelessMaxBtn"),
+                               QStringLiteral("最大化"));
+        QObject::connect(m_maxBtn, &QPushButton::clicked, this,
+                         [this]() { toggleMaximize(); });
 
         /// ----- 关闭按钮 -----
-        m_closeBtn = new QPushButton(QStringLiteral("×"), this);
-        m_closeBtn->setObjectName(QStringLiteral("framelessCloseBtn"));
-        m_closeBtn->setFixedSize(32, 32);
-        m_closeBtn->setCursor(Qt::PointingHandCursor);
-        m_closeBtn->setFocusPolicy(Qt::NoFocus);
-        m_closeBtn->setToolTip(QStringLiteral("关闭"));
+        m_closeBtn = make_button(QStringLiteral("framelessCloseBtn"),
+                                 QStringLiteral("关闭"));
         QObject::connect(m_closeBtn, &QPushButton::clicked, this, [this]() {
             /// Dialog 用 reject() 结束模态；普通窗口用 close()
             if constexpr (std::is_base_of_v<QDialog, Base>) {
@@ -346,8 +430,53 @@ private:
             }
         });
 
-        updateMaximizeButtonIcon();
+        updateTitleButtonIcons();
         updateTitleButtonsGeometry();
+
+        /// 主题切换时按新令牌重新着色图标（图标是位图，不随 QSS 变色）
+        QObject::connect(&ui::ThemeManager::instance(),
+                         &ui::ThemeManager::theme_changed, this,
+                         [this]() { updateTitleButtonIcons(); });
+    }
+
+    /** @brief 生成带 Normal/Active 两种颜色的标题按钮图标 */
+    QIcon title_button_icon(const QString &name, const QColor &normal,
+                            const QColor &active) const {
+        QIcon icon;
+        const QPixmap normal_pm =
+            ui::IconProvider::instance().pixmap(name, normal, 12);
+        const QPixmap active_pm =
+            ui::IconProvider::instance().pixmap(name, active, 12);
+        if (!normal_pm.isNull()) {
+            icon.addPixmap(normal_pm, QIcon::Normal);
+        }
+        if (!active_pm.isNull()) {
+            icon.addPixmap(active_pm, QIcon::Active);
+        }
+        return icon;
+    }
+
+    /** @brief 按主题与窗口状态刷新三个标题按钮的图标 */
+    void updateTitleButtonIcons() {
+        auto &theme = ui::ThemeManager::instance();
+        const QColor normal = theme.color(QStringLiteral("textMuted"));
+        const QColor hover = theme.color(QStringLiteral("text"));
+        const QColor close_hover = theme.color(QStringLiteral("onPrimary"));
+
+        if (m_minBtn) {
+            m_minBtn->setIcon(
+                title_button_icon(QStringLiteral("minimize"), normal, hover));
+        }
+        if (m_maxBtn) {
+            const bool maximized = Base::isMaximized();
+            m_maxBtn->setIcon(title_button_icon(
+                maximized ? QStringLiteral("restore") : QStringLiteral("maximize"),
+                normal, hover));
+        }
+        if (m_closeBtn) {
+            m_closeBtn->setIcon(title_button_icon(
+                QStringLiteral("close"), normal, close_hover));
+        }
     }
 
     /**
@@ -368,17 +497,32 @@ private:
         m_last_title_geometry_width = width;
         ++m_title_geometry_updates;
 
-        const int closeX = Base::width() - m_closeBtn->width() - kBtnMargin;
-        m_closeBtn->move(closeX, kBtnMargin);
+        const int button_h = m_closeBtn->height();
+        const int y = qBound(0, (m_titleBarHeight - button_h) / 2, button_h);
 
-        // 注意：不能加 isVisible() 判断——按钮可能先隐藏后显示，
-        // 若只摆放可见按钮，隐藏期间尺寸变化后它会永远停在 (0,0)
-        if (m_maxBtn) {
-            const int maxX = closeX - m_maxBtn->width() - kBtnGap;
-            m_maxBtn->move(maxX, kBtnMargin);
-            m_maxBtn->raise();   ///< 先抬起最大化
+        // 从右往左依次摆放：关闭 → 最大化 → 最小化
+        int x = Base::width() - m_closeBtn->width() - kBtnMargin;
+        m_closeBtn->move(x, y);
+
+        // 按"配置是否启用"而不是 isVisible() 来排布：
+        // 隐藏按钮在尺寸变化时也要跟着挪，否则重新启用会停在旧位置；
+        // 未启用的按钮不占位，避免出现空洞。
+        if (m_maximizable && m_maxBtn) {
+            x -= (button_h + kBtnGap);
+            m_maxBtn->move(x, y);
         }
-        m_closeBtn->raise();     ///< 再抬起关闭，关闭在最上层
+        if (m_minimizable && m_minBtn) {
+            x -= (button_h + kBtnGap);
+            m_minBtn->move(x, y);
+        }
+
+        if (m_minBtn) {
+            m_minBtn->raise();
+        }
+        if (m_maxBtn) {
+            m_maxBtn->raise();   ///< 再抬起最大化
+        }
+        m_closeBtn->raise();     ///< 最后抬起关闭，关闭在最上层
     }
 
     /**
@@ -389,8 +533,8 @@ private:
         if (!m_maxBtn) {
             return;
         }
-        // 最大化状态不随尺寸改变：只有状态翻转时才 setText/setToolTip，
-        // 否则每次 resize 都在重设按钮文本（会触发按钮重绘）
+        // 最大化状态不随尺寸改变：只有状态翻转时才重设图标/提示，
+        // 否则每次 resize 都在换图标（会触发按钮重绘）
         const bool maximized = Base::isMaximized();
         if (m_maximize_icon_initialized && maximized == m_last_maximized_state) {
             return;
@@ -399,13 +543,9 @@ private:
         m_maximize_icon_initialized = true;
         ++m_maximize_icon_updates;
 
-        if (maximized) {
-            m_maxBtn->setText(QStringLiteral("❐"));
-            m_maxBtn->setToolTip(QStringLiteral("还原"));
-        } else {
-            m_maxBtn->setText(QStringLiteral("□"));
-            m_maxBtn->setToolTip(QStringLiteral("最大化"));
-        }
+        updateTitleButtonIcons();
+        m_maxBtn->setToolTip(maximized ? QStringLiteral("还原")
+                                       : QStringLiteral("最大化"));
     }
 
 protected:
@@ -421,7 +561,9 @@ protected:
             return;
         }
         if (Base::isMaximized()) {
-            Base::showNormal();
+            // 不用 showNormal()：它会先让系统按默认规则放一次再被 setGeometry
+            // 覆盖，Windows 上会闪一帧；直接清状态再落几何。
+            Base::setWindowState(Base::windowState() & ~Qt::WindowMaximized);
             if (m_savedMaxSize.isValid()) {
                 Base::setMaximumSize(m_savedMaxSize);
                 m_savedMaxSize = QSize();
@@ -511,7 +653,7 @@ private:
 
         const int w = Base::width();
         const int h = Base::height();
-        const int b = kBorderWidth;
+        const int b = m_borderWidth;
 
         const bool left = pos.x() >= 0 && pos.x() < b;
         const bool right = pos.x() > w - b && pos.x() < w;
@@ -530,6 +672,12 @@ private:
      * @brief 根据命中区域设置鼠标光标（↔ ↕ 对角等）
      */
     void updateCursor(ResizeRegion region) {
+        // 同一区域不重复 setCursor：hover 移动时每像素都会走到这里，
+        // 重复设置会触发大量 WM_SETCURSOR
+        if (region == m_lastCursorRegion) {
+            return;
+        }
+        m_lastCursorRegion = region;
         switch (region) {
         case ResizeRegion::Left:
         case ResizeRegion::Right:
@@ -592,7 +740,8 @@ private:
         /// 最小尺寸：minimumSize、sizeHint、热区宽度三者取大
         const QSize minSize = Base::minimumSize()
                                   .expandedTo(Base::minimumSizeHint())
-                                  .expandedTo(QSize(kBorderWidth * 2, kBorderWidth * 2));
+                                  .expandedTo(QSize(m_borderWidth * 2,
+                                                    m_borderWidth * 2));
         QSize maxSize = Base::maximumSize();
         if (maxSize.width() <= 0) {
             maxSize.setWidth(QWIDGETSIZE_MAX);
@@ -660,11 +809,23 @@ private:
     }
 
 private:
+    /** @brief 清掉拖拽/缩放状态并释放鼠标抓取（hide/析构兜底） */
+    void release_drag_state() {
+        if (m_resizing) {
+            Base::releaseMouse();
+        }
+        m_dragging = false;
+        m_resizing = false;
+        m_resizeRegion = ResizeRegion::None;
+        m_lastCursorRegion = ResizeRegion::None;
+    }
+
     /// ----- 交互状态 -----
     bool m_dragging = false;              ///< 是否正在拖动移动窗口
     bool m_resizing = false;              ///< 是否正在拖边缩放
     bool m_resizable = true;              ///< 是否允许边缘缩放
     bool m_maximizable = true;            ///< 是否允许最大化（按钮/双击）
+    bool m_minimizable = false;           ///< 是否允许最小化（对话框默认 false）
 
     /// ----- 拖动 / 缩放锚点 -----
     QPoint m_dragOffset;                  ///< 拖动时：鼠标相对窗口左上角的偏移
@@ -672,12 +833,23 @@ private:
     QRect m_dragGeometry;                 ///< 开始缩放时窗口的几何（计算基准）
     QRect m_normalGeometry;               ///< 最大化前的几何，用于还原与按比例定位
     ResizeRegion m_resizeRegion = ResizeRegion::None; ///< 当前缩放的边/角
+    ResizeRegion m_lastCursorRegion = ResizeRegion::None; ///< 上次设置的光标区域（去重）
 
     /// ----- 标题栏控件 -----
     QPushButton *m_closeBtn = nullptr;    ///< 关闭按钮
     QPushButton *m_maxBtn = nullptr;      ///< 最大化/还原按钮
+    QPushButton *m_minBtn = nullptr;      ///< 最小化按钮
     QSize m_savedMaxSize;                 ///< 最大化前备份的 maximumSize
     int m_titleBarHeight = 36;            ///< 可拖动标题栏高度（像素）
+    int m_borderWidth = 8;                ///< 边缘缩放热区厚度（像素）
+
+    /// ----- 自检/性能诊断 -----
+    bool m_roundedCornersApplied = false;  ///< 是否已申请过系统圆角
+    int m_last_title_geometry_width = -1;  ///< 最近一次摆放时的宽度（不变则跳过）
+    bool m_last_maximized_state = false;   ///< 最近一次刷新最大化图标时的状态
+    bool m_maximize_icon_initialized = false;
+    std::uint32_t m_title_geometry_updates = 0;  ///< 标题按钮摆放次数
+    std::uint32_t m_maximize_icon_updates = 0;   ///< 最大化图标刷新次数
 };
 
 #endif // FRAMELESS_WINDOW_H
