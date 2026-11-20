@@ -315,6 +315,16 @@ void ui::SettingsPageUi::setupUi(QWidget *parent) {
     meetingShowTabs->setObjectName(QStringLiteral("meetingShowTabs"));
     uiForm->addRow(QString(), meetingShowTabs);
 
+    nativeMoveCheck = new QCheckBox(
+        QObject::tr("拖动窗口时交给系统原生移动（更顺滑，支持贴边吸附）"), uiPage);
+    nativeMoveCheck->setObjectName(QStringLiteral("nativeMoveCheck"));
+    uiForm->addRow(QString(), nativeMoveCheck);
+
+    freezeOnDragCheck = new QCheckBox(
+        QObject::tr("拖动窗口时暂停画面刷新（降低占用）"), uiPage);
+    freezeOnDragCheck->setObjectName(QStringLiteral("freezeOnDragCheck"));
+    uiForm->addRow(QString(), freezeOnDragCheck);
+
     pageStack->addWidget(makeScrollPage(body, uiPage));
 
     bodyLayout->addWidget(pageStack, 1);
