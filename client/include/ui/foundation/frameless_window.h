@@ -938,8 +938,8 @@ private:
     QElapsedTimer m_geometryApplied;     ///< 上次应用几何的时刻
     QPoint m_pendingDragPos;             ///< 挂起的拖动目标位置
     QRect m_pendingResizeGeometry;       ///< 挂起的缩放目标矩形
-    bool m_hasPendingDrag = false;
-    bool m_hasPendingResize = false;
+    bool m_hasPendingDrag = false;       ///< 是否有缓存的位置
+    bool m_hasPendingResize = false;     ///是否有缓存的大小改变的位置
     std::uint32_t m_geometryThrottleCount = 0; ///< 被合并的更新次数（自检用）
     bool m_resizing = false;              ///< 是否正在拖边缩放
     bool m_resizable = true;              ///< 是否允许边缘缩放

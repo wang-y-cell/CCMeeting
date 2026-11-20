@@ -49,7 +49,7 @@ QPixmap IconProvider::pixmap(const QString &name, const QColor &color, int size)
 
     QPixmap canvas(QSize(size, size) * dpr);
     canvas.setDevicePixelRatio(dpr);
-    canvas.fill(Qt::transparent);
+    canvas.fill(Qt::transparent); //透明
 
     QSvgRenderer renderer(path);
     QPainter painter(&canvas);
