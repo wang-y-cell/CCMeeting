@@ -17,16 +17,28 @@ jobs:
   client-unit-tests:
     name: 客户端单元测试 (Qt 6.8.3 / MSVC / Ninja)
     runs-on: windows-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+
+      # install-qt-action 内部用 aqtinstall；GitHub 的 windows-latest 默认
+      # Python 已升到 3.13，而 aqtinstall 尚不支持 3.13（会以 exit code 1 失败）。
+      # 显式固定 3.11 再装 Qt。
+      - name: 固定 Python（供 aqtinstall 使用）
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
       - name: 安装 Qt
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.8.3'
           arch: win64_msvc2022_64
-          modules: 'qtmultimedia qtnetworkauth qtsvg'
-          cache: true
+          # 测试工程只需要 qtmultimedia；多余模块会放大下载/失败面
+          modules: 'qtmultimedia'
+          # 排查阶段先用干净安装（历史失败可能留下的缓存会再次失败）
+          cache: false
+          dir: '${{ runner.workspace }}/Qt'
 
       - name: 配置 MSVC 环境
         uses: ilammy/msvc-dev-cmd@v1
@@ -34,7 +46,7 @@ jobs:
           arch: x64
 
       - name: 配置测试工程
-        run: cmake -S client/tests -B build/tests -G Ninja -DCMAKE_BUILD_TYPE=Debug
+        run: cmake -S client/tests -B build/tests -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
 
       - name: 编译
         run: cmake --build build/tests
