@@ -1842,8 +1842,7 @@ int run_move_throttle_selftest() {
     // 打印刷新率与节流间隔，确认"跟随显示器"而不是固定 60Hz
     const QScreen *screen = window.screen();
     const qreal hz = (screen != nullptr) ? screen->refreshRate() : 0.0;
-    std::printf("[move-throttle] 屏幕刷新率=%.1fHz 配置间隔=%dms 实际间隔=%dms\n",
-                hz, window.geometryUpdateInterval(),
+    std::printf("[move-throttle] 屏幕刷新率=%.1fHz 实际间隔=%dms\n", hz,
                 window.effective_geometry_interval());
     const bool interval_ok = window.effective_geometry_interval() >= 2 &&
                              window.effective_geometry_interval() <= 33;

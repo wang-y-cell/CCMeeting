@@ -46,9 +46,7 @@
  * 常用配置：
  * - setResizable(false)    禁止拖边缩放（如登录框固定尺寸）
  * - setMaximizable(false)  禁止最大化按钮与双击放大
- * - setMinimizable(false)  禁止最小化按钮（对话框默认就是 false）
  * - setTitleBarHeight(36)  可拖动的标题栏高度（像素）
- * - setResizeBorderWidth(8) 边缘缩放热区厚度（像素）
  *
  * 子类注意事项：
  * - 本类重写了 mousePress/Move/Release/DoubleClick、resize、show、hide、change、
@@ -82,7 +80,7 @@ public:
         /// 启用 Hover 事件（配合 event() 里处理 HoverMove）
         Base::setAttribute(Qt::WA_Hover, true);
 
-        // 拖动/缩放几何节流定时器（默认 16ms，可用 setGeometryUpdateInterval 调整）
+        // 拖动/缩放几何节流定时器：间隔按当前显示器刷新率换算
         m_geometryTimer = new QTimer(this);
         m_geometryTimer->setSingleShot(true);
         m_geometryTimer->setTimerType(Qt::PreciseTimer);
@@ -106,16 +104,11 @@ public:
         m_titleBarHeight = height > 0 ? height : 0;
     }
 
-    /** @brief 获得当前标题栏高度 */
-    int titleBarHeight() const { return m_titleBarHeight; }
-
     /**
      * @brief 设置是否允许拖窗口边缘改变大小
      * @note 与最大化无关；登录等固定尺寸窗口应设为 false
      */
     void setResizable(bool enabled) { m_resizable = enabled; }
-    /** @brief 获得是否允许拖窗口边缘改变大小的bool值,true表示允许,false表示不允许 */
-    bool isResizable() const { return m_resizable; }
 
     /**
      * @brief 设置是否允许最大化
@@ -130,79 +123,12 @@ public:
             updateTitleButtonsGeometry();
         }
     }
-    /** @brief 获得是否允许最大化的bool值,true表示允许,false表示不允许 */
-    bool isMaximizable() const { return m_maximizable; }
 
     /** @brief 获取最小化按钮（对话框等不允许最小化的窗口为隐藏状态） */
     QPushButton *minimizeButton() const { return m_minBtn; }
 
-    /**
-     * @brief 设置是否允许最小化
-     * @details 为 false 时隐藏最小化按钮。对话框（QDialog）默认 false。
-     */
-    void setMinimizable(bool enabled) {
-        m_minimizable = enabled;
-        if (m_minBtn) {
-            m_minBtn->setVisible(enabled);
-            m_last_title_geometry_width = -1;   // 可见性变了：强制重新摆放
-            updateTitleButtonsGeometry();
-        }
-    }
-    bool isMinimizable() const { return m_minimizable; }
-
-    /**
-     * @brief 窗口级覆盖：是否使用系统原生拖动
-     * @param enabled true/false 覆盖全局开关；传入 -1 恢复跟随全局设置
-     */
-    void setNativeMoveEnabled(int enabled) {
-        m_nativeMoveOverride = (enabled < 0) ? -1 : (enabled ? 1 : 0);
-    }
-    bool nativeMoveEnabled() const {
-        if (m_nativeMoveOverride >= 0) {
-            return m_nativeMoveOverride != 0;
-        }
-        return ui::WindowBehavior::native_move_enabled();
-    }
-
-    /** @brief 窗口级覆盖：是否使用系统原生缩放（-1 跟随全局） */
-    void setNativeResizeEnabled(int enabled) {
-        m_nativeResizeOverride = (enabled < 0) ? -1 : (enabled ? 1 : 0);
-    }
-    bool nativeResizeEnabled() const {
-        if (m_nativeResizeOverride >= 0) {
-            return m_nativeResizeOverride != 0;
-        }
-        return ui::WindowBehavior::native_resize_enabled();
-    }
-
-    /** @brief 设置边缘缩放热区厚度（像素，2~16） */
-    void setResizeBorderWidth(int pixels) {
-        m_borderWidth = qBound(2, pixels, 16);
-    }
-    int resizeBorderWidth() const { return m_borderWidth; }
-
-    /**
-     * @brief 设置拖动/缩放时窗口几何的最小更新间隔
-     * @param ms -1 = 自动跟随显示器刷新率（默认）；0 = 不节流；>0 = 固定毫秒
-     *
-     * 默认"自动"：按窗口所在屏幕的 refreshRate() 计算（144Hz≈7ms、165Hz≈6ms），
-     * 避免固定 60Hz 在高刷屏上显得"帧率低"。高回报率鼠标（125~1000Hz）下，
-     * 如果不节流，每个 move 事件都 SetWindowPos 会把 UI 线程压满。
-     */
-    void setGeometryUpdateInterval(int ms) {
-        m_geometryIntervalMs = (ms < 0) ? -1 : qBound(0, ms, 100);
-        if (m_geometryTimer && m_geometryIntervalMs == 0) {
-            m_geometryTimer->stop();
-        }
-    }
-    /** @brief 返回配置值（-1 表示自动） */
-    int geometryUpdateInterval() const { return m_geometryIntervalMs; }
-
-    /** @brief 当前实际使用的间隔（自动模式下按屏幕刷新率换算） */
+    /** @brief 当前实际使用的几何更新间隔（按屏幕刷新率换算） */
     int effective_geometry_interval() const {
-        if (m_geometryIntervalMs >= 0) {
-            return m_geometryIntervalMs;
-        }
         const QScreen *screen = Base::screen();
         qreal hz = (screen != nullptr) ? screen->refreshRate() : 60.0;
         if (!(hz > 1.0)) {
@@ -254,7 +180,7 @@ protected:
             if (m_resizeRegion != ResizeRegion::None) {
                 // 方案 A：交给系统缩放循环（左上角同时改位置+尺寸也不抖）。
                 // startSystemResize 在 Windows 上模态：返回即缩放结束。
-                if (nativeResizeEnabled() &&
+                if (ui::WindowBehavior::native_resize_enabled() &&
                     !Base::testAttribute(Qt::WA_DontShowOnScreen)) {
                     if (QWindow *window = Base::windowHandle()) {
                         if (window->startSystemResize(
@@ -280,7 +206,7 @@ protected:
             // 方案 A：交给系统拖动循环（DWM 搬移已合成表面，不触发内容重绘）。
             // startSystemMove 在 Windows 上是模态的：函数返回即拖动结束。
             // 自测窗口（WA_DontShowOnScreen）跳过，避免测试卡在模态循环里。
-            if (nativeMoveEnabled() &&
+            if (ui::WindowBehavior::native_move_enabled() &&
                 !Base::testAttribute(Qt::WA_DontShowOnScreen)) {
                 if (QWindow *window = Base::windowHandle()) {
                     if (window->startSystemMove()) {
@@ -510,7 +436,7 @@ private:
         return edges;
     }
 
-    static constexpr int kBorderWidth = 6; ///< 边缘可拖缩放的热区厚度（像素）
+    static constexpr int kBorderWidth = 8; ///< 边缘可拖缩放的热区厚度（像素）
     static constexpr int kBtnMargin = 6;   ///< 标题按钮距窗口右上边缘的边距
     static constexpr int kBtnGap = 4;      ///< 最大化按钮与关闭按钮间距
 
@@ -784,7 +710,7 @@ private:
 
         const int w = Base::width();
         const int h = Base::height();
-        const int b = m_borderWidth;
+        const int b = kBorderWidth;
 
         const bool left = pos.x() >= 0 && pos.x() < b;
         const bool right = pos.x() > w - b && pos.x() < w;
@@ -871,8 +797,8 @@ private:
         /// 最小尺寸：minimumSize、sizeHint、热区宽度三者取大
         const QSize minSize = Base::minimumSize()
                                   .expandedTo(Base::minimumSizeHint())
-                                  .expandedTo(QSize(m_borderWidth * 2,
-                                                    m_borderWidth * 2));
+                                  .expandedTo(QSize(kBorderWidth * 2,
+                                                    kBorderWidth * 2));
         QSize maxSize = Base::maximumSize();
         if (maxSize.width() <= 0) {
             maxSize.setWidth(QWIDGETSIZE_MAX);
@@ -930,7 +856,7 @@ private:
     }
 
     /**
-     * @brief 调度几何更新（节流到 m_geometryIntervalMs）
+     * @brief 调度几何更新（节流到当前显示器刷新率）
      *
      * - 距上次应用已超过间隔：立即应用（保证拖动跟手）
      * - 否则：挂起，由定时器在剩余时间后应用"最新目标"
@@ -1014,7 +940,6 @@ private:
     QRect m_pendingResizeGeometry;       ///< 挂起的缩放目标矩形
     bool m_hasPendingDrag = false;
     bool m_hasPendingResize = false;
-    int m_geometryIntervalMs = -1;       ///< 最小更新间隔（ms）：-1 自动、0 关闭、>0 固定
     std::uint32_t m_geometryThrottleCount = 0; ///< 被合并的更新次数（自检用）
     bool m_resizing = false;              ///< 是否正在拖边缩放
     bool m_resizable = true;              ///< 是否允许边缘缩放
@@ -1037,7 +962,6 @@ private:
     QPushButton *m_minBtn = nullptr;      ///< 最小化按钮
     QSize m_savedMaxSize;                 ///< 最大化前备份的 maximumSize
     int m_titleBarHeight = 36;            ///< 可拖动标题栏高度（像素）
-    int m_borderWidth = 8;                ///< 边缘缩放热区厚度（像素）
 
     /// ----- 自检/性能诊断 -----
     bool m_roundedCornersApplied = false;  ///< 是否已申请过系统圆角
