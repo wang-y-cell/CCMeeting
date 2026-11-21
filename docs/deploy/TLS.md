@@ -184,3 +184,17 @@ openssl s_client -connect 8.153.155.18:8989 -CAfile /etc/ccmeeting/tls/cert.pem 
 openssl s_client -connect 8.153.155.18:8989 -CAfile /etc/ccmeeting/tls/cert.pem </dev/null
 # Verify return code: 0 (ok)，fingerprint 与客户端证书一致
 ```
+## 10. 自签 CA 证书要求（重要）
+
+自签证书同时当 CA 用时，`keyUsage` **必须包含 `keyCertSign`**：
+
+```ini
+basicConstraints = critical,CA:TRUE
+keyUsage = critical,digitalSignature,keyEncipherment,keyCertSign
+extendedKeyUsage = serverAuth
+subjectAltName = IP:8.153.155.18
+```
+
+否则 BoringSSL（xrtc wss）会报
+`unable to get local issuer certificate`，即使 OpenSSL `verify` 能通过。
+证书轮换后要同步更新客户端 `client/resources/tls/server-cert.pem`。

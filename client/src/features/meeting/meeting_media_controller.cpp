@@ -40,6 +40,10 @@ xrtc::XRTCJoinConfig MeetingMediaController::build_join_config(
                          : to_std(cfg.janus_ca_file);
     config.tls_verify = cfg.janus_tls_verify;
     config.allow_plaintext_ws = cfg.allow_plaintext_ws;
+    spdlog::info("[MeetingMedia] cfg.janus_ca_file=[{}] isEmpty={}",
+                 to_std(cfg.janus_ca_file), cfg.janus_ca_file.isEmpty());
+    spdlog::info("[MeetingMedia] wss ca_file={} verify={} allow_plaintext={}",
+                 config.ca_file, config.tls_verify, config.allow_plaintext_ws);
     config.width = cfg.video.width;
     config.height = cfg.video.height;
     config.fps = cfg.video.fps;
