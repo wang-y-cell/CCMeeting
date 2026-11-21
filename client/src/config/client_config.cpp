@@ -103,6 +103,12 @@ bool ClientConfig::loadFromJsonObject(const QJsonObject& root) {
         webrtc_.janus_ws_url =
             webrtc.value(QStringLiteral("janus_ws_url")).toString();
         webrtc_.admin_key = webrtc.value(QStringLiteral("admin_key")).toString();
+        webrtc_.janus_ca_file =
+            webrtc.value(QStringLiteral("janus_ca_file")).toString();
+        webrtc_.janus_tls_verify =
+            webrtc.value(QStringLiteral("janus_tls_verify")).toBool(true);
+        webrtc_.allow_plaintext_ws =
+            webrtc.value(QStringLiteral("allow_plaintext_ws")).toBool(false);
         if (const QJsonObject video = webrtc.value(QStringLiteral("video")).toObject();
             !video.isEmpty()) {
             webrtc_.video.width = video.value(QStringLiteral("width")).toInt(640);
@@ -149,6 +155,9 @@ QJsonObject ClientConfig::toJsonObject() const {
     QJsonObject webrtc;
     webrtc.insert(QStringLiteral("janus_ws_url"), webrtc_.janus_ws_url);
     webrtc.insert(QStringLiteral("admin_key"), webrtc_.admin_key);
+    webrtc.insert(QStringLiteral("janus_ca_file"), webrtc_.janus_ca_file);
+    webrtc.insert(QStringLiteral("janus_tls_verify"), webrtc_.janus_tls_verify);
+    webrtc.insert(QStringLiteral("allow_plaintext_ws"), webrtc_.allow_plaintext_ws);
     QJsonObject video;
     video.insert(QStringLiteral("width"), webrtc_.video.width);
     video.insert(QStringLiteral("height"), webrtc_.video.height);

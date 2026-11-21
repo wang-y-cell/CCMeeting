@@ -144,3 +144,43 @@ openssl s_client -connect 8.153.155.18:8888 -CAfile /etc/ccmeeting/tls/cert.pem 
   产物 `message_server/CloudMeetingServer` 为静态 ELF，可直接 scp 到服务器运行。
 - **不要在小内存 VPS 上直接 `-j2` 编译**：会拖死 sshd/nginx；优先在 WSL/Docker 构建后
   只上传二进制。
+## 9. Janus WSS（媒体信令）
+
+采用「单张自签证书作为统一根」：`/etc/ccmeeting/tls/{cert,key}.pem`
+同时用于 443、8888、Janus 8989。
+
+服务器：
+
+```bash
+# /opt/janus/etc/janus/janus.transport.websockets.jcfg
+wss_port = 8989
+cert_pem = "/etc/ccmeeting/tls/cert.pem"
+key_pem  = "/etc/ccmeeting/tls/key.pem"
+
+sudo systemctl restart janus
+sudo ss -lntp | grep 8989
+openssl s_client -connect 8.153.155.18:8989 -CAfile /etc/ccmeeting/tls/cert.pem </dev/null
+```
+
+客户端：
+
+```json
+"webrtc": {
+  "janus_ws_url": "wss://8.153.155.18:8989/",
+  "janus_ca_file": "",
+  "janus_tls_verify": true,
+  "allow_plaintext_ws": false
+}
+```
+
+- `janus_ca_file` 为空时，客户端把 qrc 内置证书导出到临时 PEM
+  （`%TEMP%/ccmeeting-ca-<hash>.pem`）供 xrtc 使用；
+- `tls_verify=true` 按 SAN 校验 IP；`allow_plaintext_ws=false` 拒绝任何 `ws://`；
+- xrtc 需要更新到含 WSS 的版本（`fc6d2da` 或更新）。
+
+验证：
+
+```bash
+openssl s_client -connect 8.153.155.18:8989 -CAfile /etc/ccmeeting/tls/cert.pem </dev/null
+# Verify return code: 0 (ok)，fingerprint 与客户端证书一致
+```

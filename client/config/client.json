@@ -15,7 +15,7 @@
     "tls": true
   },
   "webrtc": {
-    "janus_ws_url": "ws://8.153.155.18:8188/",
+    "janus_ws_url": "wss://8.153.155.18:8989/",
     "admin_key": "",
     "video": {
       "width": 640,
@@ -38,6 +38,9 @@
         "username": "wang_y",
         "password": "wang_y"
       }
-    ]
+    ],
+    "janus_ca_file": "",
+    "janus_tls_verify": true,
+    "allow_plaintext_ws": false
   }
 }
