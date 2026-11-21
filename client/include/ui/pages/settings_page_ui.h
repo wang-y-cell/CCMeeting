@@ -3,6 +3,7 @@
 
 class QCheckBox;
 class QRadioButton;
+class QToolButton;
 class QComboBox;
 class QLabel;
 class QLineEdit;
@@ -57,9 +58,9 @@ public:
     QCheckBox *nativeResizeCheck = nullptr;
 
     // 主题（system / light / dark）
-    QRadioButton *themeSystem = nullptr;
-    QRadioButton *themeLight = nullptr;
-    QRadioButton *themeDark = nullptr;
+    QToolButton *themeSystem = nullptr;
+    QToolButton *themeLight = nullptr;
+    QToolButton *themeDark = nullptr;
 
     QPushButton *saveBtn = nullptr;
     QPushButton *resetBtn = nullptr;

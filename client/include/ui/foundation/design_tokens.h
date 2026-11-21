@@ -72,17 +72,17 @@ inline constexpr Palette kDark{
     "#3DD68C", "#F5B544",
 };
 
-/** 浅色（新增） */
+/** 浅色（灰调：视频会议场景下避免大面积纯白） */
 inline constexpr Palette kLight{
-    // 背景（再灰一档：画布 #E2E5EA → 卡片 #F1F3F6 → 侧栏 #EAEDF1）
-    "#E2E5EA", "#D9DEE5", "#EAEDF1", "#F1F3F6", "#E8EBEF", "#E2E6EB",
-    "#E4E8ED", "#DDE1E7", "#F3F5F8", "#D6DBE2",
+    // 背景（灰阶层次：画布 #C4C8CE → 卡片 #D9DCE1 → 侧栏 #CFD3D9）
+    "#C4C8CE", "#B9BEC5", "#CFD3D9", "#D9DCE1", "#D2D6DB", "#CCD1D6",
+    "#CDD2D7", "#C6CBD1", "#DEE1E5", "#B7BCC2",
     // 交互
-    "#DDE2E8", "#D5DBE3", "#CBD2DB", "#C9D1DC",
+    "#D2D6DB", "#CBD0D6", "#B0B6BD", "#C3C8CE",
     // 描边
-    "#C9D0D9", "#D8DEE5", "#A9B3C1",
+    "#AEB4BB", "#C2C7CD", "#8F979F",
     // 文字
-    "#1E242E", "#434C59", "#67707E", "#94A0AF", "#707A88", "#4B5563",
+    "#1C2026", "#3F454D", "#5D646C", "#8A9199", "#666D75", "#3F454D",
     "#FFFFFF",
     // 强调
     "#2F6BFF", "#4C8DFF", "#245BDB",
