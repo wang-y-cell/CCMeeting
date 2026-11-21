@@ -7,6 +7,9 @@
 
 namespace ui {
 
+
+//主题样式预览小框
+
 namespace {
 
 struct ThumbSpec {

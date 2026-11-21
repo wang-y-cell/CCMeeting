@@ -159,6 +159,27 @@ private slots:
         QCOMPARE(MeetingHistory::load().size(), 0);
     }
 
+    void recordTextFormatting() {
+        MeetingRecord record;
+        record.kind = MeetingRecordKind::Created;
+        record.startedAt = QDateTime(QDate(2026, 3, 4), QTime(7, 5));
+        record.durationMs = 3723000;   // 1h 2m 3s
+        record.open = false;
+
+        QCOMPARE(record.kindText(), QStringLiteral("我创建"));
+        QCOMPARE(record.startedText(), QStringLiteral("2026-03-04 07:05"));
+        QCOMPARE(record.durationText(), QStringLiteral("01:02:03"));
+
+        record.kind = MeetingRecordKind::Joined;
+        QCOMPARE(record.kindText(), QStringLiteral("我加入"));
+
+        record.open = true;
+        QCOMPARE(record.durationText(), QStringLiteral("进行中"));
+
+        record.startedAt = QDateTime();
+        QCOMPARE(record.startedText(), QStringLiteral("-"));
+    }
+
     void historyPersistsAcrossLoads() {
         MeetingHistory::set_now_override(QDateTime(QDate(2026, 2, 1), QTime(8, 30)));
         MeetingHistory::append(MeetingRecordKind::Joined, 88);
