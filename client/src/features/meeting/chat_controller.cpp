@@ -55,6 +55,13 @@ void ChatController::finish_pending_immediately() {
 
 void ChatController::mark_pending_sent() { finish_pending_immediately(); }
 
+void ChatController::on_send_failed() {
+    if (_pending) {
+        _pending->setTextFailed();
+        _pending = nullptr;
+    }
+}
+
 void ChatController::append_remote(const QString &text,
                                    const QString &sender_name,
                                    const QString &avatar_url, bool mention_me) {

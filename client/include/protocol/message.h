@@ -372,8 +372,15 @@ Q_DECLARE_METATYPE(MessagePtr)
  */
 class PriorityMessageQueue {
 public:
-    /** @brief 将消息添加到队列 */
-    void push(MessagePtr msg);
+    /** @brief push 的结果：正常入队 / 丢弃最旧 / 等锁超时 */
+    enum class PushResult {
+        Queued,
+        DroppedOldest,
+        Timeout,
+    };
+
+    /** @brief 将消息添加到队列（队列满时丢弃最旧并在返回值中报告） */
+    PushResult push(MessagePtr msg);
     /** @brief 从队列中取出消息 */
     std::optional<MessagePtr> pop(int wait_ms = WAITSECONDS * 1000);
     /** @brief 清空队列 */

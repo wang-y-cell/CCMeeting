@@ -4,16 +4,20 @@
 
 namespace {
 
-void push_bounded(std::deque<MessagePtr> &bucket, MessagePtr msg,
+bool push_bounded(std::deque<MessagePtr> &bucket, MessagePtr msg,
                   std::size_t max_size) {
     if (max_size == 0)
-        return;
-    while (bucket.size() >= max_size)
-        bucket.pop_front();
+        return false;
+    bool dropped = false;
+    while (bucket.size() >= max_size) {
+        bucket.pop_front();   // 丢最旧，但要把"丢过"返回给上层
+        dropped = true;
+    }
     bucket.push_back(std::move(msg));
+    return dropped;
 }
 
-} // namespace
+}  // namespace
 
 std::deque<MessagePtr> &
 PriorityMessageQueue::bucket_for(MessagePriority priority) {
@@ -23,9 +27,9 @@ PriorityMessageQueue::bucket_for(MessagePriority priority) {
     return buckets_[index];
 }
 
-void PriorityMessageQueue::push(MessagePtr msg) {
+PriorityMessageQueue::PushResult PriorityMessageQueue::push(MessagePtr msg) {
     if (!msg)
-        return;
+        return PushResult::Timeout;
 
     const MessagePriority priority = msg->send_priority();
     {
@@ -34,14 +38,16 @@ void PriorityMessageQueue::push(MessagePtr msg) {
                               std::chrono::milliseconds(WAITSECONDS * 1000);
         while (!lock.try_lock()) {
             if (std::chrono::steady_clock::now() >= deadline)
-                return;
+                return PushResult::Timeout;
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
 
         auto &bucket = bucket_for(priority);
-        push_bounded(bucket, std::move(msg), QUEUE_MAXSIZE);
+        const bool dropped =
+            push_bounded(bucket, std::move(msg), QUEUE_MAXSIZE);
+        cond_.notify_one();
+        return dropped ? PushResult::DroppedOldest : PushResult::Queued;
     }
-    cond_.notify_one();
 }
 
 std::optional<MessagePtr> PriorityMessageQueue::pop(int wait_ms) {

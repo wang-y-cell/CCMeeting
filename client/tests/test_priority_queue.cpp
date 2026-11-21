@@ -33,8 +33,10 @@ MessagePtr text_message(const std::string &text) {
 
 void TestPriorityQueue::control_before_text() {
     PriorityMessageQueue queue;
-    queue.push(text_message(QStringLiteral("hello").toStdString()));
-    queue.push(std::make_shared<CreateMeetingMessage>(8, 60));
+    QVERIFY(queue.push(text_message(QStringLiteral("hello").toStdString())) ==
+            PriorityMessageQueue::PushResult::Queued);
+    QVERIFY(queue.push(std::make_shared<CreateMeetingMessage>(8, 60)) ==
+            PriorityMessageQueue::PushResult::Queued);
 
     const auto first = queue.pop(50);
     QVERIFY(first.has_value());
@@ -64,7 +66,13 @@ void TestPriorityQueue::overflow_drops_oldest() {
     // 队列上限为 QUEUE_MAXSIZE（默认 1500），多推一条应把最旧的一条挤掉
     const int total = QUEUE_MAXSIZE + 1;
     for (int i = 0; i < total; ++i) {
-        queue.push(text_message(std::to_string(i)));
+        const auto result = queue.push(text_message(std::to_string(i)));
+        if (i < QUEUE_MAXSIZE) {
+            QVERIFY(result == PriorityMessageQueue::PushResult::Queued);
+        } else {
+            // 关键：溢出必须显式告诉调用方，不能静默丢包
+            QVERIFY(result == PriorityMessageQueue::PushResult::DroppedOldest);
+        }
     }
 
     const auto first = queue.pop(50);

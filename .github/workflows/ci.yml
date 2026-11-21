@@ -35,7 +35,7 @@ jobs:
           version: '6.8.3'
           arch: win64_msvc2022_64
           # 测试工程只需要 qtmultimedia；多余模块会放大下载/失败面
-          modules: 'qtmultimedia'
+          modules: 'qtmultimedia qtwebsockets'
           # 排查阶段先用干净安装（历史失败可能留下的缓存会再次失败）
           cache: false
           dir: '${{ runner.workspace }}/Qt'

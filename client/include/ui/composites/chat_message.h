@@ -62,6 +62,8 @@ public:
     };
     /** @brief 标记本人消息已发送成功，隐藏「发送中」动画 */
     void setTextSuccess();
+    /** @brief 发送失败：停止加载动画，气泡用危险色并标注"发送失败" */
+    void setTextFailed();
     /**
      * @brief 设置文案、时间戳、列表项整体尺寸、可选昵称与角色；会触发重绘并在本人未成功时显示加载动画
      * @param text 消息正文
@@ -142,6 +144,7 @@ private:
     QLabel* m_loading = Q_NULLPTR;   ///< 「发送中」GIF 容器,发送旋转动画将在这个label上
     QMovie* m_loadingMovie = Q_NULLPTR; ///< 「发送中」动画
     bool m_isSending = false; ///< 本人消息是否已标记发送成功（与 setTextSuccess 配合）
+    bool m_sendFailed = false; ///< 是否发送失败（自绘用危险色）
     quint64 m_avatarLoadGen = 0;
 
     void loadAvatar(const QString &avatarUrl, User_Type userType);

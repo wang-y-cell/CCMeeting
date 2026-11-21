@@ -17,6 +17,14 @@ NetworkManager::NetworkManager(QObject *parent) : QObject(parent) {
         hub_->stop_send_worker_async();
         emit disconnected();
     });
+    connect(connection_, &Connection::reconnecting, this,
+            &NetworkManager::reconnecting);
+    connect(connection_, &Connection::reconnected, this,
+            &NetworkManager::reconnected);
+    connect(connection_, &Connection::reconnect_failed, this, [this]() {
+        hub_->stop_send_worker_async();
+        emit disconnected();
+    });
 
     connect(hub_, &MessageHub::request_message_ready, this,
             &NetworkManager::request_message_ready);
@@ -26,6 +34,8 @@ NetworkManager::NetworkManager(QObject *parent) : QObject(parent) {
             &NetworkManager::text_message_ready);
     connect(hub_, &MessageHub::text_send_finished, this,
             &NetworkManager::send_text_finished);
+    connect(hub_, &MessageHub::text_send_failed, this,
+            &NetworkManager::send_text_failed);
 
     hub_->start(connection_);
 }

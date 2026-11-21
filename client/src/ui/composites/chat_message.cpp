@@ -34,6 +34,17 @@ void ChatMessage::setTextSuccess() {
     m_loading->hide();
     m_loadingMovie->stop();
     m_isSending = true;
+    m_sendFailed = false;
+    update();
+}
+
+void ChatMessage::setTextFailed() {
+    m_loading->hide();
+    m_loadingMovie->stop();
+    m_isSending = false;
+    m_sendFailed = true;
+    setToolTip(tr("发送失败，请重试"));
+    update();
 }
 
 QSize ChatMessage::relayoutForWidth(int width) {
@@ -251,8 +262,10 @@ void ChatMessage::paintEvent(QPaintEvent *event) {
         //绘制自己头像
         painter.drawPixmap(m_iconRightRect, m_rightPixmap);
 
-        //绘制气泡边框
-        QColor col_Kuang = ui::ThemeManager::instance().color(QStringLiteral("primary"));
+        //绘制气泡边框：发送失败用危险色，成功/发送中用主色
+        const QString bubble_token =
+            m_sendFailed ? QStringLiteral("danger") : QStringLiteral("primary");
+        QColor col_Kuang = ui::ThemeManager::instance().color(bubble_token);
         painter.setBrush(QBrush(col_Kuang));
         painter.drawRoundedRect(m_kuangRightRect, radius, radius);
 

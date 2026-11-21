@@ -11,9 +11,9 @@ MessageHub::MessageHub(QObject *parent) : QObject(parent) {
 
 MessageHub::~MessageHub() { stop(); }
 
-void MessageHub::enqueue_send(MessagePtr msg) {
+bool MessageHub::enqueue_send(MessagePtr msg) {
     if (!msg)
-        return;
+        return false;
     const MessageKind kind = msg->kind();
     if (kind == MessageKind::CreateMeeting ||
         kind == MessageKind::JoinMeeting || kind == MessageKind::CloseCamera ||
@@ -21,7 +21,31 @@ void MessageHub::enqueue_send(MessagePtr msg) {
         spdlog::info("[MessageHub] enqueue_send kind={}",
                      static_cast<int>(kind));
     }
-    send_queue_.push(std::move(msg));
+    const PriorityMessageQueue::PushResult result =
+        send_queue_.push(std::move(msg));
+    if (result == PriorityMessageQueue::PushResult::Timeout) {
+        spdlog::error("[MessageHub] 发送队列等待超时，丢弃 kind={}",
+                      static_cast<int>(kind));
+        notify_hub([this, kind]() {
+            if (kind == MessageKind::SendText) {
+                emit text_send_failed();
+            } else {
+                emit send_failed(static_cast<int>(kind));
+            }
+        });
+        return false;
+    }
+    if (result == PriorityMessageQueue::PushResult::DroppedOldest) {
+        spdlog::warn("[MessageHub] 发送队列已满，丢弃最旧消息（新消息 kind={}）",
+                     static_cast<int>(kind));
+        notify_hub([this, kind]() {
+            emit send_dropped(static_cast<int>(kind));
+            if (kind == MessageKind::SendText) {
+                emit text_send_failed();
+            }
+        });
+    }
+    return true;
 }
 
 void MessageHub::emit_incoming(MessagePtr msg) {
@@ -91,6 +115,9 @@ void MessageHub::send_loop(std::uint64_t epoch) {
 
     // 如果当前旧的线程(上次创建的线程)发现send_epoch_和自己不相等了，说明被新线程取代了，则退出循环
     while (send_running_.load() && send_epoch_.load() == epoch) {
+        if (QThread::currentThread()->isInterruptionRequested()) {
+            break;
+        }
         /// 短超时，便于 epoch/stop 后尽快退出，避免与新会话发送线程重叠
         auto msg = send_queue_.pop(100); // 从发送队列中取出消息
         if (send_epoch_.load() !=
@@ -113,7 +140,16 @@ void MessageHub::send_loop(std::uint64_t epoch) {
             continue;
 
         if (!connection_) {
-            spdlog::warn("[MessageHub] 无 Connection，丢弃待发消息");
+            const MessageKind failed_kind = (*msg)->kind();
+            spdlog::warn("[MessageHub] 无 Connection，发送失败 kind={}",
+                         static_cast<int>(failed_kind));
+            notify_hub([this, failed_kind]() {
+                if (failed_kind == MessageKind::SendText) {
+                    emit text_send_failed();
+                } else {
+                    emit send_failed(static_cast<int>(failed_kind));
+                }
+            });
             continue;
         }
 
@@ -133,13 +169,22 @@ void MessageHub::send_loop(std::uint64_t epoch) {
                          static_cast<int>(kind), frame.size());
         }
 
-        const bool text_kind =
-            kind == MessageKind::SendText; // 如果消息类型为发送文本，则设置为true
-        QMetaObject::invokeMethod(
-            connection_, "sendWireData", // 调用连接对象的sendWireData方法发送消息
-            Qt::QueuedConnection, Q_ARG(QByteArray, frame));
-        if (text_kind) // 如果消息类型为发送文本，则发送完成信号
-            emit text_send_finished(); // 发送完成信号,通知UI线程发送文本完成,结束等待动画
+        // 每帧编号：只有 Connection 真正写 socket 成功后才通知"已发送"
+        const std::uint64_t frame_id = next_frame_id_.fetch_add(1);
+        {
+            std::lock_guard<std::mutex> lock(pending_mutex_);
+            pending_frames_[frame_id] = kind;
+        }
+        const bool invoked = QMetaObject::invokeMethod(
+            connection_, "sendWireData", Qt::QueuedConnection,
+            Q_ARG(QByteArray, frame), Q_ARG(std::uint64_t, frame_id));
+        if (!invoked) {
+            spdlog::error("[MessageHub] sendWireData 投递失败 kind={}",
+                          static_cast<int>(kind));
+            QMetaObject::invokeMethod(
+                this, [this, frame_id]() { on_wire_result(frame_id, false); },
+                Qt::QueuedConnection);
+        }
     }
 
     spdlog::info("[MessageHub] 发送线程结束 tid={} epoch={}",
@@ -176,14 +221,8 @@ void MessageHub::join_send_thread() {
         send_thread_ = nullptr;
     }
 
-    if (joiner) {
-        joiner->wait(3000);
-        delete joiner;
-    }
-    if (worker) {
-        worker->wait(3000);
-        delete worker;
-    }
+    reap_thread(joiner);
+    reap_thread(worker);
 }
 
 void MessageHub::stop_send_worker() {
@@ -204,23 +243,103 @@ void MessageHub::stop_send_worker_async() {
 
         /// 若已有 joiner，先串到其后，保证 start_send_worker 能等到全部退出
         QThread *prev_joiner = pending_joiner_;
-        pending_joiner_ = QThread::create([prev_joiner, old_thread]() {
-            if (prev_joiner) {
-                prev_joiner->wait(3000);
-                delete prev_joiner;
-            }
-            if (old_thread) {
-                old_thread->wait(3000);
-                delete old_thread;
-            }
+        pending_joiner_ = QThread::create([this, prev_joiner, old_thread]() {
+            reap_thread(prev_joiner);
+            reap_thread(old_thread);
         });
         pending_joiner_->start();
     }
 }
 
-void MessageHub::start(Connection *connection) { connection_ = connection; }
+void MessageHub::start(Connection *connection) {
+    if (connection_) {
+        QObject::disconnect(connection_, &Connection::wire_result, this,
+                            nullptr);
+        QObject::disconnect(connection_, &Connection::disconnected, this,
+                            nullptr);
+    }
+    connection_ = connection;
+    if (connection_) {
+        connect(connection_, &Connection::wire_result, this,
+                &MessageHub::on_wire_result, Qt::QueuedConnection);
+        connect(connection_, &Connection::disconnected, this,
+                &MessageHub::fail_pending_frames, Qt::QueuedConnection);
+    }
+}
+
+void MessageHub::on_wire_result(std::uint64_t frameId, bool ok) {
+    MessageKind kind = MessageKind::SendText;
+    bool found = false;
+    {
+        std::lock_guard<std::mutex> lock(pending_mutex_);
+        const auto it = pending_frames_.find(frameId);
+        if (it != pending_frames_.end()) {
+            kind = it->second;
+            pending_frames_.erase(it);
+            found = true;
+        }
+    }
+    if (!found) {
+        return;
+    }
+    if (kind == MessageKind::SendText) {
+        if (ok) {
+            emit text_send_finished();
+        } else {
+            emit text_send_failed();
+        }
+    } else if (!ok) {
+        emit send_failed(static_cast<int>(kind));
+    }
+}
+
+void MessageHub::fail_pending_frames() {
+    std::unordered_map<std::uint64_t, MessageKind> pending;
+    {
+        std::lock_guard<std::mutex> lock(pending_mutex_);
+        pending.swap(pending_frames_);
+    }
+    if (pending.empty()) {
+        return;
+    }
+    spdlog::warn("[MessageHub] 连接断开，{} 帧未完成", pending.size());
+    // 可能从 IO 线程进入（断线/重连清理）：统一回到 Hub 线程发信号
+    notify_hub([this, pending = std::move(pending)]() {
+        for (const auto &item : pending) {
+            if (item.second == MessageKind::SendText) {
+                emit text_send_failed();
+            } else {
+                emit send_failed(static_cast<int>(item.second));
+            }
+        }
+    });
+}
+
+void MessageHub::notify_hub(const std::function<void()> &fn) {
+    if (QThread::currentThread() == thread()) {
+        fn();
+        return;
+    }
+    QMetaObject::invokeMethod(this, fn, Qt::QueuedConnection);
+}
+
+void MessageHub::reap_thread(QThread *thread) {
+    if (thread == nullptr) {
+        return;
+    }
+    if (!thread->wait(3000)) {
+        spdlog::warn("[MessageHub] 发送线程 3s 未退出，请求中断后继续等待");
+        thread->requestInterruption();
+        thread->quit();
+        // 发送循环每 100ms 检查一次停止标志/中断，这里必须等它真正退出，
+        // 否则 delete 运行中的 QThread 会在退出时崩溃（原问题所在）。
+        thread->wait();
+    }
+    delete thread;
+}
 
 void MessageHub::stop() {
     stop_send_worker();
     connection_ = nullptr;
+    fail_pending_frames();   // 停机时不要留下"永远发送中"的气泡
 }

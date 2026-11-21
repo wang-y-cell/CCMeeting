@@ -42,6 +42,8 @@ public:
     void finish_pending_immediately();
     /** @brief 服务器确认发送成功，更新待确认气泡状态 */
     void mark_pending_sent();
+    /** @brief 发送失败：把待确认气泡标成失败（不再假装已发送） */
+    void on_send_failed();
 
     /** @brief 是否还有待确认的发送气泡 */
     bool has_pending() const { return _pending != nullptr; }
