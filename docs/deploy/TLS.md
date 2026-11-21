@@ -127,3 +127,20 @@ client/resources/tls/server-cert.pem
 openssl s_client -connect 8.153.155.18:8888 -CAfile /etc/ccmeeting/tls/cert.pem </dev/null
 # Verify return code: 0 (ok)
 ```
+
+## 8. 运维注意
+
+- **nginx 开机自启**：如果 `systemctl is-enabled nginx` 为 disabled，重启后 443 不会自动恢复，
+  执行 `systemctl enable nginx`。
+- **在 WSL 交叉构建 message_server**（服务器 Ubuntu 22.04 / glibc 2.35，WSL 24.04 直接
+  编译会引用 GLIBC_2.38）：
+  ```bash
+  cmake -S /mnt/f/wy/code/qt/CCMeeting -B ~/ccmeeting-build-static \
+        -G Ninja -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_CLIENT=OFF -DBUILD_SERVER=ON \
+        -DBoost_USE_STATIC_LIBS=ON -DCMAKE_EXE_LINKER_FLAGS=-static
+  cmake --build ~/ccmeeting-build-static --target CloudMeetingServer -j8
+  ```
+  产物 `message_server/CloudMeetingServer` 为静态 ELF，可直接 scp 到服务器运行。
+- **不要在小内存 VPS 上直接 `-j2` 编译**：会拖死 sshd/nginx；优先在 WSL/Docker 构建后
+  只上传二进制。
