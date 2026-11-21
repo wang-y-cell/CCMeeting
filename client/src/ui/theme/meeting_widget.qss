@@ -264,7 +264,8 @@ QToolButton#btnSideChat:hover,
 QToolButton#btnTogglePanel:hover,
 QToolButton#openAudio:hover,
 QToolButton#openVedio:hover,
-QToolButton#shareScreenBtn:hover {
+QToolButton#shareScreenBtn:hover,
+QToolButton#leaveMeetingBtn:hover {
     background-color: @hover;
     color: @text;
 }
@@ -304,18 +305,10 @@ QToolButton#leaveMeetingBtn:disabled {
     background-color: transparent;
 }
 
-/* 结束会议：唯一保留语义色的按钮（红字 + 中性图标，无底色） */
+/* 结束会议：与麦克风/摄像头一致（白色文字 + 中性图标，悬停淡底色）；
+   红色只保留在麦克风/摄像头关闭态的斜杠上。 */
 QToolButton#leaveMeetingBtn {
-    color: @danger;
-}
-
-QToolButton#leaveMeetingBtn:hover {
-    background-color: rgba(229, 72, 77, 0.14);
-    color: @danger;
-}
-
-QToolButton#leaveMeetingBtn:pressed {
-    background-color: rgba(229, 72, 77, 0.22);
+    color: @text;
 }
 /* ---------- 设备选择菜单 ---------- */
 
