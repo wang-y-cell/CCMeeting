@@ -279,9 +279,26 @@ void ui::MeetingWindow::init_connect() {
             &ui::MeetingWindow::on_text_message_slot, Qt::QueuedConnection);
     connect(net, &NetworkManager::send_text_finished, this,
             &ui::MeetingWindow::on_text_send_slot);
+    connect(net, &NetworkManager::send_text_failed, this,
+            &ui::MeetingWindow::on_text_send_failed_slot);
     connect(net, &NetworkManager::disconnected, this,
             &ui::MeetingWindow::on_network_disconnected_slot,
             Qt::QueuedConnection);
+    connect(net, &NetworkManager::reconnecting, this, [this](int attempt, int delay_ms) {
+        if (ui_.canvasHint) {
+            ui_.canvasHint->setText(
+                tr("网络重连中…（第 %1 次，%2 秒后重试）").arg(attempt).arg(delay_ms / 1000.0, 0, 'f', 1));
+        }
+    });
+    connect(net, &NetworkManager::reconnected, this, [this]() {
+        if (ui_.canvasHint) {
+            ui_.canvasHint->setText(tr("网络已恢复，正在重新加入会议…"));
+        }
+        // 重连后服务端已丢失房间成员关系：自动重新入会
+        if (_state._roomNo > 0 && network()) {
+            network()->send_join_meeting(std::to_string(_state._roomNo));
+        }
+    });
 
     // 连接协调器：窗口不再自己维护 pending/connecting 状态
     connect(_connect.get(), &ConnectCoordinator::connect_requested, this,
@@ -640,6 +657,14 @@ void ui::MeetingWindow::on_send_msg_clicked_slot() {
 void ui::MeetingWindow::on_text_send_slot() {
     if (chat()) {
         chat()->mark_pending_sent();
+    }
+    ui_.sendmsg->setDisabled(false);
+}
+
+void ui::MeetingWindow::on_text_send_failed_slot() {
+    // 发送失败：气泡标红，重新允许输入（不再假装"已发送"）
+    if (chat()) {
+        chat()->on_send_failed();
     }
     ui_.sendmsg->setDisabled(false);
 }

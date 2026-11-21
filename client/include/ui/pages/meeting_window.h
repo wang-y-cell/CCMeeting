@@ -141,6 +141,7 @@ private slots:
     void on_recv_user_slot(qint64 userId);
     void on_send_msg_clicked_slot();
     void on_text_send_slot();
+    void on_text_send_failed_slot();
     void on_network_disconnected_slot();
     void flush_pending_connect();
 

@@ -27,7 +27,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
     set(CCMEETING_TESTS_STANDALONE ON)
 
-    find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Multimedia Network Sql Test)
+    find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Multimedia Network Sql WebSockets Test)
 
     if(NOT TARGET spdlog::spdlog)
         include(FetchContent)
@@ -45,7 +45,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     enable_testing()
 else()
     # 作为 client/ 的子目录：Qt / spdlog / 编译选项由父工程提供
-    find_package(Qt6 REQUIRED COMPONENTS Gui Widgets Multimedia Network Sql Test)
+    find_package(Qt6 REQUIRED COMPONENTS Gui Widgets Multimedia Network Sql WebSockets Test)
 endif()
 
 set(CCMEETING_TEST_LIB_SOURCES
@@ -153,3 +153,15 @@ ccmeeting_add_test(test_window_behavior
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/preferences.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/core/storage.cpp")
 target_link_libraries(test_window_behavior PRIVATE Qt6::Sql)
+# 网络可靠性：真实回环 WebSocket（P0 发送回执 + P3 自动重连）
+ccmeeting_add_test(test_network_reliability
+    test_network_reliability.cpp
+    "${CMAKE_CURRENT_SOURCE_DIR}/../include/protocol/connection.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/protocol/connection.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../include/protocol/message_hub.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/protocol/message_hub.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/protocol/message.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/protocol/message_codec.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/user_session.cpp")
+target_link_libraries(test_network_reliability PRIVATE
+    Qt6::WebSockets Qt6::Widgets Qt6::Network)

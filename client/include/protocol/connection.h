@@ -44,6 +44,9 @@ public:
     bool connectToServer(const QString &ip, const QString &port);
     /** @brief 异步断开：投递到 IO 线程关闭 socket，完成后发出 disconnected */
     void disconnectFromHost();
+    /** @brief 是否在意外断开时自动重连（默认开启） */
+    void setAutoReconnect(bool enabled) { m_autoReconnect = enabled; }
+    bool autoReconnect() const { return m_autoReconnect; }
     /** @brief 同步销毁 socket（析构/强制停止用） */
     void stopImmediately();
 
@@ -68,6 +71,14 @@ signals:
     void connected();
     /** @brief 已断开连接 */
     void disconnected();
+    /** @brief 某一帧的真实发送结果（写入 socket 成功/失败） */
+    void wire_result(std::uint64_t frameId, bool ok);
+    /** @brief 正在重连（attempt 从 1 开始，delayMs 为本次等待） */
+    void reconnecting(int attempt, int delayMs);
+    /** @brief 自动重连成功 */
+    void reconnected();
+    /** @brief 重连放弃（已尽力），上层可提示用户 */
+    void reconnect_failed();
 
 private slots:
     /**
@@ -82,7 +93,7 @@ private slots:
      * @param frame 帧数据
      * @return 是否已提交发送
      */
-    bool sendWireData(const QByteArray &frame);
+    void sendWireData(const QByteArray &frame, std::uint64_t frameId);
     /** @brief 收到一条 WS 文本消息 */
     void onTextMessage(const QString &message);
     /**
@@ -94,6 +105,12 @@ private slots:
     void destroySocket();
     /** @brief 在 IO 线程上断开连接 */
     void disconnectOnIoThread();
+    /** @brief 心跳检查（ping/pong） */
+    void onHeartbeatTick();
+    /** @brief 对端正常关闭 WS（不是 error） */
+    void onSocketDisconnected();
+    /** @brief 自动重连一次 */
+    void tryReconnect();
 
 private:
     MessageHub *m_hub = nullptr;    ///< 消息中心
@@ -102,6 +119,16 @@ private:
     MessageCodec::WireStreamParser m_parser; ///< 解帧器（防御半包）
 
     QString m_lastError; ///< 最近错误信息
+
+    // ---- 心跳 / 重连 ----
+    QTimer *m_heartbeatTimer = nullptr;   ///< 5s 发一次 ping
+    qint64 m_lastPongMs = 0;              ///< 最近一次 pong 时间
+    bool m_autoReconnect = true;          ///< 意外断开是否自动重连
+    bool m_userDisconnect = false;        ///< 主动断开：不触发重连
+    bool m_closing = false;               ///< destroySocket 正在进行，忽略回调
+    QString m_lastIp;                     ///< 最近连接地址（重连用）
+    QString m_lastPort;
+    int m_reconnectAttempt = 0;           ///< 已重连次数
 };
 
 #endif // CONNECTION_H

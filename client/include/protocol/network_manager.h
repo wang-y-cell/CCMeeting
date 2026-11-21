@@ -71,6 +71,12 @@ signals:
     void user_info_message_ready(MessagePtr msg);
     void text_message_ready(MessagePtr msg);
     void send_text_finished();
+    /** @brief 文本真正发送失败（未连接/写 socket 失败/断线） */
+    void send_text_failed();
+    /** @brief 自动重连进度 */
+    void reconnecting(int attempt, int delay_ms);
+    /** @brief 自动重连成功 */
+    void reconnected();
     void disconnected();
 
 private:

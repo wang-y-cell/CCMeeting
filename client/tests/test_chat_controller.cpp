@@ -65,6 +65,15 @@ private slots:
         QVERIFY(!controller_->has_pending());
     }
 
+    void onSendFailedClearsPending() {
+        input_->setPlainText(QStringLiteral("will fail"));
+        QVERIFY(!controller_->submit_input().isEmpty());
+        QVERIFY(controller_->has_pending());
+
+        controller_->on_send_failed();
+        QVERIFY(!controller_->has_pending());
+    }
+
     void appendRemoteAddsItem() {
         controller_->append_remote(QStringLiteral("from peer"),
                                    QStringLiteral("Peer"),

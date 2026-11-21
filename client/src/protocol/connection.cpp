@@ -9,6 +9,7 @@
 #include <QMetaObject>
 #include <QRegularExpression>
 #include <QRegularExpressionValidator>
+#include <QDateTime>
 #include <QTimer>
 #include <QUrl>
 #include <QWebSocket>
@@ -31,6 +32,9 @@ Connection::~Connection() {
 void Connection::setMessageHub(MessageHub *hub) { m_hub = hub; }
 
 bool Connection::connectToServer(const QString &ip, const QString &port) {
+    m_lastIp = ip;
+    m_lastPort = port;
+    m_userDisconnect = false;
     spdlog::info("[Connection] connectToServer ws://{}:{}", ip.toUtf8().constData(),
                  port.toUtf8().constData());
 
@@ -101,24 +105,106 @@ bool Connection::connectOnIoThread(const QString &ip, const QString &port) {
             &Connection::onTextMessage);
     connect(m_socket, &QWebSocket::errorOccurred, this,
             &Connection::onSocketError);
+    connect(m_socket, &QWebSocket::disconnected, this,
+            &Connection::onSocketDisconnected);
 
+    // 心跳：5s 一次 ping，15s 没有 pong 视为半开连接
+    if (m_heartbeatTimer == nullptr) {
+        m_heartbeatTimer = new QTimer(this);
+        connect(m_heartbeatTimer, &QTimer::timeout, this,
+                &Connection::onHeartbeatTick);
+    }
+    connect(m_socket, &QWebSocket::pong, this, [this]() {
+        m_lastPongMs = QDateTime::currentMSecsSinceEpoch();
+    });
+    m_lastPongMs = QDateTime::currentMSecsSinceEpoch();
+    m_heartbeatTimer->start(5000);
+
+    m_reconnectAttempt = 0;
     m_lastError.clear();
     spdlog::info("[Connection] websocket connected");
     return true;
 }
 
-bool Connection::sendWireData(const QByteArray &frame) {
-    if (QThread::currentThread() != thread()) {
-        /// 只投递、不阻塞调用方（发送工作线程 / UI 断线路径都可能走到这里）
-        return QMetaObject::invokeMethod(this, "sendWireData",
-                                         Qt::QueuedConnection,
-                                         Q_ARG(QByteArray, frame));
+void Connection::onSocketDisconnected() {
+    if (m_closing || m_userDisconnect) {
+        return;   // 主动断开：由 disconnectOnIoThread 统一收尾
     }
+    spdlog::warn("[Connection] 对端关闭 WebSocket");
+    if (m_autoReconnect && m_reconnectAttempt < 5) {
+        tryReconnect();
+        return;
+    }
+    emit disconnected();
+}
+
+void Connection::onHeartbeatTick() {
+    if (m_socket == nullptr ||
+        m_socket->state() != QAbstractSocket::ConnectedState) {
+        return;
+    }
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (now - m_lastPongMs > 15000) {
+        spdlog::warn("[Connection] 心跳超时（15s 无 pong），判定连接已死");
+        destroySocket();
+        tryReconnect();   // 先尝试恢复；全部失败才由 reconnect_failed 通知 UI
+        return;
+    }
+    m_socket->ping();
+}
+
+void Connection::tryReconnect() {
+    if (!m_autoReconnect || m_userDisconnect) {
+        emit reconnect_failed();
+        return;
+    }
+    if (m_reconnectAttempt >= 5) {
+        spdlog::error("[Connection] 重连 5 次仍失败，放弃");
+        emit reconnect_failed();
+        return;
+    }
+    ++m_reconnectAttempt;
+    const int delay_ms = 1000 << (m_reconnectAttempt - 1);   // 1s,2s,4s,8s,16s
+    emit reconnecting(m_reconnectAttempt, delay_ms);
+    QTimer::singleShot(delay_ms, this, [this]() {
+        if (m_userDisconnect || !m_autoReconnect) {
+            return;
+        }
+        spdlog::warn("[Connection] 第 {} 次重连 ws://{}:{}", m_reconnectAttempt,
+                     m_lastIp.toUtf8().constData(),
+                     m_lastPort.toUtf8().constData());
+        if (connectOnIoThread(m_lastIp, m_lastPort)) {
+            spdlog::info("[Connection] 重连成功");
+            m_reconnectAttempt = 0;
+            emit connected();
+            emit reconnected();
+        } else {
+            tryReconnect();
+        }
+    });
+}
+
+void Connection::sendWireData(const QByteArray &frame,
+                              std::uint64_t frameId) {
+    if (QThread::currentThread() != thread()) {
+        /// 不阻塞调用方；结果通过 wire_result 回传
+        QMetaObject::invokeMethod(this, "sendWireData", Qt::QueuedConnection,
+                                  Q_ARG(QByteArray, frame),
+                                  Q_ARG(std::uint64_t, frameId));
+        return;
+    }
+
+    const auto report = [this, frameId](bool ok) {
+        if (frameId != 0) {
+            emit wire_result(frameId, ok);
+        }
+    };
 
     if (m_socket == nullptr ||
         m_socket->state() != QAbstractSocket::ConnectedState) {
         spdlog::info("[Connection] websocket 未连接, 发送失败");
-        return false;
+        report(false);
+        return;
     }
 
     // 一条业务消息 = 一条 WS 文本帧（JSON）
@@ -126,9 +212,10 @@ bool Connection::sendWireData(const QByteArray &frame) {
     const qint64 queued = m_socket->sendTextMessage(text);
     if (queued < 0) {
         spdlog::error("[Connection] 网络写入失败");
-        return false;
+        report(false);
+        return;
     }
-    return true;
+    report(true);
 }
 
 void Connection::onTextMessage(const QString &message) {
@@ -144,12 +231,20 @@ void Connection::onTextMessage(const QString &message) {
 }
 
 void Connection::onSocketError(QAbstractSocket::SocketError error) {
-    if (!m_hub)
-        return;
-
     spdlog::error("[Connection] socket 错误 code={} tid={}",
                   static_cast<int>(error),
                   reinterpret_cast<quintptr>(QThread::currentThreadId()));
+
+    // 半开/网络抖动：先尝试自动重连，避免直接让 UI 结束会议
+    if (m_autoReconnect && !m_userDisconnect && m_reconnectAttempt < 5 &&
+        m_socket != nullptr &&
+        m_socket->state() != QAbstractSocket::ConnectedState) {
+        tryReconnect();
+        return;
+    }
+
+    if (!m_hub)
+        return;
 
     MessagePtr msg;
     if (error == QAbstractSocket::RemoteHostClosedError)
@@ -161,12 +256,16 @@ void Connection::onSocketError(QAbstractSocket::SocketError error) {
 
 void Connection::destroySocket() {
     m_parser.reset();
+    if (m_heartbeatTimer) {
+        m_heartbeatTimer->stop();
+    }
     if (m_socket == nullptr)
         return;
 
     m_socket->abort();
     m_socket->deleteLater();
     m_socket = nullptr;
+    m_closing = false;
 }
 
 void Connection::stopImmediately() {
@@ -176,6 +275,10 @@ void Connection::stopImmediately() {
 }
 
 void Connection::disconnectFromHost() {
+    m_userDisconnect = true;
+    if (m_heartbeatTimer) {
+        m_heartbeatTimer->stop();
+    }
     /// 只唤醒队列，不在调用线程 clearAll（避免与 IO/发送线程抢锁卡死
     /// controller）
     if (m_hub)
