@@ -111,3 +111,35 @@ endif()
 gtest_discover_tests(test_message_server_room
     DISCOVERY_TIMEOUT 30
 )
+# 端到端：真实 loopback WebSocket（Server + MeetingService + Room）
+add_executable(test_message_server_service
+    test_meeting_service.cpp
+    "${SERVER_ROOT}/src/service/meeting_service.cpp"
+    "${SERVER_ROOT}/src/network/server.cpp"
+    "${SERVER_ROOT}/src/network/connection.cpp"
+    "${SERVER_ROOT}/src/network/buffer.cpp"
+    "${SERVER_ROOT}/src/meeting/room.cpp"
+    "${SERVER_ROOT}/src/meeting/room_manager.cpp"
+    "${SERVER_ROOT}/src/protocol/codec.cpp"
+    "${SERVER_ROOT}/src/protocol/message_type.cpp"
+)
+target_include_directories(test_message_server_service PRIVATE
+    "${SERVER_ROOT}/include"
+    "${JSON_INCLUDE}"
+    "${BOOST_INCLUDE_DIR}"
+)
+target_link_libraries(test_message_server_service PRIVATE
+    GTest::gtest_main
+    spdlog::spdlog
+    Threads::Threads
+)
+if(WIN32)
+    target_link_libraries(test_message_server_service PRIVATE ws2_32 mswsock)
+endif()
+if(MSVC)
+    target_compile_options(test_message_server_service PRIVATE /utf-8 /bigobj)
+endif()
+
+gtest_discover_tests(test_message_server_service
+    DISCOVERY_TIMEOUT 60
+)

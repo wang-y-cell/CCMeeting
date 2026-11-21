@@ -27,6 +27,8 @@ public:
 
     void set_connection_handler(ConnectionHandler handler);  // 新连接建立时调用
     void start();  // 开始接受连接
+    /** @brief 实际监听端口（构造时传 0 则由系统分配，测试用） */
+    uint16_t local_port() const;
 
 private:
     void do_accept();
