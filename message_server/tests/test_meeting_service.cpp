@@ -250,3 +250,65 @@ TEST(MeetingServiceTest, UserIdZeroIsRejectedAndConnectionClosed) {
     }
     EXPECT_TRUE(closed);
 }
+TEST(MeetingServiceTest, LargeTextPayloadIsForwardedIntact) {
+    ServerFixture fixture;
+    boost::asio::io_context client_io;
+    WsClient owner(client_io, fixture.port());
+    WsClient member(client_io, fixture.port());
+
+    owner.send_packet(make_create_packet(6001, 4, 60));
+    const uint32_t room_id = read_room_id(owner.read_packet());
+    ASSERT_NE(room_id, 0u);
+
+    member.send_packet(make_join_packet(6002, room_id));
+    ASSERT_EQ(read_room_id(member.read_packet()), room_id);
+    ASSERT_EQ(owner.read_packet().type, protocol::MessageType::PartnerJoin);
+
+    // 256KB 文本：验证跨 WS 帧/Codec 的二进制 payload 不被截断
+    protocol::Packet text;
+    text.type = protocol::MessageType::TextSend;
+    text.user_id = 6002;
+    text.payload.assign(256 * 1024, 'x');
+    text.payload[0] = 'S';
+    text.payload[text.payload.size() - 1] = 'E';
+    member.send_packet(text);
+
+    const protocol::Packet received = owner.read_packet();
+    // 服务端把 TextSend 转成 TextRecv 再广播（客户端视角）
+    EXPECT_EQ(received.type, protocol::MessageType::TextRecv);
+    EXPECT_EQ(received.user_id, 6002u);
+    EXPECT_EQ(received.payload.size(), text.payload.size());
+    EXPECT_EQ(received.payload, text.payload);
+}
+
+TEST(MeetingServiceTest, BurstOfMessagesArrivesInOrder) {
+    ServerFixture fixture;
+    boost::asio::io_context client_io;
+    WsClient owner(client_io, fixture.port());
+    WsClient member(client_io, fixture.port());
+
+    owner.send_packet(make_create_packet(7001, 4, 60));
+    const uint32_t room_id = read_room_id(owner.read_packet());
+    ASSERT_NE(room_id, 0u);
+
+    member.send_packet(make_join_packet(7002, room_id));
+    ASSERT_EQ(read_room_id(member.read_packet()), room_id);
+    ASSERT_EQ(owner.read_packet().type, protocol::MessageType::PartnerJoin);
+
+    constexpr int kCount = 30;
+    for (int i = 0; i < kCount; ++i) {
+        protocol::Packet text;
+        text.type = protocol::MessageType::TextSend;
+        text.user_id = 7002;
+        const std::string body = "msg-" + std::to_string(i);
+        text.payload.assign(body.begin(), body.end());
+        member.send_packet(text);
+    }
+
+    for (int i = 0; i < kCount; ++i) {
+        const protocol::Packet received = owner.read_packet();
+        ASSERT_EQ(received.type, protocol::MessageType::TextRecv);
+        const std::string body(received.payload.begin(), received.payload.end());
+        EXPECT_EQ(body, "msg-" + std::to_string(i)) << "index " << i;
+    }
+}
