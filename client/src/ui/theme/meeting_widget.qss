@@ -304,7 +304,7 @@ QToolButton#leaveMeetingBtn:disabled {
     background-color: transparent;
 }
 
-/* 结束会议：唯一保留语义色的按钮（红字 + 红图标，无底色） */
+/* 结束会议：唯一保留语义色的按钮（红字 + 中性图标，无底色） */
 QToolButton#leaveMeetingBtn {
     color: @danger;
 }

@@ -64,12 +64,11 @@ QToolButton *makeToolButton(const QString &objectName, const QString &text,
     if (const auto it = kIconByName.constFind(objectName); it != kIconByName.constEnd()) {
         const bool is_device = objectName == QStringLiteral("audioDeviceBtn") ||
                                objectName == QStringLiteral("videoDeviceBtn");
-        // 设备下拉箭头小一号；结束会议用语义红，其余中性
-        int icon_size = is_device ? 12 : 22;
-        QColor icon_color = ui::ThemeManager::instance().color(QStringLiteral("icon"));
-        if (objectName == QStringLiteral("leaveMeetingBtn")) {
-            icon_color = ui::ThemeManager::instance().color(QStringLiteral("danger"));
-        }
+        // 设备下拉箭头小一号；其余图标统一用中性色
+        // （结束会议与麦克风/摄像头一致：图标本体不染色，红色只留给文字/斜杠）
+        const int icon_size = is_device ? 12 : 22;
+        const QColor icon_color =
+            ui::ThemeManager::instance().color(QStringLiteral("icon"));
         btn->setIcon(ui::IconProvider::instance().icon(it.value(), icon_color, icon_size));
         btn->setIconSize(QSize(icon_size, icon_size));
         if (is_device) {
