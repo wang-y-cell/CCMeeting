@@ -1817,6 +1817,41 @@ int run_window_behavior_selftest() {
 }
 
 }  // namespace// ---------------------------------------------------------------------------
+// 会议按钮 hover 对比自检：浅色/深色下 hover 都必须看得出底色变化
+// 用法：UiPreview.exe --meeting-hover-selftest
+// ---------------------------------------------------------------------------
+namespace {
+
+int run_meeting_hover_selftest() {
+    auto &theme = ui::ThemeManager::instance();
+    bool ok = true;
+    for (const ui::Theme mode : {ui::Theme::Light, ui::Theme::Dark}) {
+        theme.set_theme(mode);
+        // 会议按钮贴在 @canvas 上；hover 用的是 @raised（@hover 也一并检查）
+        const QColor canvas = theme.color(QStringLiteral("canvas"));
+        const QColor raised = theme.color(QStringLiteral("raised"));
+        const QColor hover = theme.color(QStringLiteral("hover"));
+        const auto delta = [](const QColor &a, const QColor &b) {
+            return qAbs(a.red() - b.red()) + qAbs(a.green() - b.green()) +
+                   qAbs(a.blue() - b.blue());
+        };
+        const int raised_delta = delta(canvas, raised);
+        const int hover_delta = delta(canvas, hover);
+        const bool theme_ok = raised_delta >= 18 && hover_delta >= 18;
+        std::printf(
+            "[hover] theme=%s canvas=(%d,%d,%d) raised=(%d,%d,%d) d1=%d "
+            "hover=(%d,%d,%d) d2=%d %s\n",
+            theme.name_of(mode).toUtf8().constData(), canvas.red(),
+            canvas.green(), canvas.blue(), raised.red(), raised.green(),
+            raised.blue(), raised_delta, hover.red(), hover.green(),
+            hover.blue(), hover_delta, theme_ok ? "OK" : "TOO_CLOSE");
+        ok = ok && theme_ok;
+    }
+    std::printf("[hover] 结论: %s\n", ok ? "PASS" : "FAIL");
+    return ok ? 0 : 1;
+}
+
+}  // namespace// ---------------------------------------------------------------------------
 // 生日日历弹层自检：离屏渲染弹层并保存截图，校验日期与外观配置
 // 用法：UiPreview.exe --calendar-selftest
 // ---------------------------------------------------------------------------
@@ -2263,6 +2298,10 @@ int main(int argc, char *argv[]) {
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--calendar-selftest")) {
         return run_calendar_selftest();
+    }
+    if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
+                        QStringLiteral("--meeting-hover-selftest")) {
+        return run_meeting_hover_selftest();
     }
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--device-menu-selftest")) {

@@ -266,7 +266,8 @@ QToolButton#openAudio:hover,
 QToolButton#openVedio:hover,
 QToolButton#shareScreenBtn:hover,
 QToolButton#leaveMeetingBtn:hover {
-    background-color: @hover;
+    /* 会议按钮直接贴在 canvas 上，hover 用更明确的一档底色，浅色下也能看见 */
+    background-color: @raised;
     color: @text;
 }
 
