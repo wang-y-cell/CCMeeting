@@ -120,3 +120,7 @@ ccmeeting_add_test(test_theme_tokens
 target_include_directories(test_theme_tokens PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/../include")
 target_link_libraries(test_theme_tokens PRIVATE Qt6::Gui)
+# 客户端配置：默认值 / JSON 解析 / 非法 JSON / 保存后重载
+ccmeeting_add_test(test_client_config
+    test_client_config.cpp
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/client_config.cpp")
