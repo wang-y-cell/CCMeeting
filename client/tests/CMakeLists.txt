@@ -27,7 +27,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
     set(CCMEETING_TESTS_STANDALONE ON)
 
-    find_package(Qt6 REQUIRED COMPONENTS Core Gui Multimedia Network Sql Test)
+    find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Multimedia Network Sql Test)
 
     if(NOT TARGET spdlog::spdlog)
         include(FetchContent)
@@ -45,7 +45,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     enable_testing()
 else()
     # 作为 client/ 的子目录：Qt / spdlog / 编译选项由父工程提供
-    find_package(Qt6 REQUIRED COMPONENTS Gui Multimedia Network Sql Test)
+    find_package(Qt6 REQUIRED COMPONENTS Gui Widgets Multimedia Network Sql Test)
 endif()
 
 set(CCMEETING_TEST_LIB_SOURCES
@@ -128,3 +128,28 @@ ccmeeting_add_test(test_client_config
 ccmeeting_add_test(test_user_session
     test_user_session.cpp
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/user_session.cpp")
+# 聊天控制器：提交/待确认气泡/追加/清空（offscreen）
+ccmeeting_add_test(test_chat_controller
+    test_chat_controller.cpp
+    "${CMAKE_CURRENT_SOURCE_DIR}/../include/features/meeting/chat_controller.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/features/meeting/chat_controller.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../include/ui/composites/chat_message.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/composites/chat_message.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../include/ui/composites/my_text_edit.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/composites/my_text_edit.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/user_session.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/media/avatar_service.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/client_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/preferences.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/core/storage.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../include/ui/foundation/theme_manager.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/foundation/theme_manager.cpp")
+target_link_libraries(test_chat_controller PRIVATE
+    Qt6::Widgets Qt6::Network Qt6::Multimedia Qt6::Sql)
+# 窗口行为开关：默认值/关闭/恢复默认/旧键清理
+ccmeeting_add_test(test_window_behavior
+    test_window_behavior.cpp
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/foundation/window_behavior.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/preferences.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/core/storage.cpp")
+target_link_libraries(test_window_behavior PRIVATE Qt6::Sql)
