@@ -280,13 +280,6 @@ void ui::SettingsPageUi::setupUi(QWidget *parent) {
     themeLayout->addStretch(1);
     generalForm->addRow(makeFieldLabel(QObject::tr("主题"), generalPage), themeRow);
 
-    auto *serverHint = new QLabel(
-        QObject::tr("服务器地址、端口与 Janus 信令地址由管理员统一配置，不在此处修改。"),
-        generalPage);
-    serverHint->setObjectName(QStringLiteral("fieldLabel"));
-    serverHint->setWordWrap(true);
-    generalForm->addRow(QString(), serverHint);
-
     pageStack->addWidget(makeScrollPage(body, generalPage));
 
     // ---------- 界面 ----------
