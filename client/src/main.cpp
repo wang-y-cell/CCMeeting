@@ -25,6 +25,7 @@
 
 #include "config/client_config.h"
 #include "config/preferences.h"
+#include "config/tls_config.h"
 #include "core/storage.h"
 #include "config/user_session.h"
 #include "media/avatar_service.h"
@@ -229,6 +230,14 @@ int main(int argc, char *argv[]) {
 #endif
 
     QApplication app(argc, argv);
+
+    // 诊断用：验证内置 CA 导出（不影响正常启动）
+    if (app.arguments().contains(QStringLiteral("--tls-ca-selftest"))) {
+        const std::string ca = config::tls_ca_file();
+        std::printf("tls_ca_file=[%s]\\n", ca.c_str());
+        std::fflush(stdout);
+        return ca.empty() ? 2 : 0;
+    }
 
     // 固定应用名：否则 %LOCALAPPDATA% 下的目录会跟随 exe 文件名变化，
     // 改名后会议记录/缓存会"丢失"（其实还在旧目录）。必须在任何
