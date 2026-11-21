@@ -78,7 +78,7 @@ inline constexpr Palette kLight{
     "#C4C8CE", "#B9BEC5", "#CFD3D9", "#D9DCE1", "#D2D6DB", "#CCD1D6",
     "#CDD2D7", "#C6CBD1", "#DEE1E5", "#B7BCC2",
     // 交互
-    "#D2D6DB", "#CBD0D6", "#B0B6BD", "#C3C8CE",
+    "#D2D6DB", "#CBD0D6", "#B0B6BD", "#B3B9C0",
     // 描边
     "#AEB4BB", "#C2C7CD", "#8F979F",
     // 文字
