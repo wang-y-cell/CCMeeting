@@ -242,16 +242,6 @@ def test_update_profile_success(ctx):
         ({"phone": "1" * 33}, "field too long"),
     ],
 )
-def test_write_api_requires_token(ctx):
-    client, _, _ = ctx
-    user_id = _register(client).json()["data"]["id"]
-    resp = client.post(
-        "/api/update-profile", json={"user_id": user_id, "nickname": "x"}
-    )
-    assert resp.status_code == 401
-    assert resp.json() == {"code": 401, "message": "unauthorized"}
-
-
 def test_update_profile_validation(ctx, patch, expected):
     client, _, _ = ctx
     user_id = _register(client).json()["data"]["id"]
@@ -260,6 +250,16 @@ def test_update_profile_validation(ctx, patch, expected):
     resp = client.post("/api/update-profile", json=payload, headers=_auth(user_id))
     assert resp.status_code == 400
     assert resp.json() == {"code": 400, "message": expected}
+
+
+def test_write_api_requires_token(ctx):
+    client, _, _ = ctx
+    user_id = _register(client).json()["data"]["id"]
+    resp = client.post(
+        "/api/update-profile", json={"user_id": user_id, "nickname": "x"}
+    )
+    assert resp.status_code == 401
+    assert resp.json() == {"code": 401, "message": "unauthorized"}
 
 
 def test_update_profile_user_not_found(ctx):
