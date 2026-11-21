@@ -11,6 +11,7 @@
 
 #include <boost/asio.hpp>
 #include <cstdint>
+#include <string>
 #include <functional>
 #include <memory>
 
@@ -22,7 +23,8 @@ class Server {
 public:
     using ConnectionHandler = std::function<void(std::shared_ptr<Connection>)>;
 
-    Server(io_context& io_ctx, uint16_t port);
+    Server(io_context& io_ctx, uint16_t port,
+           const std::string& host = "0.0.0.0");
     ~Server();
 
     void set_connection_handler(ConnectionHandler handler);  // 新连接建立时调用

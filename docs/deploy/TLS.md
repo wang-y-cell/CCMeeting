@@ -94,8 +94,36 @@ client/resources/tls/server-cert.pem
 - 客户端资源可**同时内置新旧两张证书**，发布新版后再移除旧证书；
 - 私钥 `key.pem` 只留在服务器，且不要提交到 git。
 
-## 7. 后续（WSS）
+## 7. 信令 WSS（文本/业务消息）
 
-信令改 `wss` 时复用同一张证书，nginx 配置见
-`deploy/nginx/ccmeeting-signal-stream.conf`；客户端 `connection.cpp`
-的 scheme 改为按 `meeting_server.tls` 选择 `wss`。
+文本聊天走客户端自己的 Qt `QWebSocket` → `message_server`，与 Janus 无关。
+
+### 服务器
+
+1. `message_server` 只监听 `127.0.0.1:8889`：
+   - `ccmeeting-signal.service` 增加
+     `Environment=CCMEETING_SIGNAL_BIND=127.0.0.1`、
+     `Environment=CCMEETING_SIGNAL_PORT=8889`；
+2. nginx stream 终止 TLS：
+   - 放置 `deploy/nginx/ccmeeting-signal-stream.conf` 到
+     `/etc/nginx/stream.d/ccmeeting-signal.conf`；
+   - `/etc/nginx/nginx.conf` 顶层增加：
+     ```nginx
+     stream {
+         include /etc/nginx/stream.d/*.conf;
+     }
+     ```
+   - `nginx -t && systemctl reload nginx`。
+
+### 客户端
+
+- `client.json` 的 `meeting_server` 增加 `"tls": true`（默认 true）；
+- `Connection` 按 `tls` 选择 `wss://`，并使用 `config::tls_config()` 内置 CA；
+- 本地联调没有 TLS 时可设 `"tls": false`（仅开发）。
+
+验证：
+
+```bash
+openssl s_client -connect 8.153.155.18:8888 -CAfile /etc/ccmeeting/tls/cert.pem </dev/null
+# Verify return code: 0 (ok)
+```
