@@ -28,6 +28,14 @@ public:
     /** @brief 停止并释放设备（幂等） */
     void stop();
 
+    /**
+     * @brief 把一段 PCM 转成 0..100 的电平（纯函数，便于单测）
+     *
+     * 支持 Int16 / Int32 / Float / UInt8；其它格式返回 0。
+     * 算法：0.7×RMS + 0.3×峰值（dBFS），-80dB→0%，-6dB→100%。
+     */
+    static int level_percent(const QByteArray &raw, const QAudioFormat &format);
+
 signals:
     /** @brief 电平 0..100（约 20 次/秒） */
     void levelChanged(int percent);
@@ -36,7 +44,6 @@ signals:
 
 private:
     void on_timer();
-    static int level_percent(const QByteArray &raw, const QAudioFormat &format);
 
     QAudioSource *source_ = nullptr;
     QIODevice *io_ = nullptr;

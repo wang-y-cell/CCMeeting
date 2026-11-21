@@ -8,6 +8,9 @@
 #include <QIODevice>
 #include <QTimer>
 
+#include <spdlog/spdlog.h>
+#include <cstring>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -36,8 +39,12 @@ void MicTestService::start(const QString &deviceId) {
         format.setSampleFormat(QAudioFormat::Int16);
     }
     if (!device.isFormatSupported(format)) {
+        // 很多 Windows 设备只暴露 Float；此时保留首选格式，level_percent 已支持
         format = device.preferredFormat();
     }
+    spdlog::info("[MicTestService] format rate={} ch={} sampleFormat={}",
+                 format.sampleRate(), format.channelCount(),
+                 static_cast<int>(format.sampleFormat()));
 
     source_ = new QAudioSource(device, format, this);
     io_ = source_->start();
@@ -97,25 +104,71 @@ void MicTestService::on_timer() {
 
 int MicTestService::level_percent(const QByteArray &raw,
                                   const QAudioFormat &format) {
-    if (raw.isEmpty() || format.sampleFormat() != QAudioFormat::Int16) {
+    if (raw.isEmpty()) {
         return 0;
     }
-    const auto *samples = reinterpret_cast<const int16_t *>(raw.constData());
-    const int count = raw.size() / static_cast<int>(sizeof(int16_t));
+    const QAudioFormat::SampleFormat sample_format = format.sampleFormat();
+    const int bytes_per_sample = format.bytesPerSample();
+    if (bytes_per_sample <= 0 ||
+        raw.size() < bytes_per_sample) {
+        return 0;
+    }
+    const int count = raw.size() / bytes_per_sample;
     if (count <= 0) {
         return 0;
     }
+
     double sum_sq = 0.0;
-    int peak = 0;
+    double peak = 0.0;
+    const char *data = raw.constData();
     for (int i = 0; i < count; ++i) {
-        const int value = samples[i];
-        const int magnitude = value >= 0 ? value : -value;
+        double normalized = 0.0;
+        const char *sample = data + static_cast<std::ptrdiff_t>(i) * bytes_per_sample;
+        switch (sample_format) {
+            case QAudioFormat::UInt8: {
+                const auto value = static_cast<quint8>(*sample);
+                normalized = (static_cast<double>(value) - 128.0) / 128.0;
+                break;
+            }
+            case QAudioFormat::Int16: {
+                qint16 value = 0;
+                std::memcpy(&value, sample, sizeof(value));
+                normalized = static_cast<double>(value) / 32768.0;
+                break;
+            }
+            case QAudioFormat::Int32: {
+                qint32 value = 0;
+                std::memcpy(&value, sample, sizeof(value));
+                normalized = static_cast<double>(value) / 2147483648.0;
+                break;
+            }
+            case QAudioFormat::Float: {
+                float value = 0.0F;
+                std::memcpy(&value, sample, sizeof(value));
+                normalized = static_cast<double>(value);
+                break;
+            }
+            default:
+                return 0;
+        }
+        const double magnitude = std::fabs(normalized);
         if (magnitude > peak) {
             peak = magnitude;
         }
-        sum_sq += static_cast<double>(value) * static_cast<double>(value);
+        sum_sq += normalized * normalized;
     }
     const double rms = std::sqrt(sum_sq / static_cast<double>(count));
-    const double mixed = 0.7 * rms + 0.3 * static_cast<double>(peak);
-    return std::clamp(static_cast<int>(mixed / 32768.0 * 100.0 * 1.8), 0, 100);
+    // 用 dBFS 映射（麦克风电平表通用做法）：
+    //   -80 dBFS -> 0%，-6 dBFS -> 100%
+    // 线性映射会把安静环境的微小信号（如 -80dB）直接截断成 0，
+    // 表现就是"点了测试但进度条不动"。
+    constexpr double kFloorDb = -80.0;   // 静音门限（很安静的环境也能看到小电平）
+    constexpr double kCeilDb = -6.0;     // 满格
+    constexpr double kSilence = 1e-7;    // log10(0) 保护
+    const double rms_db = 20.0 * std::log10(std::max(rms, kSilence));
+    const double peak_db = 20.0 * std::log10(std::max(peak, kSilence));
+    const double mixed_db = 0.7 * rms_db + 0.3 * peak_db;
+    const double percent =
+        (mixed_db - kFloorDb) / (kCeilDb - kFloorDb) * 100.0;
+    return std::clamp(static_cast<int>(std::lround(percent)), 0, 100);
 }
