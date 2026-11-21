@@ -2,6 +2,7 @@
 
 #include "media/devices/device_catalog.h"
 
+#include <QAudio>
 #include <QAudioDevice>
 #include <QAudioSource>
 #include <QIODevice>
@@ -46,6 +47,19 @@ void MicTestService::start(const QString &deviceId) {
         source_ = nullptr;
         return;
     }
+
+    // 采集过程中设备被拔出/被独占：Qt 会把状态切到 Stopped + 具体错误
+    connect(source_, &QAudioSource::stateChanged, this,
+            [this](QAudio::State state) {
+                if (state != QAudio::StoppedState || source_ == nullptr) {
+                    return;
+                }
+                if (source_->error() == QAudio::NoError) {
+                    return;
+                }
+                emit errorOccurred(tr("麦克风测试中断（设备可能已被拔出或占用）。"));
+                stop();
+            });
 
     timer_ = new QTimer(this);
     timer_->setInterval(kSampleIntervalMs);

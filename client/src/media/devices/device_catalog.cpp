@@ -60,9 +60,9 @@ QAudioDevice DeviceCatalog::find_microphone(const QString &id) const {
 
 QList<QSize> DeviceCatalog::resolutions(const QCameraDevice &device) const {
     QList<QSize> out;
-    std::set<std::pair<int, int>> seen;
+    std::set<std::pair<int, int>> seen; //排序加去重
     for (const QCameraFormat &format : device.videoFormats()) {
-        const QSize res = format.resolution();
+        const QSize res = format.resolution(); //获得分辨率
         if (res.width() <= 0 || res.height() <= 0 || fps_of(format) <= 0) {
             continue;
         }
@@ -75,7 +75,7 @@ QList<QSize> DeviceCatalog::resolutions(const QCameraDevice &device) const {
 
 QList<int> DeviceCatalog::frame_rates(const QCameraDevice &device,
                                       const QSize &res) const {
-    std::set<int> rates;
+    std::set<int> rates; //排序加去重
     for (const QCameraFormat &format : device.videoFormats()) {
         if (format.resolution() == res && fps_of(format) > 0) {
             rates.insert(fps_of(format));
