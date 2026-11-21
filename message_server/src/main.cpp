@@ -26,6 +26,16 @@ int main() {
     if (const char* env_port = std::getenv("CCMEETING_SIGNAL_PORT")) {
         config.listen_port = static_cast<uint16_t>(std::atoi(env_port));
     }
+    if (const char* env_auth = std::getenv("CCMEETING_REQUIRE_AUTH")) {
+        config.require_auth = std::string(env_auth) == "1";
+    }
+    if (const char* env_secret = std::getenv("CCMEETING_TOKEN_SECRET")) {
+        config.token_secret = env_secret;
+    }
+    if (config.require_auth && config.token_secret.empty()) {
+        spdlog::error("CCMEETING_REQUIRE_AUTH=1 but CCMEETING_TOKEN_SECRET is empty");
+        return 1;
+    }
 
     spdlog::info("Server config: max_rooms = {}, max_participants_per_room = {}, listen = {}:{}"
         , config.max_rooms, config.max_participants_per_room, listen_host, config.listen_port);

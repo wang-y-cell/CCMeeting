@@ -9,6 +9,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 namespace config {
 
@@ -16,6 +17,8 @@ struct ServerConfig {
     std::size_t max_rooms = 64;                  // 最大并发房间数
     std::size_t max_participants_per_room = 1024;  // 单房间最大人数
     uint16_t listen_port = 8888;                   // TCP 监听端口
+    bool require_auth = false;                     // 生产打开：创建/加入必须带有效 token
+    std::string token_secret;                      // 与 data_server 共享的 HMAC 密钥
 };
 
 }  // namespace config

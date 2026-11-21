@@ -10,6 +10,7 @@
 #include "protocol/message_type.h"
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace protocol {
@@ -17,6 +18,7 @@ namespace protocol {
 struct Packet {
     MessageType type{};
     uint64_t user_id = 0;  // 网络字节序
+    std::string auth_token;  // 无状态会话令牌（JSON "a" 字段）
     std::vector<uint8_t> payload;
 };
 

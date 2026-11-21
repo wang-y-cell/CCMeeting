@@ -198,3 +198,20 @@ subjectAltName = IP:8.153.155.18
 否则 BoringSSL（xrtc wss）会报
 `unable to get local issuer certificate`，即使 OpenSSL `verify` 能通过。
 证书轮换后要同步更新客户端 `client/resources/tls/server-cert.pem`。
+## 11. 会话令牌与接口鉴权
+
+- `data_server` 登录成功后返回 `data.token`（HMAC-SHA256，24h）；
+- `POST /api/upload-avatar`、`POST /api/update-profile` 必须带
+  `Authorization: Bearer <token>`，否则 401；
+- 信令 `message_server` 在 `CCMEETING_REQUIRE_AUTH=1` 时校验
+  `create_meeting` / `join_meeting` 的 `a` 字段，token 无效返回失败响应。
+
+共享密钥：
+
+```bash
+# /etc/ccmeeting-auth.env（600）
+CCMEETING_TOKEN_SECRET=<openssl rand -hex 32>
+```
+
+`ccmeeting-auth` 与 `ccmeeting-signal` 都读取同一个文件；
+轮换 secret 会让所有已登录用户失效，需重新登录。

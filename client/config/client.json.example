@@ -1,0 +1,46 @@
+{
+  "auth": {
+    "host": "auth.example.com",
+    "port": 9000,
+    "login_path": "/api/login",
+    "register_path": "/api/register",
+    "upload_avatar_path": "/api/upload-avatar",
+    "update_profile_path": "/api/update-profile",
+    "public_base_url": "https://auth.example.com",
+    "default_avatar_path": "/static/avatar/default.png"
+  },
+  "meeting_server": {
+    "host": "meet.example.com",
+    "port": 8888,
+    "tls": true
+  },
+  "webrtc": {
+    "janus_ws_url": "wss://meet.example.com:8989/",
+    "admin_key": "",
+    "video": {
+      "width": 640,
+      "height": 480,
+      "fps": 30
+    },
+    "ice_servers": [
+      {
+        "uri": "stun:8.153.155.18:3478",
+        "username": "",
+        "password": ""
+      },
+      {
+        "uri": "turn:8.153.155.18:3478?transport=udp",
+        "username": "",
+        "password": ""
+      },
+      {
+        "uri": "turn:8.153.155.18:3478?transport=tcp",
+        "username": "",
+        "password": ""
+      }
+    ],
+    "janus_ca_file": "",
+    "janus_tls_verify": true,
+    "allow_plaintext_ws": false
+  }
+}

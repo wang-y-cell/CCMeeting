@@ -84,7 +84,8 @@ ccmeeting_add_test(test_priority_queue
 # 编解码：线上 JSON 格式与二进制 payload 布局
 ccmeeting_add_test(test_message_codec
     test_message_codec.cpp
-    "${CMAKE_CURRENT_SOURCE_DIR}/../src/protocol/message_codec.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/protocol/message_codec.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/user_session.cpp")
 
 # 协议分发：网络消息 → 语义信号
 # 注意：被测类头文件必须列进源列表，AUTOMOC 才会为它生成 moc（Q_OBJECT）
@@ -177,5 +178,6 @@ ccmeeting_add_test(test_auth_http
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/foundation/auth_http.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/tls_config.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/client_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/user_session.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../resource.qrc")
 target_link_libraries(test_auth_http PRIVATE Qt6::Network)

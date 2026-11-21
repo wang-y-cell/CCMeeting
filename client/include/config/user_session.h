@@ -30,6 +30,8 @@ public:
     QString phone() const { return m_extras.phone; }
     QString email() const { return m_extras.email; }
     QString extraJson() const { return m_extras.extraJson; }
+    QString token() const { return m_token; }
+    void setToken(const QString& token) { m_token = token; }
     const UserProfileExtras& extras() const { return m_extras; }
 
     /** 由生日推算年龄；无效生日返回 -1 */
@@ -63,4 +65,5 @@ private:
     QString m_avatar;
     QString m_info;
     UserProfileExtras m_extras;
+    QString m_token;
 };

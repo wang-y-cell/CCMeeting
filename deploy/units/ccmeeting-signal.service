@@ -12,6 +12,9 @@ LimitNOFILE=65535
     # nginx stream 在 8888 终止 TLS，后端只监听本机
     Environment=CCMEETING_SIGNAL_BIND=127.0.0.1
     Environment=CCMEETING_SIGNAL_PORT=8889
+    # 生产：创建/加入会议必须带 auth 服务签发的 token
+    EnvironmentFile=/etc/ccmeeting-auth.env
+    Environment=CCMEETING_REQUIRE_AUTH=1
 
 [Install]
 WantedBy=multi-user.target

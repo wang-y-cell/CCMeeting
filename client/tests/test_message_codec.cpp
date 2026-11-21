@@ -3,6 +3,7 @@
 #include "protocol/message.h"
 #include "protocol/message_codec.h"
 #include "protocol/net_header.h"
+#include "config/user_session.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -27,6 +28,7 @@ private slots:
     void decode_room_settings_notify();
     void decode_bad_json_returns_null();
     void type_name_round_trips();
+    void auth_token_included_when_logged_in();
 };
 
 namespace {
@@ -127,3 +129,16 @@ void TestMessageCodec::type_name_round_trips() {
 
 QTEST_GUILESS_MAIN(TestMessageCodec)
 #include "test_message_codec.moc"
+
+
+void TestMessageCodec::auth_token_included_when_logged_in() {
+    UserSession::instance().setToken(QStringLiteral("test-token"));
+    CreateMeetingMessage msg(8, 60);
+    const QJsonObject object = parse(MessageCodec::encode_wire_frame(msg, 7));
+    QCOMPARE(object.value(QStringLiteral("a")).toString(),
+             QStringLiteral("test-token"));
+
+    UserSession::instance().clear();
+    const QJsonObject anonymous = parse(MessageCodec::encode_wire_frame(msg, 7));
+    QVERIFY(!anonymous.contains(QStringLiteral("a")));
+}

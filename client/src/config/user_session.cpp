@@ -83,4 +83,5 @@ void UserSession::clear() {
     m_avatar.clear();
     m_info.clear();
     m_extras = {};
+    m_token.clear();
 }
