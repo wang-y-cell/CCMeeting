@@ -5,7 +5,11 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <arpa/inet.h>
+#ifdef _WIN32
+#  include <winsock2.h>
+#else
+#  include <arpa/inet.h>
+#endif
 #include <chrono>
 #include <cstring>
 

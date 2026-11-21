@@ -109,7 +109,7 @@ jobs:
       - name: 审计 :/Style/source/*.qss 引用
         run: python client/tools/audit_qss_refs.py
   # ---------------------------------------------------------------
-  # 信令服务协议测试：GoogleTest（不依赖 Boost / WebSocket）
+  # 信令服务测试：GoogleTest（协议编解码 + 房间/成员逻辑）
   # ---------------------------------------------------------------
   server-unit-tests:
     name: 信令服务协议测试 (GoogleTest / Ubuntu)
@@ -121,7 +121,10 @@ jobs:
           submodules: false
 
       - name: 检出测试依赖子模块
-        run: git submodule update --init third_party/gtest third_party/json
+        run: git submodule update --init third_party/gtest third_party/json third_party/spdlog
+
+      - name: 安装 Boost 头文件
+        run: sudo apt-get update && sudo apt-get install -y libboost-dev
 
       - name: 配置
         run: cmake -S message_server/tests -B build/server-tests -G Ninja -DCMAKE_BUILD_TYPE=Debug
