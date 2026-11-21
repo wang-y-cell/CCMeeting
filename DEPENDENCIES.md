@@ -17,7 +17,7 @@
 |---|---|---|---|
 | `third_party/spdlog` | `v1.17.0` | 1.17.0 | 日志，客户端与服务端共用 |
 | `third_party/json` | `v3.12.0` | 3.12.0 | nlohmann/json，协议序列化 |
-| `third_party/gtest` | `v1.18.0` | 1.18.0 | 当前构建未启用，保留备用 |
+| `third_party/gtest` | `v1.18.0` | 1.18.0 | 用于 `message_server/tests` 协议单测 |
 | `third_party/httplib` | `v0.66.0` | 0.66.0 | 旧认证服务用过，现已不引用，保留备用 |
 | `third_party/webrtcSDK` | **无可用 tag** | 自家 xrtc，停在 `v1.0.0` 之后 26 个提交的 `main` | 跟随自家主分支更新；如需固定，先在 xrtc 仓库打新 tag |
 
@@ -180,7 +180,7 @@ curl -s http://127.0.0.1:9000/api/health
 | 目录 | 钉定版本 | 说明 |
 |---|---|---|
 | `third_party/httplib` | `v0.66.0`（0.66.0） | 旧 C++ 认证服务用过，已随认证服务删除而**不再被引用**；保留备用 |
-| `third_party/gtest` | `v1.18.0`（1.18.0） | 当前构建未启用；如后续加 C++ 单测再启用 |
+| `third_party/gtest` | `v1.18.0`（1.18.0） | `message_server/tests`（18 个用例）依赖它 |
 
 > 这两个目录**不参与构建**，暂时保留（以后可能用上）；已和其他 submodule 一样钉在 release tag 上。
 
