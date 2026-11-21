@@ -237,4 +237,25 @@ QPushButton#framelessMinBtn:hover {
     background-color: @raised;
     color: @text;
 }
+/* ---------- 生日：日历按钮 + 日历弹层 ---------- */
 
+/* 隐藏 QDateEdit 自带的小箭头：入口统一用右侧日历按钮，更直观 */
+QDateEdit#birthdayEdit::drop-down {
+    width: 0;
+    border: none;
+}
+
+QToolButton#birthdayPickBtn {
+    background-color: @surface2;
+    border: 1px solid @border;
+    border-radius: 8px;
+}
+
+QToolButton#birthdayPickBtn:hover {
+    background-color: @surface3;
+    border-color: @borderStrong;
+}
+
+QToolButton#birthdayPickBtn:pressed {
+    background-color: @surface3;
+}

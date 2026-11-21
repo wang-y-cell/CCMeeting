@@ -21,6 +21,11 @@
 #include "ui/foundation/window_behavior.h"
 #include "media/devices/mic_test_service.h"
 #include "media/devices/device_catalog.h"
+#include "ui/composites/calendar_popup.h"
+#include "ui/dialogs/edit_profile_dialog.h"
+#include <QCalendarWidget>
+#include <QDateEdit>
+#include <QToolButton>
 #include <QAudioDevice>
 #include <QAudioFormat>
 #include <QEventLoop>
@@ -1812,6 +1817,61 @@ int run_window_behavior_selftest() {
 }
 
 }  // namespace// ---------------------------------------------------------------------------
+// 生日日历弹层自检：离屏渲染弹层并保存截图，校验日期与外观配置
+// 用法：UiPreview.exe --calendar-selftest
+// ---------------------------------------------------------------------------
+namespace {
+
+int run_calendar_selftest() {
+    ui::CalendarPopup popup;
+    popup.setAttribute(Qt::WA_DontShowOnScreen, true);
+    popup.setDate(QDate(1995, 6, 15));
+    popup.show();
+    QCoreApplication::processEvents();
+
+    const QPixmap shot = popup.grab();
+    const QString path = QDir::tempPath() + QStringLiteral("/ccmeeting-calendar-popup.png");
+    const bool saved = shot.save(path);
+
+    bool grid_off = false;
+    bool no_week_numbers = false;
+    if (auto *calendar = popup.calendar_widget()) {
+        grid_off = !calendar->isGridVisible();
+        no_week_numbers = calendar->verticalHeaderFormat() ==
+                          QCalendarWidget::NoVerticalHeader;
+    }
+    std::printf("[calendar] 截图=%s 尺寸=%dx%d gridOff=%d noWeekNumbers=%d\n",
+                saved ? path.toUtf8().constData() : "(保存失败)",
+                shot.width(), shot.height(), grid_off ? 1 : 0,
+                no_week_numbers ? 1 : 0);
+    // 集成校验：弹窗里的日历按钮能打开弹层，选中日期会写回生日字段
+    ui::EditProfileDialog dialog;
+    dialog.setAttribute(Qt::WA_DontShowOnScreen, true);
+    dialog.show();
+    QCoreApplication::processEvents();
+    auto *pick = dialog.findChild<QToolButton *>(QStringLiteral("birthdayPickBtn"));
+    auto *birthday = dialog.findChild<QDateEdit *>(QStringLiteral("birthdayEdit"));
+    bool wired = false;
+    if (pick != nullptr && birthday != nullptr) {
+        pick->click();
+        QCoreApplication::processEvents();
+        auto *popup_layer = dialog.findChild<ui::CalendarPopup *>();
+        if (popup_layer != nullptr) {
+            const QDate target(1990, 5, 20);
+            QMetaObject::invokeMethod(popup_layer->calendar_widget(), "clicked",
+                                      Q_ARG(QDate, target));
+            QCoreApplication::processEvents();
+            wired = birthday->date() == target;
+        }
+    }
+    std::printf("[calendar] 弹窗接线=%d\n", wired ? 1 : 0);
+    const bool ok = saved && popup.date() == QDate(1995, 6, 15) && grid_off &&
+                    no_week_numbers && wired;
+    std::printf("[calendar] 结论: %s\n", ok ? "PASS" : "FAIL");
+    return ok ? 0 : 1;
+}
+
+}  // namespace// ---------------------------------------------------------------------------
 // 麦克风测试自检：列出输入设备与格式，跑 2 秒看是否收到电平事件
 // 用法：UiPreview.exe --mic-selftest
 // ---------------------------------------------------------------------------
@@ -2199,6 +2259,10 @@ int main(int argc, char *argv[]) {
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--mic-selftest")) {
         return run_mic_selftest();
+    }
+    if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
+                        QStringLiteral("--calendar-selftest")) {
+        return run_calendar_selftest();
     }
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--device-menu-selftest")) {
