@@ -124,3 +124,7 @@ target_link_libraries(test_theme_tokens PRIVATE Qt6::Gui)
 ccmeeting_add_test(test_client_config
     test_client_config.cpp
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/client_config.cpp")
+# 用户会话：生日→年龄、性别文案、资料更新语义
+ccmeeting_add_test(test_user_session
+    test_user_session.cpp
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/user_session.cpp")
