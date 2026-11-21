@@ -37,8 +37,16 @@ ss -lntp | grep 9000     # 只应出现 127.0.0.1:9000
 
 ## 3. nginx 反向代理
 
+如果服务器上已有 443 站点（例如 Janus demo 页面），不要直接覆盖；
+把 `deploy/nginx/ccmeeting-default.conf` 合并进去，重点保留：
+
+- `ssl_certificate` / `ssl_certificate_key` 指向 `/etc/ccmeeting/tls/*`；
+- `location /api/`、`/uploads/`、`/static/` 反代到 `127.0.0.1:9000`；
+- 原有 `/janus` 代理保持不变。
+
 ```bash
-sudo cp deploy/nginx/ccmeeting-auth.conf /etc/nginx/conf.d/
+sudo cp /etc/nginx/conf.d/default.conf /etc/nginx/conf.d/default.conf.bak
+sudo cp deploy/nginx/ccmeeting-default.conf /etc/nginx/conf.d/default.conf
 sudo nginx -t && sudo systemctl reload nginx
 ```
 

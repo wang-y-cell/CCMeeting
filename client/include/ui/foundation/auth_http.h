@@ -7,7 +7,7 @@
 namespace ui {
 
 /**
- * @brief 认证服务的 SSL 配置：内置自签 CA（:/ui/tls/server-cert.pem）
+ * @brief 认证服务的 SSL 设置本机信任的CA
  *
  * 只用于"信任我们自己的服务器证书"，仍然保持 VerifyPeer，
  * 绝不能改成 VerifyNone。
