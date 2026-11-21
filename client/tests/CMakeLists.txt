@@ -18,6 +18,7 @@ cmake_minimum_required(VERSION 3.19)
 
 # 测试类自身带 Q_OBJECT（QTEST_*_MAIN 需要 moc）
 set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     # 独立构建：自己解决 Qt 与 spdlog，避免依赖 third_party/webrtcSDK
@@ -139,6 +140,7 @@ ccmeeting_add_test(test_chat_controller
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/composites/my_text_edit.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/user_session.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/media/avatar_service.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/foundation/auth_http.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/client_config.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/preferences.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/core/storage.cpp"
@@ -167,3 +169,10 @@ target_link_libraries(test_network_reliability PRIVATE
     Qt6::WebSockets Qt6::Widgets Qt6::Network)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+# 认证 HTTPS：内置 CA、URL 规则、请求头（含 qrc 资源）
+ccmeeting_add_test(test_auth_http
+    test_auth_http.cpp
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/foundation/auth_http.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/client_config.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../resource.qrc")
+target_link_libraries(test_auth_http PRIVATE Qt6::Network)

@@ -1,5 +1,6 @@
 #include "ui/dialogs/edit_profile_dialog.h"
 
+#include "ui/foundation/auth_http.h"
 #include "ui/foundation/theme_manager.h"
 
 #include "ui/dialogs/avatar_crop_dialog.h"
@@ -27,25 +28,6 @@
 #include <QUrl>
 
 namespace {
-
-QUrl authUrl(const QString &path) {
-    QUrl url;
-    url.setScheme(QStringLiteral("http"));
-    const auto &auth = ClientConfig::instance().auth();
-    url.setHost(auth.host);
-    url.setPort(auth.port);
-    url.setPath(path);
-    return url;
-}
-
-QNetworkRequest makeJsonRequest(const QUrl &url) {
-    QNetworkRequest request(url);
-    request.setHeader(QNetworkRequest::ContentTypeHeader,
-                      QStringLiteral("application/json; charset=utf-8"));
-    request.setHeader(QNetworkRequest::UserAgentHeader,
-                      QStringLiteral("CloudMeetingClient/1.0"));
-    return request;
-}
 
 UserProfileExtras extrasFromJson(const QJsonObject &data) {
     UserProfileExtras extras;
@@ -236,8 +218,8 @@ void ui::EditProfileDialog::uploadPendingAvatar() {
                 QString::fromLatin1(bytes.toBase64()));
 
     const QUrl url =
-        authUrl(ClientConfig::instance().auth().upload_avatar_path);
-    m_reply = nam->post(makeJsonRequest(url),
+        ui::auth_url(ClientConfig::instance().auth().upload_avatar_path);
+    m_reply = nam->post(ui::auth_request(url),
                         QJsonDocument(body).toJson(QJsonDocument::Compact));
     connect(m_reply, &QNetworkReply::finished, this,
             &ui::EditProfileDialog::onAvatarUploadFinished);
@@ -318,8 +300,8 @@ void ui::EditProfileDialog::submitProfileUpdate() {
     body.insert(QStringLiteral("extra_json"), extras.extraJson);
 
     const QUrl url =
-        authUrl(ClientConfig::instance().auth().update_profile_path);
-    m_reply = nam->post(makeJsonRequest(url),
+        ui::auth_url(ClientConfig::instance().auth().update_profile_path);
+    m_reply = nam->post(ui::auth_request(url),
                         QJsonDocument(body).toJson(QJsonDocument::Compact));
     connect(m_reply, &QNetworkReply::finished, this,
             &ui::EditProfileDialog::onProfileUpdateFinished);

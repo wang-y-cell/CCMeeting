@@ -1,5 +1,7 @@
 #include "media/avatar_service.h"
 
+#include "ui/foundation/auth_http.h"
+
 #include "config/client_config.h"
 
 #include <QCoreApplication>
@@ -124,6 +126,7 @@ void AvatarService::loadInternal(const QString& url,
 
     const QString defaultUrl = ClientConfig::instance().auth().defaultAvatarUrl();
     QNetworkRequest request{QUrl(requestUrl)};
+    request.setSslConfiguration(ui::ssl_config());
     request.setAttribute(QNetworkRequest::CacheLoadControlAttribute,
                          QNetworkRequest::PreferCache);
     auto* reply = m_nam->get(request);
