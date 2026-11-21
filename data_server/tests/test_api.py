@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.api import create_app  # noqa: E402
 from app.config import AuthServerConfig, AssetsConfig  # noqa: E402
 from app.security import hash_password, sha256_hex, verify_password  # noqa: E402
+from app.tokens import issue_token  # noqa: E402
 
 PNG_1PX = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
@@ -36,6 +37,10 @@ def _login(client, username="alice", password="secret-123"):
     return client.post(
         "/api/login", json={"username": username, "password": password}
     )
+
+
+def _auth(user_id):
+    return {"Authorization": f"Bearer {issue_token(user_id)}"}
 
 
 # --------------------------------------------------------------- 基础契约
@@ -205,6 +210,7 @@ def test_update_profile_success(ctx):
             "email": "a@b.c",
             "extra_json": "{}",
         },
+        headers=_auth(user_id),
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -236,12 +242,22 @@ def test_update_profile_success(ctx):
         ({"phone": "1" * 33}, "field too long"),
     ],
 )
+def test_write_api_requires_token(ctx):
+    client, _, _ = ctx
+    user_id = _register(client).json()["data"]["id"]
+    resp = client.post(
+        "/api/update-profile", json={"user_id": user_id, "nickname": "x"}
+    )
+    assert resp.status_code == 401
+    assert resp.json() == {"code": 401, "message": "unauthorized"}
+
+
 def test_update_profile_validation(ctx, patch, expected):
     client, _, _ = ctx
     user_id = _register(client).json()["data"]["id"]
     payload = {"user_id": user_id, "nickname": "ok"}
     payload.update(patch)
-    resp = client.post("/api/update-profile", json=payload)
+    resp = client.post("/api/update-profile", json=payload, headers=_auth(user_id))
     assert resp.status_code == 400
     assert resp.json() == {"code": 400, "message": expected}
 
@@ -249,7 +265,8 @@ def test_update_profile_validation(ctx, patch, expected):
 def test_update_profile_user_not_found(ctx):
     client, _, _ = ctx
     resp = client.post(
-        "/api/update-profile", json={"user_id": 999999, "nickname": "nobody"}
+        "/api/update-profile", json={"user_id": 999999, "nickname": "nobody"},
+        headers=_auth(999999),
     )
     assert resp.status_code == 404
     assert resp.json() == {"code": 404, "message": "user not found"}
@@ -267,6 +284,7 @@ def test_upload_avatar_and_serve(ctx):
             "mime": "image/png",
             "data_base64": base64.b64encode(PNG_1PX).decode(),
         },
+        headers=_auth(user_id),
     )
     assert resp.status_code == 200
     body = resp.json()
@@ -299,6 +317,7 @@ def test_upload_avatar_errors(ctx):
     bad_mime = client.post(
         "/api/upload-avatar",
         json={"user_id": user_id, "mime": "image/tiff", "data_base64": good},
+        headers=_auth(user_id),
     )
     assert bad_mime.status_code == 400
     assert bad_mime.json() == {"code": 400, "message": "unsupported mime type"}
@@ -306,6 +325,7 @@ def test_upload_avatar_errors(ctx):
     ghost = client.post(
         "/api/upload-avatar",
         json={"user_id": 999999, "mime": "image/png", "data_base64": good},
+        headers=_auth(999999),
     )
     assert ghost.status_code == 404
     assert ghost.json() == {"code": 404, "message": "user not found"}
@@ -313,6 +333,7 @@ def test_upload_avatar_errors(ctx):
     bad_b64 = client.post(
         "/api/upload-avatar",
         json={"user_id": user_id, "mime": "image/png", "data_base64": "!!!not-base64!!!"},
+        headers=_auth(user_id),
     )
     assert bad_b64.status_code == 400
     assert bad_b64.json() == {"code": 400, "message": "invalid base64 data"}
@@ -324,6 +345,7 @@ def test_upload_avatar_errors(ctx):
             "mime": "image/png",
             "data_base64": base64.b64encode(b"\x00" * (2 * 1024 * 1024 + 1)).decode(),
         },
+        headers=_auth(user_id),
     )
     assert too_big.status_code == 413
     assert too_big.json() == {"code": 413, "message": "avatar too large"}

@@ -24,6 +24,12 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     # 独立构建：自己解决 Qt 与 spdlog，避免依赖 third_party/webrtcSDK
     project(ccmeeting_client_tests LANGUAGES CXX)
 
+# CI/新环境没有私有 client.json：用脱敏示例生成（qrc 需要该文件）
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../config/client.json")
+    configure_file("${CMAKE_CURRENT_SOURCE_DIR}/../config/client.json.example"
+                   "${CMAKE_CURRENT_SOURCE_DIR}/../config/client.json" COPYONLY)
+endif()
+
     set(CMAKE_CXX_STANDARD 17)
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
     set(CCMEETING_TESTS_STANDALONE ON)

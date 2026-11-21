@@ -122,6 +122,7 @@ add_executable(test_message_server_service
     "${SERVER_ROOT}/src/meeting/room_manager.cpp"
     "${SERVER_ROOT}/src/protocol/codec.cpp"
     "${SERVER_ROOT}/src/protocol/message_type.cpp"
+    "${SERVER_ROOT}/src/protocol/token.cpp"
 )
 target_include_directories(test_message_server_service PRIVATE
     "${SERVER_ROOT}/include"
