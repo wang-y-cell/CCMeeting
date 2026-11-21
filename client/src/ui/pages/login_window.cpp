@@ -1,5 +1,6 @@
 #include "ui/pages/login_window.h"
 
+#include "ui/foundation/auth_http.h"
 #include "ui/foundation/theme_manager.h"
 
 #include "config/login_store.h"
@@ -32,25 +33,6 @@ void flush_log() {
     if (spdlog::default_logger()) {
         spdlog::default_logger()->flush();
     }
-}
-
-QUrl authUrl(const QString &path) {
-    QUrl url;
-    url.setScheme(QStringLiteral("http"));
-    const auto &auth = ClientConfig::instance().auth();
-    url.setHost(auth.host);
-    url.setPort(auth.port);
-    url.setPath(path);
-    return url;
-}
-
-QNetworkRequest makeJsonRequest(const QUrl &url) {
-    QNetworkRequest request(url);
-    request.setHeader(QNetworkRequest::ContentTypeHeader,
-                      QStringLiteral("application/json; charset=utf-8"));
-    request.setHeader(QNetworkRequest::UserAgentHeader,
-                      QStringLiteral("CloudMeetingClient/1.0"));
-    return request;
 }
 
 }  // namespace
@@ -119,7 +101,7 @@ void ui::LoginWindow::Login() {
         return;
     }
 
-    const QUrl url = authUrl(ClientConfig::instance().auth().login_path);
+    const QUrl url = ui::auth_url(ClientConfig::instance().auth().login_path);
 
     QJsonObject body;
     body.insert(QStringLiteral("username"), username);
@@ -130,7 +112,7 @@ void ui::LoginWindow::Login() {
     ui.login_button->setEnabled(false);
     spdlog::info("[login] POST {}", qutf8(url.toString()));
     flush_log();
-    m_nam.post(makeJsonRequest(url),
+    m_nam.post(ui::auth_request(url),
                QJsonDocument(body).toJson(QJsonDocument::Compact));
 }
 
@@ -147,7 +129,7 @@ void ui::LoginWindow::Register() {
         return;
     }
 
-    const QUrl url = authUrl(ClientConfig::instance().auth().register_path);
+    const QUrl url = ui::auth_url(ClientConfig::instance().auth().register_path);
 
     QJsonObject body;
     body.insert(QStringLiteral("username"), username);
@@ -158,7 +140,7 @@ void ui::LoginWindow::Register() {
     ui.register_button->setEnabled(false);
     spdlog::info("[register] POST {}", qutf8(url.toString()));
     flush_log();
-    m_nam.post(makeJsonRequest(url),
+    m_nam.post(ui::auth_request(url),
                QJsonDocument(body).toJson(QJsonDocument::Compact));
 }
 

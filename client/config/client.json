@@ -6,7 +6,7 @@
     "register_path": "/api/register",
     "upload_avatar_path": "/api/upload-avatar",
     "update_profile_path": "/api/update-profile",
-    "public_base_url": "http://8.153.155.18:9000",
+    "public_base_url": "https://8.153.155.18",
     "default_avatar_path": "/static/avatar/default.png"
   },
   "meeting_server": {
