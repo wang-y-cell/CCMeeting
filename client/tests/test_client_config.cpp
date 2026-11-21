@@ -76,8 +76,11 @@ private slots:
 
         QJsonObject webrtc;
         webrtc.insert(QStringLiteral("janus_ws_url"),
-                      QStringLiteral("ws://janus.example:8188"));
+                      QStringLiteral("wss://janus.example:8989/"));
         webrtc.insert(QStringLiteral("admin_key"), QStringLiteral("secret"));
+        webrtc.insert(QStringLiteral("janus_ca_file"), QStringLiteral("/tmp/ca.pem"));
+        webrtc.insert(QStringLiteral("janus_tls_verify"), true);
+        webrtc.insert(QStringLiteral("allow_plaintext_ws"), false);
         webrtc.insert(QStringLiteral("video"), video);
         webrtc.insert(QStringLiteral("ice_servers"), ice);
 
@@ -95,8 +98,10 @@ private slots:
         QCOMPARE(config.meeting_server().host, QStringLiteral("10.1.2.3"));
         QCOMPARE(config.meeting_server().port, 9999);
         QCOMPARE(config.meeting_server().tls, false);
-        QCOMPARE(config.webrtc().janus_ws_url,
-                 QStringLiteral("ws://janus.example:8188"));
+        QCOMPARE(config.webrtc().janus_ws_url, QStringLiteral("wss://janus.example:8989/"));
+        QCOMPARE(config.webrtc().janus_ca_file, QStringLiteral("/tmp/ca.pem"));
+        QVERIFY(config.webrtc().janus_tls_verify);
+        QVERIFY(!config.webrtc().allow_plaintext_ws);
         QCOMPARE(config.webrtc().video.width, 1280);
         QCOMPARE(config.webrtc().video.height, 720);
         QCOMPARE(config.webrtc().video.fps, 24);

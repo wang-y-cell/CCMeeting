@@ -3,20 +3,21 @@
 #include <QtTest>
 
 #include "config/client_config.h"
+#include "config/tls_config.h"
 #include "ui/foundation/auth_http.h"
 
 /**
- * auth_http：内置自签 CA 与认证 URL 的构造规则。
+ * auth_http: bundled self-signed CA and auth URL rules.
  */
 class TestAuthHttp : public QObject {
     Q_OBJECT
 private slots:
     void certificateIsBundledAsPublicPem() {
         QFile file(QStringLiteral(":/ui/tls/server-cert.pem"));
-        QVERIFY2(file.open(QIODevice::ReadOnly), "qrc 未注册 :/ui/tls/server-cert.pem");
+        QVERIFY2(file.open(QIODevice::ReadOnly), "qrc missing :/ui/tls/server-cert.pem");
         const QByteArray pem = file.readAll();
         QVERIFY(pem.contains("BEGIN CERTIFICATE"));
-        // 私钥绝不能进客户端资源
+        // Private key must never be shipped in client resources.
         QVERIFY(!pem.contains("PRIVATE KEY"));
     }
 
@@ -24,8 +25,7 @@ private slots:
         const QSslConfiguration config = ui::ssl_config();
         QCOMPARE(config.peerVerifyMode(), QSslSocket::VerifyPeer);
 
-        // 必须真的内置了我们的服务器证书（SAN 含 IP 8.153.155.18），
-        // 而不是只依赖系统 CA。
+        // The bundled cert with SAN IP 8.153.155.18 must really be present.
         bool found = false;
         for (const QSslCertificate &cert : config.caCertificates()) {
             const auto names = cert.subjectAlternativeNames();
@@ -41,6 +41,18 @@ private slots:
             }
         }
         QVERIFY(found);
+    }
+
+    void tlsCaFileIsExportedForXrtc() {
+        const std::string path = config::tls_ca_file();
+        QVERIFY(!path.empty());
+
+        QFile file(QString::fromStdString(path));
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QVERIFY(file.readAll().contains("BEGIN CERTIFICATE"));
+
+        // Same certificate must map to the same temp path.
+        QCOMPARE(config::tls_ca_file(), path);
     }
 
     void authUrlUsesPublicBaseUrl() {
@@ -60,7 +72,7 @@ private slots:
         config.auth().port = 9443;
 
         const QUrl url = ui::auth_url(QStringLiteral("/api/register"));
-        QCOMPARE(url.scheme(), QStringLiteral("https"));   // 绝不回退到 http
+        QCOMPARE(url.scheme(), QStringLiteral("https"));
         QCOMPARE(url.host(), QStringLiteral("127.0.0.1"));
         QCOMPARE(url.port(), 9443);
         QCOMPARE(url.path(), QStringLiteral("/api/register"));

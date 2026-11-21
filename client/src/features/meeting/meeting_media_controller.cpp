@@ -1,6 +1,7 @@
 #include "features/meeting/meeting_media_controller.h"
 
 #include "config/client_config.h"
+#include "config/tls_config.h"
 #include "config/user_session.h"
 #include "features/meeting/meeting_rtc_observer.h"
 
@@ -33,6 +34,12 @@ xrtc::XRTCJoinConfig MeetingMediaController::build_join_config(
     config.room_description = to_std(session.name());
     config.max_publishers = options.max_participants;
     config.admin_key = to_std(cfg.admin_key);
+    // wss 证书：优先配置文件的 ca_file，否则用内置证书导出的临时 PEM
+    config.ca_file = cfg.janus_ca_file.isEmpty()
+                         ? config::tls_ca_file()
+                         : to_std(cfg.janus_ca_file);
+    config.tls_verify = cfg.janus_tls_verify;
+    config.allow_plaintext_ws = cfg.allow_plaintext_ws;
     config.width = cfg.video.width;
     config.height = cfg.video.height;
     config.fps = cfg.video.fps;

@@ -19,6 +19,12 @@ struct WebRtcVideoConfig {
 struct WebRtcConfig {
     QString janus_ws_url;
     QString admin_key;
+    /// wss 使用的 CA 文件；为空时使用内置证书导出的临时 PEM
+    QString janus_ca_file;
+    /// wss 是否校验证书（生产必须 true）
+    bool janus_tls_verify = true;
+    /// 是否允许明文 ws://（生产必须 false）
+    bool allow_plaintext_ws = false;
     WebRtcVideoConfig video;
     std::vector<IceServerConfig> ice_servers;
 };
