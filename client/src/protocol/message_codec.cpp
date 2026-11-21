@@ -1,5 +1,7 @@
 #include "protocol/message_codec.h"
 
+#include "config/user_session.h"
+
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
@@ -289,6 +291,10 @@ QByteArray MessageCodec::encode_wire_frame(const Message &msg,
     object.insert(QStringLiteral("t"),
                   QString::fromLatin1(type_name(wire_type)));
     object.insert(QStringLiteral("u"), static_cast<double>(local_user_id));
+    const QString auth_token = UserSession::instance().token();
+    if (!auth_token.isEmpty()) {
+        object.insert(QStringLiteral("a"), auth_token);
+    }
 
     // 文本消息走明文 s 字段：WS 上直接可读，也顺手去掉了原来的 qCompress
     if (msg.kind() == MessageKind::SendText) {

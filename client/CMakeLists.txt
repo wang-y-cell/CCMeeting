@@ -53,6 +53,13 @@ set(BUILD_XRTC_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory("${XRTC_ROOT}" "${CMAKE_BINARY_DIR}/xrtc-build" EXCLUDE_FROM_ALL)
 
 # ---------- sources ----------
+# 真实 client.json 不入库；缺失时用脱敏示例初始化本地配置
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/config/client.json")
+    configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config/client.json.example"
+                   "${CMAKE_CURRENT_SOURCE_DIR}/config/client.json" COPYONLY)
+    message(STATUS "[client] client.json missing, generated from client.json.example")
+endif()
+
 file(GLOB_RECURSE CLIENT_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"

@@ -29,3 +29,11 @@ build_message_server/
 # UI 预览截图输出（UiPreview.exe 生成）
 ui-preview*/
 --theme/
+
+
+
+# 本地上线检查清单（不公开）
+/docs/notes/*.local.md
+
+# 私有部署配置（含服务器地址 / TURN 凭据），只保留 .example
+/client/config/client.json

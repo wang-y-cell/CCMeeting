@@ -1,6 +1,7 @@
 #include "ui/foundation/auth_http.h"
 
 #include "config/client_config.h"
+#include "config/user_session.h"
 #include "config/tls_config.h"
 
 namespace ui {
@@ -31,6 +32,11 @@ QNetworkRequest auth_request(const QUrl &url) {
                       QStringLiteral("application/json; charset=utf-8"));
     request.setHeader(QNetworkRequest::UserAgentHeader,
                       QStringLiteral("CloudMeetingClient/1.0"));
+    const QString token = UserSession::instance().token();
+    if (!token.isEmpty()) {
+        request.setRawHeader("Authorization",
+                             ("Bearer " + token).toUtf8());
+    }
     return request;
 }
 

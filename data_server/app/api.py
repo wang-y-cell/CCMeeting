@@ -29,6 +29,7 @@ from fastapi.responses import JSONResponse, Response
 from .config import AuthServerConfig, load_config
 from .db import Database
 from .repository import UserRepository
+from .tokens import issue_token, verify_token
 from .service import AuthService
 
 logger = logging.getLogger("ccmeeting.auth")
@@ -137,7 +138,12 @@ def create_app(config: AuthServerConfig | None = None) -> FastAPI:
         parsed = await _parse_upload_avatar_request(request)
         if parsed is None:
             return _json_response(400, {"code": 400, "message": "invalid json body"})
-        user_id, mime, data_base64 = parsed
+        token_user_id = _authenticate(request)
+        if token_user_id is None:
+            return _json_response(401, {"code": 401, "message": "unauthorized"})
+        # 以 token 身份为准，忽略 body 里的 user_id
+        _body_user_id, mime, data_base64 = parsed
+        user_id = token_user_id
 
         result = service.upload_avatar(user_id, mime, data_base64)
         status = 400
@@ -172,6 +178,11 @@ def create_app(config: AuthServerConfig | None = None) -> FastAPI:
             email,
             extra_json,
         ) = parsed
+        token_user_id = _authenticate(request)
+        if token_user_id is None:
+            return _json_response(401, {"code": 401, "message": "unauthorized"})
+        # 以 token 身份为准，忽略 body 里的 user_id
+        user_id = token_user_id
 
         result = service.update_profile(
             user_id, nickname, info, gender, birthday, address, phone, email, extra_json
@@ -227,6 +238,14 @@ def create_app(config: AuthServerConfig | None = None) -> FastAPI:
 
 
 # ---------------------------------------------------------------- 请求解析
+def _authenticate(request: Request) -> int | None:
+    """校验 Authorization: Bearer <token>，返回 token 中的 user_id。"""
+    header = request.headers.get("authorization", "")
+    if not header.lower().startswith("bearer "):
+        return None
+    return verify_token(header[7:].strip())
+
+
 async def _read_json_object(request: Request) -> dict[str, Any] | None:
     try:
         raw = await request.body()
@@ -321,6 +340,7 @@ def _login_payload(result) -> dict[str, Any]:
             "phone": user.phone,
             "email": user.email,
             "extra_json": user.extra_json,
+            "token": issue_token(user.id),
         }
     return payload
 

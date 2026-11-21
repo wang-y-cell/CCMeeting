@@ -1,5 +1,7 @@
 #include "service/meeting_service.h"
 
+#include "protocol/token.h"
+
 #include "protocol/codec.h"
 
 #include <spdlog/spdlog.h>
@@ -126,7 +128,21 @@ void MeetingService::handle_lobby_packet(std::shared_ptr<network::Connection> co
 void MeetingService::handle_create_meeting(std::shared_ptr<network::Connection> conn,
                                            const protocol::Packet& packet) {
     const auto options = parse_create_meeting_options(packet, _config);
-    const uint64_t owner_user_id = packet.user_id;
+    uint64_t owner_user_id = packet.user_id;
+    if (_config.require_auth) {
+        if (!protocol::token::verify(packet.auth_token, _config.token_secret,
+                                     owner_user_id)) {
+            spdlog::warn("create meeting rejected: invalid token from connection {}",
+                         conn->id());
+            protocol::Packet response;
+            response.type = protocol::MessageType::CreateMeetingResponse;
+            response.payload.resize(sizeof(uint32_t));
+            const uint32_t zero = 0;
+            std::memcpy(response.payload.data(), &zero, sizeof(zero));
+            conn->send(protocol::Codec::encode(response));
+            return;
+        }
+    }
     if (owner_user_id == 0) {
         spdlog::warn("create meeting rejected: user_id=0 from connection {}",
                      conn->id());
@@ -171,7 +187,21 @@ void MeetingService::handle_join_meeting(std::shared_ptr<network::Connection> co
     std::memcpy(&room_no_net, packet.payload.data(), sizeof(room_no_net));
     /*将网络字节序转换为主机字节序*/
     const uint32_t room_id = ntohl(room_no_net);
-    const uint64_t user_id = packet.user_id;
+    uint64_t user_id = packet.user_id;
+    if (_config.require_auth) {
+        if (!protocol::token::verify(packet.auth_token, _config.token_secret,
+                                     user_id)) {
+            spdlog::warn("join meeting rejected: invalid token from connection {}",
+                         conn->id());
+            protocol::Packet response;
+            response.type = protocol::MessageType::JoinMeetingResponse;
+            response.payload.resize(sizeof(uint32_t));
+            const uint32_t deny = htonl(static_cast<uint32_t>(-1));
+            std::memcpy(response.payload.data(), &deny, sizeof(deny));
+            conn->send(protocol::Codec::encode(response));
+            return;
+        }
+    }
     if (user_id == 0) {
         spdlog::warn("join meeting rejected: user_id=0 from connection {}",
                      conn->id());

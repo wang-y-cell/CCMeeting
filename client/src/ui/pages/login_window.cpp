@@ -221,6 +221,8 @@ void ui::LoginWindow::onLoginFinished(QNetworkReply *reply) {
     extras.email = data.value(QStringLiteral("email")).toString();
     extras.extraJson = data.value(QStringLiteral("extra_json")).toString();
 
+    UserSession::instance().setToken(
+        data.value(QStringLiteral("token")).toString());
     UserSession::instance().setUser(
         userId,
         username.isEmpty() ? ui.account_line->text().trimmed() : username,

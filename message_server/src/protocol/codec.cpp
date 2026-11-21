@@ -181,6 +181,7 @@ DecodeStatus Codec::try_decode(Buffer& buffer, Packet& packet) {
 
     packet.type = *type;
     packet.user_id = static_cast<uint64_t>(document.value("u", 0.0));
+    packet.auth_token = document.value("a", std::string());
 
     if (document.contains("s")) {
         // 文本类：明文 UTF-8
@@ -201,6 +202,9 @@ std::vector<uint8_t> Codec::encode(const Packet& packet) {
     json document;
     document["t"] = type_name(packet.type);
     document["u"] = static_cast<double>(packet.user_id);
+    if (!packet.auth_token.empty()) {
+        document["a"] = packet.auth_token;
+    }
 
     if (is_text_type(packet.type)) {
         // 文本消息走明文 s 字段，WS 上直接可读
