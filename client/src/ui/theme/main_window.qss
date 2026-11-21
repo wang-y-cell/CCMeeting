@@ -457,29 +457,6 @@ QPushButton#framelessMinBtn:hover {
     color: @text;
 }
 
-/* ---------- 创建会议页的小贴士卡片 ---------- */
-
-QFrame#tipCard {
-    background-color: @sidebar;
-    border: 1px solid @borderSoft;
-    border-radius: 12px;
-}
-
-QLabel#tipTitle {
-    color: @text;
-    font-size: 13px;
-    font-weight: 600;
-    background: transparent;
-    border: none;
-}
-
-QLabel#tipLine {
-    color: @textWeak;
-    font-size: 12px;
-    line-height: 18px;
-    background: transparent;
-    border: none;
-}
 /* ---------- 「最近 N 个会议」小块（创建 / 加入页下方）---------- */
 
 QFrame#recentCard {

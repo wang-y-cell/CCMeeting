@@ -87,32 +87,6 @@ void ui::CreateMeetingPageUi::setupUi(QWidget *parent) {
     row->setSpacing(20);
     row->addWidget(frame);
 
-    // 右侧小贴士卡片：填充横向留白，同时解释表单里的两个字段
-    auto *tipCard = new QFrame(parent);
-    tipCard->setObjectName(QStringLiteral("tipCard"));
-    tipCard->setFixedWidth(300);
-    tipCard->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-    auto *tipLayout = new QVBoxLayout(tipCard);
-    tipLayout->setContentsMargins(20, 18, 20, 18);
-    tipLayout->setSpacing(10);
-
-    auto *tipTitle = new QLabel(QObject::tr("小贴士"), tipCard);
-    tipTitle->setObjectName(QStringLiteral("tipTitle"));
-    tipLayout->addWidget(tipTitle);
-
-    const QStringList tipLines = {
-        QObject::tr("会议号由服务端自动分配，创建后直接分享给其他成员"),
-        QObject::tr("参会人数受服务端上限约束，超出会被拒绝加入"),
-        QObject::tr("会议中可随时共享屏幕，与摄像头互斥"),
-    };
-    for (const QString &line : tipLines) {
-        auto *tipLine = new QLabel(QStringLiteral("· ") + line, tipCard);
-        tipLine->setObjectName(QStringLiteral("tipLine"));
-        tipLine->setWordWrap(true);
-        tipLayout->addWidget(tipLine);
-    }
-    tipLayout->addStretch(1);
-    row->addWidget(tipCard, 0, Qt::AlignTop);
     row->addStretch(1);
     root->addLayout(row);
 
