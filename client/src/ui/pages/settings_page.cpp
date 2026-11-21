@@ -94,6 +94,21 @@ ui::SettingsPage::SettingsPage(QWidget *parent) : Page(parent) {
                 stopVideoPreview(true);
             });
 
+
+    // 麦克风测试：采集与电平计算在 MicTestService，页面只做展示
+    mic_ = new MicTestService(this);
+    connect(mic_, &MicTestService::levelChanged, this, [this](int percent) {
+        if (ui->micLevelBar) {
+            ui->micLevelBar->setValue(percent);
+        }
+    });
+    connect(mic_, &MicTestService::errorOccurred, this,
+            [this](const QString &message) {
+                // 设备打开失败/被拔出：服务已停，页面要回到未测试状态
+                update_mic_ui();
+                QMessageBox::warning(this, tr("麦克风测试"), message);
+            });
+
     connect(ui->categoryList, &QListWidget::currentRowChanged, this,
             &ui::SettingsPage::onCategoryChanged);
     connect(ui->saveBtn, &QPushButton::clicked, this,
@@ -106,6 +121,15 @@ ui::SettingsPage::SettingsPage(QWidget *parent) : Page(parent) {
     connect(ui->videoResolution,
             QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             &ui::SettingsPage::onVideoResolutionChanged);
+    // 测试进行中切换麦克风：直接用新设备重启，避免"仍在测旧设备"
+    connect(ui->audioDeviceCombo,
+            QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            [this](int) {
+                if (mic_ && mic_->running()) {
+                    mic_->start(currentAudioDeviceId());
+                    update_mic_ui();
+                }
+            });
     connect(ui->videoFps, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &ui::SettingsPage::onVideoFpsChanged);
     connect(ui->micTestBtn, &QPushButton::clicked, this,
@@ -288,6 +312,8 @@ void ui::SettingsPage::refreshAudioDevices() {
 
     const QString savedId = catalog_.saved_audio_device_id();
 
+    // 重建列表会触发 currentIndexChanged(-1)；用阻塞避免误重启正在进行的测试
+    const QSignalBlocker blocker(ui->audioDeviceCombo);
     ui->audioDeviceCombo->clear();
     const auto mics = catalog_.audio_devices();
     spdlog::info("[SettingsPage] Qt mics={}", mics.size());
@@ -528,6 +554,9 @@ void ui::SettingsPage::onMicTestClicked() {
     if (mic_->running()) {
         mic_->stop();
     } else {
+        if (ui->micLevelBar) {
+            ui->micLevelBar->setValue(0);   // 新一轮测试从 0 开始
+        }
         mic_->start(currentAudioDeviceId());
     }
     update_mic_ui();
@@ -541,8 +570,8 @@ void ui::SettingsPage::update_mic_ui() {
     if (ui->micTestBtn) {
         ui->micTestBtn->setText(running ? tr("停止测试") : tr("麦克风测试"));
     }
-    if (ui->micLevelBar) {
-        ui->micLevelBar->setValue(0);
+    if (ui->micLevelBar && !running) {
+        ui->micLevelBar->setValue(0);   // 运行中保留实时电平，不要清零
     }
 }
 

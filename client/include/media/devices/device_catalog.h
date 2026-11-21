@@ -25,10 +25,14 @@ public:
     /** @param prefs 偏好实现；传 nullptr 时使用全局 `preferences()` */
     explicit DeviceCatalog(IPreferences *prefs = nullptr);
 
+    /** @brief 获取摄像头信息列表*/
     QList<QCameraDevice> video_devices() const;
+    /** @brief 获取音频设备列表 */
     QList<QAudioDevice> audio_devices() const;
 
+    /** @brief 根据id找到对应的摄像头 */
     QCameraDevice find_camera(const QString &id) const;
+    /** @brief 根据id找到对应的麦克风 */
     QAudioDevice find_microphone(const QString &id) const;
 
     /** @brief 去重后的分辨率候选（保持设备格式顺序） */
@@ -39,8 +43,11 @@ public:
     QCameraFormat best_format(const QCameraDevice &device, QSize res,
                               int fps) const;
 
+    //获得保存的摄像头设备id
     QString saved_video_device_id() const;
+    //获得保存的音频设备的id
     QString saved_audio_device_id() const;
+    //保存
     void save_video_device_id(const QString &id);
     void save_audio_device_id(const QString &id);
 
