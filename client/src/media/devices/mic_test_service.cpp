@@ -113,7 +113,7 @@ int MicTestService::level_percent(const QByteArray &raw,
         raw.size() < bytes_per_sample) {
         return 0;
     }
-    const int count = raw.size() / bytes_per_sample;
+    const int count = raw.size() / bytes_per_sample; //总采样点数
     if (count <= 0) {
         return 0;
     }
