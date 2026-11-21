@@ -143,3 +143,5 @@ endif()
 gtest_discover_tests(test_message_server_service
     DISCOVERY_TIMEOUT 60
 )
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

@@ -165,3 +165,5 @@ ccmeeting_add_test(test_network_reliability
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/user_session.cpp")
 target_link_libraries(test_network_reliability PRIVATE
     Qt6::WebSockets Qt6::Widgets Qt6::Network)
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
