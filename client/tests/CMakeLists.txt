@@ -27,7 +27,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
     set(CCMEETING_TESTS_STANDALONE ON)
 
-    find_package(Qt6 REQUIRED COMPONENTS Core Gui Multimedia Test)
+    find_package(Qt6 REQUIRED COMPONENTS Core Gui Multimedia Network Sql Test)
 
     if(NOT TARGET spdlog::spdlog)
         include(FetchContent)
@@ -45,7 +45,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     enable_testing()
 else()
     # 作为 client/ 的子目录：Qt / spdlog / 编译选项由父工程提供
-    find_package(Qt6 REQUIRED COMPONENTS Gui Multimedia Test)
+    find_package(Qt6 REQUIRED COMPONENTS Gui Multimedia Network Sql Test)
 endif()
 
 set(CCMEETING_TEST_LIB_SOURCES
@@ -101,3 +101,22 @@ ccmeeting_add_test(test_device_catalog
     test_device_catalog.cpp
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/media/devices/device_catalog.cpp")
 target_link_libraries(test_device_catalog PRIVATE Qt6::Multimedia)
+# 连接协调器：挂起/补发/建会入会动作（纯逻辑，无网络）
+ccmeeting_add_test(test_connect_coordinator
+    test_connect_coordinator.cpp
+    "${CMAKE_CURRENT_SOURCE_DIR}/../include/features/meeting/connect_coordinator.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/features/meeting/connect_coordinator.cpp")
+target_link_libraries(test_connect_coordinator PRIVATE Qt6::Network)
+
+# 本地存储 + 会议记录：临时 SQLite（QStandardPaths 测试模式）
+ccmeeting_add_test(test_local_store
+    test_local_store.cpp
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/core/storage.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/data/meeting_history.cpp")
+target_link_libraries(test_local_store PRIVATE Qt6::Sql)
+# 主题令牌：颜色有效 / 对比度 / 灰调 / hover 区分度
+ccmeeting_add_test(test_theme_tokens
+    test_theme_tokens.cpp)
+target_include_directories(test_theme_tokens PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/../include")
+target_link_libraries(test_theme_tokens PRIVATE Qt6::Gui)
