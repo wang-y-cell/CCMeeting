@@ -723,3 +723,25 @@ QRadioButton::indicator:checked {
     background: @primary;
     border: 4px solid @surface;
 }
+/* ---------- 主题选择：窗口缩略图按钮（选中态描主色）---------- */
+QToolButton#themeSystem,
+QToolButton#themeLight,
+QToolButton#themeDark {
+    background-color: transparent;
+    border: 2px solid transparent;
+    border-radius: 12px;
+    padding: 4px;
+}
+
+QToolButton#themeSystem:hover,
+QToolButton#themeLight:hover,
+QToolButton#themeDark:hover {
+    border-color: @borderStrong;
+}
+
+QToolButton#themeSystem:checked,
+QToolButton#themeLight:checked,
+QToolButton#themeDark:checked {
+    border-color: @primary;
+    background-color: @hover;
+}

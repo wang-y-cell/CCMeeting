@@ -1,5 +1,7 @@
 #include "ui/pages/settings_page_ui.h"
 
+#include "ui/composites/theme_thumbnail.h"
+
 #include <QCheckBox>
 #include <QComboBox>
 #include <QFrame>
@@ -12,6 +14,7 @@
 #include <QProgressBar>
 #include <QPushButton>
 #include <QRadioButton>
+#include <QToolButton>
 #include <QScrollArea>
 #include <QStackedWidget>
 #include <QVBoxLayout>
@@ -259,19 +262,38 @@ void ui::SettingsPageUi::setupUi(QWidget *parent) {
     videoAutoPreview->setObjectName(QStringLiteral("videoAutoPreview"));
     generalForm->addRow(QString(), videoAutoPreview);
 
-    // 主题：跟随系统 / 浅色 / 深色（立即生效并持久化到 Storage 的 ui/theme）
+    // 主题：跟随系统 / 浅色 / 深色（纯图标缩略图，立即生效并持久化）
     auto *themeRow = new QWidget(generalPage);
     themeRow->setObjectName(QStringLiteral("themeRow"));
     auto *themeLayout = new QHBoxLayout(themeRow);
     themeLayout->setContentsMargins(0, 0, 0, 0);
-    themeLayout->setSpacing(16);
+    themeLayout->setSpacing(12);
 
-    themeSystem = new QRadioButton(QObject::tr("跟随系统"), themeRow);
-    themeSystem->setObjectName(QStringLiteral("themeSystem"));
-    themeLight = new QRadioButton(QObject::tr("浅色"), themeRow);
-    themeLight->setObjectName(QStringLiteral("themeLight"));
-    themeDark = new QRadioButton(QObject::tr("深色"), themeRow);
-    themeDark->setObjectName(QStringLiteral("themeDark"));
+    const auto make_theme_button = [themeRow](const QString &name,
+                                              ui::Theme theme, bool split,
+                                              const QString &tooltip) {
+        auto *button = new QToolButton(themeRow);
+        button->setObjectName(name);
+        button->setCheckable(true);
+        button->setAutoExclusive(true);
+        button->setCursor(Qt::PointingHandCursor);
+        button->setToolTip(tooltip);
+        button->setAccessibleName(tooltip);
+        button->setIcon(ui::theme_thumbnail(theme, split));
+        button->setIconSize(QSize(76, 54));
+        button->setFixedSize(92, 68);
+        return button;
+    };
+
+    themeSystem = make_theme_button(
+        QStringLiteral("themeSystem"), ui::Theme::Dark, true,
+        QObject::tr("跟随系统"));
+    themeLight = make_theme_button(
+        QStringLiteral("themeLight"), ui::Theme::Light, false,
+        QObject::tr("浅色（灰色调）"));
+    themeDark = make_theme_button(
+        QStringLiteral("themeDark"), ui::Theme::Dark, false,
+        QObject::tr("深色"));
     themeSystem->setChecked(true);
 
     themeLayout->addWidget(themeSystem);

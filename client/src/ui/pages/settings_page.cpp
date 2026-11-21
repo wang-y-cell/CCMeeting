@@ -34,6 +34,7 @@
 #include <QStyleHints>
 #include <QSignalBlocker>
 #include <QRadioButton>
+#include <QToolButton>
 #include <QStyle>
 #include "config/preferences.h"
 #include "ui/foundation/theme_manager.h"
@@ -175,17 +176,17 @@ ui::SettingsPage::SettingsPage(QWidget *parent) : Page(parent) {
                          ui::ThemeManager::name_of(theme.theme()).toStdString());
         };
         if (ui->themeSystem) {
-            connect(ui->themeSystem, &QRadioButton::toggled, this, [apply_mode](bool on) {
+            connect(ui->themeSystem, &QToolButton::toggled, this, [apply_mode](bool on) {
                 if (on) apply_mode(QStringLiteral("system"));
             });
         }
         if (ui->themeLight) {
-            connect(ui->themeLight, &QRadioButton::toggled, this, [apply_mode](bool on) {
+            connect(ui->themeLight, &QToolButton::toggled, this, [apply_mode](bool on) {
                 if (on) apply_mode(QStringLiteral("light"));
             });
         }
         if (ui->themeDark) {
-            connect(ui->themeDark, &QRadioButton::toggled, this, [apply_mode](bool on) {
+            connect(ui->themeDark, &QToolButton::toggled, this, [apply_mode](bool on) {
                 if (on) apply_mode(QStringLiteral("dark"));
             });
         }
@@ -592,7 +593,7 @@ void ui::SettingsPage::reloadFromConfig() {
         const QString mode = s.value(QStringLiteral("ui/theme"),
                                      QStringLiteral("system"))
                                  .toString();
-        QRadioButton *target = ui->themeSystem;
+        QToolButton *target = ui->themeSystem;
         if (mode == QLatin1String("light")) {
             target = ui->themeLight;
         } else if (mode == QLatin1String("dark")) {
