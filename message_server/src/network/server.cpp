@@ -18,6 +18,12 @@ void Server::set_connection_handler(ConnectionHandler handler) {
     _connection_handler = std::move(handler);
 }
 
+uint16_t Server::local_port() const {
+    boost::system::error_code ec;
+    const auto endpoint = _acceptor.local_endpoint(ec);
+    return ec ? 0 : endpoint.port();
+}
+
 void Server::start() {
     spdlog::info("server started accepting connections");
     do_accept();
