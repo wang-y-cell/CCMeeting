@@ -19,6 +19,15 @@
 #include "ui/foundation/window_effects.h"
 #include "ui/foundation/theme_manager.h"
 #include "ui/foundation/window_behavior.h"
+#include "media/devices/mic_test_service.h"
+#include "media/devices/device_catalog.h"
+#include <QAudioDevice>
+#include <QAudioFormat>
+#include <QEventLoop>
+#include <QMediaDevices>
+#include <QAudioSource>
+#include <QIODevice>
+#include <QTimer>
 #include "media/recording/meeting_recorder.h"
 #include "ui/pages/meeting_settings_popup.h"
 #include "ui/pages/meeting_window.h"
@@ -52,6 +61,8 @@
 #include <QCameraDevice>
 #include <QElapsedTimer>
 #include <QMediaDevices>
+#include <QAudioSource>
+#include <QIODevice>
 #include <QEventLoop>
 #include <QFileInfo>
 #include <QMediaPlayer>
@@ -1801,6 +1812,155 @@ int run_window_behavior_selftest() {
 }
 
 }  // namespace// ---------------------------------------------------------------------------
+// 麦克风测试自检：列出输入设备与格式，跑 2 秒看是否收到电平事件
+// 用法：UiPreview.exe --mic-selftest
+// ---------------------------------------------------------------------------
+namespace {
+
+int run_mic_selftest() {
+    QCoreApplication::setApplicationName(QStringLiteral("CCMeeting"));
+    DeviceCatalog catalog;
+    const QList<QAudioDevice> mics = catalog.audio_devices();
+    std::printf("[mic] 输入设备数=%d\n", static_cast<int>(mics.size()));
+    for (const QAudioDevice &mic : mics) {
+        const QAudioFormat preferred = mic.preferredFormat();
+        QString formats;
+        for (const QAudioFormat::SampleFormat sf : mic.supportedSampleFormats()) {
+            formats += QString::number(static_cast<int>(sf)) + QStringLiteral(",");
+        }
+        std::printf(
+            "[mic] name=%s id=%s rate=%d ch=%d preferredSampleFormat=%d supported=[%s]\n",
+            mic.description().toUtf8().constData(), mic.id().constData(),
+            preferred.sampleRate(), preferred.channelCount(),
+            static_cast<int>(preferred.sampleFormat()),
+            formats.toUtf8().constData());
+    }
+    if (mics.isEmpty()) {
+        std::printf("[mic] 结论: FAIL（无输入设备）\n");
+        return 1;
+    }
+
+    // 合成波形校验：Float 与 Int16 各一段 0.5 幅度正弦，电平应落在合理区间
+    auto make_sine_int16 = [](int samples, int channels) {
+        QByteArray raw(samples * channels * 2, Qt::Uninitialized);
+        auto *out = reinterpret_cast<qint16 *>(raw.data());
+        for (int i = 0; i < samples * channels; ++i) {
+            out[i] = static_cast<qint16>(
+                16384.0 * std::sin(2.0 * M_PI * 440.0 * i / 48000.0));
+        }
+        return raw;
+    };
+    auto make_sine_float = [](int samples, int channels) {
+        QByteArray raw(samples * channels * 4, Qt::Uninitialized);
+        auto *out = reinterpret_cast<float *>(raw.data());
+        for (int i = 0; i < samples * channels; ++i) {
+            out[i] = static_cast<float>(
+                0.5 * std::sin(2.0 * M_PI * 440.0 * i / 48000.0));
+        }
+        return raw;
+    };
+
+    QAudioFormat int16_format;
+    int16_format.setSampleRate(48000);
+    int16_format.setChannelCount(2);
+    int16_format.setSampleFormat(QAudioFormat::Int16);
+    QAudioFormat float_format = int16_format;
+    float_format.setSampleFormat(QAudioFormat::Float);
+    const int int16_level = MicTestService::level_percent(
+        make_sine_int16(4800, 2), int16_format);
+    const int float_level = MicTestService::level_percent(
+        make_sine_float(4800, 2), float_format);
+    std::printf("[mic] 合成波形 Int16=%d Float=%d\n", int16_level, float_level);
+    const bool synth_ok = int16_level >= 40 && int16_level <= 100 &&
+                          float_level >= 40 && float_level <= 100;
+
+    // 逐个设备抓 1 秒原始数据，确认是否真的是静音（而不是算法问题）
+    for (const QAudioDevice &mic : mics) {
+        QAudioSource raw_source(mic, mic.preferredFormat());
+        QIODevice *raw_io = raw_source.start();
+        if (raw_io == nullptr) {
+            std::printf("[mic] raw name=%s open=FAIL error=%d\n",
+                        mic.description().toUtf8().constData(),
+                        static_cast<int>(raw_source.error()));
+            continue;
+        }
+        QByteArray captured;
+        QEventLoop raw_loop;
+        QTimer raw_timer;
+        raw_timer.setInterval(50);
+        QObject::connect(&raw_timer, &QTimer::timeout, [&]() {
+            captured += raw_io->readAll();
+        });
+        raw_timer.start();
+        QTimer::singleShot(1000, &raw_loop, &QEventLoop::quit);
+        raw_loop.exec();
+        raw_timer.stop();
+        raw_source.stop();
+
+        const QAudioFormat format = raw_source.format();
+        double max_abs = 0.0;
+        int nonzero = 0;
+        const int bps = format.bytesPerSample();
+        const int count = bps > 0 ? captured.size() / bps : 0;
+        for (int i = 0; i < count; ++i) {
+            double value = 0.0;
+            const char *p = captured.constData() + static_cast<std::ptrdiff_t>(i) * bps;
+            if (format.sampleFormat() == QAudioFormat::Float) {
+                float f = 0.0F;
+                std::memcpy(&f, p, sizeof(f));
+                value = f;
+            } else if (format.sampleFormat() == QAudioFormat::Int16) {
+                qint16 s = 0;
+                std::memcpy(&s, p, sizeof(s));
+                value = s / 32768.0;
+            } else if (format.sampleFormat() == QAudioFormat::Int32) {
+                qint32 s = 0;
+                std::memcpy(&s, p, sizeof(s));
+                value = s / 2147483648.0;
+            } else if (format.sampleFormat() == QAudioFormat::UInt8) {
+                value = (static_cast<int>(static_cast<quint8>(*p)) - 128) / 128.0;
+            }
+            max_abs = qMax(max_abs, std::fabs(value));
+            if (std::fabs(value) > 1e-6) {
+                ++nonzero;
+            }
+        }
+        std::printf("[mic] raw name=%s bytes=%d samples=%d nonzero=%d maxAbs=%.6f\n",
+                    mic.description().toUtf8().constData(), captured.size(), count,
+                    nonzero, max_abs);
+    }
+
+    MicTestService service;
+    int levels = 0;
+    int max_level = 0;
+    QString error;
+    QObject::connect(&service, &MicTestService::levelChanged, [&](int percent) {
+        ++levels;
+        max_level = qMax(max_level, percent);
+    });
+    QObject::connect(&service, &MicTestService::errorOccurred,
+                     [&](const QString &message) { error = message; });
+
+    QEventLoop loop;
+    QTimer::singleShot(2000, &loop, &QEventLoop::quit);
+    service.start(QString::fromUtf8(mics.first().id()));
+    loop.exec();
+    const bool running = service.running();
+    service.stop();
+
+    std::printf("[mic] 运行=%d 电平事件=%d 最大电平=%d 错误=%s\n",
+                running ? 1 : 0, levels, max_level,
+                error.toUtf8().constData());
+    if (max_level == 0) {
+        std::printf("[mic] 提示: 采集到的是静音（测试期间请对着麦克风说话；"
+                    "若仍为 0，检查 Windows 隐私设置与麦克风静音键）\n");
+    }
+    const bool ok = error.isEmpty() && levels > 0 && synth_ok;
+    std::printf("[mic] 结论: %s\n", ok ? "PASS" : "FAIL");
+    return ok ? 0 : 1;
+}
+
+}  // namespace// ---------------------------------------------------------------------------
 // 拖动节流自检：连续 200 个 move 事件应被合并，最终位置准确
 // 用法：UiPreview.exe --move-throttle-selftest
 // ---------------------------------------------------------------------------
@@ -2035,6 +2195,10 @@ int main(int argc, char *argv[]) {
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--window-behavior-selftest")) {
         return run_window_behavior_selftest();
+    }
+    if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
+                        QStringLiteral("--mic-selftest")) {
+        return run_mic_selftest();
     }
     if (argc > 1 && QString::fromLocal8Bit(argv[1]) ==
                         QStringLiteral("--device-menu-selftest")) {
