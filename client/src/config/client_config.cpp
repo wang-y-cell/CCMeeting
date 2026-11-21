@@ -94,6 +94,8 @@ bool ClientConfig::loadFromJsonObject(const QJsonObject& root) {
             meeting.value(QStringLiteral("host")).toString(meeting_server_.host);
         meeting_server_.port =
             meeting.value(QStringLiteral("port")).toInt(meeting_server_.port);
+        meeting_server_.tls =
+            meeting.value(QStringLiteral("tls")).toBool(meeting_server_.tls);
     }
 
     if (const QJsonObject webrtc = root.value(QStringLiteral("webrtc")).toObject();
@@ -141,6 +143,7 @@ QJsonObject ClientConfig::toJsonObject() const {
     QJsonObject meeting;
     meeting.insert(QStringLiteral("host"), meeting_server_.host);
     meeting.insert(QStringLiteral("port"), meeting_server_.port);
+    meeting.insert(QStringLiteral("tls"), meeting_server_.tls);
     root.insert(QStringLiteral("meeting_server"), meeting);
 
     QJsonObject webrtc;

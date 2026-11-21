@@ -4,11 +4,14 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/root/code/build/server/message_server
-ExecStart=/root/code/build/server/message_server/CloudMeetingServer
+WorkingDirectory=/root/code/build/server-wss/message_server
+ExecStart=/root/code/build/server-wss/message_server/CloudMeetingServer
 Restart=always
 RestartSec=2
 LimitNOFILE=65535
+    # nginx stream 在 8888 终止 TLS，后端只监听本机
+    Environment=CCMEETING_SIGNAL_BIND=127.0.0.1
+    Environment=CCMEETING_SIGNAL_PORT=8889
 
 [Install]
 WantedBy=multi-user.target

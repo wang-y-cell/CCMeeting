@@ -1,4 +1,6 @@
 #include "protocol/network_manager.h"
+
+#include "config/client_config.h"
 #include "protocol/connection.h"
 #include "protocol/message_hub.h"
 #include <QMetaObject>
@@ -58,6 +60,8 @@ bool NetworkManager::connect_to_server(const QString &ip, const QString &port,
     /// 新连接前确保旧发送线程已退出，再启动新世代发送线程
     if (hub_) //如果消息中心不为空，则停止发送线程
         hub_->stop_send_worker();
+    // 生产配置默认 wss；本地联调可在 client.json 设 meeting_server.tls=false
+    connection_->setUseTls(ClientConfig::instance().meeting_server().tls);
     const bool ok = connection_->connectToServer(ip, port); //连接到服务器
     if (ok && hub_) //如果连接成功，则启动发送线程
         hub_->start_send_worker();

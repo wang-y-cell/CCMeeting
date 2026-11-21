@@ -57,6 +57,7 @@ private slots:
         QJsonObject meeting;
         meeting.insert(QStringLiteral("host"), QStringLiteral("10.1.2.3"));
         meeting.insert(QStringLiteral("port"), 9999);
+        meeting.insert(QStringLiteral("tls"), false);
 
         QJsonObject video;
         video.insert(QStringLiteral("width"), 1280);
@@ -93,6 +94,7 @@ private slots:
         QCOMPARE(config.auth().login_path, QStringLiteral("/v2/login"));
         QCOMPARE(config.meeting_server().host, QStringLiteral("10.1.2.3"));
         QCOMPARE(config.meeting_server().port, 9999);
+        QCOMPARE(config.meeting_server().tls, false);
         QCOMPARE(config.webrtc().janus_ws_url,
                  QStringLiteral("ws://janus.example:8188"));
         QCOMPARE(config.webrtc().video.width, 1280);

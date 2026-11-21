@@ -46,6 +46,9 @@ public:
     void disconnectFromHost();
     /** @brief 是否在意外断开时自动重连（默认开启） */
     void setAutoReconnect(bool enabled) { m_autoReconnect = enabled; }
+    /** @brief 是否用 wss 连接（默认 ws，生产由 NetworkManager 按配置设置） */
+    void setUseTls(bool enabled) { m_useTls = enabled; }
+    bool useTls() const { return m_useTls; }
     bool autoReconnect() const { return m_autoReconnect; }
     /** @brief 同步销毁 socket（析构/强制停止用） */
     void stopImmediately();
@@ -124,6 +127,7 @@ private:
     QTimer *m_heartbeatTimer = nullptr;   ///< 5s 发一次 ping
     qint64 m_lastPongMs = 0;              ///< 最近一次 pong 时间
     bool m_autoReconnect = true;          ///< 意外断开是否自动重连
+    bool m_useTls = false;                ///< 是否 wss
     bool m_userDisconnect = false;        ///< 主动断开：不触发重连
     bool m_closing = false;               ///< destroySocket 正在进行，忽略回调
     QString m_lastIp;                     ///< 最近连接地址（重连用）

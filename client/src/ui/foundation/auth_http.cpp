@@ -1,31 +1,11 @@
 #include "ui/foundation/auth_http.h"
 
 #include "config/client_config.h"
-
-#include <QFile>
-#include <QSslCertificate>
-#include <QSslSocket>
+#include "config/tls_config.h"
 
 namespace ui {
 
-QSslConfiguration ssl_config() {
-    QSslConfiguration config = QSslConfiguration::defaultConfiguration();
-
-    QFile file(QStringLiteral(":/ui/tls/server-cert.pem"));
-    if (file.open(QIODevice::ReadOnly)) {
-        const QList<QSslCertificate> certs =
-            QSslCertificate::fromData(file.readAll(), QSsl::Pem);
-        for (const QSslCertificate &cert : certs) {
-            if (!cert.isNull()) {
-                config.addCaCertificate(cert);
-            }
-        }
-    }
-
-    // 必须校验对端证书：内置 CA 只是让自签证书被信任，不是关闭校验
-    config.setPeerVerifyMode(QSslSocket::VerifyPeer);
-    return config;
-}
+QSslConfiguration ssl_config() { return config::tls_config(); }
 
 QUrl auth_url(const QString &path) {
     const auto &auth = ClientConfig::instance().auth();

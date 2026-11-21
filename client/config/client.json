@@ -11,7 +11,8 @@
   },
   "meeting_server": {
     "host": "8.153.155.18",
-    "port": 8888
+    "port": 8888,
+    "tls": true
   },
   "webrtc": {
     "janus_ws_url": "ws://8.153.155.18:8188/",

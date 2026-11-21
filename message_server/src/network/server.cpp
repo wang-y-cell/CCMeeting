@@ -4,10 +4,11 @@
 
 namespace network {
 
-Server::Server(io_context& io_ctx, uint16_t port)
+Server::Server(io_context& io_ctx, uint16_t port, const std::string& host)
     : _io_ctx(io_ctx),
-      _acceptor(io_ctx, tcp::endpoint(tcp::v4(), port)) {
-    spdlog::info("server listening on port {}", port);
+      _acceptor(io_ctx, tcp::endpoint(
+          boost::asio::ip::make_address(host), port)) {
+    spdlog::info("server listening on {}:{}", host, port);
 }
 
 Server::~Server() {

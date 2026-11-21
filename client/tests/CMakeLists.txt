@@ -141,6 +141,7 @@ ccmeeting_add_test(test_chat_controller
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/user_session.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/media/avatar_service.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/foundation/auth_http.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/tls_config.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/client_config.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/preferences.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/core/storage.cpp"
@@ -160,6 +161,7 @@ ccmeeting_add_test(test_network_reliability
     test_network_reliability.cpp
     "${CMAKE_CURRENT_SOURCE_DIR}/../include/protocol/connection.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/protocol/connection.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/tls_config.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../include/protocol/message_hub.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/protocol/message_hub.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/protocol/message.cpp"
@@ -173,6 +175,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 ccmeeting_add_test(test_auth_http
     test_auth_http.cpp
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/foundation/auth_http.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/tls_config.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/client_config.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../resource.qrc")
 target_link_libraries(test_auth_http PRIVATE Qt6::Network)

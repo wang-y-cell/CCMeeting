@@ -39,6 +39,7 @@ struct AuthConfigData {
 struct MeetingServerConfig {
     QString host = QStringLiteral("127.0.0.1");
     int port = 8888;
+    bool tls = true;   ///< true: wss，false: ws（仅限本地开发）
 };
 
 class ClientConfig {

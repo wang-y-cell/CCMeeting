@@ -1,5 +1,6 @@
 #include "protocol/connection.h"
 
+#include "config/tls_config.h"
 #include "protocol/message_hub.h"
 
 #include <QAbstractSocket>
@@ -35,7 +36,8 @@ bool Connection::connectToServer(const QString &ip, const QString &port) {
     m_lastIp = ip;
     m_lastPort = port;
     m_userDisconnect = false;
-    spdlog::info("[Connection] connectToServer ws://{}:{}", ip.toUtf8().constData(),
+    const char *scheme = m_useTls ? "wss" : "ws";
+    spdlog::info("[Connection] connectToServer {}://{}:{}", scheme, ip.toUtf8().constData(),
                  port.toUtf8().constData());
 
     bool ok = false;
@@ -56,7 +58,8 @@ bool Connection::connectToServer(const QString &ip, const QString &port) {
 }
 
 bool Connection::connectOnIoThread(const QString &ip, const QString &port) {
-    spdlog::info("[Connection] IO connect ws://{}:{} tid={}",
+    spdlog::info("[Connection] IO connect {}://{}:{} tid={}",
+                 (m_useTls ? "wss" : "ws"),
                  ip.toUtf8().constData(), port.toUtf8().constData(),
                  reinterpret_cast<quintptr>(QThread::currentThreadId()));
 
@@ -89,7 +92,13 @@ bool Connection::connectOnIoThread(const QString &ip, const QString &port) {
         loop.quit();
     });
 
-    m_socket->open(QUrl(QStringLiteral("ws://%1:%2").arg(ip).arg(port)));
+    if (m_useTls) {
+        m_socket->setSslConfiguration(config::tls_config());
+    }
+    m_socket->open(QUrl(QStringLiteral("%1://%2:%3")
+                            .arg(m_useTls ? QStringLiteral("wss")
+                                          : QStringLiteral("ws"),
+                                 ip, port)));
     timeout.start(5000);
     loop.exec();
 
@@ -170,7 +179,8 @@ void Connection::tryReconnect() {
         if (m_userDisconnect || !m_autoReconnect) {
             return;
         }
-        spdlog::warn("[Connection] 第 {} 次重连 ws://{}:{}", m_reconnectAttempt,
+        spdlog::warn("[Connection] 第 {} 次重连 {}://{}:{}", m_reconnectAttempt,
+                     (m_useTls ? "wss" : "ws"),
                      m_lastIp.toUtf8().constData(),
                      m_lastPort.toUtf8().constData());
         if (connectOnIoThread(m_lastIp, m_lastPort)) {
