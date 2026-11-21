@@ -8,6 +8,7 @@ class QLineEdit;
 class QPushButton;
 class QScrollArea;
 class QTextEdit;
+class QToolButton;
 class QWidget;
 
 /** 修改资料弹窗纯 UI，不含业务逻辑 */
@@ -18,6 +19,7 @@ public:
     QLineEdit *nicknameEdit = nullptr;
     QComboBox *genderCombo = nullptr;
     QDateEdit *birthdayEdit = nullptr;
+    QToolButton *birthdayPickBtn = nullptr;  ///< 打开日历
     QLabel *ageValue = nullptr;
     QLineEdit *addressEdit = nullptr;
     QLineEdit *phoneEdit = nullptr;

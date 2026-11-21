@@ -3,6 +3,7 @@
 #include "ui/foundation/theme_manager.h"
 
 #include "ui/dialogs/avatar_crop_dialog.h"
+#include "ui/composites/calendar_popup.h"
 #include "media/avatar_service.h"
 #include "config/client_config.h"
 #include "config/user_session.h"
@@ -22,6 +23,7 @@
 #include <QNetworkRequest>
 #include <QPushButton>
 #include <QTextEdit>
+#include <QToolButton>
 #include <QUrl>
 
 namespace {
@@ -78,6 +80,21 @@ ui::EditProfileDialog::EditProfileDialog(QWidget *parent)
     connect(ui.cancelBtn, &QPushButton::clicked, this, &QDialog::reject);
     connect(ui.birthdayEdit, &QDateEdit::dateChanged, this,
             &ui::EditProfileDialog::refreshAgeLabel);
+    connect(ui.birthdayPickBtn, &QToolButton::clicked, this, [this]() {
+        auto *popup = new ui::CalendarPopup(this);
+        popup->setAttribute(Qt::WA_DeleteOnClose);
+        const QDate minimum = ui.birthdayEdit->minimumDate();
+        const QDate current = ui.birthdayEdit->date();
+        popup->setDate(current > minimum ? current : QDate(2000, 1, 1));
+        connect(popup, &ui::CalendarPopup::date_selected, this,
+                [this](const QDate &date) { ui.birthdayEdit->setDate(date); });
+        connect(popup, &ui::CalendarPopup::cleared, this,
+                [this]() { ui.birthdayEdit->setDate(ui.birthdayEdit->minimumDate()); });
+        const QPoint anchor = ui.birthdayPickBtn->mapToGlobal(
+            QPoint(0, ui.birthdayPickBtn->height() + 6));
+        popup->move(anchor);
+        popup->show();
+    });
 }
 
 void ui::EditProfileDialog::refreshAgeLabel() {

@@ -18,6 +18,8 @@
 
     <qresource prefix="/ui/icons">
         <file alias="calendar.svg">resources/icons/calendar.svg</file>
+    <file alias="chevron-left.svg">resources/icons/chevron-left.svg</file>
+    <file alias="chevron-right.svg">resources/icons/chevron-right.svg</file>
         <file alias="camera-off.svg">resources/icons/camera-off.svg</file>
         <file alias="camera.svg">resources/icons/camera.svg</file>
         <file alias="hangup.svg">resources/icons/hangup.svg</file>
@@ -59,6 +61,7 @@
         <file alias="source/stack_recordings.qss">src/ui/theme/stack_recordings.qss</file>
         <file alias="source/recording_playback_dialog.qss">src/ui/theme/recording_playback_dialog.qss</file>
         <file alias="source/edit_profile_dialog.qss">src/ui/theme/edit_profile_dialog.qss</file>
+    <file alias="source/calendar_popup.qss">src/ui/theme/calendar_popup.qss</file>
         <file alias="source/avatar_crop_dialog.qss">src/ui/theme/avatar_crop_dialog.qss</file>
     </qresource>
 

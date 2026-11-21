@@ -1,5 +1,8 @@
 #include "ui/dialogs/edit_profile_dialog_ui.h"
 
+#include "ui/foundation/icon_provider.h"
+#include "ui/foundation/theme_manager.h"
+
 #include <QComboBox>
 #include <QDate>
 #include <QDateEdit>
@@ -11,6 +14,7 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QTextEdit>
+#include <QToolButton>
 #include <QVBoxLayout>
 
 void EditProfileDialogUi::setupUi(QWidget *parent) {
@@ -86,6 +90,24 @@ void EditProfileDialogUi::setupUi(QWidget *parent) {
     birthdayEdit->setMaximumDate(QDate::currentDate());
     birthdayEdit->setSpecialValueText(QObject::tr("未设置"));
     birthdayEdit->setDate(birthdayEdit->minimumDate());
+    birthdayEdit->setToolTip(QObject::tr("可以直接输入，或点右侧日历选择"));
+
+    // 日历入口：QDateEdit 自带下拉箭头太隐蔽，单独给一个看得见的日历按钮
+    birthdayPickBtn = new QToolButton(scrollContent);
+    birthdayPickBtn->setObjectName(QStringLiteral("birthdayPickBtn"));
+    birthdayPickBtn->setToolTip(QObject::tr("选择生日"));
+    birthdayPickBtn->setCursor(Qt::PointingHandCursor);
+    birthdayPickBtn->setFixedSize(38, 38);
+    birthdayPickBtn->setIcon(ui::IconProvider::instance().icon(
+        QStringLiteral("calendar"),
+        ui::ThemeManager::instance().color(QStringLiteral("icon")), 18));
+    birthdayPickBtn->setIconSize(QSize(18, 18));
+
+    auto *birthdayRow = new QHBoxLayout();
+    birthdayRow->setContentsMargins(0, 0, 0, 0);
+    birthdayRow->setSpacing(8);
+    birthdayRow->addWidget(birthdayEdit, 1);
+    birthdayRow->addWidget(birthdayPickBtn);
 
     ageValue = new QLabel(QStringLiteral("-"), scrollContent);
     ageValue->setObjectName(QStringLiteral("ageValue"));
@@ -118,7 +140,7 @@ void EditProfileDialogUi::setupUi(QWidget *parent) {
                  genderCombo);
     form->addRow(makeFieldLabel(QStringLiteral("fieldLabelBirthday"),
                                  QObject::tr("生日")),
-                 birthdayEdit);
+                 birthdayRow);
     form->addRow(makeFieldLabel(QStringLiteral("fieldLabelAge"),
                                  QObject::tr("年龄")),
                  ageValue);
