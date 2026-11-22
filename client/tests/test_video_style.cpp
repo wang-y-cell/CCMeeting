@@ -6,22 +6,22 @@
  * @brief 画面样式预设的单元测试
  *
  * 这些预设是「头像/视频怎么摆」的唯一来源：成员小窗头像固定 72×72、
- * 主画面头像占内容区高度 10%、视频等比铺满。改动它们会直接改变会议界面
+ * 主画面头像占内容区高度 10%、视频等比填充并居中裁剪。改动它们会直接改变会议界面
  * 的观感，因此用测试把语义钉住（纯头文件，不依赖 OpenGL/xrtc）。
  */
 class TestVideoStyle : public QObject {
     Q_OBJECT
 
 private slots:
-    void video_preset_fits_aspect();
+    void video_preset_covers_aspect();
     void member_avatar_is_fixed_72_centered();
     void main_avatar_uses_height_fraction();
     void equality_compares_all_fields();
 };
 
-void TestVideoStyle::video_preset_fits_aspect() {
+void TestVideoStyle::video_preset_covers_aspect() {
     const VideoStyle style = VideoStyles::video();
-    QCOMPARE(style.mode, DrawMode::FitWidgetSmooth);
+    QCOMPARE(style.mode, DrawMode::CoverWidget);
     QCOMPARE(style.alignment, Qt::Alignment(Qt::AlignCenter));
     QVERIFY(!style.fixedOutputSize.isValid());
 }
