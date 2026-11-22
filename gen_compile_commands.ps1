@@ -16,8 +16,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$root = Split-Path -Parent $MyInvocation.MyCommand.Path
-Set-Location $root
+$root = Split-Path -Parent $MyInvocation.MyCommand.Path # 获得当前执行脚本的绝对路径
+Set-Location $root # 切换工作目录
 
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 $vs = & $vswhere -latest -products * `

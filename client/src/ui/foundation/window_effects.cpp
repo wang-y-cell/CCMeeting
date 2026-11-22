@@ -107,6 +107,25 @@ public:
 
 }  // namespace
 
+bool disable_rounded_corners(QWidget *window) {
+    if (window == nullptr) {
+        return false;
+    }
+#ifdef Q_OS_WIN
+    const HWND hwnd = reinterpret_cast<HWND>(window->winId());
+    if (hwnd != nullptr) {
+        // DWMWCP_DONOTROUND = 1
+        const int preference = 1;
+        const HRESULT result = ::DwmSetWindowAttribute(
+            hwnd, kDwmWindowCornerPreference, &preference, sizeof(preference));
+        window->clearMask();
+        return SUCCEEDED(result);
+    }
+#endif
+    window->clearMask();
+    return false;
+}
+
 bool query_rounded_corners(QWidget *window) {
 #ifdef Q_OS_WIN
     if (window == nullptr) {

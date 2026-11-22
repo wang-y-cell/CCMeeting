@@ -8,18 +8,17 @@
 
 class QLabel;
 class QMouseEvent;
+class QPaintEvent;
 class QResizeEvent;
-class QVBoxLayout;
 class VideoGLWidget;
 
 /**
- * @brief 会议侧边栏的成员卡片：画面（头像 / 视频）+ 昵称，点击选中
+ * @brief 会议侧边栏的成员卡片：16:9 画面（头像 / 视频）+ 左下角昵称
  *
- * 合并了原来的 `Partner`（数据）+ `PartnerTile`（视图）：一个成员只有一个对象，
- * 不再有双向指针、`setParent` 技巧与"转发给卡片"的空方法。
- *
- * - 头像由 `ParticipantsController` 统一加载（裁圆）后经 `showAvatar()` 传入；
- * - 布局只有 `set_video_mode()` 一个入口（头像 72×72 居中 / 视频铺满）。
+ * - 画面统一 16:9，视频用 cover 填满（不拉伸、不留黑边）；
+ * - 卡片圆角、视频直角，视频四周留白避免被卡片圆角裁到；
+ * - 昵称浮在画面左下角，半透明底色保证对比度；
+ * - 说话时由 set_speaking() 点亮绿色圆角边框。
  */
 class ParticipantCard : public QWidget {
     Q_OBJECT
@@ -39,8 +38,11 @@ public:
     void set_profile(const QString &displayName, const QString &avatarUrl);
     /** @brief 显示已裁圆的头像 */
     void show_avatar(const QImage &image);
-    /** @brief 切换布局：视频铺满 / 头像 72×72 居中（唯一布局入口） */
+    /** @brief 切换内容：视频铺满 16:9 / 头像居中 */
     void set_video_mode(bool video);
+    /** @brief 当前是否正在说话（绿色边框） */
+    void set_speaking(bool speaking);
+    bool is_speaking() const { return _speaking; }
 
 signals:
     void clicked(qint64 userId);
@@ -48,18 +50,20 @@ signals:
 protected:
     void mousePressEvent(QMouseEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
+    void paintEvent(QPaintEvent *event) override;
 
 private:
     void apply_layout(bool video);
+    void update_card_geometry();
+    void position_name_label();
 
     qint64 _userId = 0;
     QString _displayName;
     QString _avatarUrl;
     VideoGLWidget *_display = nullptr;
     QLabel *_nameLabel = nullptr;
-    QVBoxLayout *_layout = nullptr;
     bool _videoMode = false;
-    int _side = 40;
+    bool _speaking = false;
 };
 
 #endif  // UI_COMPOSITES_PARTICIPANT_CARD_H

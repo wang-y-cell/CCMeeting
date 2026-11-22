@@ -43,6 +43,7 @@ private slots:
     void CreateMeeting_button_clicked(quint32 max_participants,
                                       quint32 duration_minutes);
     void JoinMeeting_button_clicked(const QString &roomNo);
+    /** @brief 判断如果连接服务器失败就关闭会议窗口*/
     void onConnectServerFinished(bool ok, QString ip, QString port,
                                  ConnectAction action);
     void onUserCardClicked();

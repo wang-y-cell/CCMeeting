@@ -21,6 +21,8 @@ namespace ui {
  * @return true 表示由 DWM 接管（Win11），false 表示用了遮罩回退
  */
 bool enable_rounded_corners(QWidget *window, int fallback_radius = 12);
+/** @brief 关闭窗口圆角（Win11 DWM + mask），会议主窗口用直角 */
+bool disable_rounded_corners(QWidget *window);
 
 /**
  * @brief 给所有弹出型窗口（QMenu / 下拉框 / Qt::Popup）自动加圆角

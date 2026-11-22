@@ -62,8 +62,10 @@ std::string tls_ca_file() {
     QDir().mkpath(dir);
     spdlog::info("[tls] pem_bytes={} dir=[{}] qdir_temp=[{}]", pem.size(),
                  to_utf8(dir), to_utf8(QDir::tempPath()));
+    //进行 SHA-256 哈希计算，并将结果转换为十六进制字符串后，截取前 16 个字符
     const QByteArray digest =
-        QCryptographicHash::hash(pem, QCryptographicHash::Sha256).toHex().left(16);
+        QCryptographicHash::hash(pem, QCryptographicHash::Sha256).toHex().left(16); 
+
     const QString path = QDir(dir)
         .filePath(QStringLiteral("ccmeeting-ca-%1.pem")
                       .arg(QString::fromLatin1(digest)));

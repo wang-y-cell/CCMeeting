@@ -4,19 +4,24 @@
 #include "media/video/video_gl_widget.h"
 #include "ui/foundation/theme_manager.h"
 
-#include <QColor>
 #include <QLabel>
 #include <QMouseEvent>
+#include <QPainter>
+#include <QPaintEvent>
 #include <QResizeEvent>
-#include <QVBoxLayout>
+
+namespace {
+constexpr int kCardHMargin = 8;
+constexpr int kCardVPadding = 8;
+constexpr int kCardRadius = 12;
+constexpr int kNameMargin = 8;
+constexpr int kVideoAspectW = 16;
+constexpr int kVideoAspectH = 9;
+constexpr int kAvatarSide = 72;
+}  // namespace
 
 ParticipantCard::ParticipantCard(qint64 userId, QWidget *parent)
     : QWidget(parent), _userId(userId) {
-    _layout = new QVBoxLayout(this);
-    _layout->setContentsMargins(2, 2, 2, 4);
-    _layout->setSpacing(2);
-
-    // 点击成员可选中：只用手型光标提示，不画描边
     setCursor(Qt::PointingHandCursor);
     // QSS 选择器沿用旧名（meeting_widget.qss: QWidget#partnerTile）
     setObjectName(QStringLiteral("partnerTile"));
@@ -24,36 +29,26 @@ ParticipantCard::ParticipantCard(qint64 userId, QWidget *parent)
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
     _display = new VideoGLWidget(this);
-    // 画面样式（头像 72 / 视频铺满）不在这里设置，随 ImgDisplay::show() 传入；
-    // 头像透明角落要和卡片底色一致，否则会出现异色方块
     _display->setClearColor(
         ui::ThemeManager::instance().color(QStringLiteral("surface")));
-    _display->setFixedSize(VideoStyles::kMemberAvatarSide,
-                           VideoStyles::kMemberAvatarSide);
     _display->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 
     _nameLabel = new QLabel(this);
-    _nameLabel->setAlignment(Qt::AlignCenter);
+    _nameLabel->setObjectName(QStringLiteral("participantNameOverlay"));
+    _nameLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    _nameLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
     _nameLabel->setWordWrap(false);
-    _nameLabel->setFixedHeight(18);
-    _nameLabel->setStyleSheet(
-        QStringLiteral("color:%1;font-size:11px;")
-            .arg(ui::ThemeManager::instance().color(QStringLiteral("icon")).name()));
+    // 半透明黑底 + 白字：浅色画面/白墙背景也能看清
+    _nameLabel->setStyleSheet(QStringLiteral(
+        "QLabel { color: #ffffff; background-color: rgba(0,0,0,150);"
+        " padding: 1px 6px; font-size: 11px; }"));
     _nameLabel->setText(fallback_label());
+    _nameLabel->raise();
 
-    // 上下留弹性：头像/视频 + 名字始终整组居中，名字不会被挤出卡片
-    _layout->addStretch(1);
-    _layout->addWidget(_display, 0, Qt::AlignCenter);
-    _layout->addWidget(_nameLabel, 0);
-    _layout->addStretch(1);
-
-    // 内容类型变化时切布局：视频铺满卡片、头像回到 72×72 居中
+    // 内容类型变化时切布局：视频铺满 16:9、头像回到 72×72 居中
     connect(_display, &VideoGLWidget::content_kind_changed, this,
             [this](bool video) { set_video_mode(video); });
 
-    // 卡片是"正方形"小窗（宽度跟随面板），头像固定 72 居中
-    _side = parent ? qMax(parent->width(), 40) : 40;
-    setFixedHeight(_side + 18);
     setToolTip(fallback_label());
     apply_layout(false);
 }
@@ -68,6 +63,7 @@ void ParticipantCard::set_profile(const QString &displayName,
     _avatarUrl = avatarUrl;
     if (_nameLabel) {
         _nameLabel->setText(fallback_label());
+        position_name_label();
     }
     setToolTip(fallback_label());
 }
@@ -76,50 +72,94 @@ void ParticipantCard::show_avatar(const QImage &image) {
     if (image.isNull()) {
         return;
     }
-    // 单次调用完成"样式 + 画面"，没有 setDrawMode→setFrame 的顺序依赖
     ImgDisplay::show(_display, image, VideoStyles::memberAvatar());
 }
 
 void ParticipantCard::set_video_mode(bool video) {
     if (_videoMode == video) {
-        return;  // 同一内容反复推帧时不重复改布局（避免卡片"跳一下"）
+        update_card_geometry();
+        return;
     }
     _videoMode = video;
     apply_layout(video);
 }
 
 void ParticipantCard::apply_layout(bool video) {
-    if (!_display || !_layout) {
+    if (!_display) {
         return;
     }
-    if (video) {
-        // 视频：显示区铺满卡片宽度。布局里有上下 stretch、item 的 stretch 为 0，
-        // 所以必须用 minimumWidth 把宽撑开，否则只会拿到 sizeHint。
-        _display->setMinimumSize(0, 0);
-        _display->setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
-        _display->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-        _display->setMinimumWidth(
-            qMax(_side - 8, VideoStyles::kMemberAvatarSide));
-        _display->setFixedHeight(
-            qMax(_side - 22, VideoStyles::kMemberAvatarSide));
-        _layout->setAlignment(_display, Qt::Alignment());
-    } else {
-        // 头像：固定 72×72 并居中
-        _display->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-        _display->setFixedSize(VideoStyles::kMemberAvatarSide,
-                               VideoStyles::kMemberAvatarSide);
-        _layout->setAlignment(_display, Qt::AlignCenter);
+    update_card_geometry();
+}
+
+void ParticipantCard::update_card_geometry() {
+    if (!_display) {
+        return;
     }
+    const int cardW = width();
+    if (cardW <= 0) {
+        return;
+    }
+
+    const int videoW = qMax(1, cardW - 2 * kCardHMargin);
+    const int videoH = qMax(1, videoW * kVideoAspectH / kVideoAspectW);
+    const int cardH = videoH + 2 * kCardVPadding;
+
+    if (height() != cardH) {
+        setFixedHeight(cardH);
+    }
+
+    if (_videoMode) {
+        _display->setGeometry(kCardHMargin, kCardVPadding, videoW, videoH);
+    } else {
+        const int side = qMin(kAvatarSide, qMin(videoW, videoH));
+        _display->setGeometry((cardW - side) / 2,
+                              kCardVPadding + (videoH - side) / 2, side, side);
+    }
+    position_name_label();
+}
+
+void ParticipantCard::position_name_label() {
+    if (!_nameLabel) {
+        return;
+    }
+    const int maxW = qMax(24, width() - 2 * kNameMargin);
+    _nameLabel->setMaximumWidth(maxW);
+    _nameLabel->adjustSize();
+    const int labelW = qMin(_nameLabel->sizeHint().width() + 12, maxW);
+    const int labelH = qMax(16, _nameLabel->sizeHint().height());
+    const int videoW = qMax(1, width() - 2 * kCardHMargin);
+    const int videoH = qMax(1, videoW * kVideoAspectH / kVideoAspectW);
+    _nameLabel->setGeometry(kNameMargin,
+                            kCardVPadding + videoH - labelH - kNameMargin,
+                            labelW, labelH);
+    _nameLabel->raise();
+}
+
+void ParticipantCard::set_speaking(bool speaking) {
+    if (_speaking == speaking) {
+        return;
+    }
+    _speaking = speaking;
+    update();
+}
+
+void ParticipantCard::paintEvent(QPaintEvent *event) {
+    QWidget::paintEvent(event);
+    if (!_speaking) {
+        return;
+    }
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    QPen pen(ui::ThemeManager::instance().color(QStringLiteral("success")), 2.0);
+    painter.setPen(pen);
+    painter.setBrush(Qt::NoBrush);
+    painter.drawRoundedRect(rect().adjusted(1, 1, -1, -1), kCardRadius,
+                            kCardRadius);
 }
 
 void ParticipantCard::resizeEvent(QResizeEvent *event) {
     QWidget::resizeEvent(event);
-    // 宽度跟随面板，卡片保持"宽=高"；头像内部固定 72 不变
-    const int newW = event->size().width();
-    if (newW > 10 && newW != _side) {
-        _side = newW;
-        setFixedHeight(_side + 18);
-    }
+    update_card_geometry();
 }
 
 void ParticipantCard::mousePressEvent(QMouseEvent *) { emit clicked(_userId); }

@@ -89,7 +89,7 @@ void ui::LoginWindow::showLoginPage() {
 }
 
 void ui::LoginWindow::Login() {
-    if (m_requestInFlight) {
+    if (m_requestInFlight) { //正在登录
         return;
     }
 

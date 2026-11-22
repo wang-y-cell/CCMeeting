@@ -395,6 +395,11 @@ QRectF VideoGLWidget::destRectForFrame(int frameW, int frameH) const {
         destW = cw;
         destH = ch;
         break;
+    case DrawMode::CoverWidget:
+        // 先铺满内容区；真正的等比裁剪由 UV 完成，避免拉伸
+        destW = cw;
+        destH = ch;
+        break;
     case DrawMode::FixedSize: {
         const QSize sz = effectiveTargetSize();
         const qreal scale = qMin(qreal(sz.width()) / frameW,
@@ -450,9 +455,26 @@ void VideoGLWidget::drawTexturedQuad(const QRectF &dest, bool yuv) {
     const float y0 = toNdcY(dest.bottom());
     const float y1 = toNdcY(dest.top());
 
+    // Cover：目标矩形铺满，但 UV 只取源帧中间的一块，做到「填充 + 不拉伸」
+    float u0 = 0.f, u1 = 1.f, v0 = 0.f, v1 = 1.f;
+    if (m_drawMode == DrawMode::CoverWidget && m_videoW > 0 && m_videoH > 0 &&
+        dest.width() > 0.0 && dest.height() > 0.0) {
+        const qreal srcAspect = qreal(m_videoW) / qreal(m_videoH);
+        const qreal dstAspect = dest.width() / dest.height();
+        if (srcAspect > dstAspect) {
+            const float visible = float(dstAspect / srcAspect);
+            u0 = (1.f - visible) * 0.5f;
+            u1 = 1.f - u0;
+        } else {
+            const float visible = float(srcAspect / dstAspect);
+            v0 = (1.f - visible) * 0.5f;
+            v1 = 1.f - v0;
+        }
+    }
+
     const float vertices[] = {
-        x0, y0, 0.f, 1.f, x1, y0, 1.f, 1.f,
-        x1, y1, 1.f, 0.f, x0, y1, 0.f, 0.f,
+        x0, y0, u0, v1, x1, y0, u1, v1,
+        x1, y1, u1, v0, x0, y1, u0, v0,
     };
 
     program->bind();

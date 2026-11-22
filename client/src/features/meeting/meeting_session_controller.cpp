@@ -127,7 +127,7 @@ void MeetingSessionController::wire_settings_panel() {
             });
 }
 void MeetingSessionController::on_create_result(int room_no) {
-    spdlog::info("[MeetingWindow] CREATE_MEETING_RESPONSE roomno={}", room_no);
+    spdlog::debug("[MeetingWindow] CREATE_MEETING_RESPONSE roomno={}", room_no);
     if (spdlog::default_logger()) {
         spdlog::default_logger()->flush();
     }

@@ -136,6 +136,13 @@ QString ParticipantsController::avatar_url(qint64 user_id) const {
     return it->second->avatar_url();
 }
 
+void ParticipantsController::set_speaking(qint64 user_id, bool speaking) {
+    const auto it = _partners.find(user_id);
+    if (it != _partners.end() && it->second) {
+        it->second->set_speaking(speaking);
+    }
+}
+
 void ParticipantsController::select_main(qint64 user_id) {
     _mainUserId = user_id;
     if (_video) {

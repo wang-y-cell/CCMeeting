@@ -20,7 +20,7 @@ void MeetingController::connect_to_server_slot(QString ip, QString port,
 
 void MeetingController::create_meeting_slot(quint32 max_participants,
                                             quint32 duration_minutes) {
-    spdlog::info(
+    spdlog::debug(
         "[MeetingController] create_meeting_slot max_participants={} "
         "duration_minutes={}",
         max_participants, duration_minutes);

@@ -45,6 +45,30 @@ void MeetingMediaView::attach() {
                 &MeetingMediaView::on_rtc_connection_lost);
         connect(observer, &MeetingRtcObserver::remote_user_left, this,
                 &MeetingMediaView::on_rtc_remote_user_left);
+        connect(observer, &MeetingRtcObserver::remote_speaking_changed, this,
+                [this](qint64 user_id, bool speaking) {
+                    if (user_id == 0 || !_host->participants()) {
+                        return;
+                    }
+                    _host->participants()->set_speaking(user_id, speaking);
+                    if (_host->participants()->main_user_id() == user_id) {
+                        _host->set_main_speaking(speaking);
+                    }
+                });
+        connect(observer, &MeetingRtcObserver::local_speaking_changed, this,
+                [this](bool speaking) {
+                    const qint64 self = _host->local_user_id();
+                    if (self == 0) {
+                        return;
+                    }
+                    if (_host->participants()) {
+                        _host->participants()->set_speaking(self, speaking);
+                    }
+                    if (!_host->participants() ||
+                        _host->participants()->main_user_id() == self) {
+                        _host->set_main_speaking(speaking);
+                    }
+                });
     }
 
     if (auto *media = _host->media()) {

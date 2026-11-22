@@ -14,6 +14,9 @@
 
 #include <QAbstractButton>
 #include <QCloseEvent>
+#include <QGridLayout>
+#include <QLabel>
+#include <QEvent>
 #include <QDateTime>
 #include <QGroupBox>
 #include <QListWidget>
@@ -85,6 +88,7 @@ ui::MeetingWindow::MeetingWindow(QWidget *parent)
     init_ui();
 
     _video = new MeetingVideo(this);
+    init_main_video_host();
     _video->bindMain(ui_.mainshow_label);
 
     // 会话装配层：网络、工作线程、控制器、协议分发不再由窗口创建
@@ -95,6 +99,7 @@ ui::MeetingWindow::MeetingWindow(QWidget *parent)
     ports.chat_input = ui_.plainTextEdit;
     ports.owner = this;
     _session = std::make_unique<app::MeetingSession>(ports);
+    init_main_overlay();
 
     // 功能模块：窗口只持有指针，逻辑在各自类里
     _connect = std::make_unique<ConnectCoordinator>(this);
@@ -108,6 +113,7 @@ ui::MeetingWindow::MeetingWindow(QWidget *parent)
     init_connect();
     init_settings_popup();
 
+    ui::disable_rounded_corners(this);
     spdlog::info("[MeetingWindow] ctor done");
     spdlog::default_logger()->flush();
 }
@@ -200,6 +206,154 @@ void ui::MeetingWindow::init_ui() {
 }
 
 // ---------------------------------------------------------------- 接线
+void ui::MeetingWindow::init_main_video_host() {
+    if (!ui_.mainshow_label || !ui_.mainshow_label->parentWidget()) {
+        return;
+    }
+    auto *parent = ui_.mainshow_label->parentWidget();
+    auto *grid = qobject_cast<QGridLayout *>(parent->layout());
+    if (!grid) {
+        return;
+    }
+    const int index = grid->indexOf(ui_.mainshow_label);
+    if (index < 0) {
+        return;
+    }
+    int row = 0, col = 0, row_span = 1, col_span = 1;
+    grid->getItemPosition(index, &row, &col, &row_span, &col_span);
+    grid->removeWidget(ui_.mainshow_label);
+
+    _mainVideoHost = new QWidget(parent);
+    _mainVideoHost->setObjectName(QStringLiteral("mainVideoHost"));
+    _mainVideoHost->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    grid->addWidget(_mainVideoHost, row, col, row_span, col_span);
+
+    ui_.mainshow_label->setParent(_mainVideoHost);
+    ui_.mainshow_label->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Ignored);
+    _mainVideoHost->installEventFilter(this);
+    update_main_video_geometry();
+}
+
+void ui::MeetingWindow::update_main_video_geometry() {
+    if (!_mainVideoHost || !ui_.mainshow_label) {
+        return;
+    }
+    const QSize area = _mainVideoHost->size();
+    if (area.width() <= 0 || area.height() <= 0) {
+        return;
+    }
+    // 主画面固定 16:9，居中；两侧/上下留背景，不拉伸到整个容器
+    int videoW = qMin(area.width(), area.height() * 16 / 9);
+    int videoH = videoW * 9 / 16;
+    if (videoH > area.height()) {
+        videoH = area.height();
+        videoW = videoH * 16 / 9;
+    }
+    ui_.mainshow_label->setGeometry((area.width() - videoW) / 2,
+                                    (area.height() - videoH) / 2, videoW,
+                                    videoH);
+    update_main_overlay();
+}
+
+void ui::MeetingWindow::init_main_overlay() {
+    if (!ui_.mainshow_label) {
+        return;
+    }
+
+    _mainNameLabel = new QLabel(ui_.mainshow_label);
+    _mainNameLabel->setObjectName(QStringLiteral("mainNameOverlay"));
+    _mainNameLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    _mainNameLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
+    _mainNameLabel->setStyleSheet(QStringLiteral(
+        "QLabel { color: #ffffff; background-color: rgba(0,0,0,150);"
+        " padding: 1px 6px; font-size: 12px; }"));
+    _mainNameLabel->hide();
+
+    _mainSpeakingBorder =
+        new QWidget(_mainVideoHost ? _mainVideoHost : ui_.mainshow_label);
+    _mainSpeakingBorder->setAttribute(Qt::WA_TransparentForMouseEvents);
+    _mainSpeakingBorder->setAttribute(Qt::WA_StyledBackground, true);
+    _mainSpeakingBorder->setStyleSheet(QStringLiteral(
+        "background: transparent; border: 2px solid rgba(34,197,94,1);"));
+    _mainSpeakingBorder->hide();
+
+    ui_.mainshow_label->installEventFilter(this);
+    if (participants()) {
+        connect(participants(), &ParticipantsController::main_changed, this,
+                [this](qint64) { update_main_overlay(); });
+    }
+    update_main_overlay();
+}
+
+void ui::MeetingWindow::update_main_overlay() {
+    if (!ui_.mainshow_label || !_mainNameLabel || !_mainSpeakingBorder) {
+        return;
+    }
+    const QRect area = ui_.mainshow_label->rect();
+    if (area.isEmpty()) {
+        return;
+    }
+
+    const qint64 main_id = participants() ? participants()->main_user_id() : 0;
+    QString name;
+    if (main_id > 0) {
+        if (main_id == UserSession::instance().userId()) {
+            // 自己通常不在远端成员表里，直接取登录会话的昵称，避免显示成 "1"
+            name = UserSession::instance().name();
+            if (name.isEmpty()) {
+                name = UserSession::instance().username();
+            }
+        } else if (participants()) {
+            name = participants()->display_name(main_id);
+        }
+    }
+    _mainNameLabel->setText(name);
+    if (name.isEmpty()) {
+        _mainNameLabel->hide();
+    } else {
+        const int margin = 10;
+        const int maxW = qMax(24, area.width() - 2 * margin);
+        _mainNameLabel->setMaximumWidth(maxW);
+        _mainNameLabel->adjustSize();
+        const int labelW = qMin(_mainNameLabel->sizeHint().width() + 12, maxW);
+        const int labelH = qMax(18, _mainNameLabel->sizeHint().height());
+        _mainNameLabel->setGeometry(margin, area.height() - labelH - margin,
+                                    labelW, labelH);
+        _mainNameLabel->show();
+        _mainNameLabel->raise();
+    }
+
+    // 边框画在主画面背后的 host 上，不覆盖 VideoGLWidget 本身
+    if (_mainSpeakingBorder->parentWidget() == _mainVideoHost) {
+        _mainSpeakingBorder->setGeometry(
+            _mainVideoHost->rect().adjusted(1, 1, -1, -1));
+    } else {
+        _mainSpeakingBorder->setGeometry(1, 1, area.width() - 2,
+                                          area.height() - 2);
+    }
+    _mainSpeakingBorder->setVisible(_mainSpeaking);
+}
+
+void ui::MeetingWindow::set_main_speaking(bool speaking) {
+    _mainSpeaking = speaking;
+    if (_mainSpeakingBorder) {
+        _mainSpeakingBorder->setVisible(speaking);
+        if (speaking) {
+            _mainSpeakingBorder->raise();
+        }
+    }
+}
+
+bool ui::MeetingWindow::eventFilter(QObject *watched, QEvent *event) {
+    if (watched == _mainVideoHost && event->type() == QEvent::Resize) {
+        update_main_video_geometry();
+    } else if (watched == ui_.mainshow_label &&
+               event->type() == QEvent::Resize) {
+        update_main_overlay();
+    }
+    return FramelessWindow<QWidget>::eventFilter(watched, event);
+}
+
 void ui::MeetingWindow::init_controllers_wiring() {
     // 成员卡片 / 资料缓存 / 主画面选择交给 ParticipantsController
     auto *tiles = participants();
@@ -422,7 +576,7 @@ void ui::MeetingWindow::apply_connect_result(bool ok, QString ip, QString port,
                                              ConnectAction action,
                                              QString room_no) {
     Q_UNUSED(room_no);
-    spdlog::info("[MeetingWindow] on_connect_finished ok={} action={} {}:{}",
+    spdlog::debug("[MeetingWindow] on_connect_finished ok={} action={} {}:{}",
                  ok, static_cast<int>(action), ip.toUtf8().constData(),
                  port.toUtf8().constData());
     if (spdlog::default_logger()) {
@@ -534,6 +688,7 @@ void ui::MeetingWindow::on_partner_exited(qint64 user_id) {
         chat()->remove_mention_tag(QStringLiteral("@") + name);
     }
     _topBar->refresh_meeting_info();
+    update_main_overlay();
 }
 
 void ui::MeetingWindow::on_camera_closed(qint64 user_id) {
@@ -552,6 +707,9 @@ void ui::MeetingWindow::on_user_profile(qint64 user_id,
                                         const QString &display_name,
                                         const QString &avatar_url) {
     participants()->apply_profile(user_id, display_name, avatar_url);
+    if (participants() && participants()->main_user_id() == user_id) {
+        update_main_overlay();
+    }
 }
 
 void ui::MeetingWindow::on_text_received(qint64 user_id, const QString &str) {

@@ -107,6 +107,17 @@ void MeetingMediaController::start(const StartOptions &options) {
         if (!_rtc) {
             spdlog::info("[MeetingMedia] create_xrtc_engine ...");
             _rtc = xrtc::create_xrtc_engine(_observer);
+            if (_rtc) {
+                // 默认 15/600ms 对轻声说话偏迟钝；降低阈值并缩短释放时间
+                xrtc::XRTCVoiceActivityConfig vad;
+                vad.talking_threshold = 8;
+                vad.release_ms = 350;
+                vad.level_interval_ms = 100;
+                _rtc->set_voice_activity_config(vad);
+                spdlog::info("[MeetingMedia] voice activity threshold={} "
+                             "release={}ms",
+                             vad.talking_threshold, vad.release_ms);
+            }
             spdlog::info("[MeetingMedia] create_xrtc_engine ok");
         }
 

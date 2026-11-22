@@ -5,6 +5,7 @@
 #include <QObject>
 #include <QString>
 
+#include <atomic>
 #include <mutex>
 #include <unordered_map>
 
@@ -47,6 +48,8 @@ public:
     void on_remote_user_left(const xrtc::XRTCRemoteUser &user) override;
     void on_remote_video_frame(uint64_t feed_id,
                                const xrtc::XRTCVideoFrame &frame) override;
+    void on_audio_level(xrtc::IXRtcMediaSource *audio_source, int level) override;
+    void on_remote_talking(uint64_t feed_id, bool talking) override;
 
 signals:
     /** @brief 本地预览帧（已合并，UI 线程） */
@@ -63,6 +66,10 @@ signals:
     void connection_lost(int state);
     /** @brief 远端用户离开（已解析成业务 userId，0 表示解析失败） */
     void remote_user_left(qint64 user_id);
+    /** @brief 远端某人说话状态变化（已解析成业务 userId） */
+    void remote_speaking_changed(qint64 user_id, bool speaking);
+    /** @brief 自己说话状态变化（本地麦克风音量阈值） */
+    void local_speaking_changed(bool speaking);
 
 private:
     void schedule_preview_emit();
@@ -80,6 +87,7 @@ private:
     bool _remoteScheduled = false;
     /** @brief remote feed_id → 业务 userId（由 display 解析） */
     QHash<uint64_t, qint64> _feedToUser;
+    std::atomic<bool> _localTalking{false};
 };
 
 #endif // MEETING_RTC_OBSERVER_H

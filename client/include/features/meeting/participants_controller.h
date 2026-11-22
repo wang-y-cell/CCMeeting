@@ -56,6 +56,9 @@ public:
     /** @brief 该成员视频停止：回退到头像 */
     void close_video(qint64 user_id);
 
+    /** @brief 设置某成员说话态（绿色边框）；未知成员忽略 */
+    void set_speaking(qint64 user_id, bool speaking);
+
 signals:
     /** @brief 成员卡片被点击 */
     void member_clicked(qint64 user_id);

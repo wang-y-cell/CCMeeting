@@ -79,7 +79,7 @@ private:
                   const QString &room_no, quint32 max_participants,
                   quint32 duration_minutes);
 
-    bool _connecting = false;
+    bool _connecting = false; //是否正在连接远端服务器
     bool _sessionEnding = false;
     bool _hasPending = false;
 

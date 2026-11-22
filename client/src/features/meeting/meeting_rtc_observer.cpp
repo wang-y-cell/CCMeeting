@@ -14,6 +14,7 @@ void MeetingRtcObserver::reset() {
         _previewScheduled = false;
         _previewSizeLogged = false;
     }
+    _localTalking.store(false);
     {
         std::lock_guard<std::mutex> lock(_remoteMutex);
         _pendingRemote.clear();
@@ -162,6 +163,37 @@ void MeetingRtcObserver::on_connection_state(xrtc::XRTCConnectionState state) {
         Qt::QueuedConnection);
 }
 
+void MeetingRtcObserver::on_audio_level(xrtc::IXRtcMediaSource *, int level) {
+    const bool talking = level > 8;
+    if (talking == _localTalking.load()) {
+        return;
+    }
+    _localTalking.store(talking);
+    QMetaObject::invokeMethod(
+        this, [this, talking]() { emit local_speaking_changed(talking); },
+        Qt::QueuedConnection);
+}
+
+void MeetingRtcObserver::on_remote_talking(uint64_t feed_id, bool talking) {
+    qint64 user_id = 0;
+    {
+        std::lock_guard<std::mutex> lock(_remoteMutex);
+        const auto it = _feedToUser.constFind(feed_id);
+        if (it != _feedToUser.constEnd()) {
+            user_id = it.value();
+        }
+    }
+    if (user_id == 0) {
+        return;
+    }
+    QMetaObject::invokeMethod(
+        this,
+        [this, user_id, talking]() {
+            emit remote_speaking_changed(user_id, talking);
+        },
+        Qt::QueuedConnection);
+}
+
 void MeetingRtcObserver::on_remote_user_joined(
     const xrtc::XRTCRemoteUser &user) {
     bool ok = false;
@@ -193,7 +225,17 @@ void MeetingRtcObserver::on_remote_user_left(const xrtc::XRTCRemoteUser &user) {
             _pendingRemote.erase(user_id);
         }
     }
-    QMetaObject::invokeMethod(
-        this, [this, user_id]() { emit remote_user_left(user_id); },
-        Qt::QueuedConnection);
+    if (user_id != 0) {
+        QMetaObject::invokeMethod(
+            this,
+            [this, user_id]() {
+                emit remote_speaking_changed(user_id, false);
+                emit remote_user_left(user_id);
+            },
+            Qt::QueuedConnection);
+    } else {
+        QMetaObject::invokeMethod(
+            this, [this, user_id]() { emit remote_user_left(user_id); },
+            Qt::QueuedConnection);
+    }
 }

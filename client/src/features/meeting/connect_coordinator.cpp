@@ -17,7 +17,7 @@ void ConnectCoordinator::request(const QString &ip, const QString &port,
         _pendingRoomNo = room_no;
         _pendingMaxParticipants = max_participants;
         _pendingDurationMinutes = duration_minutes;
-        spdlog::info("[Connect] deferred (ending={} connecting={})",
+        spdlog::debug("[Connect] deferred (ending={} connecting={})",
                      _sessionEnding, _connecting);
         return;
     }

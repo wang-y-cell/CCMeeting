@@ -35,6 +35,7 @@
 #include "ui/pages/meeting_window_ui.h"
 
 class QTimer;
+class QLabel;
 class DeviceMenuController;
 
 namespace app {
@@ -128,6 +129,10 @@ signals:
     void connect_server_finished_signal(bool ok, QString ip, QString port,
                                         ConnectAction action);
 
+public slots:
+    /** @brief 主画面是否显示说话绿框（xrtc 提供活跃说话人后调用） */
+    void set_main_speaking(bool speaking) override;
+
 private slots:
     /** @brief 连接结果：交给 ConnectCoordinator 决定建会/入会 */
     void on_connect_finished_slot(bool ok, QString ip, QString port,
@@ -162,7 +167,12 @@ private:
     void init_connect();
     void init_controllers_wiring();
     void init_settings_popup();
+    void init_main_video_host();
+    void update_main_video_geometry();
+    void init_main_overlay();
+    void update_main_overlay();
     void show_side_panel_tab(int index);
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
     MeetingWindowUi ui_;
 
@@ -183,6 +193,11 @@ private:
      * 其内部辅助对象（持有界面控件指针）销毁时窗口与控件都还活着。
      */
     std::unique_ptr<app::MeetingSession> _session;
+
+    QWidget *_mainVideoHost = nullptr;
+    QLabel *_mainNameLabel = nullptr;
+    QWidget *_mainSpeakingBorder = nullptr;
+    bool _mainSpeaking = false;
 };
 
 }  // namespace ui

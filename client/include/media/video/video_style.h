@@ -20,6 +20,7 @@ enum class DrawMode {
     FitWidgetFast,                 ///< 同 Fit，语义保留
     StretchWidget,                 ///< 拉伸铺满内容区，不保持宽高比
     FixedSize,                     ///< 按 fixedOutputSize 限制输出尺寸
+    CoverWidget,                   ///< 等比放大填满内容区，居中裁剪（不留黑边）
     ScaleToHeightFractionCentered, ///< 高度 = 内容区高 × heightFraction，宽度等比
     Custom                         ///< 当前实现等同铺满内容区
 };
@@ -50,7 +51,7 @@ constexpr int kMemberAvatarSide = 72;
 /** @brief 视频：等比适应内容区并居中（主画面 / 成员小窗通用） */
 inline VideoStyle video() {
     VideoStyle style;
-    style.mode = DrawMode::FitWidgetSmooth;
+    style.mode = DrawMode::CoverWidget;
     style.alignment = Qt::AlignCenter;
     return style;
 }

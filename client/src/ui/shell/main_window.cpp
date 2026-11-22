@@ -105,7 +105,7 @@ ui::MeetingWindow *main_window::ensureMeetingWindow() {
     if (widget) {
         return widget;
     }
-    spdlog::info("[main_window] lazy create ui::MeetingWindow");
+    spdlog::debug("[main_window] lazy create ui::MeetingWindow");
     spdlog::default_logger()->flush();
     widget = new ui::MeetingWindow(nullptr);
     widget->hide();
@@ -115,7 +115,7 @@ ui::MeetingWindow *main_window::ensureMeetingWindow() {
             &main_window::onMeetingConfirmed);
     connect(widget, &ui::MeetingWindow::meeting_closed_signal, this,
             &main_window::onMeetingClosed);
-    spdlog::info("[main_window] ui::MeetingWindow ready");
+    spdlog::debug("[main_window] ui::MeetingWindow ready");
     spdlog::default_logger()->flush();
     return widget;
 }

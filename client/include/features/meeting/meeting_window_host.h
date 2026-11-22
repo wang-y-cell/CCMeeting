@@ -61,6 +61,8 @@ public:
     virtual qint64 local_user_id() const = 0;
     /** @brief 结束会话并隐藏窗口（失败/断线/超时） */
     virtual void close_meeting_window() = 0;
+    /** @brief 主画面说话绿框（xrtc 活跃说话人） */
+    virtual void set_main_speaking(bool speaking) = 0;
 };
 
 #endif  // MEETING_WINDOW_HOST_H
