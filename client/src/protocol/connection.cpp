@@ -212,7 +212,7 @@ void Connection::sendWireData(const QByteArray &frame,
 
     if (m_socket == nullptr ||
         m_socket->state() != QAbstractSocket::ConnectedState) {
-        spdlog::info("[Connection] websocket 未连接, 发送失败");
+        spdlog::warn("[Connection] websocket 未连接, 发送失败");
         report(false);
         return;
     }

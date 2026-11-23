@@ -159,7 +159,7 @@ void ui::MeetingHistoryPage::reload_from_db() {
     }
     ensure_loaded_for_view();
     apply_filter();
-    spdlog::info("[MeetingHistoryPage] 按窗口加载 {} 条，缓存 {} / 共 {}（创建 {} / 加入 {}）",
+    spdlog::debug("[MeetingHistoryPage] 按窗口加载 {} 条，缓存 {} / 共 {}（创建 {} / 加入 {}）",
                  _pageSize, _records.size(), _totalCount, _createdCount,
                  _joinedCount);
 }

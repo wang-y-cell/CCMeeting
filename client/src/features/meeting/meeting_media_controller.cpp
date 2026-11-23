@@ -105,7 +105,7 @@ void MeetingMediaController::start(const StartOptions &options) {
             _observer->reset();
         }
         if (!_rtc) {
-            spdlog::info("[MeetingMedia] create_xrtc_engine ...");
+            spdlog::debug("[MeetingMedia] create_xrtc_engine ...");
             _rtc = xrtc::create_xrtc_engine(_observer);
             if (_rtc) {
                 // 默认 15/600ms 对轻声说话偏迟钝；降低阈值并缩短释放时间
@@ -118,7 +118,7 @@ void MeetingMediaController::start(const StartOptions &options) {
                              "release={}ms",
                              vad.talking_threshold, vad.release_ms);
             }
-            spdlog::info("[MeetingMedia] create_xrtc_engine ok");
+            spdlog::debug("[MeetingMedia] create_xrtc_engine ok");
         }
 
         _videoOn = false;
@@ -286,7 +286,7 @@ void MeetingMediaController::select_video_device(const std::string &device_id) {
     }
     _videoDeviceId = device_id;
     if (_rtc && !_rtc->set_video_device(device_id)) {
-        spdlog::info("[MeetingMedia] set_video_device deferred id={}", device_id);
+        spdlog::debug("[MeetingMedia] set_video_device deferred id={}", device_id);
     }
 }
 
@@ -297,7 +297,7 @@ void MeetingMediaController::select_audio_device(const std::string &device_id) {
     _audioDeviceId = device_id;
     if (_rtc && !_rtc->set_audio_device(device_id)) {
         // join 前无 session 时返回 false，所选 id 仍由 build_join_config 使用
-        spdlog::info("[MeetingMedia] set_audio_device deferred id={}", device_id);
+        spdlog::debug("[MeetingMedia] set_audio_device deferred id={}", device_id);
     }
 }
 

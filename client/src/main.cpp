@@ -21,6 +21,7 @@
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/spdlog.h>
+#include <chrono>
 #include <string>
 
 #include "config/client_config.h"
@@ -278,18 +279,33 @@ int main(int argc, char *argv[]) {
                         static_cast<std::size_t>(log_path_local.size())),
             5 * 1024 * 1024, 3);  // 5MB × 3 个文件
         auto logger = std::make_shared<spdlog::logger>("CloudMeeting", file_sink);
-        logger->set_level(spdlog::level::debug);
-        //只要遇到 debug 或更高级别的日志，就立即将内存缓冲区的数据刷入磁盘。这保证了程序崩溃时日志不丢失，但在高频日志输出时会有一定的 I/O 性能损耗
-        logger->flush_on(spdlog::level::debug);
+        // 默认 info；需要排查时设 CCMEETING_LOG_LEVEL=debug / trace。
+        spdlog::level::level_enum level = spdlog::level::info;
+        const QByteArray level_env = qgetenv("CCMEETING_LOG_LEVEL").toLower();
+        if (level_env == "trace") {
+            level = spdlog::level::trace;
+        } else if (level_env == "debug") {
+            level = spdlog::level::debug;
+        } else if (level_env == "warn") {
+            level = spdlog::level::warn;
+        } else if (level_env == "error") {
+            level = spdlog::level::err;
+        }
+        logger->set_level(level);
+        // info/debug 走缓冲，仅 warn/error 立即刷盘，避免每条消息都触发磁盘 I/O。
+        logger->flush_on(spdlog::level::warn);
         logger->set_pattern("%Y-%m-%d %H:%M:%S.%e [%l] [tid:%t] %v");
         //将局部创建的 logger 所有权转移给 spdlog 的全局默认管理器，避免不必要的智能指针拷贝开销
         spdlog::set_default_logger(std::move(logger));
-        spdlog::set_level(spdlog::level::debug);
+        spdlog::set_level(level);
+        // info/debug 不逐条刷盘，但至少每秒落盘一次，避免崩溃时丢失最近日志。
+        spdlog::flush_every(std::chrono::seconds(1));
     } catch (const std::exception &ex) {
         fprintf(stderr, "spdlog init failed: %s\n", ex.what());
     }
 
-    spdlog::info("[main] ===== CloudMeeting start =====");
+    spdlog::info("[main] ===== CloudMeeting start (log_level={}) =====",
+                 spdlog::level::to_string_view(spdlog::get_level()));
     spdlog::info("[main] exe dir={}", qutf8(app_dir));
     spdlog::info("[main] log file={}", qutf8(log_path));
     spdlog::info("[main] cwd={}", qutf8(QDir::currentPath()));
@@ -359,10 +375,10 @@ int main(int argc, char *argv[]) {
     }
     flush_log();
 
-    spdlog::info("[main] Screen::init begin");
+    spdlog::debug("[main] Screen::init begin");
     flush_log();
     Screen::init();
-    spdlog::info("[main] Screen::init done");
+    spdlog::debug("[main] Screen::init done");
     flush_log();
 
     spdlog::info("[main] ClientConfig::load begin");
@@ -435,7 +451,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    spdlog::info("[main] main_window.show() begin");
+    spdlog::debug("[main] main_window.show() begin");
     flush_log();
     main_windowDialog->show();
     main_windowDialog->raise();
@@ -451,7 +467,7 @@ int main(int argc, char *argv[]) {
                          QCoreApplication::quit();
                      });
 
-    spdlog::info("[main] main_window.show() done visible={} topLevel={}",
+    spdlog::debug("[main] main_window.show() done visible={} topLevel={}",
                  main_windowDialog->isVisible(),
                  main_windowDialog->isTopLevel());
     flush_log();

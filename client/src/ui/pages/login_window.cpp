@@ -110,7 +110,7 @@ void ui::LoginWindow::Login() {
     m_pendingRequest = PendingRequest::Login;
     m_requestInFlight = true;
     ui.login_button->setEnabled(false);
-    spdlog::info("[login] POST {}", qutf8(url.toString()));
+    spdlog::debug("[login] POST {}", qutf8(url.toString()));
     flush_log();
     m_nam.post(ui::auth_request(url),
                QJsonDocument(body).toJson(QJsonDocument::Compact));
@@ -138,7 +138,7 @@ void ui::LoginWindow::Register() {
     m_pendingRequest = PendingRequest::Register;
     m_requestInFlight = true;
     ui.register_button->setEnabled(false);
-    spdlog::info("[register] POST {}", qutf8(url.toString()));
+    spdlog::debug("[register] POST {}", qutf8(url.toString()));
     flush_log();
     m_nam.post(ui::auth_request(url),
                QJsonDocument(body).toJson(QJsonDocument::Compact));
@@ -153,7 +153,7 @@ void ui::LoginWindow::onLoginFinished(QNetworkReply *reply) {
     m_pendingRequest = PendingRequest::None;
     ui.login_button->setEnabled(true);
 
-    spdlog::info("[login] onLoginFinished enter");
+    spdlog::debug("[login] onLoginFinished enter");
     flush_log();
 
     if (!reply) {
@@ -180,7 +180,7 @@ void ui::LoginWindow::onLoginFinished(QNetworkReply *reply) {
 
     const QByteArray payload = reply->readAll();
     reply->deleteLater();
-    spdlog::info("[login] response bytes={}", payload.size());
+    spdlog::debug("[login] response bytes={}", payload.size());
     flush_log();
 
     QJsonParseError parseError;

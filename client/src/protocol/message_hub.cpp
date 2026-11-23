@@ -18,7 +18,7 @@ bool MessageHub::enqueue_send(MessagePtr msg) {
     if (kind == MessageKind::CreateMeeting ||
         kind == MessageKind::JoinMeeting || kind == MessageKind::CloseCamera ||
         kind == MessageKind::SendText || kind == MessageKind::SendUserProfile) {
-        spdlog::info("[MessageHub] enqueue_send kind={}",
+        spdlog::debug("[MessageHub] enqueue_send kind={}",
                      static_cast<int>(kind));
     }
     const PriorityMessageQueue::PushResult result =
@@ -57,7 +57,7 @@ void MessageHub::emit_incoming(MessagePtr msg) {
     case MessageKind::JoinMeetingResponse:
     case MessageKind::RemoteHostClosedError:
     case MessageKind::OtherNetError:
-        spdlog::info("[MessageHub] 分发请求/错误 kind={}",
+        spdlog::debug("[MessageHub] 分发请求/错误 kind={}",
                      static_cast<int>(msg->kind()));
         emit request_message_ready(msg);
         break;
@@ -90,7 +90,7 @@ void MessageHub::route_incoming(MessagePtr msg) {
         k == MessageKind::JoinMeetingResponse ||
         k == MessageKind::RemoteHostClosedError ||
         k == MessageKind::OtherNetError) {
-        spdlog::info("[MessageHub] route_incoming Request kind={}",
+        spdlog::debug("[MessageHub] route_incoming Request kind={}",
                      static_cast<int>(k));
     }
 
@@ -165,7 +165,7 @@ void MessageHub::send_loop(std::uint64_t epoch) {
 
         if (kind == MessageKind::CreateMeeting ||
             kind == MessageKind::JoinMeeting) { // 如果消息类型为创建会议或加入会议，则打印日志
-            spdlog::info("[MessageHub] 发出控制包 kind={} bytes={}",
+            spdlog::debug("[MessageHub] 发出控制包 kind={} bytes={}",
                          static_cast<int>(kind), frame.size());
         }
 

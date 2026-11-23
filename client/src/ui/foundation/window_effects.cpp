@@ -45,7 +45,7 @@ bool enable_rounded_corners(QWidget *window, int fallback_radius) {
     const HRESULT result = ::DwmSetWindowAttribute(
         hwnd, kDwmWindowCornerPreference, &preference, sizeof(preference));
     if (SUCCEEDED(result)) {
-        spdlog::info("[WindowEffects] DWM 圆角已启用 hwnd={}",
+        spdlog::debug("[WindowEffects] DWM 圆角已启用 hwnd={}",
                      reinterpret_cast<std::uintptr_t>(hwnd));
         return true;
     }

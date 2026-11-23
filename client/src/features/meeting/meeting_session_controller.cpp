@@ -155,14 +155,14 @@ void MeetingSessionController::on_create_result(int room_no) {
         participants->add(self_id);
     }
 
-    spdlog::info("[MeetingWindow] start_meeting_media begin");
+    spdlog::debug("[MeetingWindow] start_meeting_media begin");
     if (spdlog::default_logger()) {
         spdlog::default_logger()->flush();
     }
     if (_mediaView) {
         _mediaView->start_media();
     }
-    spdlog::info("[MeetingWindow] start_meeting_media done");
+    spdlog::debug("[MeetingWindow] start_meeting_media done");
     if (spdlog::default_logger()) {
         spdlog::default_logger()->flush();
     }

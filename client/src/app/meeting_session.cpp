@@ -23,13 +23,13 @@ MeetingSession::MeetingSession(const MeetingViewPorts &ports, QObject *parent)
     qRegisterMetaType<MessagePtr>("MessagePtr");
     qRegisterMetaType<ConnectAction>("ConnectAction");
 
-    spdlog::info("[MeetingSession] create helpers begin");
+    spdlog::debug("[MeetingSession] create helpers begin");
     create_helpers();
-    spdlog::info("[MeetingSession] create helpers done");
+    spdlog::debug("[MeetingSession] create helpers done");
 
-    spdlog::info("[MeetingSession] start workers begin");
+    spdlog::debug("[MeetingSession] start workers begin");
     start_workers();
-    spdlog::info("[MeetingSession] start workers done");
+    spdlog::debug("[MeetingSession] start workers done");
 }
 
 MeetingSession::~MeetingSession() {

@@ -37,7 +37,7 @@ QString meeting_server_port() {
 }  // namespace
 
 main_window::main_window(QWidget *parent) : FramelessWindow<QWidget>(parent) {
-    spdlog::info("[main_window] ctor begin");
+    spdlog::debug("[main_window] ctor begin");
     spdlog::default_logger()->flush();
 
     const auto &meeting = ClientConfig::instance().meeting_server();
@@ -80,7 +80,7 @@ main_window::main_window(QWidget *parent) : FramelessWindow<QWidget>(parent) {
                      mics.size());
     });
 
-    spdlog::info("[main_window] ctor done");
+    spdlog::debug("[main_window] ctor done");
     spdlog::default_logger()->flush();
 }
 

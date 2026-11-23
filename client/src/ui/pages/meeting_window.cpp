@@ -80,7 +80,7 @@ ui::MeetingWindow::MeetingWindow(QWidget *parent)
     : FramelessWindow<QWidget>(parent) {
     qRegisterMetaType<MessagePtr>("MessagePtr");
     qRegisterMetaType<ConnectAction>("ConnectAction");
-    spdlog::info("[MeetingWindow] ctor begin");
+    spdlog::debug("[MeetingWindow] ctor begin");
     spdlog::default_logger()->flush();
 
     // 顶栏控制器只依赖宿主，先创建（init_ui 里要用它刷状态/标签栏）
@@ -114,7 +114,7 @@ ui::MeetingWindow::MeetingWindow(QWidget *parent)
     init_settings_popup();
 
     ui::disable_rounded_corners(this);
-    spdlog::info("[MeetingWindow] ctor done");
+    spdlog::debug("[MeetingWindow] ctor done");
     spdlog::default_logger()->flush();
 }
 
