@@ -3,6 +3,8 @@
 
 #include "data/meeting_record.h"
 
+#include <QVector>
+
 /**
  * @brief 会议记录的读写接口（界面层唯一可见入口）
  *
@@ -22,6 +24,21 @@ public:
     /** @brief 最近若干条指定类型记录 */
     virtual QVector<MeetingRecord> recent(MeetingRecordKind kind,
                                           int limit) const = 0;
+    /** @brief 按开始时间倒序分页读取全部记录 */
+    virtual QVector<MeetingRecord> page(int offset, int limit) const {
+        const QVector<MeetingRecord> all = load();
+        return all.mid(qMax(0, offset), qMax(0, limit));
+    }
+    /** @brief 某类型记录总数 */
+    virtual int count(MeetingRecordKind kind) const {
+        int n = 0;
+        for (const MeetingRecord &record : load()) {
+            if (record.kind == kind) {
+                ++n;
+            }
+        }
+        return n;
+    }
     /** @brief 统计：本周会议数 / 总时长等 */
     virtual MeetingStats stats() const = 0;
     /** @brief 存储位置（日志/诊断用） */

@@ -27,6 +27,10 @@ public:
 
     /** @brief 最近若干条指定类型记录 */
     static QVector<MeetingRecord> recent(MeetingRecordKind kind, int limit);
+    /** @brief 按开始时间倒序分页读取全部记录 */
+    static QVector<MeetingRecord> page(int offset, int limit);
+    /** @brief 某类型记录总数 */
+    static int count(MeetingRecordKind kind);
     /** @brief 统计：本周会议数 / 总时长等 */
     static MeetingStats stats();
 

@@ -196,8 +196,6 @@ private:
 
     QWidget *_mainVideoHost = nullptr;
     QLabel *_mainNameLabel = nullptr;
-    QWidget *_mainSpeakingBorder = nullptr;
-    bool _mainSpeaking = false;
 };
 
 }  // namespace ui

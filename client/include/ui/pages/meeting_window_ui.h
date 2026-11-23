@@ -22,7 +22,7 @@ public:
     QLabel *topDurationChip = nullptr;
     QPushButton *btnMeetingInfo = nullptr;
     QPushButton *btnMeetingSettings = nullptr;
-    QGroupBox *groupBox_2 = nullptr;
+    QWidget *groupBox_2 = nullptr;
     VideoGLWidget *mainshow_label = nullptr;
     QLabel *canvasHint = nullptr;
     QTabWidget *tabWidget = nullptr;

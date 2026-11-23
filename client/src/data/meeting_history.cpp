@@ -179,6 +179,45 @@ QVector<MeetingRecord> MeetingHistory::recent(MeetingRecordKind kind,
     return result;
 }
 
+QVector<MeetingRecord> MeetingHistory::page(int offset, int limit) {
+    QVector<MeetingRecord> result;
+    const QSqlDatabase db = open_database("page");
+    if (!db.isValid()) {
+        return result;
+    }
+    QSqlQuery query(db);
+    query.prepare(QStringLiteral(
+        "SELECT kind, room_no, started_at, duration_ms, open "
+        "FROM meeting_history ORDER BY started_at DESC, id DESC "
+        "LIMIT ? OFFSET ?"));
+    query.addBindValue(limit > 0 ? limit : MeetingHistory::kMaxRecords);
+    query.addBindValue(qMax(0, offset));
+    if (!query.exec()) {
+        spdlog::warn("[MeetingHistory] 分页查询失败: {}",
+                     query.lastError().text().toUtf8().constData());
+        return result;
+    }
+    while (query.next()) {
+        result.push_back(row_to_record(query));
+    }
+    return result;
+}
+
+int MeetingHistory::count(MeetingRecordKind kind) {
+    const QSqlDatabase db = open_database("count");
+    if (!db.isValid()) {
+        return 0;
+    }
+    QSqlQuery query(db);
+    query.prepare(QStringLiteral(
+        "SELECT COUNT(*) FROM meeting_history WHERE kind = ?"));
+    query.addBindValue(static_cast<int>(kind));
+    if (!query.exec() || !query.next()) {
+        return 0;
+    }
+    return query.value(0).toInt();
+}
+
 MeetingStats MeetingHistory::stats() {
     MeetingStats result;
     const QSqlDatabase db = open_database("stats");

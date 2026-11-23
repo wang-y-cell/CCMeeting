@@ -252,7 +252,6 @@ void MeetingSessionController::reset_ui() {
     ui.btnMeetingSettings->setEnabled(false);
     ui.leaveMeetingBtn->setEnabled(false);
     ui.sendmsg->setDisabled(true);
-    ui.groupBox_2->setTitle(QString());
 
     if (_topBar) {
         _topBar->apply_tab_bar_visibility();

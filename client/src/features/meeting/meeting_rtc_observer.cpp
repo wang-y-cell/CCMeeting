@@ -179,7 +179,7 @@ void MeetingRtcObserver::on_remote_talking(uint64_t feed_id, bool talking) {
     {
         std::lock_guard<std::mutex> lock(_remoteMutex);
         const auto it = _feedToUser.constFind(feed_id);
-        if (it != _feedToUser.constEnd()) {
+        if (it != _feedToUser.constEnd()) { //存在用户
             user_id = it.value();
         }
     }

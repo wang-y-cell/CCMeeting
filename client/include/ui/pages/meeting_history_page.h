@@ -5,11 +5,13 @@
 
 #include "data/meeting_record.h"
 
+#include <QVector>
 #include <QWidget>
 
 class QLabel;
 class QPushButton;
 class QVBoxLayout;
+class QResizeEvent;
 class QScrollArea;
 
 /**
@@ -32,7 +34,7 @@ public:
 public:
     explicit MeetingHistoryPage(QWidget *parent = nullptr);
 
-    /** @brief 重新读取历史并刷新 */
+    /** @brief 强制重新读取历史并刷新（清空/删除/新会议后调用） */
     void refresh();
 
 private:
@@ -40,6 +42,11 @@ private:
     void clear_rows();
     void add_row(const MeetingRecord &record, int load_index);
     void apply_filter();
+    void reload_from_db();
+    void ensure_loaded_for_view();
+    int viewport_page_size() const;
+    void on_scroll_value_changed(int value);
+    void resizeEvent(QResizeEvent *event) override;
 
 
     QVBoxLayout *_rowLayout = nullptr;
@@ -54,7 +61,13 @@ private:
 
     /** -1 表示全部，0 创建，1 加入 */
     int _filter = -1;
+    /** 已加载到内存的记录前缀，避免每次刷新都查数据库 */
     QVector<MeetingRecord> _records;
+    int _totalCount = 0;
+    int _createdCount = 0;
+    int _joinedCount = 0;
+    bool _cacheValid = false;
+    int _pageSize = 8;
 };
 
 }  // namespace ui

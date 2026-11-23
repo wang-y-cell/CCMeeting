@@ -8,6 +8,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QScrollBar>
 #include <QSizePolicy>
 #include <QVBoxLayout>
 
@@ -115,6 +116,8 @@ void ui::MeetingHistoryPage::build_ui() {
         meeting_repository().clear();
         refresh();
     });
+    connect(_scroll->verticalScrollBar(), &QScrollBar::valueChanged, this,
+            &MeetingHistoryPage::on_scroll_value_changed);
 }
 
 void ui::MeetingHistoryPage::clear_rows() {
@@ -131,26 +134,100 @@ void ui::MeetingHistoryPage::clear_rows() {
 }
 
 void ui::MeetingHistoryPage::refresh() {
-    _records = meeting_repository().load();
+    // 显式刷新（新增/删除/清空）才重新查库；on_show 只复用内存缓存
+    reload_from_db();
+}
 
-    int created = 0;
-    int joined = 0;
-    for (const MeetingRecord &record : _records) {
-        if (record.kind == MeetingRecordKind::Created) {
-            ++created;
-        } else {
-            ++joined;
+int ui::MeetingHistoryPage::viewport_page_size() const {
+    const int h = (_scroll && _scroll->viewport()) ? _scroll->viewport()->height() : 0;
+    // 一行约 72px，额外多取 2 行作为滚动缓冲
+    const int rows = h > 0 ? (h / 72 + 2) : 8;
+    return qBound(4, rows, 20);
+}
+
+void ui::MeetingHistoryPage::reload_from_db() {
+    _createdCount = meeting_repository().count(MeetingRecordKind::Created);
+    _joinedCount = meeting_repository().count(MeetingRecordKind::Joined);
+    _totalCount = _createdCount + _joinedCount;
+    _pageSize = viewport_page_size();
+
+    _records.clear();
+    _cacheValid = true;
+    const QVector<MeetingRecord> first = meeting_repository().page(0, _pageSize);
+    for (const MeetingRecord &record : first) {
+        _records.push_back(record);
+    }
+    ensure_loaded_for_view();
+    apply_filter();
+    spdlog::info("[MeetingHistoryPage] 按窗口加载 {} 条，缓存 {} / 共 {}（创建 {} / 加入 {}）",
+                 _pageSize, _records.size(), _totalCount, _createdCount,
+                 _joinedCount);
+}
+
+void ui::MeetingHistoryPage::ensure_loaded_for_view() {
+    if (!_cacheValid) {
+        return;
+    }
+    // 当前筛选下已缓存的记录数
+    auto filtered_count = [this]() {
+        int n = 0;
+        for (const MeetingRecord &record : _records) {
+            if (_filter < 0 || static_cast<int>(record.kind) == _filter) {
+                ++n;
+            }
+        }
+        return n;
+    };
+
+    const int target = _pageSize;
+    while (filtered_count() < target && _records.size() < _totalCount) {
+        const int offset = _records.size();
+        const int limit = qMax(_pageSize, target - filtered_count());
+        const QVector<MeetingRecord> page =
+            meeting_repository().page(offset, limit);
+        if (page.isEmpty()) {
+            break;
+        }
+        for (const MeetingRecord &record : page) {
+            _records.push_back(record);
         }
     }
-    _summaryLabel->setText(
-        tr("共 %1 条（创建 %2 · 加入 %3）").arg(_records.size()).arg(created).arg(joined));
+}
 
+void ui::MeetingHistoryPage::on_scroll_value_changed(int value) {
+    if (!_cacheValid || !_scroll || !_scroll->verticalScrollBar()) {
+        return;
+    }
+    QScrollBar *bar = _scroll->verticalScrollBar();
+    if (value < bar->maximum() - 1 || _records.size() >= _totalCount) {
+        return;
+    }
+    ensure_loaded_for_view();
     apply_filter();
-    spdlog::info("[MeetingHistoryPage] 记录数 {}（创建 {} / 加入 {}）",
-                 _records.size(), created, joined);
+}
+
+void ui::MeetingHistoryPage::resizeEvent(QResizeEvent *event) {
+    Page::resizeEvent(event);
+    if (!_cacheValid || !_scroll) {
+        return;
+    }
+    const int rows = viewport_page_size();
+    if (rows > _pageSize) {
+        _pageSize = rows;
+        ensure_loaded_for_view();
+        apply_filter();
+    } else {
+        _pageSize = rows;
+    }
 }
 
 void ui::MeetingHistoryPage::apply_filter() {
+    // 页面首次构造时 viewport 还没布局，高度很小；真正显示后在这里补算
+    const int rows = viewport_page_size();
+    if (rows > _pageSize) {
+        _pageSize = rows;
+    }
+    ensure_loaded_for_view();
     clear_rows();
 
     int shown = 0;
@@ -163,11 +240,17 @@ void ui::MeetingHistoryPage::apply_filter() {
         ++shown;
     }
 
+    _summaryLabel->setText(
+        tr("共 %1 条（创建 %2 · 加入 %3）")
+            .arg(_totalCount)
+            .arg(_createdCount)
+            .arg(_joinedCount));
+
     const bool empty = shown == 0;
     _emptyHint->setVisible(empty);
     _scroll->setVisible(!empty);
     if (empty) {
-        _emptyHint->setText(_records.isEmpty()
+        _emptyHint->setText(_totalCount == 0
                                 ? tr("还没有会议记录")
                                 : tr("当前筛选下没有记录"));
     }
@@ -221,5 +304,16 @@ void ui::MeetingHistoryPage::add_row(const MeetingRecord &record, int load_index
 }
 
 void ui::MeetingHistoryPage::on_show() {
-    refresh();
+    // 页面每次显示不查库；只有缓存失效时才重新加载
+    if (!_cacheValid) {
+        reload_from_db();
+        return;
+    }
+    // 构造时控件尚未布局，viewport 高度不可靠；显示后按真实高度补页
+    const int rows = viewport_page_size();
+    if (rows > _pageSize) {
+        _pageSize = rows;
+        ensure_loaded_for_view();
+    }
+    apply_filter();
 }

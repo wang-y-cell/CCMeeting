@@ -7,6 +7,7 @@
 #include <QOpenGLShaderProgram>
 #include <QOpenGLWidget>
 #include <QRect>
+#include <QResizeEvent>
 #include <QSize>
 
 #include <xrtc/xrtc_defines.h>
@@ -72,12 +73,25 @@ public:
     void setClearColor(const QColor &color);
     /** @brief 清空画面（下一帧 paintGL 只清背景） */
     void clearFrame();
+    /**
+     * @brief 说话态：视频画边框、头像画圆环。
+     * @param draw_video_border 视频模式是否画边框；小窗视频由卡片画，传 false
+     */
+    void set_speaking(bool speaking, bool draw_video_border = true);
+    bool speaking() const { return m_speaking; }
+    bool draw_video_border() const { return m_drawVideoBorder; }
+    /** @brief 当前是否视频内容（否则为头像/空） */
+    bool video_content() const;
+    /** @brief 当前头像实际绘制矩形（控件坐标）；非头像返回空 */
+    QRect avatar_rect() const;
 
 protected:
     /** @brief 编译着色器、创建 VBO */
     void initializeGL() override;
     /** @brief 尺寸变化时触发重绘 */
     void resizeGL(int w, int h) override;
+    /** @brief 尺寸变化时同步说话边框 overlay */
+    void resizeEvent(QResizeEvent *event) override;
     /** @brief 取待绘制帧、上传纹理、按 destRect 画四边形 */
     void paintGL() override;
 
@@ -164,6 +178,9 @@ private:
     int m_rgbaTexW = 0;   ///< RGBA 纹理当前宽
     int m_rgbaTexH = 0;   ///< RGBA 纹理当前高
     bool m_glReady = false; ///< initializeGL 是否已成功执行
+    QWidget *m_speakingOverlay = nullptr; ///< 说话绿框/头像圆环 overlay
+    bool m_speaking = false;
+    bool m_drawVideoBorder = true;
 };
 
 #endif // VIDEOGLWIDGET_H

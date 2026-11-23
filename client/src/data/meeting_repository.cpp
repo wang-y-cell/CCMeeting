@@ -18,6 +18,14 @@ public:
         return MeetingHistory::recent(kind, limit);
     }
 
+    QVector<MeetingRecord> page(int offset, int limit) const override {
+        return MeetingHistory::page(offset, limit);
+    }
+
+    int count(MeetingRecordKind kind) const override {
+        return MeetingHistory::count(kind);
+    }
+
     MeetingStats stats() const override { return MeetingHistory::stats(); }
 
     QString storage_path() const override {

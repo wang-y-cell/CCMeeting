@@ -43,8 +43,8 @@ QToolButton *makeToolButton(const QString &objectName, const QString &text,
     // 与背景融为一体：默认无边框、无底色，悬停才出现淡底色
     btn->setAutoRaise(true);
     btn->setCursor(Qt::PointingHandCursor);
-    btn->setMinimumSize(QSize(minSize.width(), qMax(minSize.height(), 56)));
-    btn->setIconSize(QSize(22, 22));
+    btn->setMinimumSize(QSize(56, 44));
+    btn->setIconSize(QSize(18, 18));
     if (!toolTip.isEmpty()) {
         btn->setToolTip(toolTip);
     }
@@ -66,7 +66,7 @@ QToolButton *makeToolButton(const QString &objectName, const QString &text,
                                objectName == QStringLiteral("videoDeviceBtn");
         // 设备下拉箭头小一号；其余图标统一用中性色
         // （结束会议与麦克风/摄像头一致：图标本体不染色，红色只留给文字/斜杠）
-        const int icon_size = is_device ? 12 : 22;
+        const int icon_size = is_device ? 12 : 18;
         const QColor icon_color =
             ui::ThemeManager::instance().color(QStringLiteral("icon"));
         btn->setIcon(ui::IconProvider::instance().icon(it.value(), icon_color, icon_size));
@@ -74,11 +74,12 @@ QToolButton *makeToolButton(const QString &objectName, const QString &text,
         if (is_device) {
             // 设备箭头：宽度保持窄条，高度与其它工具按钮一致（56）
             btn->setToolButtonStyle(Qt::ToolButtonIconOnly);
-            btn->setFixedWidth(22);
-            btn->setFixedHeight(56);
+            btn->setFixedWidth(20);
+            btn->setFixedHeight(44);
         } else {
             // 所有工具按钮统一宽度：文字长短不同也不该宽窄不一
-            btn->setFixedWidth(76);
+            btn->setFixedWidth(objectName == QStringLiteral("leaveMeetingBtn") ? 72 : 64);
+            btn->setFixedHeight(44);
         }
     }
 
@@ -87,7 +88,7 @@ QToolButton *makeToolButton(const QString &objectName, const QString &text,
 QFrame *makePillSep(const QString &objectName, QWidget *parent) {
     auto *sep = new QFrame(parent);
     sep->setObjectName(objectName);
-    sep->setFixedSize(1, 28);
+    sep->setFixedSize(1, 22);
     sep->setFrameShape(QFrame::NoFrame);
     return sep;
 }
@@ -178,11 +179,10 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
     main_box_layout->setSpacing(0);
     main_box_layout->setContentsMargins(0, 0, 0, 0);
 
-    groupBox_2 = new QGroupBox(parent);
+    groupBox_2 = new QWidget(parent);
     groupBox_2->setObjectName(QStringLiteral("groupBox_2"));
     groupBox_2->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    groupBox_2->setTitle(QString());
-    groupBox_2->setFlat(true);
+    groupBox_2->setContentsMargins(5,0,5,0);
 
     auto *gridLayout = new QGridLayout(groupBox_2);
     gridLayout->setObjectName(QStringLiteral("gridLayout"));
@@ -303,59 +303,59 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
     // ---- 底栏工具条 ----
     avToolbar = new QWidget(parent);
     avToolbar->setObjectName(QStringLiteral("avToolbar"));
-    avToolbar->setMinimumHeight(84);
+    avToolbar->setMinimumHeight(48);
 
     auto *AV_box = new QHBoxLayout(avToolbar);
     AV_box->setObjectName(QStringLiteral("AV_box"));
     AV_box->setSpacing(0);
-    AV_box->setContentsMargins(16, 10, 16, 12);
+    AV_box->setContentsMargins(8, 4, 8, 5);
     AV_box->addItem(
-        new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum));
+        new QSpacerItem(20, 10, QSizePolicy::Expanding, QSizePolicy::Minimum));
 
     controlPill = new QWidget(avToolbar);
     controlPill->setObjectName(QStringLiteral("controlPill"));
     auto *controlPillLayout = new QHBoxLayout(controlPill);
     controlPillLayout->setObjectName(QStringLiteral("controlPillLayout"));
     controlPillLayout->setSpacing(1);
-    controlPillLayout->setContentsMargins(10, 8, 10, 8);
+    controlPillLayout->setContentsMargins(4, 5, 4, 5);
 
     btnSideMembers =
         makeToolButton(QStringLiteral("btnSideMembers"), QObject::tr("成员"),
-                       QSize(64, 48), controlPill, QObject::tr("成员列表"));
+                       QSize(64, 44), controlPill, QObject::tr("成员列表"));
     btnSideChat =
         makeToolButton(QStringLiteral("btnSideChat"), QObject::tr("聊天"),
-                       QSize(64, 48), controlPill, QObject::tr("打开聊天"));
+                       QSize(64, 44), controlPill, QObject::tr("打开聊天"));
     openAudio =
         makeToolButton(QStringLiteral("openAudio"), QObject::tr("开启音频"),
-                       QSize(88, 48), controlPill);
+                       QSize(64, 44), controlPill);
     audioDeviceBtn =
         makeToolButton(QStringLiteral("audioDeviceBtn"), QStringLiteral("▲"),
-                       QSize(28, 48), controlPill, QObject::tr("选择音频设备"));
-    audioDeviceBtn->setMaximumWidth(28);
+                       QSize(20, 44), controlPill, QObject::tr("选择音频设备"));
+    audioDeviceBtn->setMaximumWidth(14);
 
     openVedio =
         makeToolButton(QStringLiteral("openVedio"), QObject::tr("开启摄像头"),
-                       QSize(88, 48), controlPill);
+                       QSize(64, 44), controlPill);
     videoDeviceBtn =
         makeToolButton(QStringLiteral("videoDeviceBtn"), QStringLiteral("▲"),
-                       QSize(28, 48), controlPill, QObject::tr("选择摄像头"));
-    videoDeviceBtn->setMaximumWidth(28);
+                       QSize(20, 44), controlPill, QObject::tr("选择摄像头"));
+    videoDeviceBtn->setMaximumWidth(14);
 
     shareScreenBtn =
         makeToolButton(QStringLiteral("shareScreenBtn"), QObject::tr("共享屏幕"),
-                       QSize(88, 48), controlPill,
+                       QSize(64, 44), controlPill,
                        QObject::tr("共享屏幕（与摄像头互斥，共用同一路视频）"));
 
     btnTogglePanel =
         makeToolButton(QStringLiteral("btnTogglePanel"), QObject::tr("侧栏"),
-                       QSize(64, 48), controlPill,
+                       QSize(64, 44), controlPill,
                        QObject::tr("显示/隐藏侧栏"));
     btnTogglePanel->setCheckable(true);
     btnTogglePanel->setChecked(true);
 
     leaveMeetingBtn =
         makeToolButton(QStringLiteral("leaveMeetingBtn"),
-                       QObject::tr("结束会议"), QSize(88, 48), controlPill);
+                       QObject::tr("结束会议"), QSize(72, 44), controlPill);
 
     controlPillLayout->addWidget(btnSideMembers);
     controlPillLayout->addWidget(btnSideChat);
@@ -373,6 +373,6 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
 
     AV_box->addWidget(controlPill);
     AV_box->addItem(
-        new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum));
+        new QSpacerItem(20, 10, QSizePolicy::Expanding, QSizePolicy::Minimum));
     verticalLayout->addWidget(avToolbar);
 }

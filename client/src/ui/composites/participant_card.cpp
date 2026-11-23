@@ -13,8 +13,8 @@
 namespace {
 constexpr int kCardHMargin = 8;
 constexpr int kCardVPadding = 8;
-constexpr int kCardRadius = 12;
-constexpr int kNameMargin = 8;
+constexpr int kCardRadius = 12; //方框圆角半径
+constexpr int kNameMargin = 8; // 名称标签边距
 constexpr int kVideoAspectW = 16;
 constexpr int kVideoAspectH = 9;
 constexpr int kAvatarSide = 72;
@@ -35,7 +35,7 @@ ParticipantCard::ParticipantCard(qint64 userId, QWidget *parent)
 
     _nameLabel = new QLabel(this);
     _nameLabel->setObjectName(QStringLiteral("participantNameOverlay"));
-    _nameLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    _nameLabel->setAlignment(Qt::AlignVCenter);
     _nameLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
     _nameLabel->setWordWrap(false);
     // 半透明黑底 + 白字：浅色画面/白墙背景也能看清
@@ -81,6 +81,9 @@ void ParticipantCard::set_video_mode(bool video) {
         return;
     }
     _videoMode = video;
+    if (_display) {
+        _display->set_speaking(_speaking && !video, false);
+    }
     apply_layout(video);
 }
 
@@ -132,6 +135,7 @@ void ParticipantCard::position_name_label() {
     _nameLabel->setGeometry(kNameMargin,
                             kCardVPadding + videoH - labelH - kNameMargin,
                             labelW, labelH);
+    _nameLabel->setAlignment(Qt::AlignCenter);
     _nameLabel->raise();
 }
 
@@ -140,6 +144,9 @@ void ParticipantCard::set_speaking(bool speaking) {
         return;
     }
     _speaking = speaking;
+    if (_display) {
+        _display->set_speaking(_speaking && !_videoMode, false);
+    }
     update();
 }
 
@@ -149,12 +156,15 @@ void ParticipantCard::paintEvent(QPaintEvent *event) {
         return;
     }
     QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setRenderHint(QPainter::Antialiasing); //开启抗锯齿
     QPen pen(ui::ThemeManager::instance().color(QStringLiteral("success")), 2.0);
     painter.setPen(pen);
     painter.setBrush(Qt::NoBrush);
-    painter.drawRoundedRect(rect().adjusted(1, 1, -1, -1), kCardRadius,
-                            kCardRadius);
+    if (_videoMode) {
+        // 视频：绿色卡片边框；头像圆环由 VideoGLWidget 的 overlay 画
+        painter.drawRoundedRect(rect().adjusted(1, 1, -1, -1), kCardRadius,
+                                kCardRadius);
+    }
 }
 
 void ParticipantCard::resizeEvent(QResizeEvent *event) {

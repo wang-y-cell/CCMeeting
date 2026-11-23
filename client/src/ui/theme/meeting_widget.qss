@@ -20,18 +20,12 @@ QWidget#topStatusBar {
 
 /* ---------- 主画面 ---------- */
 
-QGroupBox#groupBox_2 {
+QWidget#groupBox_2 {
     background-color: @videoBackdrop;
     border: 1px solid @borderSoft;
     border-radius: 0px;
     margin-top: 0;
     padding-top: 0;
-}
-
-QGroupBox#groupBox_2::title {
-    height: 0;
-    width: 0;
-    color: transparent;
 }
 
 VideoGLWidget#mainshow_label {
@@ -240,7 +234,7 @@ QFrame#pillSep2 {
     background-color: @borderSoft;
     border: none;
     max-width: 1px;
-    margin: 14px 6px;
+    margin: 10px 5px;
 }
 
 /* 所有工具按钮：默认无底色无边框，悬停才出现淡底 */
@@ -253,10 +247,10 @@ QToolButton#shareScreenBtn,
 QToolButton#leaveMeetingBtn {
     background-color: transparent;
     border: none;
-    border-radius: 8px;
+    border-radius: 7px;
     color: @textMuted;
     font-size: 11px;
-    padding: 4px 8px;
+    padding: 3px 6px;
 }
 
 QToolButton#btnSideMembers:hover,

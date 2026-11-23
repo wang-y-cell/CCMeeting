@@ -269,14 +269,6 @@ void ui::MeetingWindow::init_main_overlay() {
         " padding: 1px 6px; font-size: 12px; }"));
     _mainNameLabel->hide();
 
-    _mainSpeakingBorder =
-        new QWidget(_mainVideoHost ? _mainVideoHost : ui_.mainshow_label);
-    _mainSpeakingBorder->setAttribute(Qt::WA_TransparentForMouseEvents);
-    _mainSpeakingBorder->setAttribute(Qt::WA_StyledBackground, true);
-    _mainSpeakingBorder->setStyleSheet(QStringLiteral(
-        "background: transparent; border: 2px solid rgba(34,197,94,1);"));
-    _mainSpeakingBorder->hide();
-
     ui_.mainshow_label->installEventFilter(this);
     if (participants()) {
         connect(participants(), &ParticipantsController::main_changed, this,
@@ -286,7 +278,7 @@ void ui::MeetingWindow::init_main_overlay() {
 }
 
 void ui::MeetingWindow::update_main_overlay() {
-    if (!ui_.mainshow_label || !_mainNameLabel || !_mainSpeakingBorder) {
+    if (!ui_.mainshow_label || !_mainNameLabel) {
         return;
     }
     const QRect area = ui_.mainshow_label->rect();
@@ -311,7 +303,7 @@ void ui::MeetingWindow::update_main_overlay() {
     if (name.isEmpty()) {
         _mainNameLabel->hide();
     } else {
-        const int margin = 10;
+        const int margin = 10; //姓名标签距离视频边框的距离
         const int maxW = qMax(24, area.width() - 2 * margin);
         _mainNameLabel->setMaximumWidth(maxW);
         _mainNameLabel->adjustSize();
@@ -319,28 +311,16 @@ void ui::MeetingWindow::update_main_overlay() {
         const int labelH = qMax(18, _mainNameLabel->sizeHint().height());
         _mainNameLabel->setGeometry(margin, area.height() - labelH - margin,
                                     labelW, labelH);
+        _mainNameLabel->setAlignment(Qt::AlignCenter);
         _mainNameLabel->show();
         _mainNameLabel->raise();
     }
 
-    // 边框画在主画面背后的 host 上，不覆盖 VideoGLWidget 本身
-    if (_mainSpeakingBorder->parentWidget() == _mainVideoHost) {
-        _mainSpeakingBorder->setGeometry(
-            _mainVideoHost->rect().adjusted(1, 1, -1, -1));
-    } else {
-        _mainSpeakingBorder->setGeometry(1, 1, area.width() - 2,
-                                          area.height() - 2);
-    }
-    _mainSpeakingBorder->setVisible(_mainSpeaking);
 }
 
 void ui::MeetingWindow::set_main_speaking(bool speaking) {
-    _mainSpeaking = speaking;
-    if (_mainSpeakingBorder) {
-        _mainSpeakingBorder->setVisible(speaking);
-        if (speaking) {
-            _mainSpeakingBorder->raise();
-        }
+    if (ui_.mainshow_label) {
+        ui_.mainshow_label->set_speaking(speaking);
     }
 }
 

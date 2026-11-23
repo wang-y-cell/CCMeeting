@@ -61,9 +61,9 @@ private:
     QString _displayName;
     QString _avatarUrl;
     VideoGLWidget *_display = nullptr;
-    QLabel *_nameLabel = nullptr;
-    bool _videoMode = false;
-    bool _speaking = false;
+    QLabel *_nameLabel = nullptr; //名称标签
+    bool _videoMode = false; //如果当前是开启视频的模式
+    bool _speaking = false; //当前用户是否说话
 };
 
 #endif  // UI_COMPOSITES_PARTICIPANT_CARD_H

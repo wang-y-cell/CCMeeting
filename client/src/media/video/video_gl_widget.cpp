@@ -2,6 +2,8 @@
 
 #include <QDebug>
 #include <QOpenGLContext>
+#include <QPaintEvent>
+#include <QPainter>
 #include <algorithm>
 
 namespace {
@@ -65,9 +67,51 @@ QImage toRgba8888(const QImage &image) {
 
 } // namespace
 
+namespace {
+
+/** @brief 画在 VideoGLWidget 上层的说话提示：视频矩形框 / 头像圆环 */
+class SpeakingOverlay : public QWidget {
+public:
+    explicit SpeakingOverlay(VideoGLWidget *owner)
+        : QWidget(owner), m_owner(owner) {
+        setAttribute(Qt::WA_TransparentForMouseEvents);
+        setAttribute(Qt::WA_TranslucentBackground);
+        setAttribute(Qt::WA_NoSystemBackground);
+        setGeometry(owner->rect());
+    }
+
+protected:
+    void paintEvent(QPaintEvent *) override {
+        if (!m_owner || !m_owner->speaking()) {
+            return;
+        }
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(QPen(QColor(34, 197, 94), 2.0));
+        painter.setBrush(Qt::NoBrush);
+        if (m_owner->video_content()) {
+            if (m_owner->draw_video_border()) {
+                painter.drawRect(rect().adjusted(1, 1, -1, -1));
+            }
+        } else {
+            const QRect avatar = m_owner->avatar_rect();
+            if (avatar.isValid() && !avatar.isEmpty()) {
+                painter.drawEllipse(avatar.adjusted(1, 1, -1, -1));
+            }
+        }
+    }
+
+private:
+    VideoGLWidget *m_owner = nullptr;
+};
+
+}  // namespace
+
 VideoGLWidget::VideoGLWidget(QWidget *parent) : QOpenGLWidget(parent) {
     setMinimumSize(1, 1);
     setUpdateBehavior(QOpenGLWidget::NoPartialUpdate);
+    m_speakingOverlay = new SpeakingOverlay(this);
+    m_speakingOverlay->show();
 }
 
 VideoGLWidget::~VideoGLWidget() {
@@ -522,6 +566,38 @@ void VideoGLWidget::drawTexturedQuad(const QRectF &dest, bool yuv) {
     program->release();
 }
 
+void VideoGLWidget::set_speaking(bool speaking, bool draw_video_border) {
+    m_speaking = speaking;
+    m_drawVideoBorder = draw_video_border;
+    if (m_speakingOverlay) {
+        m_speakingOverlay->setGeometry(rect());
+        m_speakingOverlay->update();
+        m_speakingOverlay->setVisible(speaking);
+        if (speaking) {
+            m_speakingOverlay->raise();
+        }
+    }
+}
+
+bool VideoGLWidget::video_content() const {
+    return m_drawnKind == ContentKind::I420;
+}
+
+QRect VideoGLWidget::avatar_rect() const {
+    if (m_drawnKind != ContentKind::Rgba || m_videoW <= 0 || m_videoH <= 0) {
+        return {};
+    }
+    return destRectForFrame(m_videoW, m_videoH).toRect();
+}
+
+void VideoGLWidget::resizeEvent(QResizeEvent *event) {
+    QOpenGLWidget::resizeEvent(event);
+    if (m_speakingOverlay) {
+        m_speakingOverlay->setGeometry(rect());
+        m_speakingOverlay->raise();
+    }
+}
+
 void VideoGLWidget::setClearColor(const QColor &color) {
     if (!color.isValid()) {
         return;
@@ -581,4 +657,8 @@ void VideoGLWidget::paintGL() {
     const QRectF dest = destRectForFrame(m_videoW, m_videoH);
     //绘制视频帧或头像图
     drawTexturedQuad(dest, m_drawnKind == ContentKind::I420);
+    if (m_speakingOverlay && m_speaking) {
+        m_speakingOverlay->update();
+        m_speakingOverlay->raise();
+    }
 }
