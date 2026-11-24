@@ -113,7 +113,7 @@ def create_app(config: AuthServerConfig | None = None) -> FastAPI:
             status = 403
         elif result.code == 500:
             status = 500
-        return _json_response(status, _login_payload(result))
+        return _json_response(status, _login_payload(result, config))
 
     # ---------------------------------------------------------------- 注册
     @app.post("/api/register")
@@ -131,7 +131,7 @@ def create_app(config: AuthServerConfig | None = None) -> FastAPI:
             status = 409
         elif result.code == 500:
             status = 500
-        return _json_response(status, _login_payload(result))
+        return _json_response(status, _login_payload(result, config))
 
     # ---------------------------------------------------------------- 头像
     @app.post("/api/upload-avatar")
@@ -325,7 +325,7 @@ async def _parse_update_profile_request(
 
 
 # ---------------------------------------------------------------- 响应构造
-def _login_payload(result) -> dict[str, Any]:
+def _login_payload(result, config: AuthServerConfig) -> dict[str, Any]:
     payload: dict[str, Any] = {"code": result.code, "message": result.message}
     if result.success and result.user is not None:
         user = result.user
