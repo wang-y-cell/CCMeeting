@@ -31,6 +31,7 @@ from .db import Database
 from .repository import UserRepository
 from .tokens import issue_token, verify_token
 from .service import AuthService
+from .turn import make_turn_credentials
 
 logger = logging.getLogger("ccmeeting.auth")
 
@@ -342,6 +343,11 @@ def _login_payload(result) -> dict[str, Any]:
             "extra_json": user.extra_json,
             "token": issue_token(user.id),
         }
+        turn = make_turn_credentials(config.turn.secret, user.id,
+                                     config.turn.ttl_seconds,
+                                     config.turn.uris)
+        if turn is not None:
+            payload["data"]["turn"] = turn
     return payload
 
 

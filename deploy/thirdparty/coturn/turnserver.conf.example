@@ -7,8 +7,7 @@
 # 占位符：
 #   ${PRIVATE_IP}     服务器内网 IP（直连公网时与公网 IP 相同）
 #   ${PUBLIC_IP}      服务器公网 IP
-#   ${TURN_USER}      TURN 用户名（必须与客户端 client.json 一致）
-#   ${TURN_PASSWORD}  TURN 密码（必须与客户端 client.json 一致，建议强随机）
+#   ${TURN_SECRET}    coturn 与认证服务共享的 TURN 临时凭据密钥
 #
 # 注意：密码不要提交进仓库；本文件只作为模板。
 
@@ -23,10 +22,10 @@ relay-threads=50
 min-port=49152
 max-port=50100
 fingerprint
-lt-cred-mech
+# 临时 TURN 凭据：用户名 = 过期时间:userId，密码 = base64(HMAC-SHA1(secret, username))
+use-auth-secret
+static-auth-secret=${TURN_SECRET}
 realm=shanghai
-user=${TURN_USER}:${TURN_PASSWORD}
-userdb=/etc/turnuserdb.conf
 cert=/etc/turn_server_cert.pem
 pkey=/etc/turn_server_pkey.pem
 no-cli

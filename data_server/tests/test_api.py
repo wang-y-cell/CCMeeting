@@ -79,8 +79,8 @@ def test_register_success_and_duplicate(ctx):
     data = body["data"]
     assert data["username"] == "alice"
     assert data["name"] == "alice"
-    # 默认头像 = public_base_url + default_avatar_path
-    assert data["avatar"] == "http://testserver/static/avatar/default.png"
+    # 默认头像由客户端本地 SVG 提供，注册时服务端不再写远程默认 URL
+    assert data["avatar"] == ""
     for key in ("id", "info", "gender", "birthday", "address", "phone", "email", "extra_json"):
         assert key in data
 

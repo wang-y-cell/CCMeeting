@@ -120,8 +120,9 @@ class AuthService:
             if self._repo.find_credential_by_username(username) is not None:
                 return LoginResult(code=409, message="username already exists")
 
+            # 默认头像由客户端内置 SVG 提供；服务端不再给新用户写入远程默认头像。
             user_id = self._repo.create_user(
-                username, hash_password(password), self._config.default_avatar_url()
+                username, hash_password(password), ""
             )
             if user_id is None:
                 return LoginResult(code=500, message="failed to create user")

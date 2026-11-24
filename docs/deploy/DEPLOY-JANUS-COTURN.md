@@ -133,10 +133,11 @@ relay-threads=50
 min-port=49152
 max-port=65535                        # 建议收窄到 49152-50100 以减少安全组规则
 fingerprint
-lt-cred-mech
+# 临时 TURN 凭据：用户名 = 过期时间:userId，密码 = base64(HMAC-SHA1(secret, username))
+# 认证服务与 coturn 必须使用同一个 CCMEETING_TURN_SECRET
+use-auth-secret
+static-auth-secret=<与认证服务共享的强随机密钥>
 realm=shanghai
-user=<用户名>:<强密码>                 # 必须与客户端 client.json 的 TURN 账号一致
-userdb=/etc/turnuserdb.conf
 cert=/etc/turn_server_cert.pem
 pkey=/etc/turn_server_pkey.pem
 no-cli
@@ -248,11 +249,8 @@ sudo systemctl enable --now janus coturn
   "webrtc": {
     "janus_ws_url": "ws://8.153.155.18:8188/",        // ← Janus 地址
     "ice_servers": [
-      { "uri": "stun:8.153.155.18:3478", "username": "", "password": "" },
-      { "uri": "turn:8.153.155.18:3478?transport=udp",  // ← coturn 地址
-        "username": "<用户名>", "password": "<密码>" },   // ← 与 turnserver.conf 的 user= 一致
-      { "uri": "turn:8.153.155.18:3478?transport=tcp",
-        "username": "<用户名>", "password": "<密码>" }
+      // client.json 只保留 STUN；TURN 临时凭据由登录接口返回
+      { "uri": "stun:8.153.155.18:3478", "username": "", "password": "" }
     ]
   }
 }
@@ -267,7 +265,7 @@ sudo systemctl enable --now janus coturn
 | 项 | 现状 | 建议 |
 |---|---|---|
 | Janus `admin_secret` | `janusoverlord`（社区默认值，公开可查） | 改成强随机值，且 `admin_ws=false` 保持不变 |
-| coturn 账号 | `user=wang_y:<redacted>`（弱口令） | 改成强密码，同步改客户端；或改 `use-auth-secret` + 服务端签发临时凭据 |
+| coturn 账号 | 已改为 `use-auth-secret` 临时凭据 | 认证服务与 coturn 共享 `CCMEETING_TURN_SECRET`，客户端不再保存 TURN 密码 |
 | 证书 | 自签，coturn 的 CN 是 OpenSSL 默认值 | 用域名 + Let's Encrypt |
 | Janus 管理接口 | 未开放（`admin_ws=false` ✅） | 保持 |
 | coturn CLI | `no-cli` ✅ | 保持 |
@@ -312,7 +310,7 @@ curl -s http://127.0.0.1:8188/janus/info | head -c 200
 # 期望：{"janus":"server_info",...}
 
 # 3) TURN 连通性（★ 必须在另一台公网机器上执行）
-turnutils_uclient -u <用户名> -w <密码> -v <公网IP>
+turnutils_uclient -u <临时用户名> -w <临时密码> -v <公网IP>
 # 期望：拿到 relay 地址，relay 端口落在 min-port~max-port 区间
 #
 # 如果没有另一台机器，至少从本机做 STUN 探测（证明 3478 可达）：
@@ -339,5 +337,5 @@ tcpdump -i any -n udp portrange 20000-40000 -c 20
 | relay 分配失败 | relay 端口段被拦或耗尽 | 放行 UDP 段、收窄为 49152–50100 |
 | Janus 反复重启 | unit 里带了 `-b` | 去掉 `-b` |
 | coturn 反复重启 | unit 里带了 `-o` | 去掉 `-o` |
-| 客户端 TURN 认证失败 | `user=` 与 client.json 不一致 | 两边同步 |
+| 客户端 TURN 认证失败 | 认证服务与 coturn 的 `CCMEETING_TURN_SECRET` 不一致 | 两边使用同一个强随机密钥 |
 | Janus 起不来 | 缺依赖（libnice/libsrtp/libwebsockets） | 按第 3.1 节补装 |

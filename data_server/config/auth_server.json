@@ -3,7 +3,6 @@
     "listen_address": "127.0.0.1",
     "listen_port": 9000
   },
-
   "mysql": {
     "host": "127.0.0.1",
     "port": 3306,
@@ -18,5 +17,14 @@
     "upload_root": "./uploads",
     "default_avatar_path": "/static/avatar/default.png",
     "max_avatar_bytes": 2097152
+  },
+  "turn": {
+    "secret": "",
+    "ttl_seconds": 3600,
+    "realm": "shanghai",
+    "uris": [
+      "turn:8.153.155.18:3478?transport=udp",
+      "turn:8.153.155.18:3478?transport=tcp"
+    ]
   }
 }

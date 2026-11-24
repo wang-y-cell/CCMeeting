@@ -47,11 +47,22 @@ class MysqlConfig:
 
 
 @dataclass
+class TurnConfig:
+    """coturn use-auth-secret 的共享密钥与临时凭据参数。"""
+
+    secret: str = ""
+    ttl_seconds: int = 3600
+    realm: str = "shanghai"
+    uris: list[str] = field(default_factory=list)
+
+
+@dataclass
 class AuthServerConfig:
     listen_address: str = "0.0.0.0"
     listen_port: int = 9000
     mysql: MysqlConfig = field(default_factory=MysqlConfig)
     assets: AssetsConfig = field(default_factory=AssetsConfig)
+    turn: TurnConfig = field(default_factory=TurnConfig)
 
     # ---- 与 C++ 版同名的语义 ----
     def default_avatar_url(self) -> str:
@@ -154,12 +165,25 @@ def _apply(config: AuthServerConfig, root: dict) -> None:
         if isinstance(assets.get("max_avatar_bytes"), int):
             config.assets.max_avatar_bytes = assets["max_avatar_bytes"]
 
+    turn = root.get("turn")
+    if isinstance(turn, dict):
+        if isinstance(turn.get("secret"), str):
+            config.turn.secret = turn["secret"]
+        if isinstance(turn.get("ttl_seconds"), int):
+            config.turn.ttl_seconds = turn["ttl_seconds"]
+        if isinstance(turn.get("realm"), str):
+            config.turn.realm = turn["realm"]
+        if isinstance(turn.get("uris"), list):
+            config.turn.uris = [u for u in turn["uris"] if isinstance(u, str)]
+
     # 环境变量覆盖（只用于本地调试，不改变线上语义）
     if os.environ.get("CCMEETING_AUTH_PORT"):
         config.listen_port = int(os.environ["CCMEETING_AUTH_PORT"])
     if os.environ.get("CCMEETING_AUTH_PUBLIC_BASE"):
         config.assets.public_base_url = os.environ["CCMEETING_AUTH_PUBLIC_BASE"]
     # MySQL：密码优先取环境变量（生产环境不要把密码写进配置文件）
+    if os.environ.get("CCMEETING_TURN_SECRET"):
+        config.turn.secret = os.environ["CCMEETING_TURN_SECRET"]
     if os.environ.get("CCMEETING_MYSQL_PASSWORD"):
         config.mysql.password = os.environ["CCMEETING_MYSQL_PASSWORD"]
     if os.environ.get("CCMEETING_MYSQL_HOST"):
