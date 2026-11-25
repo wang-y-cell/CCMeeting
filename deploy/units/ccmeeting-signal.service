@@ -1,10 +1,11 @@
 [Unit]
-Description=CloudMeeting signaling server (WebSocket 8888)
+Description=CloudMeeting signaling server (loopback 127.0.0.1:8889, public 8888 via nginx stream)
 After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/root/code/build/server-wss/message_server
+# 二进制不读取相对路径文件（配置全部来自环境变量），因此不设置 WorkingDirectory，
+# 避免依赖未纳入部署脚本的构建目录；ExecStart 路径见部署说明。
 ExecStart=/root/code/build/server-wss/message_server/CloudMeetingServer
 Restart=always
 RestartSec=2

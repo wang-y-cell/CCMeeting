@@ -30,7 +30,7 @@ BK=/root/deploy-backup-$STAMP
 LOG_FILE=/root/deploy.log
 
 log()  { printf '[deploy] %s\n' "$*" | tee -a "$LOG_FILE"; }
-die()  { printf '[deploy][ERROR] %s\n' "$*" >&2 | tee -a "$LOG_FILE"; exit 1; }
+die()  { printf '[deploy][ERROR] %s\n' "$*" | tee -a "$LOG_FILE" >&2; exit 1; }
 
 need_root() { [ "$(id -u)" -eq 0 ] || die "需要 root 执行"; }
 
@@ -48,11 +48,15 @@ backup() {
     ( cd "$REPO" && git rev-parse HEAD > "$BK/commit.txt" ) || true
     if systemctl is-active --quiet mysql && [ -f "$ENV_FILE" ]; then
         set -a; . "$ENV_FILE"; set +a
-        mysqldump -h "${CCMEETING_MYSQL_HOST:-127.0.0.1}" \
-                  -u "${CCMEETING_MYSQL_USER:-ccmeeting}" \
-                  -p"${CCMEETING_MYSQL_PASSWORD:-}" \
-                  --single-transaction --no-tablespaces \
-                  "${CCMEETING_MYSQL_DATABASE:-ccmeeting}" > "$BK/db.sql" 2>/dev/null \
+        local dump_args=(-h "${CCMEETING_MYSQL_HOST:-127.0.0.1}"
+                         -u "${CCMEETING_MYSQL_USER:-ccmeeting}"
+                         --single-transaction --no-tablespaces)
+        # 空密码时不能传裸 "-p"：mysqldump 会交互式等待输入，脚本会静默卡死
+        if [ -n "${CCMEETING_MYSQL_PASSWORD:-}" ]; then
+            dump_args+=("-p${CCMEETING_MYSQL_PASSWORD}")
+        fi
+        dump_args+=("${CCMEETING_MYSQL_DATABASE:-ccmeeting}")
+        mysqldump "${dump_args[@]}" > "$BK/db.sql" 2>/dev/null \
             && log "数据库已备份: $BK/db.sql" \
             || log "mysqldump 失败（继续部署）"
     fi
@@ -64,9 +68,11 @@ sync_repo() {
     git fetch --quiet origin
     git checkout -f "$REF" >/dev/null 2>&1
     log "代码已同步到 $REF: $(git rev-parse --short HEAD)"
-    # 服务器上 public_base_url 用环境变量覆盖；这里保证配置文件不会回落到 127.0.0.1
+    # 服务器上 public_base_url 用环境变量覆盖；这里保证配置文件不会回落到 127.0.0.1。
+    # 必须是客户端可达的 https 入口（nginx 443）：9000 只在 127.0.0.1 上监听，
+    # 写成 http://IP:9000 会让登录返回的头像 URL 不可达（见 data_server/README.md）。
     if [ -f data_server/config/auth_server.json ]; then
-        sed -i 's#"public_base_url": *"[^"]*"#"public_base_url": "http://8.153.155.18:9000"#' \
+        sed -i 's#"public_base_url": *"[^"]*"#"public_base_url": "https://8.153.155.18"#' \
             data_server/config/auth_server.json || true
     fi
 }
@@ -157,7 +163,7 @@ case "$TARGET" in
         install_units
         verify || log "警告：当前服务未全部健康（仅安装了 unit）"
         ;;
-    *)
+    all|auth|signal|janus|coturn)
         backup
         sync_repo
         install_units
@@ -171,5 +177,8 @@ case "$TARGET" in
             rollback
             die "部署失败，已回滚（备份：$BK）"
         fi
+        ;;
+    *)
+        die "未知部署目标: $TARGET（可选：all|auth|signal|janus|coturn|units|verify|backup）"
         ;;
 esac

@@ -204,7 +204,9 @@ subjectAltName = IP:8.153.155.18
 - `POST /api/upload-avatar`、`POST /api/update-profile` 必须带
   `Authorization: Bearer <token>`，否则 401；
 - 信令 `message_server` 在 `CCMEETING_REQUIRE_AUTH=1` 时校验
-  `create_meeting` / `join_meeting` 的 `a` 字段，token 无效返回失败响应。
+  `create_meeting` / `join_meeting` 的**顶层 `token` 字段**（协议 v2；v1 的 `a` 字段已删除），
+  token 无效时返回 `code=-3`。令牌算法与 `data_server` 完全相同，两边必须共用同一个
+  `CCMEETING_TOKEN_SECRET`。
 
 共享密钥：
 

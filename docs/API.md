@@ -60,6 +60,10 @@ token = `base64url("<user_id>:<exp>").base64url(HMAC-SHA256(secret,payload))`，
 
 **写接口的身份只取自 token**，请求里带 `user_id` 会被忽略。
 
+**默认头像由客户端提供，不从服务端拉取**：`avatar` 为空、或指向 `/static/avatar/default.png`
+（任何 host / 端口 / 协议形态）时，客户端直接渲染内置 `:/ui/images/default-avatar.svg`，
+不发起任何网络请求。服务端不再生成默认头像 URL。
+
 | code | 含义 |
 |---|---|
 | 400 | 请求体非法 / 参数校验失败 |

@@ -10,9 +10,9 @@ general: {
 	ws_port = 8188
 	ws_interface = "0.0.0.0"
 	wss_port = 8989
-	# 证书（自签或 Let's Encrypt）
-	cert_pem = "/opt/janus/share/janus/certs/mycert.pem"
-	key_pem = "/opt/janus/share/janus/certs/mykey.pem"
+	# 证书（与 443/8888 共用同一张自签证书，见 docs/deploy/TLS.md 第 9 节）
+	cert_pem = "/etc/ccmeeting/tls/cert.pem"
+	key_pem = "/etc/ccmeeting/tls/key.pem"
 	# 管理接口保持关闭
 	admin_ws = false
 	admin_ws_port = 7188
