@@ -235,7 +235,7 @@ int main(int argc, char *argv[]) {
     // 诊断用：验证内置 CA 导出（不影响正常启动）
     if (app.arguments().contains(QStringLiteral("--tls-ca-selftest"))) {
         const std::string ca = config::tls_ca_file();
-        std::printf("tls_ca_file=[%s]\\n", ca.c_str());
+        std::printf("tls_ca_file=[%s]\n", ca.c_str());
         std::fflush(stdout);
         return ca.empty() ? 2 : 0;
     }
@@ -333,19 +333,13 @@ int main(int argc, char *argv[]) {
                                  .value(QStringLiteral("ui/theme"),
                                         QStringLiteral("system"))
                                  .toString();
-        const auto resolve_mode = [](const QString &m) {
-            if (m == QLatin1String("light")) {
-                return ui::Theme::Light;
-            }
-            if (m == QLatin1String("dark")) {
-                return ui::Theme::Dark;
-            }
-            // system：按系统配色决定
+        // system：按系统配色决定；light/dark 的解析统一走 ThemeManager::parse
+        const auto system_theme = []() {
             const auto scheme = QGuiApplication::styleHints()->colorScheme();
             return scheme == Qt::ColorScheme::Light ? ui::Theme::Light
                                                     : ui::Theme::Dark;
         };
-        theme.set_theme(resolve_mode(mode));
+        theme.set_theme(ui::ThemeManager::parse(mode, system_theme()));
 
         if (theme.apply_global(QStringLiteral(":/Style/source/style.qss"))) {
             spdlog::info("[main] style.qss applied (theme={})",
@@ -406,7 +400,7 @@ int main(int argc, char *argv[]) {
 
     // 空闲预热 Qt Multimedia 设备枚举：首次 videoInputs() 冷启动 500ms+，
     // 若拖到用户第一次打开设置页才做，会表现为"点设置卡一下"。
-    QTimer::singleShot(1500, &loginDialog, [&loginDialog]() {
+    QTimer::singleShot(1500, &loginDialog, []() {
         QElapsedTimer timer;
         timer.start();
         const auto cameras = QMediaDevices::videoInputs();
@@ -414,7 +408,6 @@ int main(int argc, char *argv[]) {
         spdlog::info("[main] devices warmed in {}ms (cameras={} mics={})",
                      static_cast<long long>(timer.elapsed()), cameras.size(),
                      mics.size());
-        Q_UNUSED(loginDialog);
     });
     const int login_result = loginDialog.exec();
     spdlog::info("[main] login.exec returned={} (Accepted={})", login_result,

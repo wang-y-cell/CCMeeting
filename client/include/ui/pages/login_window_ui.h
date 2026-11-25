@@ -14,17 +14,12 @@ class LoginWindowUi {
 public:
     QStackedWidget *stackedWidget = nullptr;
     QWidget *loginPage = nullptr;
-    QLabel *logoLabel = nullptr;
-    QLabel *brandLabel = nullptr;
-    QLabel *subtitleLabel = nullptr;
     QLineEdit *account_line = nullptr;
     QLineEdit *password_line = nullptr;
     QPushButton *login_button = nullptr;
     QLabel *hintLabel = nullptr;
     QLabel *createUserLink = nullptr;
     QWidget *registerPage = nullptr;
-    QLabel *registerBrandLabel = nullptr;
-    QLabel *registerSubtitleLabel = nullptr;
     QLineEdit *register_username_line = nullptr;
     QLineEdit *register_password_line = nullptr;
     QPushButton *register_button = nullptr;

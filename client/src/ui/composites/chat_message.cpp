@@ -57,7 +57,6 @@ QSize ChatMessage::relayoutForWidth(int width) {
     if (m_userType == User_Time) {
         const QSize size(width, m_metrics.s(m_metrics.timeRowHeight));
         resize(size);
-        m_allSize = size;
         m_curTime =
             QDateTime::fromSecsSinceEpoch(m_time.toInt()).toString("ddd hh:mm");
         update();
@@ -65,7 +64,6 @@ QSize ChatMessage::relayoutForWidth(int width) {
     }
 
     const QSize size = fontRect(m_msg);
-    m_allSize = size;
     if (m_userType == User_Me && !m_isSending && m_loading &&
         m_loading->isVisible()) {
         m_loading->move(
@@ -78,7 +76,7 @@ QSize ChatMessage::relayoutForWidth(int width) {
     return size;
 }
 
-void ChatMessage::setText(QString text, QString time, QSize allSize, QString ip,
+void ChatMessage::setText(QString text, QString time, QString ip,
                           ChatMessage::User_Type userType,
                           const QString &avatarUrl) {
     m_msg = text;
@@ -86,7 +84,6 @@ void ChatMessage::setText(QString text, QString time, QSize allSize, QString ip,
     m_time = time;
     m_curTime =
         QDateTime::fromSecsSinceEpoch(time.toInt()).toString("ddd hh:mm");
-    m_allSize = allSize;
     m_ip = ip;
     if (userType == User_Me || userType == User_She) {
         loadAvatar(avatarUrl, userType);

@@ -73,8 +73,6 @@ private:
     void initConnect() const;
     /** @brief 创建内部 QPlainTextEdit 与布局 */
     void initUI();
-    /** @brief 返回光标下当前单词 */
-    QString textUnderCursor();
     /**
      * @brief 拦截编辑器按键，实现 @ 段原子删除
      * @param obj 事件对象

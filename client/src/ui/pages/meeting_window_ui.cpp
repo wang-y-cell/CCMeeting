@@ -3,15 +3,12 @@
 #include "ui/foundation/icon_provider.h"
 #include "ui/foundation/theme_manager.h"
 
-#include "ui/foundation/theme_manager.h"
-
 #include "ui/composites/my_text_edit.h"
 #include "media/video/video_gl_widget.h"
 
 #include <QAbstractScrollArea>
 #include <QFrame>
 #include <QGridLayout>
-#include <QGroupBox>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QListWidget>
@@ -239,7 +236,7 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
     scrollArea->setWidgetResizable(true);
     setupStableVerticalScrollBar(scrollArea);
 
-    scrollAreaWidgetContents = new QWidget();
+    auto *scrollAreaWidgetContents = new QWidget();
     scrollAreaWidgetContents->setObjectName(
         QStringLiteral("scrollAreaWidgetContents"));
     scrollAreaWidgetContents->setSizePolicy(QSizePolicy::Preferred,

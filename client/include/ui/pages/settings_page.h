@@ -24,10 +24,6 @@ class SettingsPage : public Page {
     Q_OBJECT
 
 public:
-    QString page_id() const override { return QStringLiteral("settings"); }
-    QString title() const override { return tr("设置"); }
-    QString icon_name() const override { return QStringLiteral("settings"); }
-    int nav_order() const override { return 40; }
 public:
     explicit SettingsPage(QWidget *parent = nullptr);
     ~SettingsPage() override;
@@ -66,8 +62,8 @@ private:
     void rebuildResolutionList();
     void rebuildFpsList();
     void scheduleVideoPreview();
-    /** @param deferHardware true：先让 UI 切页，再异步 stop 摄像头（避免卡顿） */
-    void stopVideoPreview(bool deferHardware = true);
+    /** @brief 停止摄像头预览并复位预览区文案 */
+    void stopVideoPreview();
 
     void syncPreviewForCategory(int row);
     /** @brief 按服务状态刷新麦克风按钮与电平条 */

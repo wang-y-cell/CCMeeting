@@ -82,7 +82,6 @@ private:
     std::string preferred_screen_id() const;
 
     MeetingRtcObserver *_observer = nullptr;
-    QWidget *_owner = nullptr;
     xrtc::IXRtcEngine *_rtc = nullptr;
 
     std::string _videoDeviceId;
@@ -93,7 +92,6 @@ private:
     bool _videoOn = false;
     bool _audioOn = false;
     bool _screenOn = false;
-    StartOptions _options;
 };
 
 #endif // MEETING_MEDIA_CONTROLLER_H

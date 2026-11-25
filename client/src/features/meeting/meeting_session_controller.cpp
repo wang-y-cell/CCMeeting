@@ -12,7 +12,6 @@
 #include "media/recording/meeting_recorder.h"
 #include "protocol/network_manager.h"
 #include "protocol/net_header.h"
-#include "protocol/room_settings_flags.h"
 #include "ui/pages/meeting_window_ui.h"
 
 #include <QClipboard>
@@ -42,19 +41,22 @@ void MeetingSessionController::wire_settings_panel() {
     }
 
     connect(settings, &RoomSettingsController::settings_edited, this,
-            [this](std::uint32_t flags) {
+            [this](bool allow_record, bool allow_member_share) {
                 meeting::MeetingState &state = _host->state();
                 if (!_host->room_settings()->is_host() ||
                     (!state._createmeet && !state._joinmeet)) {
                     return;
                 }
-                spdlog::info("[MeetingWindow] host changed room settings=0x{:x}",
-                             flags);
+                spdlog::info("[MeetingWindow] host changed room settings "
+                             "allow_record={} allow_member_share={}",
+                             allow_record, allow_member_share);
                 if (_host->network()) {
-                    _host->network()->send_room_settings(flags);
+                    _host->network()->send_room_settings(allow_record,
+                                                         allow_member_share);
                 }
                 // 本地先落地，服务端广播回来时再校准一次
-                _host->room_settings()->apply_flags(flags);
+                _host->room_settings()->apply_settings(allow_record,
+                                                       allow_member_share);
             });
 
     connect(settings, &RoomSettingsController::copy_room_no_requested, this,
@@ -76,8 +78,8 @@ void MeetingSessionController::wire_settings_panel() {
                 }
             });
 
-    connect(settings, &RoomSettingsController::flags_applied, this,
-            [this](std::uint32_t) {
+    connect(settings, &RoomSettingsController::settings_applied, this,
+            [this](bool, bool) {
                 // 房主关闭「允许共享」后，正在共享的成员要立刻停
                 if (!(_host->room_settings() &&
                       _host->room_settings()->can_share_screen()) &&
@@ -283,7 +285,7 @@ void MeetingSessionController::reset_ui() {
     state._rtcJoined = false;
 
     if (_host->room_settings()) {
-        _host->room_settings()->apply_flags(ROOM_SETTINGS_DEFAULT);
+        _host->room_settings()->apply_settings(true, true);
         _host->room_settings()->set_session_active(false);
     }
     ui.openVedio->setText(QString(OPENVIDEO).toUtf8());

@@ -60,9 +60,10 @@ public:
                            const std::string &avatar_url);
     /**
      * @brief 房主修改房间开关（服务端会校验身份）
-     * @param flags 房间开关位掩码
+     * @param allow_record 是否允许录制
+     * @param allow_member_share 是否允许普通成员共享屏幕
      */
-    void send_room_settings(std::uint32_t flags);
+    void send_room_settings(bool allow_record, bool allow_member_share);
 
     void stop();
 

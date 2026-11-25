@@ -11,7 +11,10 @@
 
 MeetingMediaController::MeetingMediaController(MeetingRtcObserver *observer,
                                                QWidget *owner, QObject *parent)
-    : QObject(parent), _observer(observer), _owner(owner) {}
+    : QObject(parent), _observer(observer) {
+    // 提示一律通过 notice 信号交回界面层，本类不直接使用 owner
+    Q_UNUSED(owner);
+}
 
 MeetingMediaController::~MeetingMediaController() { shutdown(); }
 
@@ -140,7 +143,6 @@ void MeetingMediaController::start(const StartOptions &options) {
     if (options.room_no <= 0) {
         return;
     }
-    _options = options;
 
     try {
         // 观察者由界面持有（负责回调与帧合并），此处只负责挂载
@@ -162,6 +164,11 @@ void MeetingMediaController::start(const StartOptions &options) {
                              vad.talking_threshold, vad.release_ms);
             }
             spdlog::debug("[MeetingMedia] create_xrtc_engine ok");
+        }
+        // 引擎创建失败时下面的 set_video_capture_request/join 会解引用空指针
+        if (!_rtc) {
+            spdlog::error("[MeetingMedia] create_xrtc_engine 失败，无法开始媒体");
+            return;
         }
 
         _videoOn = false;

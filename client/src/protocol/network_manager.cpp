@@ -102,8 +102,10 @@ void NetworkManager::send_user_profile(qint64 user_id,
         user_id, display_name, avatar_url));
 }
 
-void NetworkManager::send_room_settings(std::uint32_t flags) {
-    hub_->enqueue_send(std::make_shared<RoomSettingsMessage>(flags));
+void NetworkManager::send_room_settings(bool allow_record,
+                                        bool allow_member_share) {
+    hub_->enqueue_send(
+        std::make_shared<RoomSettingsMessage>(allow_record, allow_member_share));
 }
 
 void NetworkManager::stop() {

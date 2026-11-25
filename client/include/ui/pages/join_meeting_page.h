@@ -13,7 +13,6 @@
 
 #include "ui/pages/page.h"
 
-class QLabel;
 class QLineEdit;
 class QPushButton;
 class RecentMeetingList;
@@ -27,10 +26,6 @@ public:
     explicit JoinMeetingPage(QWidget *parent = nullptr);
     ~JoinMeetingPage() override = default;
 
-    QString page_id() const override { return QStringLiteral("join"); }
-    QString title() const override;
-    QString icon_name() const override { return QStringLiteral("users"); }
-    int nav_order() const override { return 10; }
 
     /** @brief 懒刷新「最近加入的会议」 */
     void on_show() override;
@@ -45,9 +40,6 @@ signals:
 private:
     void build_ui();
 
-    QLabel *m_title = nullptr;
-    QLabel *m_desc = nullptr;
-    QLabel *m_field_label = nullptr;
     QLineEdit *m_room_input = nullptr;
     QPushButton *m_join_button = nullptr;
     RecentMeetingList *m_recent = nullptr;

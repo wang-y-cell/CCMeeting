@@ -18,10 +18,6 @@ class CreateMeetingPage : public Page {
     Q_OBJECT
 
 public:
-    QString page_id() const override { return QStringLiteral("create"); }
-    QString title() const override { return tr("创建会议"); }
-    QString icon_name() const override { return QStringLiteral("video"); }
-    int nav_order() const override { return 0; }
 
 public:
     ///设置默认最大参加人数

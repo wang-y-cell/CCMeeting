@@ -37,6 +37,36 @@ QString format_duration(qint64 ms) {
         .arg(seconds, 2, 10, QLatin1Char('0'));
 }
 
+/// sidecar .json → 条目（DB 同步与文件扫描共用，避免两处解析各写一遍后漂移）
+void apply_sidecar_meta(RecordingEntry &entry) {
+    if (entry.filePath.isEmpty()) {
+        return;
+    }
+    QFile meta(meta_path_for(entry.filePath));
+    if (!meta.open(QIODevice::ReadOnly)) {
+        return;
+    }
+    const QJsonObject root = QJsonDocument::fromJson(meta.readAll()).object();
+    const int room_no = root.value(QStringLiteral("roomNo")).toInt();
+    if (room_no > 0) {
+        entry.roomNo = room_no;
+    }
+    const qint64 duration =
+        static_cast<qint64>(root.value(QStringLiteral("durationMs")).toDouble());
+    if (duration > 0) {
+        entry.durationMs = duration;
+    }
+    const QDateTime started = QDateTime::fromString(
+        root.value(QStringLiteral("startedAt")).toString(), Qt::ISODate);
+    if (started.isValid()) {
+        entry.startedAt = started;
+    }
+    const QString title = root.value(QStringLiteral("title")).toString();
+    if (!title.isEmpty()) {
+        entry.title = title;
+    }
+}
+
 }  // namespace
 
 QString RecordingEntry::startedText() const {
@@ -137,22 +167,7 @@ void sync_db_from_files() {
         entry.title = info.completeBaseName();
         entry.startedAt = info.lastModified();
         entry.sizeBytes = info.size();
-        QFile meta(meta_path_for(path));
-        if (meta.open(QIODevice::ReadOnly)) {
-            const QJsonObject root =
-                QJsonDocument::fromJson(meta.readAll()).object();
-            entry.roomNo = root.value(QStringLiteral("roomNo")).toInt();
-            const qint64 duration = static_cast<qint64>(
-                root.value(QStringLiteral("durationMs")).toDouble());
-            if (duration > 0) {
-                entry.durationMs = duration;
-            }
-            const QDateTime started = QDateTime::fromString(
-                root.value(QStringLiteral("startedAt")).toString(), Qt::ISODate);
-            if (started.isValid()) {
-                entry.startedAt = started;
-            }
-        }
+        apply_sidecar_meta(entry);
         upsert_db_entry(entry);
     }
 
@@ -229,7 +244,7 @@ QVector<RecordingEntry> RecordingLibrary::scan() {
     if (Storage::instance().isOpen()) {
         sync_db_from_files();
         const QVector<RecordingEntry> fromDb = load_db_entries();
-        if (!fromDb.isEmpty() || scan_files().isEmpty()) {
+        if (!fromDb.isEmpty()) {
             return fromDb;
         }
         // 库里没有但磁盘有（例如库被清空）→ 回落文件系统
@@ -254,32 +269,7 @@ QVector<RecordingEntry> RecordingLibrary::scan_files() {
         entry.title = info.completeBaseName();
 
         // 读 sidecar 元数据（存在则以里面为准）
-        QFile meta(meta_path_for(entry.filePath));
-        if (meta.open(QIODevice::ReadOnly)) {
-            const QJsonObject root =
-                QJsonDocument::fromJson(meta.readAll()).object();
-            const int room_no = root.value(QStringLiteral("roomNo")).toInt();
-            if (room_no > 0) {
-                entry.roomNo = room_no;
-            }
-            const qint64 duration =
-                static_cast<qint64>(root.value(QStringLiteral("durationMs"))
-                                        .toDouble());
-            if (duration > 0) {
-                entry.durationMs = duration;
-            }
-            const QDateTime started = QDateTime::fromString(
-                root.value(QStringLiteral("startedAt")).toString(),
-                Qt::ISODate);
-            if (started.isValid()) {
-                entry.startedAt = started;
-            }
-            const QString title =
-                root.value(QStringLiteral("title")).toString();
-            if (!title.isEmpty()) {
-                entry.title = title;
-            }
-        }
+        apply_sidecar_meta(entry);
         entries.push_back(entry);
     }
 

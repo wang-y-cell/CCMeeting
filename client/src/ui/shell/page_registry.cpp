@@ -74,9 +74,4 @@ QList<PageMeta> PageRegistry::nav() const {
     return metas;
 }
 
-void PageRegistry::clear() {
-    m_entries.clear();
-    m_next_index = 0;
-}
-
 }  // namespace ui

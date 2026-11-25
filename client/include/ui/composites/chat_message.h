@@ -30,8 +30,6 @@ struct ChatBubbleMetrics {
     int topPad = 10;
     int bottomExtra = 15;
     int ipHeight = 20;
-    int ipLeftYOffset = -20;
-    int ipRightYOffset = -30;
     int cornerRadius = 4;
     int borderPad = 1;
 
@@ -68,11 +66,10 @@ public:
      * @brief 设置文案、时间戳、列表项整体尺寸、可选昵称与角色；会触发重绘并在本人未成功时显示加载动画
      * @param text 消息正文
      * @param time 时间戳字符串
-     * @param allSize 列表/容器尺寸
      * @param ip 可选昵称（历史字段名）
      * @param userType 消息角色
      */
-    void setText(QString text, QString time, QSize allSize, QString ip = "",
+    void setText(QString text, QString time, QString ip = "",
                  User_Type userType = User_Time,
                  const QString &avatarUrl = QString());
 
@@ -105,11 +102,6 @@ public:
      * @return 时间字符串
      */
     inline QString time() {return m_time;}
-    /**
-     * @brief 消息角色
-     * @return User_Type
-     */
-    inline User_Type userType() {return m_userType;}
 protected:
     /**
      * @brief 自绘气泡、头像与正文
@@ -124,7 +116,6 @@ private:
     QString m_curTime;   ///< 格式化后的显示时间，如 "ddd hh:mm"
     QString m_ip;        ///< 对方昵称（历史字段名）
 
-    QSize m_allSize;     ///< 所属列表/容器尺寸，用于布局参考
     User_Type m_userType = User_System; ///< 消息角色
 
     int m_kuangWidth;    ///< 气泡框总宽度

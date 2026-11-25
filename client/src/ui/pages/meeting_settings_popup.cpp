@@ -4,13 +4,12 @@
 
 #include "ui/foundation/window_effects.h"
 
-#include "protocol/net_header.h"
-
 #include <QCheckBox>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
+#include <QSignalBlocker>
 #include <QStyle>
 #include <QVBoxLayout>
 
@@ -163,12 +162,14 @@ void ui::MeetingSettingsPopup::set_host(bool is_host) {
     _hostHint->setVisible(!is_host);
 }
 
-void ui::MeetingSettingsPopup::set_settings(std::uint32_t flags) {
-    _flags = flags;
+void ui::MeetingSettingsPopup::set_settings(bool allow_record,
+                                            bool allow_member_share) {
+    _allowRecordSetting = allow_record;
+    _allowShareSetting = allow_member_share;
     const QSignalBlocker blockRecord(_allowRecord);
     const QSignalBlocker blockShare(_allowShare);
-    _allowRecord->setChecked((flags & ROOM_SETTINGS_ALLOW_RECORD) != 0);
-    _allowShare->setChecked((flags & ROOM_SETTINGS_ALLOW_MEMBER_SHARE) != 0);
+    _allowRecord->setChecked(allow_record);
+    _allowShare->setChecked(allow_member_share);
 }
 
 void ui::MeetingSettingsPopup::set_can_record(bool can_record) {
@@ -201,18 +202,18 @@ void ui::MeetingSettingsPopup::set_recording(bool recording, qint64 elapsed_ms) 
 }
 
 void ui::MeetingSettingsPopup::emit_settings() {
+    const bool allow_record = _allowRecord->isChecked();
+    const bool allow_member_share = _allowShare->isChecked();
     if (!_isHost) {
         // 非房主不会走到这里（控件已禁用），兜底再挡一次
-        set_settings(_flags);
+        set_settings(_allowRecordSetting, _allowShareSetting);
         return;
     }
-    std::uint32_t flags = 0;
-    if (_allowRecord->isChecked())
-        flags |= ROOM_SETTINGS_ALLOW_RECORD;
-    if (_allowShare->isChecked())
-        flags |= ROOM_SETTINGS_ALLOW_MEMBER_SHARE;
-    if (flags == _flags)
+    if (allow_record == _allowRecordSetting &&
+        allow_member_share == _allowShareSetting) {
         return;
-    _flags = flags;
-    emit settingsChanged(flags);
+    }
+    _allowRecordSetting = allow_record;
+    _allowShareSetting = allow_member_share;
+    emit settingsChanged(allow_record, allow_member_share);
 }

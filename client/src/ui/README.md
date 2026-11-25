@@ -27,9 +27,9 @@ ui（foundation → primitives → composites → pages → shell）
 | 目录 | 放什么 | 不允许 |
 |---|---|---|
 | `core/` | 平台与存储基础设施：`screen`、`storage`（SQLite 单一后端） | 认识任何业务概念 |
-| `config/` | 配置与会话：`client_config`、`auth_config`、`user_session`、`login_store`、`preferences`、`stdtypes` | include `ui/` |
+| `config/` | 配置与会话：`client_config`、`user_session`、`login_store`、`preferences`、`tls_config` | include `ui/` |
 | `data/` | 业务数据：`meeting_record`、`meeting_repository`、`meeting_history`（实现）、`recording_repository`、`recording_library`（实现） | 弹窗、控件 |
-| `protocol/` | 线上协议与传输：`connection`、`message(_hub/_codec)`、`net_header`、`network_manager`、`room_settings_flags` | include `ui/`、`media/` |
+| `protocol/` | 线上协议与传输：`connection`、`message(_hub/_codec)`、`net_header`、`network_manager` | include `ui/`、`media/` |
 | `media/` | 图像/视频资源：`avatar_service`、`media/video/*`（样式/渲染/路由）、`media/recording/*` | 依赖 `ui/` 或 `protocol/` |
 | `features/meeting/` | 8 个 controller（会议、聊天、成员、媒体、协议分发、RTC 观察、房间设置） | 自己 new 线程/网络 |
 | `app/` | `MeetingSession`：创建并持有网络、工作线程、控制器、协议分发；`stop_workers()` 收尾 | 依赖具体页面 |

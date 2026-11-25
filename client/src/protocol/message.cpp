@@ -76,19 +76,16 @@ std::optional<MessagePtr> PriorityMessageQueue::pop(int wait_ms) {
 }
 
 void PriorityMessageQueue::clear() {
+    /// 必须真正清空：切换会话前调用它来丢弃上一轮的残留包，
+    /// 原实现的 try_lock 重试 8 次就放弃，会把旧会话的消息留在队列里。
+    /// 锁只在 push/pop 内短暂持有，这里阻塞等待不会死锁。
     std::deque<MessagePtr> discarded[k_priority_count];
-    for (int attempt = 0; attempt < 8; ++attempt) {
-        std::unique_lock<std::mutex> lock(mutex_, std::try_to_lock);
-        if (lock.owns_lock()) {
-            for (int i = 0; i < k_priority_count; ++i)
-                discarded[i].swap(buckets_[i]);
-            lock.unlock();
-            cond_.notify_all();
-            return;
-        }
-        cond_.notify_all();
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        for (int i = 0; i < k_priority_count; ++i)
+            discarded[i].swap(buckets_[i]);
     }
+    cond_.notify_all();
 }
 
 void PriorityMessageQueue::wake_all() {

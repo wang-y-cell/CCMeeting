@@ -1,7 +1,6 @@
 #ifndef CREATEMEETING_PAGE_UI_H
 #define CREATEMEETING_PAGE_UI_H
 
-class QLabel;
 class QLineEdit;
 class QPushButton;
 class QWidget;
@@ -12,11 +11,7 @@ namespace ui {
 
 class CreateMeetingPageUi {
 public:
-    QLabel *pageTitle = nullptr;
-    QLabel *pageDesc = nullptr;
-    QLabel *fieldLabel = nullptr;
     QLineEdit *lineEdit = nullptr;
-    QLabel *fieldLabel_2 = nullptr;
     QLineEdit *lineEdit_2 = nullptr;
     QPushButton *create_meeting_btn = nullptr;
     RecentMeetingList *recent = nullptr;

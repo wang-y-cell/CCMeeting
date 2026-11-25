@@ -19,7 +19,9 @@
 
 ChatController::ChatController(QListWidget *list, MyTextEdit *input,
                                QWidget *owner, QObject *parent)
-    : QObject(parent), _list(list), _input(input), _owner(owner) {
+    : QObject(parent), _list(list), _input(input) {
+    // 提示音挂在 Controller 自身，不需要持有父窗口
+    Q_UNUSED(owner);
     if (_list) {
         _list->viewport()->installEventFilter(this);
     }
@@ -194,7 +196,7 @@ void ChatController::deal_message(ChatMessage *message, QListWidgetItem *item,
     message->setFixedWidth(listWidth > 0 ? listWidth : _list->width());
     const QSize size = message->fontRect(text);
     item->setSizeHint(size);
-    message->setText(text, time, size, senderName, type, avatarUrl);
+    message->setText(text, time, senderName, type, avatarUrl);
     _list->setItemWidget(item, message);
 }
 
@@ -204,7 +206,9 @@ void ChatController::deal_message_time(const QString &curMsgTime) {
         QListWidgetItem *lastItem = _list->item(_list->count() - 1);
         if (auto *message =
                 qobject_cast<ChatMessage *>(_list->itemWidget(lastItem))) {
-            isShowTime = (curMsgTime.toInt() - message->time().toInt()) > 60;
+            // 时间是 epoch 秒；toInt() 在 2038 年会溢出，用 64 位
+            isShowTime =
+                (curMsgTime.toLongLong() - message->time().toLongLong()) > 60;
         }
     }
     if (!isShowTime) {
@@ -220,6 +224,6 @@ void ChatController::deal_message_time(const QString &curMsgTime) {
     timeMessage->setFixedWidth(w);
     timeMessage->resize(size);
     itemTime->setSizeHint(size);
-    timeMessage->setText(curMsgTime, curMsgTime, size);
+    timeMessage->setText(curMsgTime, curMsgTime);
     _list->setItemWidget(itemTime, timeMessage);
 }

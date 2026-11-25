@@ -199,24 +199,34 @@ private:
  * @brief 房主修改房间开关（上行）
  *
  * 线上 data 为 {"allow_record":bool,"allow_member_share":bool}（v2 规范）。
- * 客户端内部仍用位掩码表达：flags() 与两个布尔之间的转换由 MessageCodec 完成
- * （bit0=allow_record, bit1=allow_member_share），属过渡兼容，访问器保持不变。
+ * 客户端内部同样用两个布尔表达，两端一一对应，不再做位掩码转换。
  */
 class RoomSettingsMessage : public Message {
 public:
-    explicit RoomSettingsMessage(std::uint32_t flags = 0) : flags_(flags) {}
+    explicit RoomSettingsMessage(bool allow_record = true,
+                                 bool allow_member_share = true)
+        : allow_record_(allow_record),
+          allow_member_share_(allow_member_share) {}
 
     MessageKind kind() const override { return MessageKind::RoomSettings; }
     MessagePriority send_priority() const override {
         return MessagePriority::Control;
     }
 
-    /** @brief 房间开关位掩码 */
-    std::uint32_t flags() const { return flags_; }
-    void set_flags(std::uint32_t flags) { flags_ = flags; }
+    /** @brief 是否允许录制 */
+    bool allow_record() const { return allow_record_; }
+    /** @brief 设置是否允许录制 */
+    void set_allow_record(bool allow_record) { allow_record_ = allow_record; }
+    /** @brief 是否允许普通成员共享屏幕 */
+    bool allow_member_share() const { return allow_member_share_; }
+    /** @brief 设置是否允许普通成员共享屏幕 */
+    void set_allow_member_share(bool allow_member_share) {
+        allow_member_share_ = allow_member_share;
+    }
 
 private:
-    std::uint32_t flags_ = 0;
+    bool allow_record_ = true;
+    bool allow_member_share_ = true;
 };
 
 /** @brief 发送文本消息 */
@@ -348,19 +358,31 @@ private:
 /**
  * @brief 房间开关通知（下行）。服务器校验房主后广播，并在新人入会时补发
  *
- * 线上 data 为 {"allow_record":bool,"allow_member_share":bool}；flags() 仍是
- * 兼容位掩码（bit0=allow_record, bit1=allow_member_share），转换在 MessageCodec 内。
+ * 线上 data 为 {"allow_record":bool,"allow_member_share":bool}，与内部字段一一对应。
  */
 class RoomSettingsNotifyMessage : public Message {
 public:
+    explicit RoomSettingsNotifyMessage(bool allow_record = true,
+                                       bool allow_member_share = true)
+        : allow_record_(allow_record),
+          allow_member_share_(allow_member_share) {}
+
     MessageKind kind() const override { return MessageKind::RoomSettingsNotify; }
 
-    /** @brief 房间开关位掩码 */
-    std::uint32_t flags() const { return flags_; }
-    void set_flags(std::uint32_t flags) { flags_ = flags; }
+    /** @brief 是否允许录制 */
+    bool allow_record() const { return allow_record_; }
+    /** @brief 设置是否允许录制 */
+    void set_allow_record(bool allow_record) { allow_record_ = allow_record; }
+    /** @brief 是否允许普通成员共享屏幕 */
+    bool allow_member_share() const { return allow_member_share_; }
+    /** @brief 设置是否允许普通成员共享屏幕 */
+    void set_allow_member_share(bool allow_member_share) {
+        allow_member_share_ = allow_member_share;
+    }
 
 private:
-    std::uint32_t flags_ = 0;
+    bool allow_record_ = true;
+    bool allow_member_share_ = true;
 };
 
 /** @brief 远程主机关闭错误消息 */

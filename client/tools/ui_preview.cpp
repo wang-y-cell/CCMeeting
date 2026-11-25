@@ -622,10 +622,11 @@ int run_join_codec_selftest() {
                   snapshot->partner_user_ids()[1] == 22);
     }
 
-    // 4) 房间开关广播：布尔 ↔ 兼容位掩码（bit0=allow_record, bit1=allow_member_share）
+    // 4) 房间开关广播：两个布尔往返
     {
         RoomSettingsNotifyMessage msg;
-        msg.set_flags(ROOM_SETTINGS_ALLOW_RECORD);
+        msg.set_allow_record(true);
+        msg.set_allow_member_share(false);
         const QByteArray json = MessageCodec::encode_json_frame(msg, 1);
         const QJsonObject object = QJsonDocument::fromJson(json).object();
         const QJsonObject data = object.value(QStringLiteral("data")).toObject();
@@ -635,8 +636,8 @@ int run_join_codec_selftest() {
         auto decoded = MessageCodec::decode_json_frame(json);
         auto *notify = dynamic_cast<RoomSettingsNotifyMessage *>(decoded.get());
         check("room_settings_notify",
-              booleans_ok && notify &&
-                  notify->flags() == ROOM_SETTINGS_ALLOW_RECORD);
+              booleans_ok && notify && notify->allow_record() &&
+                  !notify->allow_member_share());
     }
 
     // 5) 文本消息：data.text 明文，且不再有 v1 的 p/u/s/a 字段
@@ -2553,13 +2554,13 @@ int main(int argc, char *argv[]) {
         ui::MeetingSettingsPopup hostPopup;
         hostPopup.set_room_no(1);
         hostPopup.set_host(true);
-        hostPopup.set_settings(ROOM_SETTINGS_DEFAULT);
+        hostPopup.set_settings(true, true);
         capture(&hostPopup, QStringLiteral("08-meeting-settings-host"), 304, 340);
 
         ui::MeetingSettingsPopup memberPopup;
         memberPopup.set_room_no(7);
         memberPopup.set_host(false);
-        memberPopup.set_settings(ROOM_SETTINGS_ALLOW_RECORD);
+        memberPopup.set_settings(true, false);
         capture(&memberPopup, QStringLiteral("09-meeting-settings-member"), 304, 340);
     }
 

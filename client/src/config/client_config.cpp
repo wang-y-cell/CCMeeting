@@ -9,30 +9,6 @@
 
 #include <spdlog/spdlog.h>
 
-namespace {
-
-QString joinBaseUrlPath(const QString &base, const QString &path) {
-    if (base.isEmpty()) {
-        return path;
-    }
-    if (base.endsWith(QLatin1Char('/')) && path.startsWith(QLatin1Char('/'))) {
-        return base.chopped(1) + path;
-    }
-    if (!base.endsWith(QLatin1Char('/')) && !path.startsWith(QLatin1Char('/'))) {
-        return base + QLatin1Char('/') + path;
-    }
-    return base + path;
-}
-
-}  // namespace
-
-QString AuthConfigData::defaultAvatarUrl() const {
-    const QString base = public_base_url.isEmpty()
-                             ? QStringLiteral("http://%1:%2").arg(host).arg(port)
-                             : public_base_url;
-    return joinBaseUrlPath(base, QStringLiteral("/static/avatar/default.png"));
-}
-
 ClientConfig& ClientConfig::instance() {
     static ClientConfig cfg;
     return cfg;
@@ -80,8 +56,10 @@ bool ClientConfig::loadFromJsonObject(const QJsonObject& root) {
         auth_.update_profile_path =
             auth.value(QStringLiteral("update_profile_path"))
                 .toString(auth_.update_profile_path);
+        // 缺键时必须保留现值，否则一次 load() 就把已有配置清空
         auth_.public_base_url =
-            auth.value(QStringLiteral("public_base_url")).toString();
+            auth.value(QStringLiteral("public_base_url"))
+                .toString(auth_.public_base_url);
     }
 
     if (const QJsonObject meeting =

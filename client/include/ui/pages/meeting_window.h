@@ -6,7 +6,6 @@
 #include "media/recording/meeting_recorder.h"
 #include "features/meeting/room_settings_controller.h"
 #include "ui/pages/meeting_settings_popup.h"
-#include "protocol/room_settings_flags.h"
 #include "features/meeting/meeting_controller.h"
 #include "protocol/network_manager.h"
 #include "protocol/message.h"
@@ -97,7 +96,6 @@ protected:
     void closeEvent(QCloseEvent *event) override;
 
 public slots:
-    void on_create_meet_btn_clicked_slot();
     void on_open_vedio_clicked_slot();
     void on_open_audio_clicked_slot();
     void on_audio_device_btn_clicked_slot();
@@ -160,7 +158,7 @@ private slots:
     void on_text_received(qint64 user_id, const QString &str);
     void on_remote_host_closed();
     void on_other_net_error();
-    void apply_room_settings(std::uint32_t flags);
+    void apply_room_settings(bool allow_record, bool allow_member_share);
 
 private:
     void init_ui();

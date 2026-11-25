@@ -24,16 +24,4 @@ PageHeader::PageHeader(const QString &title, const QString &description,
     }
 }
 
-void PageHeader::set_title(const QString &title) {
-    if (m_title != nullptr) {
-        m_title->setText(title);
-    }
-}
-
-void PageHeader::set_description(const QString &description) {
-    if (m_desc != nullptr) {
-        m_desc->setText(description);
-    }
-}
-
 }  // namespace ui

@@ -25,8 +25,9 @@
 MeetingMediaView::MeetingMediaView(IMeetingWindowHost *host,
                                    MeetingTopBarController *top_bar,
                                    QObject *parent)
-    : QObject(parent), _host(host), _topBar(top_bar) {
-
+    : QObject(parent), _host(host) {
+    // 顶栏刷新由 MeetingSessionController 负责，本类不持有 top_bar
+    Q_UNUSED(top_bar);
 }
 
 void MeetingMediaView::attach() {
@@ -123,10 +124,8 @@ void MeetingMediaView::refresh_buttons() {
                                               : QString(OPENAUDIO).toUtf8());
     ui.shareScreenBtn->setText(state._localScreenOn ? tr("停止共享")
                                                     : tr("共享屏幕"));
-    ui::apply_toggle_icon(ui.openAudio, QStringLiteral("mic"),
-                          QStringLiteral("mic-off"), state._localAudioOn);
-    ui::apply_toggle_icon(ui.openVedio, QStringLiteral("camera"),
-                          QStringLiteral("camera-off"), state._localVideoOn);
+    ui::apply_toggle_icon(ui.openAudio, QStringLiteral("mic"), state._localAudioOn);
+    ui::apply_toggle_icon(ui.openVedio, QStringLiteral("camera"), state._localVideoOn);
 
 }
 

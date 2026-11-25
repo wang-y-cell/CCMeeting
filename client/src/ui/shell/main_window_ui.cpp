@@ -57,7 +57,7 @@ void MainWindowUi::setupUi(QWidget *parent) {
     leftColumn->addWidget(sideNav, 1);
 
     // 侧边栏底部：连接状态 + 版本，给左下角一个落点，避免大片空白
-    sideBarStatus = new QLabel(QObject::tr("● 服务就绪"), parent);
+    auto *sideBarStatus = new QLabel(QObject::tr("● 服务就绪"), parent);
     sideBarStatus->setObjectName(QStringLiteral("sideBarStatus"));
     sideBarStatus->setContentsMargins(4, 0, 4, 0);
     leftColumn->addWidget(sideBarStatus);
@@ -69,7 +69,7 @@ void MainWindowUi::setupUi(QWidget *parent) {
     btnLogout->setToolTip(QObject::tr("清除本机保存的账号，返回登录界面"));
     leftColumn->addWidget(btnLogout);
 
-    sideBarVersion = new QLabel(QStringLiteral("CloudMeeting 1.0"), parent);
+    auto *sideBarVersion = new QLabel(QStringLiteral("CloudMeeting 1.0"), parent);
     sideBarVersion->setObjectName(QStringLiteral("sideBarVersion"));
     sideBarVersion->setContentsMargins(4, 0, 4, 4);
     leftColumn->addWidget(sideBarVersion);

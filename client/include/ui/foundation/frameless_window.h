@@ -102,6 +102,9 @@ public:
      */
     void setTitleBarHeight(int height) {
         m_titleBarHeight = height > 0 ? height : 0;
+        // 标题栏高度参与按钮 y 坐标：宽度缓存会挡住重摆，这里强制失效
+        m_last_title_geometry_width = -1;
+        updateTitleButtonsGeometry();
     }
 
     /**
@@ -121,6 +124,18 @@ public:
             m_maxBtn->setVisible(enabled);
             m_last_title_geometry_width = -1;   // 可见性变了：强制重新摆放
             updateTitleButtonsGeometry();
+        }
+    }
+
+    /**
+     * @brief 设置是否让系统给窗口加圆角
+     * @details 默认开启；showEvent 里按此开关申请 Win11 DWM 圆角。
+     *          会议窗口等需要直角全屏感的窗口调用 setRoundedCornersEnabled(false)。
+     */
+    void setRoundedCornersEnabled(bool enabled) {
+        m_rounded_corners_enabled = enabled;
+        if (!enabled) {
+            ui::disable_rounded_corners(this);
         }
     }
 
@@ -360,7 +375,7 @@ protected:
         updateTitleButtonsGeometry();
         updateMaximizeButtonIcon();
         // Win11 DWM 圆角：让无边框窗口（主窗口/会议/回放/对话框）四角一致
-        if (!m_roundedCornersApplied) {
+        if (m_rounded_corners_enabled && !m_roundedCornersApplied) {
             m_roundedCornersApplied = true;
             ui::enable_rounded_corners(this);
         }
@@ -945,8 +960,6 @@ private:
     bool m_resizable = true;              ///< 是否允许边缘缩放
     bool m_maximizable = true;            ///< 是否允许最大化（按钮/双击）
     bool m_minimizable = false;           ///< 是否允许最小化（对话框默认 false）
-    int m_nativeMoveOverride = -1;        ///< 原生拖动覆盖：-1 跟随全局、0 关、1 开
-    int m_nativeResizeOverride = -1;      ///< 原生缩放覆盖：-1 跟随全局、0 关、1 开
 
     /// ----- 拖动 / 缩放锚点 -----
     QPoint m_dragOffset;                  ///< 拖动时：鼠标相对窗口左上角的偏移
@@ -965,6 +978,7 @@ private:
 
     /// ----- 自检/性能诊断 -----
     bool m_roundedCornersApplied = false;  ///< 是否已申请过系统圆角
+    bool m_rounded_corners_enabled = true; ///< 是否允许系统圆角（setRoundedCornersEnabled）
     int m_last_title_geometry_width = -1;  ///< 最近一次摆放时的宽度（不变则跳过）
     bool m_last_maximized_state = false;   ///< 最近一次刷新最大化图标时的状态
     bool m_maximize_icon_initialized = false;

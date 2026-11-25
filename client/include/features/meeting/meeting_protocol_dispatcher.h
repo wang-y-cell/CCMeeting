@@ -41,7 +41,7 @@ signals:
     /** @brief 入会后拿到的已有成员列表 */
     void partners_snapshot(QList<qint64> user_ids);
     void user_profile(qint64 user_id, QString display_name, QString avatar_url);
-    void room_settings_received(quint32 flags);
+    void room_settings_received(bool allow_record, bool allow_member_share);
 
     void text_received(qint64 user_id, QString text);
 };

@@ -276,6 +276,9 @@ void Connection::destroySocket() {
     if (m_socket == nullptr)
         return;
 
+    /// abort() 会同步发出 disconnected；先置位，避免 onSocketDisconnected
+    /// 把这次主动销毁当成掉线再触发一轮 tryReconnect（重连次数翻倍）。
+    m_closing = true;
     m_socket->abort();
     m_socket->deleteLater();
     m_socket = nullptr;

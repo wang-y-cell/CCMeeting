@@ -37,8 +37,6 @@ struct AuthConfigData {
     QString upload_avatar_path = QStringLiteral("/api/upload-avatar");
     QString update_profile_path = QStringLiteral("/api/update-profile");
     QString public_base_url;
-
-    QString defaultAvatarUrl() const;
 };
 
 //message_server

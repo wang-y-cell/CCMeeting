@@ -87,7 +87,6 @@ private:
 
     QListWidget *_list = nullptr;
     MyTextEdit *_input = nullptr;
-    QWidget *_owner = nullptr;
     ChatMessage *_pending = nullptr;
     QSoundEffect *_sound = nullptr;
     std::vector<QString> _mentionTags;

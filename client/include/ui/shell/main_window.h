@@ -67,6 +67,8 @@ private:
     void register_pages();
     /** @brief 按注册表创建页面并装配内容栈 */
     void build_pages();
+    /** @brief 刷新「最近会议」列表（创建页 / 记录页 / 加入页各刷一份） */
+    void refresh_meeting_summaries();
 
     MainWindowUi ui;
     ui::MeetingWindow *widget = nullptr;
@@ -83,7 +85,6 @@ private:
     ui::UserProfilePage *user_profile_widget = nullptr;
     ui::MeetingHistoryPage *history_widget = nullptr;
     ui::RecordingsPage *recordings_widget = nullptr;
-    ui::SettingsPage *setting_widget = nullptr;
 };
 
 #endif // MAIN_WINDOW_H

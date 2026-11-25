@@ -20,7 +20,6 @@
 #include <QMessageBox>
 #include <QTimer>
 #include <QMouseEvent>
-#include "core/storage.h"
 #include <QStackedWidget>
 #include <spdlog/spdlog.h>
 
@@ -240,8 +239,6 @@ void main_window::build_pages() {
         m_pages.find(QStringLiteral("history")));
     recordings_widget = qobject_cast<ui::RecordingsPage *>(
         m_pages.find(QStringLiteral("recordings")));
-    setting_widget = qobject_cast<ui::SettingsPage *>(
-        m_pages.find(QStringLiteral("settings")));
     user_profile_widget = qobject_cast<ui::UserProfilePage *>(
         m_pages.find(QStringLiteral("profile")));
 
@@ -292,8 +289,10 @@ void main_window::build_pages() {
                 }
             });
 
-    // 4) 侧栏切换：按"页"统一处理，新页面只要实现 ui::Page::on_show 就能懒刷新
-    ui.sideNav->setCurrentRow(0);
+    // 4) 侧栏切换：只负责切页。页面刷新统一由 ui::Page::showEvent → on_show() 驱动。
+    //    这里**不能**再调一次 on_show()：切页时 setCurrentWidget 已经让新页收到
+    //    showEvent（→ on_show），再手动调一次会让设置页枚举两遍设备、记录/录制页
+    //    各查两遍库。
     connect(ui.sideNav, &QListWidget::currentRowChanged, this,
             [this](int row) {
                 if (ui.contentStack == nullptr || row < 0 ||
@@ -303,10 +302,6 @@ void main_window::build_pages() {
                 QWidget *page = m_nav_pages.at(row);
                 if (page == nullptr) {
                     return;
-                }
-                // 所有页面都实现了 ui::Page：进入页面即触发懒刷新
-                if (auto *ui_page = qobject_cast<ui::Page *>(page)) {
-                    ui_page->on_show();
                 }
                 ui.contentStack->setCurrentWidget(page);
             });
@@ -323,11 +318,13 @@ void main_window::init_ui() {
 
 
     {
-        const int startPage =
+        int startPage =
             preferences().value(QStringLiteral("ui/startPage"), 0).toInt();
-        if (startPage >= 0 && startPage < ui.sideNav->count()) {
-            ui.sideNav->setCurrentRow(startPage);
+        if (startPage < 0 || startPage >= ui.sideNav->count()) {
+            startPage = 0;
         }
+        // 越界/脏偏好兜底到第 0 页；切页本身会通过 showEvent 触发该页 on_show()
+        ui.sideNav->setCurrentRow(startPage);
     }
 }
 
@@ -417,16 +414,7 @@ void main_window::onMeetingConfirmed(bool created, int roomNo) {
     meeting_repository().append(created ? MeetingRecordKind::Created
                                    : MeetingRecordKind::Joined,
                            roomNo);
-    // 首页的「最近 N 个会议」与记录页都刷新一份
-    if (history_widget) {
-        history_widget->refresh();
-    }
-    if (create_meeting_widget && create_meeting_widget->findChild<RecentMeetingList *>()) {
-        create_meeting_widget->findChild<RecentMeetingList *>()->refresh();
-    }
-    if (join_meeting_widget != nullptr) {
-        join_meeting_widget->refresh_recent();
-    }
+    refresh_meeting_summaries();
 
     // 需求：会议开始后主窗口让位，结束/终止时再出现
     hide_for_meeting();
@@ -434,17 +422,24 @@ void main_window::onMeetingConfirmed(bool created, int roomNo) {
 
 void main_window::onMeetingClosed(qint64 durationMs) {
     meeting_repository().finish_open_session(durationMs);
+    refresh_meeting_summaries();
+
+    restore_after_meeting();
+}
+
+void main_window::refresh_meeting_summaries() {
+    // 首页的「最近 N 个会议」与记录页都刷新一份
     if (history_widget) {
         history_widget->refresh();
     }
-    if (create_meeting_widget && create_meeting_widget->findChild<RecentMeetingList *>()) {
-        create_meeting_widget->findChild<RecentMeetingList *>()->refresh();
+    if (create_meeting_widget) {
+        if (auto *recent = create_meeting_widget->findChild<RecentMeetingList *>()) {
+            recent->refresh();
+        }
     }
     if (join_meeting_widget != nullptr) {
         join_meeting_widget->refresh_recent();
     }
-
-    restore_after_meeting();
 }
 
 void main_window::onLogoutClicked() {

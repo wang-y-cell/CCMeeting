@@ -36,11 +36,11 @@ void ui::UserProfilePageUi::setupUi(QWidget *parent) {
     root->setSpacing(12);
     root->setContentsMargins(8, 8, 8, 8);
 
-    pageTitle = new QLabel(QObject::tr("个人资料"), parent);
+    auto *pageTitle = new QLabel(QObject::tr("个人资料"), parent);
     pageTitle->setObjectName(QStringLiteral("pageTitle"));
     root->addWidget(pageTitle);
 
-    pageDesc = new QLabel(QObject::tr("查看账号信息"), parent);
+    auto *pageDesc = new QLabel(QObject::tr("查看账号信息"), parent);
     pageDesc->setObjectName(QStringLiteral("pageDesc"));
     root->addWidget(pageDesc);
 

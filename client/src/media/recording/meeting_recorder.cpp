@@ -16,16 +16,12 @@
 #include <cstring>
 #include <spdlog/spdlog.h>
 
-namespace {
-
-/// 目标帧率：屏幕共享源本身是 15fps，摄像头 30fps；统一按 ~15fps 落盘控制体积
-constexpr qint64 kMinFrameIntervalMs = 66;
-
-}  // namespace
-
 MeetingRecorder::MeetingRecorder(QObject *parent) : QObject(parent) {}
 
 MeetingRecorder::~MeetingRecorder() {
+    // 先立"销毁中"标记：stop() 会走 finalize()，那里不再 emit finished，
+    // 否则监听方可能在会议窗口析构阶段弹 QMessageBox。
+    _destroying = true;
     if (_recording) {
         stop();
     }
@@ -115,10 +111,9 @@ void MeetingRecorder::release_pipeline() {
         _session->deleteLater();
         _session = nullptr;
     }
-    if (_progressTimer) {
-        _progressTimer->deleteLater();
-        _progressTimer = nullptr;
-    }
+    // 注意：进度定时器不属于媒体管线（它只负责上报进度）。
+    // 编码器回退会重建管线，若在这里销毁定时器，回退后录制计时就永久停更。
+    // 定时器的生命周期由 start()/stop() 与析构（父对象）管理。
 }
 
 bool MeetingRecorder::start(int room_no) {
@@ -244,6 +239,8 @@ void MeetingRecorder::finalize() {
                  _outputPath.toUtf8().constData(),
                  static_cast<long long>(info.size()), ok);
 
-    emit finished(_outputPath, duration, ok);
+    if (!_destroying) {
+        emit finished(_outputPath, duration, ok);
+    }
     release_pipeline();
 }

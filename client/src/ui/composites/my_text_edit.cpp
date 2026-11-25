@@ -10,9 +10,11 @@
 Completer::Completer(QWidget *parent) : QCompleter(parent) {}
 
 MyTextEdit::MyTextEdit(QWidget *parent) : QWidget(parent) {
+    // completer 必须先初始化为空：initConnect() 会把 textChanged 接到
+    // complete()，而 complete() 会读 completer。
+    completer = nullptr;
     initUI();
     initConnect();
-    completer = nullptr;
 }
 
 void MyTextEdit::initConnect() const {
@@ -23,7 +25,7 @@ void MyTextEdit::initConnect() const {
 void MyTextEdit::initUI() {
     QVBoxLayout *layout = new QVBoxLayout(this); ///< 创建垂直布局
     layout->setContentsMargins(0, 0, 0, 0);      ///< 设置布局中上下左右边界
-    edit = new QPlainTextEdit();                 ///< 创建输入框控件
+    edit = new QPlainTextEdit(this);             ///< 创建输入框控件
     /// 设置输入框控件中提示字段
     edit->setPlaceholderText(QString::fromUtf8("点击发送信息..."));
     /// 将控件加入布局中
@@ -34,14 +36,6 @@ void MyTextEdit::initUI() {
      * 这允许你修改、拦截甚至完全丢弃发往 edit 的事件
      */
     edit->installEventFilter(this);
-}
-
-QString MyTextEdit::textUnderCursor() {
-    QTextCursor tc = edit->textCursor();
-    /// 选择光标下的整个单词
-    tc.select(QTextCursor::WordUnderCursor);
-    /// 返回选中的文本
-    return tc.selectedText();
 }
 
 void MyTextEdit::complete() {
@@ -88,8 +82,11 @@ void MyTextEdit::changeCompletion(const QString &text) {
     /// 获取文本最后一个字符的位置
     int pos = str.size() - 1;
     /// 如果最后一个字符不为@，则继续往前找
-    while (str.at(pos) != '@')
+    /// （边界必须守：@ 可能已被删掉，越界 str.at() 会直接崩）
+    while (pos >= 0 && str.at(pos) != '@')
         pos--;
+    if (pos < 0)
+        return;
 
     /// 清除当前的文本选中状态（取消高亮）但不会删除被选中的文本内容
     tc.clearSelection();

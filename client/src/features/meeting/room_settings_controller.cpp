@@ -2,7 +2,6 @@
 
 #include "media/recording/meeting_recorder.h"
 #include "ui/pages/meeting_settings_popup.h"
-#include "protocol/room_settings_flags.h"
 
 #include <QMessageBox>
 #include <QPushButton>
@@ -22,9 +21,10 @@ void RoomSettingsController::init_popup(QPushButton *anchor_button) {
     _popup = new ui::MeetingSettingsPopup(_owner);
 
     connect(_popup, &ui::MeetingSettingsPopup::settingsChanged, this,
-            [this](std::uint32_t flags) {
-                _flags = flags;
-                emit settings_edited(flags);
+            [this](bool allow_record, bool allow_member_share) {
+                _allowRecord = allow_record;
+                _allowMemberShare = allow_member_share;
+                emit settings_edited(allow_record, allow_member_share);
             });
     connect(_popup, &ui::MeetingSettingsPopup::copyRoomNoRequested, this,
             &RoomSettingsController::copy_room_no_requested);
@@ -46,11 +46,11 @@ bool RoomSettingsController::can_share_screen() const {
     if (_isHost) {
         return true;
     }
-    return (_flags & ROOM_SETTINGS_ALLOW_MEMBER_SHARE) != 0;
+    return _allowMemberShare;
 }
 
 bool RoomSettingsController::can_record() const {
-    return (_flags & ROOM_SETTINGS_ALLOW_RECORD) != 0;
+    return _allowRecord;
 }
 
 bool RoomSettingsController::is_recording() const {
@@ -63,7 +63,7 @@ void RoomSettingsController::update_popup_state() {
     }
     _popup->set_room_no(_roomNo);
     _popup->set_host(_isHost);
-    _popup->set_settings(_flags);
+    _popup->set_settings(_allowRecord, _allowMemberShare);
     _popup->set_can_record(can_record());
     _popup->set_recording(is_recording(),
                           _recorder ? _recorder->elapsed_ms() : 0);
@@ -91,13 +91,13 @@ void RoomSettingsController::show_popup() {
     _popup->show();
 }
 
-void RoomSettingsController::apply_flags(std::uint32_t flags) {
-    _flags = flags;
+void RoomSettingsController::apply_settings(bool allow_record,
+                                            bool allow_member_share) {
+    _allowRecord = allow_record;
+    _allowMemberShare = allow_member_share;
 
-    spdlog::info("[RoomSettings] flags=0x{:x} allow_record={} "
-                 "allow_member_share={} host={}",
-                 flags, (flags & ROOM_SETTINGS_ALLOW_RECORD) != 0,
-                 (flags & ROOM_SETTINGS_ALLOW_MEMBER_SHARE) != 0, _isHost);
+    spdlog::info("[RoomSettings] allow_record={} allow_member_share={} host={}",
+                 allow_record, allow_member_share, _isHost);
 
     // 房主关闭「允许录制」时，任何人都要立即停录
     if (!can_record() && is_recording()) {
@@ -106,7 +106,7 @@ void RoomSettingsController::apply_flags(std::uint32_t flags) {
     }
 
     update_popup_state();
-    emit flags_applied(flags);
+    emit settings_applied(allow_record, allow_member_share);
 }
 
 bool RoomSettingsController::start_recording() {

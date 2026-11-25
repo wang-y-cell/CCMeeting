@@ -2,8 +2,6 @@
 
 #include "ui/foundation/auth_http.h"
 
-#include "config/client_config.h"
-
 #include <QCoreApplication>
 #include <QNetworkAccessManager>
 #include <QNetworkDiskCache>
@@ -73,11 +71,24 @@ QPixmap renderLocalAvatar(const QSize& targetSize) {
     return pixmap;
 }
 
+/**
+ * @brief 是否指向服务端的默认头像
+ *
+ * 默认头像一律由客户端内置 SVG 提供，不再向服务端请求。
+ * 这里按**路径后缀**判断（不限 host / 端口 / 协议），
+ * 这样历史上写进数据库的 `http://IP:9000/static/avatar/default.png`
+ * 和现在的 `https://IP/static/avatar/default.png` 都会被识别。
+ */
+bool is_server_default_avatar(const QString& url) {
+    if (url.isEmpty()) {
+        return false;
+    }
+    return QUrl(url).path().endsWith(QStringLiteral("/static/avatar/default.png"));
+}
+
 QString resolvedAvatarUrl(const QString& url) {
-    const QString remoteDefault =
-        ClientConfig::instance().auth().defaultAvatarUrl();
-    // 空头像和服务端旧默认头像都落到客户端内置 SVG，避免无意义的远程请求。
-    if (url.isEmpty() || (!remoteDefault.isEmpty() && url == remoteDefault)) {
+    // 空头像与服务端默认头像都落到客户端内置 SVG，避免无意义的远程请求。
+    if (url.isEmpty() || is_server_default_avatar(url)) {
         return QString::fromLatin1(kDefaultAvatarResource);
     }
     return url;
@@ -124,27 +135,19 @@ void AvatarService::invalidate(const QString& url) {
 }
 
 void AvatarService::load(const QString& url,
-                             const QSize& targetSize,
-                             QObject* context,
-                             const std::function<void(QPixmap)>& callback) {
-    loadInternal(url, targetSize, context, callback);
-}
-
-void AvatarService::loadInternal(const QString& url,
-                                     const QSize& targetSize,
-                                     QObject* context,
-                                     const std::function<void(QPixmap)>& callback) {
+                         const QSize& targetSize,
+                         QObject* context,
+                         const std::function<void(QPixmap)>& callback) {
     if (!callback || m_shuttingDown) {
         return;
     }
 
+    // 只有调用方真的给了 context 才需要用 QPointer 兜"回调前已销毁"。
     const QPointer<QObject> contextGuard(context);
+    const bool guarded = (context != nullptr);
     const QString requestUrl = resolvedAvatarUrl(url);
     // 本地 qrc SVG 直接渲染，不经过 QNetworkAccessManager。
     if (requestUrl.startsWith(QStringLiteral(":/"))) {
-        if (contextGuard && !contextGuard.data()) {
-            return;
-        }
         callback(renderLocalAvatar(targetSize));
         return;
     }
@@ -158,11 +161,12 @@ void AvatarService::loadInternal(const QString& url,
     request.setAttribute(QNetworkRequest::CacheLoadControlAttribute,
                          QNetworkRequest::PreferCache);
     auto* reply = m_nam->get(request);
-    QObject* receiver = context ? context : qApp;
+    // receiver 必须是 reply 自己而不是 context：context 先销毁时 AutoConnection
+    // 会自动断开，lambda 一次都不执行，reply 就再也没人 deleteLater（泄漏）。
     QObject::connect(
-        reply, &QNetworkReply::finished, receiver,
-        [this, reply, targetSize, callback, requestUrl, contextGuard]() {
-            if (m_shuttingDown || (contextGuard && !contextGuard.data())) {
+        reply, &QNetworkReply::finished, reply,
+        [this, reply, targetSize, callback, contextGuard, guarded]() {
+            if (m_shuttingDown || (guarded && contextGuard.isNull())) {
                 reply->deleteLater();
                 return;
             }

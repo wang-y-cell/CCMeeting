@@ -73,6 +73,8 @@ private:
     bool _recording = false;
     bool _retriedWithMjpeg = false;
     bool _finalized = true;
+    /// 析构中：不再 emit finished，避免在窗口销毁阶段弹模态框
+    bool _destroying = false;
     int _roomNo = 0;
     QString _outputPath;
     QDateTime _startedAt;

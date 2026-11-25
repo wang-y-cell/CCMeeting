@@ -60,7 +60,6 @@ private:
     void handle_session_lost(const QString &reason);
 
     IMeetingWindowHost *_host = nullptr;
-    MeetingTopBarController *_topBar = nullptr;
 };
 
 #endif  // MEETING_MEDIA_VIEW_H

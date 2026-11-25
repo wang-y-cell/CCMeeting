@@ -2,7 +2,6 @@
 #define MEETING_SETTINGS_POPUP_H
 
 #include <QWidget>
-#include <cstdint>
 
 class QCheckBox;
 class QLabel;
@@ -28,8 +27,8 @@ public:
     void set_room_no(int room_no);
     /** @brief 是否房主（决定权限项可否编辑） */
     void set_host(bool is_host);
-    /** @brief 用房间开关位掩码刷新界面（不会触发 settingsChanged） */
-    void set_settings(std::uint32_t flags);
+    /** @brief 用房间开关值刷新界面（不会触发 settingsChanged） */
+    void set_settings(bool allow_record, bool allow_member_share);
     /** @brief 本场是否允许录制（房主关闭后禁用录制按钮） */
     void set_can_record(bool can_record);
     /** @brief 刷新录制状态与计时 */
@@ -37,7 +36,7 @@ public:
 
 signals:
     /** @brief 房主修改了房间开关 */
-    void settingsChanged(std::uint32_t flags);
+    void settingsChanged(bool allow_record, bool allow_member_share);
     /** @brief 请求复制会议号 */
     void copyRoomNoRequested();
     /** @brief 请求重新广播自己的昵称/头像 */
@@ -60,7 +59,8 @@ private:
     QLabel *_recordStatus = nullptr;
     QLabel *_recordHint = nullptr;
 
-    std::uint32_t _flags = 0;
+    bool _allowRecordSetting = false;
+    bool _allowShareSetting = false;
     bool _isHost = false;
     bool _canRecord = true;
     bool _recording = false;

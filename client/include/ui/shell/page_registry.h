@@ -59,12 +59,6 @@ public:
     /** @brief 只取要进侧栏的页面元数据 */
     QList<PageMeta> nav() const;
 
-    /** @brief 是否登记过该 id */
-    bool contains(const QString &id) const { return m_entries.contains(id); }
-
-    /** @brief 清空（测试用） */
-    void clear();
-
 private:
     struct Entry {
         PageMeta meta;

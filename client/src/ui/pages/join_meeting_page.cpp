@@ -35,8 +35,6 @@ JoinMeetingPage::JoinMeetingPage(QWidget *parent) : Page(parent) {
             });
 }
 
-QString JoinMeetingPage::title() const { return tr("加入会议"); }
-
 void JoinMeetingPage::on_show() { refresh_recent(); }
 
 void JoinMeetingPage::refresh_recent() {
@@ -56,8 +54,6 @@ void JoinMeetingPage::build_ui() {
     // 标题块由 primitives 统一（QSS 仍是 #pageTitle / #pageDesc）
     auto *header = new ui::PageHeader(tr("加入会议"),
                                       tr("输入房间号，快速加入已有会议"), this);
-    m_title = header->title_label();
-    m_desc = header->desc_label();
     root->addWidget(header);
 
     root->addItem(
@@ -67,8 +63,7 @@ void JoinMeetingPage::build_ui() {
     auto *frame = new ui::Card(this, 24, 10, 172, 520, 560);
     QVBoxLayout *card_layout = frame->body();
 
-    m_field_label = ui::make_field_label(tr("房间号"), frame);
-    card_layout->addWidget(m_field_label);
+    card_layout->addWidget(ui::make_field_label(tr("房间号"), frame));
 
     auto *join_row = new QHBoxLayout();
     join_row->setObjectName(QStringLiteral("joinRow"));

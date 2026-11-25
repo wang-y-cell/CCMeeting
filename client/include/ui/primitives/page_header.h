@@ -23,15 +23,6 @@ public:
     explicit PageHeader(const QString &title, const QString &description = {},
                         QWidget *parent = nullptr);
 
-    /** @brief 标题标签（QSS: QLabel#pageTitle） */
-    QLabel *title_label() const { return m_title; }
-    /** @brief 说明标签（QSS: QLabel#pageDesc），description 为空时不创建 */
-    QLabel *desc_label() const { return m_desc; }
-
-    /** @brief 更新标题/说明（不重建控件） */
-    void set_title(const QString &title);
-    void set_description(const QString &description);
-
 private:
     QLabel *m_title = nullptr;
     QLabel *m_desc = nullptr;

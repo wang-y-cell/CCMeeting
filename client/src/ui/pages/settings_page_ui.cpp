@@ -4,16 +4,15 @@
 
 #include <QCheckBox>
 #include <QComboBox>
-#include <QFrame>
 #include <QFormLayout>
+#include <QFrame>
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QLineEdit>
 #include <QListWidget>
 #include <QListWidgetItem>
 #include <QProgressBar>
 #include <QPushButton>
-#include <QRadioButton>
 #include <QToolButton>
 #include <QScrollArea>
 #include <QStackedWidget>
@@ -33,7 +32,6 @@ QLabel *makeFieldLabel(const QString &text, QWidget *parent, int height = 36) {
     auto *label = new QLabel(text, parent);
     label->setObjectName(QStringLiteral("fieldLabel"));
     label->setAlignment(Qt::AlignCenter);
-    //label->setStyleSheet("border: 2px solid black;");
     label->setMinimumHeight(height);
     return label;
 }
@@ -48,7 +46,7 @@ void ui::SettingsPageUi::setupUi(QWidget *parent) {
     root->setContentsMargins(8, 8, 8, 8);
     root->setSpacing(12);
 
-    pageTitle = new QLabel(QObject::tr("设置"), parent);
+    auto *pageTitle = new QLabel(QObject::tr("设置"), parent);
     pageTitle->setObjectName(QStringLiteral("pageTitle"));
     root->addWidget(pageTitle);
 
@@ -115,7 +113,7 @@ void ui::SettingsPageUi::setupUi(QWidget *parent) {
     videoForm->addRow(makeFieldLabel(QObject::tr("帧率"), videoPage), videoFps);
     videoLayout->addLayout(videoForm);
 
-    videoPreviewHint = new QLabel(QObject::tr("摄像头预览"), videoPage);
+    auto *videoPreviewHint = new QLabel(QObject::tr("摄像头预览"), videoPage);
     videoPreviewHint->setObjectName(QStringLiteral("fieldLabel"));
     videoPreviewHint->setFixedHeight(36);
     videoLayout->addWidget(videoPreviewHint);
@@ -131,7 +129,7 @@ void ui::SettingsPageUi::setupUi(QWidget *parent) {
     videoPreviewToggleBtn->setCursor(Qt::PointingHandCursor);
     previewRow->addWidget(videoPreviewToggleBtn);
 
-    videoPreviewTip = new QLabel(
+    auto *videoPreviewTip = new QLabel(
         QObject::tr("默认关闭：开启后会占用摄像头，可与会议内视频冲突"), videoPage);
     videoPreviewTip->setObjectName(QStringLiteral("fieldLabel"));
     previewRow->addWidget(videoPreviewTip, 1);
@@ -155,7 +153,6 @@ void ui::SettingsPageUi::setupUi(QWidget *parent) {
     audioLayout->setContentsMargins(16, 12, 16, 12);
     audioLayout->setSpacing(12);
 
-    //auto *audioForm = new QFormLayout();
     auto *gridLayout = new QGridLayout();
     gridLayout->setHorizontalSpacing(16);
     gridLayout->setVerticalSpacing(12);
@@ -177,7 +174,7 @@ void ui::SettingsPageUi::setupUi(QWidget *parent) {
 
     audioLayout->addLayout(gridLayout);
     // 输入电平
-    micLevelLabel = new QLabel(QObject::tr("输入电平"), audioPage);
+    auto *micLevelLabel = new QLabel(QObject::tr("输入电平"), audioPage);
     micLevelLabel->setObjectName(QStringLiteral("fieldLabel"));
     audioLayout->addWidget(micLevelLabel);
 
@@ -199,9 +196,6 @@ void ui::SettingsPageUi::setupUi(QWidget *parent) {
         new QCheckBox(QObject::tr("启用回声消除（下次进会生效）"), audioPage);
     audioEchoCancel->setObjectName(QStringLiteral("audioEchoCancel"));
     audioLayout->addWidget(audioEchoCancel);
-
-
-
 
     audioLayout->addStretch(1);
 

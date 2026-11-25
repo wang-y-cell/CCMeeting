@@ -168,9 +168,16 @@ bool Storage::open() {
     QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),
                                                 QString::fromLatin1(kConnection));
     db.setDatabaseName(_path);
+    // 失败时必须把这个命名连接移除，否则下次 open() 会 addDatabase 同名连接
+    // （Qt 会打印 "duplicate connection name" 且拿到的是坏连接）。
+    auto abandon_connection = [&db]() {
+        db = QSqlDatabase();
+        QSqlDatabase::removeDatabase(QString::fromLatin1(kConnection));
+    };
     if (!db.open()) {
         spdlog::error("[Storage] 打开数据库失败，本次运行不持久化: {}",
                       db.lastError().text().toUtf8().constData());
+        abandon_connection();
         return false;
     }
 
@@ -178,6 +185,7 @@ bool Storage::open() {
     if (!ensure_schema()) {
         spdlog::error("[Storage] 建表失败，本次运行不持久化");
         db.close();
+        abandon_connection();
         return false;
     }
 

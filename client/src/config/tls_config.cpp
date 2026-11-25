@@ -76,7 +76,13 @@ std::string tls_ca_file() {
             spdlog::error("[tls] write CA file failed: {}", to_utf8(path));
             return {};
         }
-        out.write(pem);
+        if (out.write(pem) != pem.size()) {
+            // 写不全时不能把半截 PEM 交给 xrtc，按导出失败处理
+            spdlog::error("[tls] write CA file incomplete: {}", to_utf8(path));
+            out.close();
+            out.remove();
+            return {};
+        }
         out.close();
         // 只是公钥证书；尽量只允许当前用户读写
         out.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);

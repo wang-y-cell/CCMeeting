@@ -29,7 +29,7 @@ void ui::LoginWindowUi::setupUi(QWidget *parent) {
     loginPageLayout->setSpacing(0);
     loginPageLayout->setContentsMargins(0, 0, 0, 0);
 
-    logoLabel = new QLabel(QObject::tr("云"), loginPage);
+    auto *logoLabel = new QLabel(QObject::tr("云"), loginPage);
     logoLabel->setObjectName(QStringLiteral("logoLabel"));
     logoLabel->setAlignment(Qt::AlignCenter);
     logoLabel->setFixedSize(52, 52);
@@ -37,14 +37,14 @@ void ui::LoginWindowUi::setupUi(QWidget *parent) {
     loginPageLayout->addItem(
         new QSpacerItem(20, 18, QSizePolicy::Minimum, QSizePolicy::Fixed));
 
-    brandLabel = new QLabel(QObject::tr("云会议"), loginPage);
+    auto *brandLabel = new QLabel(QObject::tr("云会议"), loginPage);
     brandLabel->setObjectName(QStringLiteral("brandLabel"));
     brandLabel->setAlignment(Qt::AlignCenter);
     loginPageLayout->addWidget(brandLabel);
     loginPageLayout->addItem(
         new QSpacerItem(20, 6, QSizePolicy::Minimum, QSizePolicy::Fixed));
 
-    subtitleLabel =
+    auto *subtitleLabel =
         new QLabel(QObject::tr("登录以开始你的云会议"), loginPage);
     subtitleLabel->setObjectName(QStringLiteral("subtitleLabel"));
     subtitleLabel->setAlignment(Qt::AlignCenter);
@@ -103,14 +103,14 @@ void ui::LoginWindowUi::setupUi(QWidget *parent) {
     registerPageLayout->setSpacing(0);
     registerPageLayout->setContentsMargins(0, 0, 0, 0);
 
-    registerBrandLabel = new QLabel(QObject::tr("创建账号"), registerPage);
+    auto *registerBrandLabel = new QLabel(QObject::tr("创建账号"), registerPage);
     registerBrandLabel->setObjectName(QStringLiteral("registerBrandLabel"));
     registerBrandLabel->setAlignment(Qt::AlignCenter);
     registerPageLayout->addWidget(registerBrandLabel);
     registerPageLayout->addItem(
         new QSpacerItem(20, 8, QSizePolicy::Minimum, QSizePolicy::Fixed));
 
-    registerSubtitleLabel =
+    auto *registerSubtitleLabel =
         new QLabel(QObject::tr("填写用户名和密码完成注册"), registerPage);
     registerSubtitleLabel->setObjectName(
         QStringLiteral("registerSubtitleLabel"));

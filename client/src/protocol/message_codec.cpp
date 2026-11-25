@@ -1,7 +1,6 @@
 #include "protocol/message_codec.h"
 
 #include "config/user_session.h"
-#include "protocol/room_settings_flags.h"
 
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -57,38 +56,6 @@ qint64 user_id_from(const QJsonObject &data, qint64 fallback) {
         return fallback;
     }
     return value.toVariant().toLongLong();
-}
-
-// ---------------- 房间开关：布尔 ↔ 位掩码（过渡兼容）----------------
-//
-// 新规范（api.json DataRoomSettings）把房间开关拆成两个布尔：
-//   allow_record / allow_member_share
-// 但客户端内部（RoomSettingsController、MeetingSettingsPopup、dispatcher 信号）
-// 仍按 ROOM_SETTINGS_FLAG 位掩码工作，RoomSettingsMessage::flags() /
-// RoomSettingsNotifyMessage::flags() 的访问器保持不变。
-//
-// TODO(protocol-v2): 这是**过渡兼容**——等上层改成两个 bool 后即可删除。
-// 目前约定 bit0 = allow_record，bit1 = allow_member_share（与 room_settings_flags.h 一致）。
-
-std::uint32_t flags_from_settings(const QJsonObject &data) {
-    std::uint32_t flags = 0;
-    // 缺省 true：与 DataRoomSettings 的 default 保持一致
-    if (data.value(QStringLiteral("allow_record")).toBool(true)) {
-        flags |= ROOM_SETTINGS_ALLOW_RECORD;
-    }
-    if (data.value(QStringLiteral("allow_member_share")).toBool(true)) {
-        flags |= ROOM_SETTINGS_ALLOW_MEMBER_SHARE;
-    }
-    return flags;
-}
-
-QJsonObject settings_from_flags(std::uint32_t flags) {
-    QJsonObject data;
-    data.insert(QStringLiteral("allow_record"),
-                (flags & ROOM_SETTINGS_ALLOW_RECORD) != 0);
-    data.insert(QStringLiteral("allow_member_share"),
-                (flags & ROOM_SETTINGS_ALLOW_MEMBER_SHARE) != 0);
-    return data;
 }
 
 // ---------------- 方向判断 ----------------
@@ -226,44 +193,6 @@ MSG_TYPE MessageCodec::to_wire_type(MessageKind kind) {
     return CREATE_MEETING;
 }
 
-MessageKind MessageCodec::from_wire_type(MSG_TYPE type) {
-    switch (type) {
-    case TEXT_SEND:
-        return MessageKind::SendText;
-    case TEXT_RECV:
-        return MessageKind::RecvText;
-    case CREATE_MEETING:
-        return MessageKind::CreateMeeting;
-    case EXIT_MEETING:
-        return MessageKind::ExitMeeting;
-    case JOIN_MEETING:
-        return MessageKind::JoinMeeting;
-    case CLOSE_CAMERA:
-        return MessageKind::CloseCamera;
-    case CREATE_MEETING_RESPONSE:
-        return MessageKind::CreateMeetingResponse;
-    case PARTNER_EXIT:
-        return MessageKind::PartnerExit;
-    case PARTNER_JOIN:
-        return MessageKind::PartnerJoin;
-    case JOIN_MEETING_RESPONSE:
-        return MessageKind::JoinMeetingResponse;
-    case PARTNER_JOIN2:
-        return MessageKind::PartnerJoin2;
-    case USER_PROFILE:
-        return MessageKind::UserProfileNotify;
-    case ROOM_SETTINGS:
-        return MessageKind::RoomSettings;
-    case ROOM_SETTINGS_NOTIFY:
-        return MessageKind::RoomSettingsNotify;
-    case RemoteHostClosedError:
-        return MessageKind::RemoteHostClosedError;
-    case OtherNetError:
-        return MessageKind::OtherNetError;
-    }
-    return MessageKind::OtherNetError;
-}
-
 QByteArray MessageCodec::encode_json_frame(const Message &msg,
                                            qint64 local_user_id) {
     const MSG_TYPE wire_type = to_wire_type(msg.kind());
@@ -311,8 +240,10 @@ QByteArray MessageCodec::encode_json_frame(const Message &msg,
         break;
     case MessageKind::RoomSettings: {
         const auto *settings = dynamic_cast<const RoomSettingsMessage *>(&msg);
-        // 过渡兼容：位掩码 → 两个布尔
-        data = settings_from_flags(settings ? settings->flags() : 0u);
+        data.insert(QStringLiteral("allow_record"),
+                    settings ? settings->allow_record() : true);
+        data.insert(QStringLiteral("allow_member_share"),
+                    settings ? settings->allow_member_share() : true);
         break;
     }
     case MessageKind::SendUserProfile: {
@@ -384,8 +315,10 @@ QByteArray MessageCodec::encode_json_frame(const Message &msg,
     }
     case MessageKind::RoomSettingsNotify: {
         const auto *notify = dynamic_cast<const RoomSettingsNotifyMessage *>(&msg);
-        // 过渡兼容：位掩码 → 两个布尔
-        data = settings_from_flags(notify ? notify->flags() : 0u);
+        data.insert(QStringLiteral("allow_record"),
+                    notify ? notify->allow_record() : true);
+        data.insert(QStringLiteral("allow_member_share"),
+                    notify ? notify->allow_member_share() : true);
         break;
     }
     case MessageKind::RemoteHostClosedError:
@@ -483,12 +416,16 @@ MessagePtr MessageCodec::decode_json_frame(const QByteArray &json_frame) {
         return std::make_shared<CloseCameraMessage>();
     }
     case ROOM_SETTINGS: {
-        auto msg = std::make_shared<RoomSettingsMessage>(flags_from_settings(data));
+        // 缺键按 DataRoomSettings 默认 true
+        auto msg = std::make_shared<RoomSettingsMessage>(
+            data.value(QStringLiteral("allow_record")).toBool(true),
+            data.value(QStringLiteral("allow_member_share")).toBool(true));
         return msg;
     }
     case ROOM_SETTINGS_NOTIFY: {
-        auto msg = std::make_shared<RoomSettingsNotifyMessage>();
-        msg->set_flags(flags_from_settings(data));
+        auto msg = std::make_shared<RoomSettingsNotifyMessage>(
+            data.value(QStringLiteral("allow_record")).toBool(true),
+            data.value(QStringLiteral("allow_member_share")).toBool(true));
         return msg;
     }
     case CREATE_MEETING_RESPONSE: {
@@ -585,8 +522,8 @@ std::vector<MessagePtr> MessageCodec::WireStreamParser::feed(const char *data,
     QJsonParseError error{};
     const QJsonDocument doc = QJsonDocument::fromJson(frame, &error);
     if (error.error != QJsonParseError::NoError) {
-        // 可能是半包：留着等后续字节；缓冲超限则丢弃避免无限堆积
-        if (buffer_.size() > 1024 * 1024) {
+        // 可能是半包：留着等后续字节；缓冲超过统一上限则丢弃避免无限堆积
+        if (buffer_.size() > static_cast<int>(k_max_buffer)) {
             spdlog::warn("[MessageCodec] incomplete json dropped ({} bytes): {}",
                          buffer_.size(),
                          error.errorString().toUtf8().constData());

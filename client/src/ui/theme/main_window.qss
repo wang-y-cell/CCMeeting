@@ -266,7 +266,6 @@ QPushButton:disabled {
 
 QPushButton#create_meeting_btn,
 QPushButton#joinMeeting_btn,
-QPushButton#connServer_btn,
 QPushButton#settingsSaveBtn,
 QPushButton#editProfileBtn {
     background-color: @primary;
@@ -279,7 +278,6 @@ QPushButton#editProfileBtn {
 
 QPushButton#create_meeting_btn:hover,
 QPushButton#joinMeeting_btn:hover,
-QPushButton#connServer_btn:hover,
 QPushButton#settingsSaveBtn:hover,
 QPushButton#editProfileBtn:hover {
     background-color: @primaryHover;
@@ -288,7 +286,6 @@ QPushButton#editProfileBtn:hover {
 
 QPushButton#create_meeting_btn:pressed,
 QPushButton#joinMeeting_btn:pressed,
-QPushButton#connServer_btn:pressed,
 QPushButton#settingsSaveBtn:pressed,
 QPushButton#editProfileBtn:pressed {
     background-color: @primaryPressed;
@@ -297,7 +294,6 @@ QPushButton#editProfileBtn:pressed {
 
 QPushButton#create_meeting_btn:disabled,
 QPushButton#joinMeeting_btn:disabled,
-QPushButton#connServer_btn:disabled,
 QPushButton#settingsSaveBtn:disabled,
 QPushButton#editProfileBtn:disabled {
     background-color: @surface2;
@@ -508,10 +504,6 @@ QLabel#recentMeta {
 }
 
 /* ---------- 会议记录页 ---------- */
-
-QWidget#stack_meeting_history {
-    background: transparent;
-}
 
 QScrollArea#historyScroll {
     background: transparent;

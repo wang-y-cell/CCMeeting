@@ -50,7 +50,7 @@ ParticipantCard::ParticipantCard(qint64 userId, QWidget *parent)
             [this](bool video) { set_video_mode(video); });
 
     setToolTip(fallback_label());
-    apply_layout(false);
+    update_card_geometry();
 }
 
 QString ParticipantCard::fallback_label() const {
@@ -83,13 +83,6 @@ void ParticipantCard::set_video_mode(bool video) {
     _videoMode = video;
     if (_display) {
         _display->set_speaking(_speaking && !video, false);
-    }
-    apply_layout(video);
-}
-
-void ParticipantCard::apply_layout(bool video) {
-    if (!_display) {
-        return;
     }
     update_card_geometry();
 }

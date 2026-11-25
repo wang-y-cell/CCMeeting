@@ -25,12 +25,8 @@ class MeetingHistoryPage : public Page {
     Q_OBJECT
 
 public:
-    QString page_id() const override { return QStringLiteral("history"); }
-    QString title() const override { return tr("会议记录"); }
-    QString icon_name() const override { return QStringLiteral("calendar"); }
     void on_show() override;
 
-    int nav_order() const override { return 20; }
 public:
     explicit MeetingHistoryPage(QWidget *parent = nullptr);
 
@@ -46,6 +42,8 @@ private:
     void ensure_loaded_for_view();
     void load_next_page();
     int viewport_page_size() const;
+    /** @brief 当前筛选下已缓存的可见记录数 */
+    int filtered_count() const;
     void on_scroll_value_changed(int value);
     void resizeEvent(QResizeEvent *event) override;
 

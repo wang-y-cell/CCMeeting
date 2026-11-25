@@ -6,25 +6,15 @@
 #include "config/client_config.h"
 #include "ui/pages/settings_page_ui.h"
 
-#include <QAudioDevice>
-#include <QAudioFormat>
-#include <QAudioSource>
-#include <QCamera>
 #include <QElapsedTimer>
 #include <QDesktopServices>
 #include <QDir>
 #include <QUrl>
-#include <QCameraDevice>
-#include <QCameraFormat>
 #include <QCheckBox>
 #include <QComboBox>
-#include <QCoreApplication>
-#include <QDateTime>
 #include <QImage>
 #include <QLabel>
-#include <QLineEdit>
 #include <QListWidget>
-#include <QMediaCaptureSession>
 #include <QMessageBox>
 #include <QPixmap>
 #include <QProgressBar>
@@ -32,7 +22,6 @@
 #include <QGuiApplication>
 #include <QStyleHints>
 #include <QSignalBlocker>
-#include <QRadioButton>
 #include <QToolButton>
 #include <QStyle>
 #include "config/preferences.h"
@@ -40,22 +29,14 @@
 #include "ui/foundation/window_behavior.h"
 #include <QSize>
 #include <QStackedWidget>
-#include <QThreadPool>
 #include <QTimer>
-#include <QVideoFrame>
-#include <QVideoSink>
 
 #include <algorithm>
-#include <climits>
-#include <cmath>
-#include <cstdint>
 
 #include <spdlog/spdlog.h>
 
 namespace {
 
-constexpr const char *kSettingsOrg = "CCMeeting";
-constexpr const char *kSettingsApp = "Client";
 ///首次进入设置页时延迟枚举设备，确保页面先绘制出来
 constexpr int kDeviceRefreshDelayMs = 50;
 
@@ -89,7 +70,7 @@ ui::SettingsPage::SettingsPage(QWidget *parent) : Page(parent) {
     connect(media_, &XrtcSettingsMedia::errorOccurred, this,
             [this](const QString &message) {
                 QMessageBox::warning(this, tr("媒体设备"), message);
-                stopVideoPreview(true);
+                stopVideoPreview();
                 update_mic_ui();
             });
     connect(media_, &XrtcSettingsMedia::levelChanged, this, [this](int percent) {
@@ -151,15 +132,12 @@ ui::SettingsPage::SettingsPage(QWidget *parent) : Page(parent) {
         const auto apply_mode = [this](const QString &mode) {
             preferences().set_value(QStringLiteral("ui/theme"), mode);
             ui::ThemeManager &theme = ui::ThemeManager::instance();
-            if (mode == QLatin1String("light")) {
-                theme.set_theme(ui::Theme::Light);
-            } else if (mode == QLatin1String("dark")) {
-                theme.set_theme(ui::Theme::Dark);
-            } else {
-                const auto scheme = QGuiApplication::styleHints()->colorScheme();
-                theme.set_theme(scheme == Qt::ColorScheme::Light ? ui::Theme::Light
-                                                                 : ui::Theme::Dark);
-            }
+            // "system" 由系统配色决定；字符串解析统一走 ThemeManager::parse
+            const auto scheme = QGuiApplication::styleHints()->colorScheme();
+            const ui::Theme system_theme = scheme == Qt::ColorScheme::Light
+                                               ? ui::Theme::Light
+                                               : ui::Theme::Dark;
+            theme.set_theme(ui::ThemeManager::parse(mode, system_theme));
             spdlog::info("[SettingsPage] theme mode={} applied={}",
                          mode.toStdString(),
                          ui::ThemeManager::name_of(theme.theme()).toStdString());
@@ -528,8 +506,7 @@ void ui::SettingsPage::update_preview_toggle_ui() {
     }
 }
 
-void ui::SettingsPage::stopVideoPreview(bool deferHardware) {
-    Q_UNUSED(deferHardware);
+void ui::SettingsPage::stopVideoPreview() {
     if (media_) {
         media_->stop_video();
     }

@@ -18,7 +18,6 @@
 #include <QLabel>
 #include <QEvent>
 #include <QDateTime>
-#include <QGroupBox>
 #include <QListWidget>
 #include <QVBoxLayout>
 #include <QMessageBox>
@@ -113,7 +112,9 @@ ui::MeetingWindow::MeetingWindow(QWidget *parent)
     init_connect();
     init_settings_popup();
 
-    ui::disable_rounded_corners(this);
+    // 会议窗口要直角：FramelessWindow 默认会在 showEvent 里申请 Win11 圆角，
+    // 直接调 disable_rounded_corners 会被随后的 showEvent 覆盖，必须走开关。
+    setRoundedCornersEnabled(false);
     spdlog::debug("[MeetingWindow] ctor done");
     spdlog::default_logger()->flush();
 }
@@ -147,10 +148,8 @@ void ui::MeetingWindow::init_ui() {
             [this]() { _topBar->show_info_popup(); });
 
     // 初始就是"静音 / 关摄像头"状态：显示带红色斜杠的图标
-    ui::apply_toggle_icon(ui_.openAudio, QStringLiteral("mic"),
-                          QStringLiteral("mic-off"), false);
-    ui::apply_toggle_icon(ui_.openVedio, QStringLiteral("camera"),
-                          QStringLiteral("camera-off"), false);
+    ui::apply_toggle_icon(ui_.openAudio, QStringLiteral("mic"), false);
+    ui::apply_toggle_icon(ui_.openVedio, QStringLiteral("camera"), false);
 
     // 视频画面底色跟随主题（未出画面时不再是死黑），切换主题时同步刷新
     {
@@ -201,7 +200,6 @@ void ui::MeetingWindow::init_ui() {
     ui_.sendmsg->setDisabled(true);
     ui_.tabWidget->setCurrentIndex(0);
     // 左侧 tab 固定宽度，右侧主屏幕由布局拉伸，不再使用 QSplitter
-    ui_.listWidget->viewport()->installEventFilter(this);
     _topBar->refresh_meeting_info();
 }
 
@@ -574,15 +572,6 @@ void ui::MeetingWindow::apply_connect_result(bool ok, QString ip, QString port,
 }
 
 // ---------------------------------------------------------------- 工具栏
-void ui::MeetingWindow::on_create_meet_btn_clicked_slot() {
-    if (!_state._createmeet) {
-        ui_.openAudio->setDisabled(true);
-        ui_.openVedio->setDisabled(true);
-        emit create_meeting_requested_signal(_connect->max_participants(),
-                                             _connect->duration_minutes());
-    }
-}
-
 void ui::MeetingWindow::on_open_vedio_clicked_slot() {
     if (!(media() && media()->has_engine()) || !_state._rtcJoined ||
         (!_state._createmeet && !_state._joinmeet)) {
@@ -625,9 +614,10 @@ void ui::MeetingWindow::on_meeting_settings_clicked_slot() {
     }
 }
 
-void ui::MeetingWindow::apply_room_settings(std::uint32_t flags) {
+void ui::MeetingWindow::apply_room_settings(bool allow_record,
+                                            bool allow_member_share) {
     if (room_settings()) {
-        room_settings()->apply_flags(flags);
+        room_settings()->apply_settings(allow_record, allow_member_share);
     }
 }
 

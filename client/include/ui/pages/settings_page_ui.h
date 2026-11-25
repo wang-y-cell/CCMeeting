@@ -2,11 +2,9 @@
 #define SETTINGS_PAGE_UI_H
 
 class QCheckBox;
-class QRadioButton;
 class QToolButton;
 class QComboBox;
 class QLabel;
-class QLineEdit;
 class QListWidget;
 class QProgressBar;
 class QPushButton;
@@ -19,7 +17,6 @@ class SettingsPageUi {
 public:
     void setupUi(QWidget *parent);
 
-    QLabel *pageTitle = nullptr;
     QLabel *pageDesc = nullptr;
     QListWidget *categoryList = nullptr;
     QStackedWidget *pageStack = nullptr;
@@ -29,9 +26,7 @@ public:
     QComboBox *videoResolution = nullptr;
     QComboBox *videoFps = nullptr;
     QPushButton *videoPreviewToggleBtn = nullptr;
-    QLabel *videoPreviewTip = nullptr;
     QLabel *videoPreview = nullptr;
-    QLabel *videoPreviewHint = nullptr;
 
     // 音频
     QComboBox *audioDeviceCombo = nullptr;
@@ -39,7 +34,6 @@ public:
     QCheckBox *audioEchoCancel = nullptr;
     QPushButton *micTestBtn = nullptr;
     QProgressBar *micLevelBar = nullptr;
-    QLabel *micLevelLabel = nullptr;
 
     // 通用（不暴露服务器/Janus 等连接参数）
     QLabel *recordDirLabel = nullptr;

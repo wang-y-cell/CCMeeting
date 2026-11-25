@@ -83,6 +83,12 @@ void ParticipantsController::clear() {
     }
     _avatarGen.clear();
     _mainUserId = 0;
+    // 与 remove() 一致：主画面状态变化必须通知出去（含画面路由与主画面姓名标签），
+    // 否则上一场会议的主画面会残留到下一次。
+    if (_video) {
+        _video->setMainUser(0);
+    }
+    emit main_changed(0);
     emit count_changed(0);
 }
 
@@ -152,11 +158,8 @@ void ParticipantsController::select_main(qint64 user_id) {
 }
 
 void ParticipantsController::set_main_user(qint64 user_id) {
-    _mainUserId = user_id;
-    if (_video) {
-        _video->setMainUser(_mainUserId);
-    }
-    emit main_changed(_mainUserId);
+    // 与用户点击选中走同一条路径（原实现是 select_main 的逐行副本，容易漂移）
+    select_main(user_id);
 }
 
 void ParticipantsController::close_video(qint64 user_id) {

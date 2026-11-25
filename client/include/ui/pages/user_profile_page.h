@@ -14,10 +14,6 @@ class UserProfilePage : public Page {
     Q_OBJECT
 
 public:
-    QString page_id() const override { return QStringLiteral("profile"); }
-    QString title() const override { return tr("个人资料"); }
-    QString icon_name() const override { return QStringLiteral("user"); }
-    int nav_order() const override { return 100; }
 
 public:
     explicit UserProfilePage(QWidget *parent = nullptr);

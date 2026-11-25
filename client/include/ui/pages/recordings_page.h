@@ -23,12 +23,8 @@ class RecordingsPage : public Page {
     Q_OBJECT
 
 public:
-    QString page_id() const override { return QStringLiteral("recordings"); }
-    QString title() const override { return tr("录制"); }
-    QString icon_name() const override { return QStringLiteral("record"); }
     void on_show() override;
 
-    int nav_order() const override { return 30; }
 public:
     explicit RecordingsPage(QWidget *parent = nullptr);
 

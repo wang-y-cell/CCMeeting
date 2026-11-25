@@ -58,10 +58,6 @@ public:
     /** @brief 补发挂起的请求（由窗口在"连接已就绪"时调用） */
     void flush_pending();
 
-    /** @brief 本次连接的建会参数（供窗口在成功后写日志/复用） */
-    quint32 max_participants() const { return _maxParticipants; }
-    quint32 duration_minutes() const { return _durationMinutes; }
-
 signals:
     /** @brief 请求连服务器（窗口转发给 MeetingController） */
     void connect_requested(QString ip, QString port, ConnectAction action,

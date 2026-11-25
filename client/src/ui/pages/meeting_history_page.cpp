@@ -164,21 +164,20 @@ void ui::MeetingHistoryPage::reload_from_db() {
                  _joinedCount);
 }
 
+int ui::MeetingHistoryPage::filtered_count() const {
+    int n = 0;
+    for (const MeetingRecord &record : _records) {
+        if (_filter < 0 || static_cast<int>(record.kind) == _filter) {
+            ++n;
+        }
+    }
+    return n;
+}
+
 void ui::MeetingHistoryPage::ensure_loaded_for_view() {
     if (!_cacheValid) {
         return;
     }
-    // 当前筛选下已缓存的记录数
-    auto filtered_count = [this]() {
-        int n = 0;
-        for (const MeetingRecord &record : _records) {
-            if (_filter < 0 || static_cast<int>(record.kind) == _filter) {
-                ++n;
-            }
-        }
-        return n;
-    };
-
     const int target = _pageSize;
     while (filtered_count() < target && _records.size() < _totalCount) {
         const int offset = _records.size();
@@ -198,15 +197,6 @@ void ui::MeetingHistoryPage::load_next_page() {
     if (!_cacheValid || _records.size() >= _totalCount) {
         return;
     }
-    auto filtered_count = [this]() {
-        int n = 0;
-        for (const MeetingRecord &record : _records) {
-            if (_filter < 0 || static_cast<int>(record.kind) == _filter) {
-                ++n;
-            }
-        }
-        return n;
-    };
 
     const int before = filtered_count();
     while (_records.size() < _totalCount) {

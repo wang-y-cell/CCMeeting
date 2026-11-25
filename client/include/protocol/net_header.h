@@ -1,6 +1,5 @@
 #ifndef NETHEADER_H
 #define NETHEADER_H
-#include "protocol/room_settings_flags.h"
 
 #include <QMetaType>
 #include <cstdint>
@@ -60,7 +59,6 @@ enum MSG_TYPE : std::uint8_t {
     RemoteHostClosedError = 40,     // 本地网络错误，不走线上
     OtherNetError
 };
-Q_DECLARE_METATYPE(MSG_TYPE);
 
 
 #endif // NETHEADER_H

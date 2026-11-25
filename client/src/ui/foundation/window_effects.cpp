@@ -3,9 +3,7 @@
 #include <QPainterPath>
 #include <QRegion>
 #include <QApplication>
-#include <QComboBox>
 #include <QMenu>
-#include <QResizeEvent>
 
 #include <spdlog/spdlog.h>
 

@@ -3,7 +3,6 @@
 #include "features/meeting/meeting_protocol_dispatcher.h"
 #include "protocol/message.h"
 #include "protocol/message_codec.h"
-#include "protocol/room_settings_flags.h"
 
 #include <memory>
 
@@ -28,7 +27,7 @@ private slots:
     void partner_joined_from_json_carries_user_id();
     void partner_snapshot_from_json_carries_ids();
     void user_profile_from_json_carries_name_and_avatar();
-    void room_settings_from_json_carries_flags();
+    void room_settings_from_json_carries_booleans();
     void text_received_from_json_carries_sender_and_text();
     void null_message_emits_nothing();
     void mismatched_kind_emits_nothing();
@@ -131,12 +130,12 @@ void TestProtocolDispatcher::user_profile_from_json_carries_name_and_avatar() {
              QStringLiteral("https://example.test/a.png"));
 }
 
-void TestProtocolDispatcher::room_settings_from_json_carries_flags() {
+void TestProtocolDispatcher::room_settings_from_json_carries_booleans() {
     MeetingProtocolDispatcher dispatcher;
     QSignalSpy spy(&dispatcher,
                    &MeetingProtocolDispatcher::room_settings_received);
 
-    // 布尔 → 兼容位掩码：allow_record=true, allow_member_share=false → bit0
+    // data 的两个布尔原样落到信号：allow_record=true, allow_member_share=false
     const MessagePtr msg = MessageCodec::decode_json_frame(
         R"({"t":"room_settings_notify","code":0,"message":"ok",)"
         R"("data":{"allow_record":true,"allow_member_share":false}})");
@@ -144,8 +143,8 @@ void TestProtocolDispatcher::room_settings_from_json_carries_flags() {
     dispatcher.dispatch_user_info(msg);
 
     QCOMPARE(spy.count(), 1);
-    QCOMPARE(spy.at(0).at(0).toUInt(),
-             static_cast<unsigned>(ROOM_SETTINGS_ALLOW_RECORD));
+    QCOMPARE(spy.at(0).at(0).toBool(), true);
+    QCOMPARE(spy.at(0).at(1).toBool(), false);
 
     spy.clear();
     const MessagePtr both = MessageCodec::decode_json_frame(
@@ -155,8 +154,8 @@ void TestProtocolDispatcher::room_settings_from_json_carries_flags() {
     dispatcher.dispatch_user_info(both);
 
     QCOMPARE(spy.count(), 1);
-    QCOMPARE(spy.at(0).at(0).toUInt(),
-             static_cast<unsigned>(ROOM_SETTINGS_DEFAULT));
+    QCOMPARE(spy.at(0).at(0).toBool(), true);
+    QCOMPARE(spy.at(0).at(1).toBool(), true);
 }
 
 void TestProtocolDispatcher::text_received_from_json_carries_sender_and_text() {

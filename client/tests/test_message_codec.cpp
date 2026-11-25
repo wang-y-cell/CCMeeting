@@ -3,7 +3,6 @@
 #include "protocol/message.h"
 #include "protocol/message_codec.h"
 #include "protocol/net_header.h"
-#include "protocol/room_settings_flags.h"
 #include "config/user_session.h"
 
 #include <QJsonArray>
@@ -29,8 +28,8 @@ private slots:
     void user_profile_round_trip();
     void join_success_carries_room_id();
     void join_failure_keeps_negative_code();
-    void room_settings_booleans_to_bitmask();
-    void room_settings_bitmask_to_booleans();
+    void room_settings_decodes_booleans();
+    void room_settings_encodes_booleans();
     void partner_events_use_data_user_id();
     void decode_bad_json_returns_null();
     void type_name_round_trips();
@@ -215,8 +214,8 @@ void TestMessageCodec::join_failure_keeps_negative_code() {
     }
 }
 
-void TestMessageCodec::room_settings_booleans_to_bitmask() {
-    // 两个布尔 → 兼容位掩码（bit0=allow_record, bit1=allow_member_share）
+void TestMessageCodec::room_settings_decodes_booleans() {
+    // 下行 room_settings_notify：data 的两个布尔直接落到消息字段
     const QByteArray frame =
         R"({"t":"room_settings_notify","code":0,"message":"ok",)"
         R"("data":{"allow_record":true,"allow_member_share":false}})";
@@ -226,8 +225,8 @@ void TestMessageCodec::room_settings_booleans_to_bitmask() {
     const auto *notify =
         dynamic_cast<const RoomSettingsNotifyMessage *>(msg.get());
     QVERIFY(notify != nullptr);
-    QCOMPARE(notify->flags(),
-             static_cast<std::uint32_t>(ROOM_SETTINGS_ALLOW_RECORD));
+    QVERIFY(notify->allow_record());
+    QVERIFY(!notify->allow_member_share());
 
     const QByteArray both_frame =
         R"({"t":"room_settings_notify","code":0,"message":"ok",)"
@@ -236,8 +235,8 @@ void TestMessageCodec::room_settings_booleans_to_bitmask() {
     const auto *both_notify =
         dynamic_cast<const RoomSettingsNotifyMessage *>(both.get());
     QVERIFY(both_notify != nullptr);
-    QCOMPARE(both_notify->flags(),
-             static_cast<std::uint32_t>(ROOM_SETTINGS_DEFAULT));
+    QVERIFY(both_notify->allow_record());
+    QVERIFY(both_notify->allow_member_share());
 
     // 缺字段按 DataRoomSettings 默认 true
     const QByteArray empty_frame =
@@ -246,14 +245,13 @@ void TestMessageCodec::room_settings_booleans_to_bitmask() {
     const auto *empty_notify =
         dynamic_cast<const RoomSettingsNotifyMessage *>(empty.get());
     QVERIFY(empty_notify != nullptr);
-    QCOMPARE(empty_notify->flags(),
-             static_cast<std::uint32_t>(ROOM_SETTINGS_DEFAULT));
+    QVERIFY(empty_notify->allow_record());
+    QVERIFY(empty_notify->allow_member_share());
 }
 
-void TestMessageCodec::room_settings_bitmask_to_booleans() {
-    // 上行 room_settings：位掩码 → 两个布尔，且不带 code/message
-    RoomSettingsMessage msg(
-        ROOM_SETTINGS_ALLOW_RECORD | ROOM_SETTINGS_ALLOW_MEMBER_SHARE);
+void TestMessageCodec::room_settings_encodes_booleans() {
+    // 上行 room_settings：两个布尔 → data，且不带 code/message
+    RoomSettingsMessage msg(true, true);
     const QJsonObject object = parse(MessageCodec::encode_json_frame(msg, 1));
 
     QCOMPARE(object.value(QStringLiteral("t")).toString(),
@@ -263,7 +261,7 @@ void TestMessageCodec::room_settings_bitmask_to_booleans() {
     QCOMPARE(data.value(QStringLiteral("allow_record")).toBool(), true);
     QCOMPARE(data.value(QStringLiteral("allow_member_share")).toBool(), true);
 
-    RoomSettingsMessage off(0);
+    RoomSettingsMessage off(false, false);
     const QJsonObject off_data =
         parse(MessageCodec::encode_json_frame(off, 1))
             .value(QStringLiteral("data"))

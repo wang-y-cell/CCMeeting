@@ -50,7 +50,7 @@ public:
     void select_main(qint64 user_id);
     /** @brief 当前主画面用户（0 表示无） */
     qint64 main_user_id() const { return _mainUserId; }
-    /** @brief 会议开始/结束等场景由外层设置主画面（不发选中态副作用） */
+    /** @brief 会议开始/结束等场景由外层设置主画面（与 select_main 等价） */
     void set_main_user(qint64 user_id);
 
     /** @brief 该成员视频停止：回退到头像 */

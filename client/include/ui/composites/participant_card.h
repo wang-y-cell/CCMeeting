@@ -42,7 +42,6 @@ public:
     void set_video_mode(bool video);
     /** @brief 当前是否正在说话（绿色边框） */
     void set_speaking(bool speaking);
-    bool is_speaking() const { return _speaking; }
 
 signals:
     void clicked(qint64 userId);
@@ -53,7 +52,6 @@ protected:
     void paintEvent(QPaintEvent *event) override;
 
 private:
-    void apply_layout(bool video);
     void update_card_geometry();
     void position_name_label();
 

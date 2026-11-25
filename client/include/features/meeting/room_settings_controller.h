@@ -2,7 +2,6 @@
 #define ROOM_SETTINGS_CONTROLLER_H
 
 #include <QObject>
-#include <cstdint>
 
 class MeetingRecorder;
 namespace ui {
@@ -41,10 +40,13 @@ public:
     /** @brief 设置是否处于会议内（决定能否开始录制） */
     void set_session_active(bool active) { _sessionActive = active; }
 
-    /** @brief 应用开关位（服务端下发或本端兜底） */
-    void apply_flags(std::uint32_t flags);
+    /** @brief 应用房间开关（服务端下发或本端兜底） */
+    void apply_settings(bool allow_record, bool allow_member_share);
 
-    std::uint32_t flags() const { return _flags; }
+    /** @brief 本场是否允许录制 */
+    bool allow_record() const { return _allowRecord; }
+    /** @brief 本场是否允许普通成员共享屏幕 */
+    bool allow_member_share() const { return _allowMemberShare; }
     bool is_host() const { return _isHost; }
     bool can_share_screen() const;
     bool can_record() const;
@@ -66,9 +68,9 @@ public:
 
 signals:
     /** @brief 房主修改了开关，需要外层发给服务器 */
-    void settings_edited(std::uint32_t flags);
+    void settings_edited(bool allow_record, bool allow_member_share);
     /** @brief 房间开关已应用（外层刷新按钮/必要时停共享） */
-    void flags_applied(std::uint32_t flags);
+    void settings_applied(bool allow_record, bool allow_member_share);
     /** @brief 请求复制会议号 */
     void copy_room_no_requested();
     /** @brief 请求重新广播昵称/头像 */
@@ -82,7 +84,8 @@ private:
     QPushButton *_anchor = nullptr;
     QWidget *_owner = nullptr;
 
-    std::uint32_t _flags = 0;
+    bool _allowRecord = true;
+    bool _allowMemberShare = true;
     bool _isHost = false;
     bool _sessionActive = false;
     int _roomNo = 0;

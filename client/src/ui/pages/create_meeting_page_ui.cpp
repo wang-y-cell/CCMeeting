@@ -27,8 +27,6 @@ void ui::CreateMeetingPageUi::setupUi(QWidget *parent) {
     auto *header = new ui::PageHeader(
         QObject::tr("创建会议"),
         QObject::tr("设置会议人数与时长，快速发起一场新会议"), parent);
-    pageTitle = header->title_label();
-    pageDesc = header->desc_label();
     root->addWidget(header);
 
     root->addItem(
@@ -45,18 +43,18 @@ void ui::CreateMeetingPageUi::setupUi(QWidget *parent) {
     auto *peopleLayout = new QVBoxLayout();
     peopleLayout->setObjectName(QStringLiteral("peopleLayout"));
     peopleLayout->setSpacing(6);
-    fieldLabel = ui::make_field_label(QObject::tr("参会人数上限"), frame);
+    peopleLayout->addWidget(
+        ui::make_field_label(QObject::tr("参会人数上限"), frame));
     lineEdit = new QLineEdit(frame);
     lineEdit->setObjectName(QStringLiteral("lineEdit"));
     lineEdit->setMinimumHeight(38);
     lineEdit->setPlaceholderText(QObject::tr("例如 8"));
-    peopleLayout->addWidget(fieldLabel);
     peopleLayout->addWidget(lineEdit);
 
     auto *timeLayout = new QVBoxLayout();
     timeLayout->setObjectName(QStringLiteral("timeLayout"));
     timeLayout->setSpacing(6);
-    fieldLabel_2 = new QLabel(QObject::tr("会议时长（分钟）"), frame);
+    auto *fieldLabel_2 = new QLabel(QObject::tr("会议时长（分钟）"), frame);
     fieldLabel_2->setObjectName(QStringLiteral("fieldLabel_2"));
     lineEdit_2 = new QLineEdit(frame);
     lineEdit_2->setObjectName(QStringLiteral("lineEdit_2"));

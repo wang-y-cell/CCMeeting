@@ -26,7 +26,6 @@ public:
     VideoGLWidget *mainshow_label = nullptr;
     QLabel *canvasHint = nullptr;
     QTabWidget *tabWidget = nullptr;
-    QWidget *scrollAreaWidgetContents = nullptr;
     QVBoxLayout *verticalLayout_3 = nullptr;
     QListWidget *listWidget = nullptr;
     MyTextEdit *plainTextEdit = nullptr;

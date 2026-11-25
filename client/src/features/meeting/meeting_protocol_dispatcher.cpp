@@ -78,7 +78,8 @@ void MeetingProtocolDispatcher::dispatch_user_info(MessagePtr msg) {
         const auto *settings =
             dynamic_cast<const RoomSettingsNotifyMessage *>(msg.get());
         if (settings) {
-            emit room_settings_received(settings->flags());
+            emit room_settings_received(settings->allow_record(),
+                                        settings->allow_member_share());
         }
         break;
     }

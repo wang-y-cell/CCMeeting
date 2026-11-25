@@ -36,8 +36,8 @@
  *   `u`(用户 id)、`s`(文本)、`a`(token) 这些 v1 顶层字段，也不再有二进制大端布局。
  *
  * 为了不改动上层一堆调用点，Message 子类的公开访问器保持原样（room_no_u32()、
- * flags()、text()、display_name()、avatar_url()、partner_user_ids() 等），
- * 位掩码/布尔、房间号/响应码的转换全部收敛在本类内部完成。
+ * text()、display_name()、avatar_url()、partner_user_ids() 等）；房间开关在
+ * 内部与线上都是两个独立布尔（allow_record / allow_member_share），不再做位掩码转换。
  */
 class MessageCodec {
 public:
@@ -82,7 +82,6 @@ public:
 
 private:
     static MSG_TYPE to_wire_type(MessageKind kind);
-    static MessageKind from_wire_type(MSG_TYPE type);
 };
 
 #endif // MESSAGECODEC_H

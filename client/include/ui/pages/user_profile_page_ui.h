@@ -11,8 +11,6 @@ namespace ui {
 
 class UserProfilePageUi {
 public:
-    QLabel *pageTitle = nullptr;
-    QLabel *pageDesc = nullptr;
     QLabel *profileAvatarLarge = nullptr;
     QLabel *valueNickname = nullptr;
     QLabel *valueUsername = nullptr;

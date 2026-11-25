@@ -50,7 +50,6 @@ public:
     /** @brief 是否用 wss 连接（默认 ws，生产由 NetworkManager 按配置设置） */
     void setUseTls(bool enabled) { m_useTls = enabled; }
     bool useTls() const { return m_useTls; }
-    bool autoReconnect() const { return m_autoReconnect; }
     /** @brief 同步销毁 socket（析构/强制停止用） */
     void stopImmediately();
 
