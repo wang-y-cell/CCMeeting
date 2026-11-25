@@ -325,7 +325,7 @@ async def _parse_update_profile_request(
 
 
 # ---------------------------------------------------------------- 响应构造
-def _login_payload(result, config: AuthServerConfig) -> dict[str, Any]:
+def _login_payload(result, config: AuthServerConfig | None = None) -> dict[str, Any]:
     payload: dict[str, Any] = {"code": result.code, "message": result.message}
     if result.success and result.user is not None:
         user = result.user
@@ -343,11 +343,12 @@ def _login_payload(result, config: AuthServerConfig) -> dict[str, Any]:
             "extra_json": user.extra_json,
             "token": issue_token(user.id),
         }
-        turn = make_turn_credentials(config.turn.secret, user.id,
-                                     config.turn.ttl_seconds,
-                                     config.turn.uris)
-        if turn is not None:
-            payload["data"]["turn"] = turn
+        if config is not None:
+            turn = make_turn_credentials(config.turn.secret, user.id,
+                                         config.turn.ttl_seconds,
+                                         config.turn.uris)
+            if turn is not None:
+                payload["data"]["turn"] = turn
     return payload
 
 
