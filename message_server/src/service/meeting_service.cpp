@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <utility>
 
@@ -22,7 +23,9 @@ constexpr uint32_t kMinDurationMinutes = 1;
 constexpr uint32_t kMaxDurationMinutes = 24 * 60;
 constexpr uint32_t kDefaultDurationMinutes = 60;
 
-/// 从 JSON data 读取非负整数；缺失/类型不符时返回 fallback
+/// 从 JSON data 读取非负 uint32；缺失/类型不符/越界时返回 fallback。
+/// 注意：协议字段是 uint32，不能把 uint64/int64 直接 static_cast 截断
+/// （例如 room_id=0x100000001 会被截成 1，导致误入别的房间）。
 uint32_t read_u32(const json& data, const char* key, uint32_t fallback) {
     if (!data.is_object()) {
         return fallback;
@@ -32,10 +35,18 @@ uint32_t read_u32(const json& data, const char* key, uint32_t fallback) {
         return fallback;
     }
     if (it->is_number_unsigned()) {
-        return static_cast<uint32_t>(it->get<uint64_t>());
+        const auto value = it->get<uint64_t>();
+        if (value > std::numeric_limits<uint32_t>::max()) {
+            return fallback;
+        }
+        return static_cast<uint32_t>(value);
     }
     const auto value = it->get<int64_t>();
-    return value <= 0 ? 0u : static_cast<uint32_t>(value);
+    if (value < 0 ||
+        value > static_cast<int64_t>(std::numeric_limits<uint32_t>::max())) {
+        return fallback;
+    }
+    return static_cast<uint32_t>(value);
 }
 
 /**
@@ -67,10 +78,9 @@ uint64_t resolve_user_id(const config::ServerConfig& config,
         return 0;
     }
 
-    if (packet.user_id != 0) {
-        return packet.user_id;  // 预留给服务层自行注入身份的场景
-    }
-    // 鉴权关闭且没有可用 token（开发/联调）：连接本身即身份
+    // 鉴权关闭且没有可用 token（开发/联调）：连接本身即身份。
+    // 这是已知退化路径：user_id 会与真实账号 id 混用，生产必须配置
+    // CCMEETING_TOKEN_SECRET（main 启动时会对空 secret 告警）。
     return connection_id;
 }
 
@@ -89,24 +99,21 @@ protocol::Packet make_room_response(protocol::MessageType type, int code,
 meeting::RoomOptions parse_create_meeting_options(
     const protocol::Packet& packet, const config::ServerConfig& config) {
     meeting::RoomOptions options;
-    options.max_participants = config.max_participants_per_room;
-    options.duration_minutes = kDefaultDurationMinutes;
+
+    // 配置里是 size_t，协议里是 uint32：先夹到 uint32 且不小于协议下限，
+    // 避免 size_t -> uint32 截断，以及 std::clamp 出现 lo > hi 的未定义行为。
+    const std::size_t configured = std::max<std::size_t>(
+        config.max_participants_per_room, kMinParticipants);
+    const uint32_t hard_max = static_cast<uint32_t>(
+        std::min<std::size_t>(configured, std::numeric_limits<uint32_t>::max()));
 
     // v2：参数在 data 里，缺失取默认，钳制逻辑与服务端配置保持一致
-    options.max_participants = read_u32(
-        packet.data, "max_participants",
-        static_cast<uint32_t>(options.max_participants));
-    options.duration_minutes = read_u32(packet.data, "duration_minutes",
-                                        kDefaultDurationMinutes);
-
-    const uint32_t hard_max =
-        static_cast<uint32_t>(config.max_participants_per_room);
-    options.max_participants =
-        std::clamp(static_cast<uint32_t>(options.max_participants),
-                   kMinParticipants, hard_max);
-    options.duration_minutes =
-        std::clamp(options.duration_minutes, kMinDurationMinutes,
-                   kMaxDurationMinutes);
+    options.max_participants = std::clamp(
+        read_u32(packet.data, "max_participants", hard_max), kMinParticipants,
+        hard_max);
+    options.duration_minutes = std::clamp(
+        read_u32(packet.data, "duration_minutes", kDefaultDurationMinutes),
+        kMinDurationMinutes, kMaxDurationMinutes);
     return options;
 }
 
@@ -162,7 +169,8 @@ void MeetingService::on_connection_read(std::shared_ptr<network::Connection> con
 void MeetingService::on_connection_close(std::shared_ptr<network::Connection> conn) {
     auto room_it = _connection_room.find(conn->id());
     if (room_it == _connection_room.end()) {
-        spdlog::warn("connection {} close, but not in any room", conn->id());
+        // 大厅连接/握手失败也会走到这里，属正常情况，不要刷 warn
+        spdlog::debug("connection {} closed before joining any room", conn->id());
         return;
     }
 

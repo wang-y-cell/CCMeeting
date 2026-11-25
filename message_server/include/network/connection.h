@@ -32,8 +32,7 @@ public:
     using ReadHandler = std::function<void(std::shared_ptr<Connection>)>;
     using CloseHandler = std::function<void(std::shared_ptr<Connection>)>;
 
-    Connection(boost::asio::io_context& io_ctx,
-               boost::asio::ip::tcp::socket socket);
+    Connection(boost::asio::ip::tcp::socket socket);
     ~Connection();
 
     void start();  // 执行 WS 握手并开始异步读循环
@@ -43,10 +42,8 @@ public:
     void send(const std::vector<uint8_t>& data);
 
     Buffer& read_buffer();  // 累积的接收缓冲（每条 WS 消息 = 一个 JSON），供上层解析
-    void consume_read(std::size_t size);
 
     Id id() const { return _id; }
-    uint32_t peer_ip_network() const;  // 对端 IPv4，网络字节序
     bool is_open() const;
 
     void set_read_handler(ReadHandler handler);
@@ -56,6 +53,8 @@ private:
     void do_accept();
     void do_read();
     void do_write();
+    /** @brief 只关闭底层 socket，不回调上层（析构路径专用） */
+    void close_socket();
     void notify_close();
 
     static Id next_id();

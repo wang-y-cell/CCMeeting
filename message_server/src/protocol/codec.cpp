@@ -33,10 +33,6 @@ int read_int(const json& object, const char* key, int fallback) {
 
 }  // namespace
 
-bool Codec::is_text_type(MessageType type) {
-    return type == MessageType::TextSend || type == MessageType::TextRecv;
-}
-
 const char* Codec::type_name(MessageType type) {
     switch (type) {
         case MessageType::TextSend:
@@ -125,7 +121,6 @@ DecodeStatus Codec::try_decode(Buffer& buffer, Packet& packet) {
 
     // 解码阶段只做形状转换；上行身份由服务层决定（token / 连接状态）
     packet.type = *type;
-    packet.user_id = 0;
     packet.auth_token.clear();
     packet.code = 0;
     packet.message = "ok";

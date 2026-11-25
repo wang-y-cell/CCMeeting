@@ -41,9 +41,6 @@ public:
     static const char* type_name(MessageType type);
     /** @brief 由线上类型名反查枚举 */
     static std::optional<MessageType> type_from_name(const std::string& name);
-
-    /** @brief 是否为文本类消息（text_send / text_recv） */
-    static bool is_text_type(MessageType type);
 };
 
 }  // namespace protocol

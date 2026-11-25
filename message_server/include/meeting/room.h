@@ -131,7 +131,6 @@ private:
     void close_room();
 
     uint32_t _room_id;/*房间ID*/
-    config::ServerConfig _config;/*服务器配置*/
     RoomOptions _options;/*本房间参数*/
     boost::asio::io_context& _io_ctx;/*IO上下文，用于到期定时器*/
     std::unique_ptr<boost::asio::steady_timer> _expire_timer;/*到期关房定时器*/

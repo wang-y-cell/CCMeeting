@@ -62,6 +62,12 @@ std::optional<uint32_t> RoomManager::create_room(
 
     auto room = std::make_shared<Room>(room_id, owner, _config, _io_ctx, options,
                                        owner_user_id);
+    if (room->participant_count() == 0) {
+        // 房主没能加入（配置异常/连接状态变化）：不要登记一个空房间，
+        // 否则会对客户端返回成功但后续 join 全部失败。
+        spdlog::warn("cannot create room {}: owner was not added", room_id);
+        return std::nullopt;
+    }
     room->start_expire_timer();
     _rooms.emplace(room_id, room);
     spdlog::info("room {} created, max_participants={}, duration_minutes={}",

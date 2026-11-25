@@ -5,9 +5,28 @@
 #include <spdlog/spdlog.h>
 
 #include <boost/asio.hpp>
+#include <cerrno>
 #include <cstdlib>
+#include <exception>
 #include <memory>
 #include <string>
+
+namespace {
+
+/// 解析 1..65535 的端口；非法值返回 false（避免 atoi + static_cast 截断）
+bool parse_port(const char* text, uint16_t& port) {
+    errno = 0;
+    char* end = nullptr;
+    const long value = std::strtol(text, &end, 10);
+    if (errno != 0 || end == text || *end != '\0' || value <= 0 ||
+        value > 65535) {
+        return false;
+    }
+    port = static_cast<uint16_t>(value);
+    return true;
+}
+
+}  // namespace
 
 int main() {
     spdlog::set_level(spdlog::level::info);
@@ -24,7 +43,11 @@ int main() {
         listen_host = env_host;
     }
     if (const char* env_port = std::getenv("CCMEETING_SIGNAL_PORT")) {
-        config.listen_port = static_cast<uint16_t>(std::atoi(env_port));
+        if (!parse_port(env_port, config.listen_port)) {
+            spdlog::error(
+                "invalid CCMEETING_SIGNAL_PORT='{}' (expect 1..65535)", env_port);
+            return 1;
+        }
     }
     if (const char* env_auth = std::getenv("CCMEETING_REQUIRE_AUTH")) {
         config.require_auth = std::string(env_auth) == "1";
@@ -32,9 +55,16 @@ int main() {
     if (const char* env_secret = std::getenv("CCMEETING_TOKEN_SECRET")) {
         config.token_secret = env_secret;
     }
-    if (config.require_auth && config.token_secret.empty()) {
-        spdlog::error("CCMEETING_REQUIRE_AUTH=1 but CCMEETING_TOKEN_SECRET is empty");
-        return 1;
+    if (config.token_secret.empty()) {
+        if (config.require_auth) {
+            spdlog::error(
+                "CCMEETING_REQUIRE_AUTH=1 but CCMEETING_TOKEN_SECRET is empty");
+            return 1;
+        }
+        // 非鉴权模式下 token 无法校验，user_id 会退化为连接 id，可能与账号 id 撞号
+        spdlog::warn(
+            "CCMEETING_TOKEN_SECRET is empty: token verification disabled, "
+            "user_id falls back to connection id (development only)");
     }
 
     spdlog::info("Server config: max_rooms = {}, max_participants_per_room = {}, listen = {}:{}"
@@ -42,12 +72,21 @@ int main() {
 
     boost::asio::io_context io_context; /*IO上下文*/
     auto service = std::make_shared<service::MeetingService>(config, io_context);
-    network::Server server(io_context, config.listen_port, listen_host);
 
-    service->bind_server(server);
-    server.start();
+    try {
+        network::Server server(io_context, config.listen_port, listen_host);
 
-    spdlog::info("CloudMeeting server started on {}:{}", listen_host, config.listen_port);
-    io_context.run();
+        service->bind_server(server);
+        server.start();
+
+        spdlog::info("CloudMeeting server started on {}:{}", listen_host,
+                     server.local_port());
+        io_context.run();
+    } catch (const std::exception& e) {
+        // make_address / bind 失败（地址非法、端口占用、权限不足）时给出可读错误，
+        // 而不是让异常逃出 main 触发 std::terminate。
+        spdlog::error("fatal: {}", e.what());
+        return 1;
+    }
     return 0;
 }

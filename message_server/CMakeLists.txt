@@ -16,6 +16,16 @@ if(NOT TARGET Boost::headers OR NOT TARGET Boost::system)
 endif()
 find_package(Threads REQUIRED)
 
+# nlohmann/json：使用仓库声明的 third_party/json 子模块（与 message_server/tests 一致），
+# 不再借用 xrtc 内部的嵌套副本，避免两份头文件版本/路径漂移。
+set(CCMEETING_JSON_INCLUDE
+    "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/json/include")
+if(NOT EXISTS "${CCMEETING_JSON_INCLUDE}/nlohmann/json.hpp")
+    message(FATAL_ERROR
+        "[message_server] 缺少 json 子模块：${CCMEETING_JSON_INCLUDE}\n"
+        "请执行: git submodule update --init third_party/json")
+endif()
+
 file(GLOB_RECURSE SERVER_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
@@ -26,8 +36,7 @@ add_executable(CloudMeetingServer ${SERVER_SOURCES})
 
 target_include_directories(CloudMeetingServer PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
-    # nlohmann/json：WebSocket 消息的 JSON 编解码（随 xrtc 的 third_party 提供）
-    "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/webrtcSDK/third_party/json/include"
+    "${CCMEETING_JSON_INCLUDE}"
 )
 
 target_link_libraries(CloudMeetingServer

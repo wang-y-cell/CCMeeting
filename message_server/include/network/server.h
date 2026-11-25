@@ -5,6 +5,9 @@
  *
  * 绑定端口并循环 async_accept，每接受一条连接即创建 Connection
  * 并通过回调交给上层（通常为 MeetingService）注册读写处理。
+ *
+ * 生命周期要求：Server 必须比 io_context.run() 活得久（accept 回调里
+ * 持有的是 this 裸指针）。析构会关闭 acceptor，不会再有新的 accept。
  */
 
 #include "network/connection.h"
@@ -38,6 +41,7 @@ private:
     io_context& _io_ctx;
     tcp::acceptor _acceptor;
     ConnectionHandler _connection_handler;
+    bool _stopped = false;  // 析构后不再发起 accept
 };
 
 }  // namespace network

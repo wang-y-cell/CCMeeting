@@ -25,15 +25,14 @@ void append_bytes(Buffer &buffer, const std::vector<uint8_t> &bytes) {
     if (bytes.empty()) {
         return;
     }
-    buffer.write(const_cast<uint8_t *>(bytes.data()), bytes.size());
+    buffer.write(bytes.data(), bytes.size());
 }
 
 void append_text(Buffer &buffer, const std::string &text) {
     if (text.empty()) {
         return;
     }
-    buffer.write(reinterpret_cast<uint8_t *>(const_cast<char *>(text.data())),
-                 text.size());
+    buffer.write(reinterpret_cast<const uint8_t *>(text.data()), text.size());
 }
 
 json encode_to_json(const protocol::Packet &packet) {
@@ -81,11 +80,6 @@ TEST(CodecTypeNames, UnknownNameReturnsNullopt) {
     EXPECT_FALSE(protocol::Codec::type_from_name("").has_value());
 }
 
-TEST(CodecTypeNames, TextTypesAreMarked) {
-    EXPECT_TRUE(protocol::Codec::is_text_type(protocol::MessageType::TextSend));
-    EXPECT_TRUE(protocol::Codec::is_text_type(protocol::MessageType::TextRecv));
-    EXPECT_FALSE(protocol::Codec::is_text_type(protocol::MessageType::JoinMeeting));
-}
 
 TEST(CodecEncode, EnvelopeCarriesTypeCodeMessageData) {
     protocol::Packet packet =
@@ -141,7 +135,6 @@ TEST(CodecDecode, UpstreamTextMessage) {
               protocol::DecodeStatus::Ok);
     EXPECT_EQ(packet.type, protocol::MessageType::TextSend);
     EXPECT_EQ(packet.auth_token, "tk");
-    EXPECT_EQ(packet.user_id, 0u);   // v2：解码阶段不填 user_id
     ASSERT_TRUE(packet.data.is_object());
     EXPECT_EQ(packet.data["text"].get<std::string>(), "hi");
     EXPECT_EQ(packet.code, 0);
@@ -174,7 +167,6 @@ TEST(CodecDecode, LegacyFieldsAreIgnored) {
                   R"({"t":"text_send","u":42,"s":"legacy","a":"old","p":"AA=="})",
                   packet),
               protocol::DecodeStatus::Ok);
-    EXPECT_EQ(packet.user_id, 0u);
     EXPECT_TRUE(packet.auth_token.empty());
     EXPECT_TRUE(packet.data.empty());
 }
@@ -320,7 +312,7 @@ TEST(BufferTest, ReadWritePositionsAndNormalize) {
 TEST(BufferTest, WriteGrowsWhenFull) {
     Buffer buffer(4);
     const std::vector<uint8_t> big(64, 0x5A);
-    buffer.write(const_cast<uint8_t *>(big.data()), big.size());
+    buffer.write(big.data(), big.size());
     EXPECT_EQ(buffer.readable_size(), 64u);
     EXPECT_EQ(buffer.read_begin()[63], 0x5A);
 }

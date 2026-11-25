@@ -24,9 +24,6 @@ public:
     Buffer& operator=(Buffer&& other) noexcept;
     ~Buffer() = default;
 
-    void reset();                       // 重置读写指针到起始位置
-    void resize(size_type size);        // 调整底层 vector 容量
-
     uint8_t* begin();                   // 缓冲区起始地址
     const uint8_t* begin() const;
     uint8_t* read_begin();              // 当前可读数据起始地址
@@ -37,13 +34,10 @@ public:
     void move_read_pos(size_type size);   // 消费已读数据，前移读指针
     void move_write_pos(size_type size);  // 前移写指针
 
-    size_type size() const;             // 底层 vector 总容量
     void normalize();                   // 将未读数据移到头部，回收前置空间
     void expand_if_need(size_type size);  // 空间不足时 compact，仍不足则扩容
 
-    std::vector<uint8_t>&& move();      // 移走底层存储并重置指针
-
-    void write(uint8_t* data, size_type size);  // 写入数据，必要时自动扩容
+    void write(const uint8_t* data, size_type size);  // 写入数据，必要时自动扩容
     size_type readable_size() const;    // 未读字节数
     size_type writable_size() const;    // 写指针至末尾的剩余可写字节数
 

@@ -33,6 +33,4 @@ enum class MessageType : uint16_t {
     RoomSettingsNotify = 26,  // 房间开关当前值（服务器判定房主后广播/补发）
 };
 
-std::string get_type_name(MessageType type);
-
 }  // namespace protocol

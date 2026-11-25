@@ -42,7 +42,6 @@ protocol::Packet make_user_event_packet(protocol::MessageType type,
                                         uint64_t user_id) {
     protocol::Packet packet;
     packet.type = type;
-    packet.user_id = user_id;
     packet.data = json{{"user_id", user_id}};
     return packet;
 }
@@ -61,7 +60,6 @@ protocol::Packet make_room_settings_packet(bool allow_record,
 protocol::Packet make_user_profile_packet(const Participant& p) {
     protocol::Packet packet;
     packet.type = protocol::MessageType::UserProfile;
-    packet.user_id = p.user_id;
     packet.data = json{{"user_id", p.user_id},
                        {"nickname", p.display_name},
                        {"avatar", p.avatar_url}};
@@ -77,14 +75,16 @@ Room::Room(uint32_t room_id,
            RoomOptions options,
            uint64_t owner_user_id)
     : _room_id(room_id),
-      _config(config),
       _options(std::move(options)),
       _io_ctx(io_ctx) {
+    // 房间至少要能容纳房主。配置异常（上限为 0）时不能退化成 0，
+    // 否则构造函数的 add_participant 会失败，留下一个没有房主的“幽灵房间”。
+    const std::size_t room_cap =
+        std::max<std::size_t>(1, config.max_participants_per_room);
     if (_options.max_participants == 0) {
-        _options.max_participants = _config.max_participants_per_room;
+        _options.max_participants = room_cap;
     }
-    _options.max_participants =
-        std::min(_options.max_participants, _config.max_participants_per_room);
+    _options.max_participants = std::min(_options.max_participants, room_cap);
     add_participant(std::move(owner), true, owner_user_id);
 }
 
@@ -94,11 +94,17 @@ void Room::start_expire_timer() {
     }
     _expire_timer = std::make_unique<boost::asio::steady_timer>(_io_ctx);
     _expire_timer->expires_after(std::chrono::minutes(_options.duration_minutes));
-    auto self = shared_from_this();
+    // 用 weak_ptr：timer 的完成回调由 io_context 持有，捕获 shared_ptr 会让
+    // Room 被自己的定时器续命，且在 io_context 析构时从 handler 内部析构 Room。
+    std::weak_ptr<Room> weak_self = weak_from_this();
     _expire_timer->async_wait(
-        [self](const boost::system::error_code& ec) {
+        [weak_self](const boost::system::error_code& ec) {
             if (ec) {
                 return;
+            }
+            const auto self = weak_self.lock();
+            if (!self) {
+                return;  // 房间已被销毁，无需再处理
             }
             spdlog::info("room {} duration expired ({} minutes)", self->_room_id,
                          self->_options.duration_minutes);
@@ -164,12 +170,17 @@ void Room::close_room() {
     }
     _closed = true;
 
+    // close_room 会关闭连接，而连接关闭回调又会回到上层并可能把本 Room 从
+    // RoomManager 中摘除。这里先持有一个强引用，并把 close 回调拷贝到局部，
+    // 避免回调执行期间析构正在调用的 std::function 或访问已释放的 this。
+    [[maybe_unused]] auto self = weak_from_this().lock();
+
     if (_expire_timer) {
         _expire_timer->cancel();
         _expire_timer.reset();
     }
 
-    auto participants = _participants;
+    auto participants = std::move(_participants);
     _participants.clear();
     for (auto& item : participants) {
         if (item.second.connection && item.second.connection->is_open()) {
@@ -177,8 +188,10 @@ void Room::close_room() {
         }
     }
 
-    if (_close_callback) {
-        _close_callback(_room_id);
+    auto on_closed = std::move(_close_callback);
+    _close_callback = nullptr;
+    if (on_closed) {
+        on_closed(_room_id);
     }
 }
 
@@ -217,13 +230,13 @@ void Room::handle_packet(std::shared_ptr<network::Connection> from,
 
     // 身份来自房间成员表（服务层用 token 或连接状态填好），不信任上行 data
     const uint64_t sender_user_id = participant_it->second.user_id;
-    spdlog::debug("room {} handle packet from connection {}, type: {}", _room_id, from->id(), protocol::get_type_name(packet.type));
+    spdlog::debug("room {} handle packet from connection {}, type: {}", _room_id,
+                  from->id(), protocol::Codec::type_name(packet.type));
 
     switch (packet.type) {
         case protocol::MessageType::TextSend: {
             protocol::Packet outbound;
             outbound.type = protocol::MessageType::TextRecv;
-            outbound.user_id = sender_user_id;
             outbound.data = json{{"user_id", sender_user_id},
                                  {"text", read_string(packet.data, "text")}};
             broadcast(outbound, from->id());

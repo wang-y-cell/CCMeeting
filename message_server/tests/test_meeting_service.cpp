@@ -57,8 +57,7 @@ public:
 
         // v2：一条 WS 消息就是一个 JSON，不需要任何长度前缀
         Buffer frame;
-        frame.write(reinterpret_cast<uint8_t *>(const_cast<char *>(text.data())),
-                    text.size());
+        frame.write(reinterpret_cast<const uint8_t *>(text.data()), text.size());
 
         protocol::Packet packet;
         EXPECT_EQ(protocol::Codec::try_decode(frame, packet),

@@ -65,18 +65,6 @@ public:
      */
     std::size_t room_count() const { return _rooms.size(); }
 
-    /**
-     * @brief 获取服务器配置
-     * @return 服务器配置
-     */
-    const config::ServerConfig& config() const { return _config; }
-
-    /**
-     * @brief 获取房间ID
-     * @return 房间ID
-     */
-    uint32_t next_room_id() const { return _next_room_id; }
-
 private:
     config::ServerConfig _config;/*服务器配置*/
     boost::asio::io_context& _io_ctx;/*IO上下文*/

@@ -39,7 +39,6 @@ set(SERVER_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
 add_executable(test_message_server_codec
     test_codec.cpp
     "${SERVER_ROOT}/src/protocol/codec.cpp"
-    "${SERVER_ROOT}/src/protocol/message_type.cpp"
     "${SERVER_ROOT}/src/network/buffer.cpp"
 )
 
@@ -89,7 +88,6 @@ add_executable(test_message_server_room
     "${SERVER_ROOT}/src/network/connection.cpp"
     "${SERVER_ROOT}/src/network/buffer.cpp"
     "${SERVER_ROOT}/src/protocol/codec.cpp"
-    "${SERVER_ROOT}/src/protocol/message_type.cpp"
 )
 target_include_directories(test_message_server_room PRIVATE
     "${SERVER_ROOT}/include"
@@ -121,7 +119,6 @@ add_executable(test_message_server_service
     "${SERVER_ROOT}/src/meeting/room.cpp"
     "${SERVER_ROOT}/src/meeting/room_manager.cpp"
     "${SERVER_ROOT}/src/protocol/codec.cpp"
-    "${SERVER_ROOT}/src/protocol/message_type.cpp"
     "${SERVER_ROOT}/src/protocol/token.cpp"
 )
 target_include_directories(test_message_server_service PRIVATE

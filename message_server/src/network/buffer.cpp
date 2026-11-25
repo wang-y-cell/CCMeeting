@@ -1,23 +1,28 @@
 #include "network/buffer.h"
-#include <cstring>
+
+#include <algorithm>
 #include <cassert>
+#include <cstring>
+#include <utility>
 
 Buffer::Buffer(size_t size)
-: _read_pos(0),
-_write_pos(0) {
+    : _read_pos(0), _write_pos(0) {
     _buffer.resize(size);
 }
 
-Buffer::Buffer(const Buffer& other) {
-    _buffer = other._buffer;
-    _read_pos = other._read_pos;
-    _write_pos = other._write_pos;
-}
+Buffer::Buffer(const Buffer& other)
+    : _buffer(other._buffer),
+      _read_pos(other._read_pos),
+      _write_pos(other._write_pos) {}
 
-Buffer::Buffer(Buffer&& other) noexcept{
-    _buffer = std::move(other._buffer);
-    _read_pos = other._read_pos;
-    _write_pos = other._write_pos;
+Buffer::Buffer(Buffer&& other) noexcept
+    : _buffer(std::move(other._buffer)),
+      _read_pos(other._read_pos),
+      _write_pos(other._write_pos) {
+    // 被移走的对象必须回到一致的初始状态，否则 readable_size()/writable_size()
+    // 会在空的 _buffer 上做减法下溢。
+    other._read_pos = 0;
+    other._write_pos = 0;
 }
 
 Buffer& Buffer::operator=(const Buffer& other) {
@@ -33,16 +38,9 @@ Buffer& Buffer::operator=(Buffer&& other) noexcept {
     _buffer = std::move(other._buffer);
     _read_pos = other._read_pos;
     _write_pos = other._write_pos;
+    other._read_pos = 0;
+    other._write_pos = 0;
     return *this;
-}
-
-void Buffer::reset() {
-    _read_pos = 0;
-    _write_pos = 0;
-}
-
-void Buffer::resize(size_type size) {
-    _buffer.resize(size);
 }
 
 uint8_t* Buffer::begin() {
@@ -87,10 +85,6 @@ Buffer::size_type Buffer::writable_size() const {
     return _buffer.size() - _write_pos;
 }
 
-Buffer::size_type Buffer::size() const {
-    return _buffer.size();
-}
-
 void Buffer::normalize() {
     if (_read_pos) {
         if (_read_pos != _write_pos) {
@@ -104,19 +98,14 @@ void Buffer::normalize() {
 void Buffer::expand_if_need(size_type size) {
     if (writable_size() < size) {
         normalize();
-        if(writable_size() < size) 
+        if (writable_size() < size) {
             _buffer.resize(std::max(2 * _buffer.size(), _write_pos + size));
+        }
     }
 }
 
-std::vector<uint8_t>&& Buffer::move() {
-    _write_pos = 0;
-    _read_pos = 0;
-    return std::move(_buffer);
-}
-
-void Buffer::write(uint8_t* data, size_type size) {
-    if(!size) return;
+void Buffer::write(const uint8_t* data, size_type size) {
+    if (!size) return;
     expand_if_need(size);
     memcpy(write_begin(), data, size);
     move_write_pos(size);

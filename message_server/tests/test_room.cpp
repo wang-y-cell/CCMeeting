@@ -22,7 +22,7 @@ std::shared_ptr<network::Connection> make_connection(
     if (open) {
         socket.open(tcp::v4());
     }
-    return std::make_shared<network::Connection>(io, std::move(socket));
+    return std::make_shared<network::Connection>(std::move(socket));
 }
 
 config::ServerConfig make_config(std::size_t max_rooms = 8,

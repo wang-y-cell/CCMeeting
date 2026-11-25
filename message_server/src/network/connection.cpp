@@ -3,6 +3,7 @@
 #include <spdlog/spdlog.h>
 
 #include <atomic>
+#include <utility>
 
 namespace network {
 
@@ -16,20 +17,15 @@ Connection::Id Connection::next_id() {
     return g_next_connection_id.fetch_add(1);
 }
 
-Connection::Connection(boost::asio::io_context& /*io_ctx*/,
-                       boost::asio::ip::tcp::socket socket)
+Connection::Connection(boost::asio::ip::tcp::socket socket)
     : _id(next_id()), _ws(std::move(socket)) {
     spdlog::info("connection created: id = {}", _id);
 }
 
 Connection::~Connection() {
-    try {
-        close();
-    } catch (const std::exception& e) {
-        spdlog::error("exception ignored in connection destructor: {}", e.what());
-    } catch (...) {
-        spdlog::error("unknown exception ignored in connection destructor");
-    }
+    // 析构阶段不能再回调上层：此时 shared_from_this() 必然失效，而且上层
+    // （MeetingService）可能已经先于本对象销毁。只做 socket 清理。
+    close_socket();
 }
 
 void Connection::set_read_handler(ReadHandler handler) {
@@ -84,8 +80,7 @@ void Connection::do_read() {
 
                        // 一条 WS 消息 = 一个 JSON，直接交给上层解析
                        _read_buffer.write(
-                           const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(
-                               message.data())),
+                           reinterpret_cast<const uint8_t*>(message.data()),
                            message.size());
 
                        if (_read_handler) {
@@ -103,6 +98,11 @@ void Connection::close() {
     }
     _closed = true;
 
+    close_socket();
+    notify_close();
+}
+
+void Connection::close_socket() {
     // 必须用 error_code 重载：会抛异常的版本在 socket 已关闭时会
     // 抛 boost::system_error("cancel: Bad file descriptor")，导致进程 abort。
     beast::error_code ec;
@@ -112,7 +112,6 @@ void Connection::close() {
     if (ec && ec != boost::asio::error::bad_descriptor) {
         spdlog::debug("connection {} close: {}", _id, ec.message());
     }
-    notify_close();
 }
 
 bool Connection::is_open() const {
@@ -120,19 +119,6 @@ bool Connection::is_open() const {
 }
 
 Buffer& Connection::read_buffer() { return _read_buffer; }
-
-void Connection::consume_read(std::size_t size) {
-    _read_buffer.move_read_pos(size);
-}
-
-uint32_t Connection::peer_ip_network() const {
-    beast::error_code ec;
-    const auto endpoint = _ws.next_layer().socket().remote_endpoint(ec);
-    if (ec) {
-        return 0;
-    }
-    return endpoint.address().to_v4().to_uint();
-}
 
 void Connection::send(const uint8_t* data, std::size_t length) {
     if (_closed || length == 0) {
@@ -173,9 +159,12 @@ void Connection::do_write() {
 }
 
 void Connection::notify_close() {
-    if (_close_handler) {
-        _close_handler(shared_from_this());
-        _close_handler = nullptr;
+    // 先摘掉回调再调用：回调里可能再次 close()/销毁本对象，不能在
+    // 调用过程中继续持有或读取 _close_handler。
+    auto handler = std::move(_close_handler);
+    _close_handler = nullptr;
+    if (handler) {
+        handler(shared_from_this());
     }
 }
 
