@@ -1,6 +1,7 @@
 <RCC>
     <qresource prefix="/ui/images">
         <file alias="demo-avatar.png">resources/images/demo-avatar.png</file>
+        <file alias="default-avatar.svg">resources/images/default-avatar.svg</file>
         <file alias="loading.gif">resources/images/loading.gif</file>
     </qresource>
     <qresource prefix="/ui/icons">

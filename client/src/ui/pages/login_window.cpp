@@ -12,6 +12,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QMessageBox>
 #include <QNetworkReply>
@@ -227,6 +228,23 @@ void ui::LoginWindow::onLoginFinished(QNetworkReply *reply) {
         userId,
         username.isEmpty() ? ui.account_line->text().trimmed() : username,
         name, avatar, info, extras);
+
+    const QJsonObject turn = data.value(QStringLiteral("turn")).toObject();
+    if (!turn.isEmpty()) {
+        TurnCredentials creds;
+        creds.username = turn.value(QStringLiteral("username")).toString();
+        creds.password = turn.value(QStringLiteral("password")).toString();
+        creds.ttlSeconds = turn.value(QStringLiteral("ttl")).toInt();
+        const QJsonArray uris = turn.value(QStringLiteral("uris")).toArray();
+        for (const QJsonValue &uri : uris) {
+            if (uri.isString()) {
+                creds.uris.push_back(uri.toString());
+            }
+        }
+        UserSession::instance().setTurnCredentials(creds);
+        spdlog::info("[login] turn credentials ttl={} uris={}", creds.ttlSeconds,
+                     creds.uris.size());
+    }
     spdlog::info("[login] success id={} name_bytes={}", userId,
                  name.toUtf8().size());
 

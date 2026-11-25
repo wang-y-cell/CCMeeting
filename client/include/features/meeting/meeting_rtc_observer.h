@@ -88,6 +88,9 @@ private:
     /** @brief remote feed_id → 业务 userId（由 display 解析） */
     QHash<uint64_t, qint64> _feedToUser;
     std::atomic<bool> _localTalking{false};
+
+private:
+    inline static constexpr int audio_threshold = 4; //调整音量闪烁绿色边框的阈值大小
 };
 
 #endif // MEETING_RTC_OBSERVER_H

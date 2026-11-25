@@ -44,6 +44,7 @@ private:
     void apply_filter();
     void reload_from_db();
     void ensure_loaded_for_view();
+    void load_next_page();
     int viewport_page_size() const;
     void on_scroll_value_changed(int value);
     void resizeEvent(QResizeEvent *event) override;

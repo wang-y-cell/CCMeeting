@@ -77,7 +77,6 @@ private slots:
         QJsonObject webrtc;
         webrtc.insert(QStringLiteral("janus_ws_url"),
                       QStringLiteral("wss://janus.example:8989/"));
-        webrtc.insert(QStringLiteral("admin_key"), QStringLiteral("secret"));
         webrtc.insert(QStringLiteral("janus_ca_file"), QStringLiteral("/tmp/ca.pem"));
         webrtc.insert(QStringLiteral("janus_tls_verify"), true);
         webrtc.insert(QStringLiteral("allow_plaintext_ws"), false);

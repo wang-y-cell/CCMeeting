@@ -164,7 +164,8 @@ void MeetingRtcObserver::on_connection_state(xrtc::XRTCConnectionState state) {
 }
 
 void MeetingRtcObserver::on_audio_level(xrtc::IXRtcMediaSource *, int level) {
-    const bool talking = level > 8;
+    const bool talking = level > audio_threshold;
+    spdlog::debug("[RtcObserver] local level={} talking={}", level, talking);
     if (talking == _localTalking.load()) {
         return;
     }

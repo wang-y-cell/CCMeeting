@@ -35,8 +35,7 @@ private:
     void loadInternal(const QString& url,
                       const QSize& targetSize,
                       QObject* context,
-                      const std::function<void(QPixmap)>& callback,
-                      bool retriedDefault);
+                      const std::function<void(QPixmap)>& callback);
 
     QNetworkAccessManager* m_nam = nullptr;
     bool m_shuttingDown = false;

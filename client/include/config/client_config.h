@@ -18,7 +18,6 @@ struct WebRtcVideoConfig {
 
 struct WebRtcConfig {
     QString janus_ws_url;
-    QString admin_key;
     /// wss 使用的 CA 文件；为空时使用内置证书导出的临时 PEM
     QString janus_ca_file;
     /// wss 是否校验证书（生产必须 true）
@@ -37,7 +36,6 @@ struct AuthConfigData {
     QString upload_avatar_path = QStringLiteral("/api/upload-avatar");
     QString update_profile_path = QStringLiteral("/api/update-profile");
     QString public_base_url;
-    QString default_avatar_path = QStringLiteral("/static/avatar/default.png");
 
     QString defaultAvatarUrl() const;
 };

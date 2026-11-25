@@ -13,6 +13,7 @@
 #include <QPainterPath>
 #include <QPointer>
 #include <QStandardPaths>
+#include <QSvgRenderer>
 #include <QUrl>
 
 QImage makeCircularAvatarImage(const QImage &src) {
@@ -54,11 +55,32 @@ QPixmap scalePixmap(const QPixmap& source, const QSize& targetSize) {
     return source.scaled(targetSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 }
 
-QString resolvedAvatarUrl(const QString& url) {
-    if (!url.isEmpty()) {
-        return url;
+constexpr const char *kDefaultAvatarResource = ":/ui/images/default-avatar.svg";
+
+QPixmap renderLocalAvatar(const QSize& targetSize) {
+    const QSize size = targetSize.isValid() ? targetSize : QSize(128, 128);
+    QPixmap pixmap(size);
+    pixmap.fill(Qt::transparent);
+    QSvgRenderer renderer(QString::fromLatin1(kDefaultAvatarResource));
+    if (!renderer.isValid()) {
+        return {};
     }
-    return ClientConfig::instance().auth().defaultAvatarUrl();
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    renderer.render(&painter, QRectF(QPointF(0, 0), QSizeF(size)));
+    painter.end();
+    return pixmap;
+}
+
+QString resolvedAvatarUrl(const QString& url) {
+    const QString remoteDefault =
+        ClientConfig::instance().auth().defaultAvatarUrl();
+    // 空头像和服务端旧默认头像都落到客户端内置 SVG，避免无意义的远程请求。
+    if (url.isEmpty() || (!remoteDefault.isEmpty() && url == remoteDefault)) {
+        return QString::fromLatin1(kDefaultAvatarResource);
+    }
+    return url;
 }
 
 }  // namespace
@@ -105,26 +127,32 @@ void AvatarService::load(const QString& url,
                              const QSize& targetSize,
                              QObject* context,
                              const std::function<void(QPixmap)>& callback) {
-    loadInternal(url, targetSize, context, callback, false);
+    loadInternal(url, targetSize, context, callback);
 }
 
 void AvatarService::loadInternal(const QString& url,
                                      const QSize& targetSize,
                                      QObject* context,
-                                     const std::function<void(QPixmap)>& callback,
-                                     bool retriedDefault) {
+                                     const std::function<void(QPixmap)>& callback) {
     if (!callback || m_shuttingDown) {
         return;
     }
 
     const QPointer<QObject> contextGuard(context);
     const QString requestUrl = resolvedAvatarUrl(url);
+    // 本地 qrc SVG 直接渲染，不经过 QNetworkAccessManager。
+    if (requestUrl.startsWith(QStringLiteral(":/"))) {
+        if (contextGuard && !contextGuard.data()) {
+            return;
+        }
+        callback(renderLocalAvatar(targetSize));
+        return;
+    }
     if (!m_nam) {
-        callback(QPixmap());
+        callback(renderLocalAvatar(targetSize));
         return;
     }
 
-    const QString defaultUrl = ClientConfig::instance().auth().defaultAvatarUrl();
     QNetworkRequest request{QUrl(requestUrl)};
     request.setSslConfiguration(ui::ssl_config());
     request.setAttribute(QNetworkRequest::CacheLoadControlAttribute,
@@ -133,8 +161,7 @@ void AvatarService::loadInternal(const QString& url,
     QObject* receiver = context ? context : qApp;
     QObject::connect(
         reply, &QNetworkReply::finished, receiver,
-        [this, reply, targetSize, callback, requestUrl, defaultUrl, retriedDefault,
-         contextGuard]() {
+        [this, reply, targetSize, callback, requestUrl, contextGuard]() {
             if (m_shuttingDown || (contextGuard && !contextGuard.data())) {
                 reply->deleteLater();
                 return;
@@ -144,11 +171,9 @@ void AvatarService::loadInternal(const QString& url,
             if (reply->error() == QNetworkReply::NoError &&
                 pix.loadFromData(reply->readAll())) {
                 callback(scalePixmap(pix, targetSize));
-            } else if (!retriedDefault && requestUrl != defaultUrl) {
-                loadInternal(defaultUrl, targetSize, contextGuard.data(), callback,
-                             true);
             } else {
-                callback(QPixmap());
+                // 远程头像失败时回退到内置 SVG，不再依赖服务端默认头像。
+                callback(renderLocalAvatar(targetSize));
             }
             reply->deleteLater();
         });

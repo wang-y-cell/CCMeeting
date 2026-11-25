@@ -84,4 +84,5 @@ void UserSession::clear() {
     m_info.clear();
     m_extras = {};
     m_token.clear();
+    m_turn = {};
 }

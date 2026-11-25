@@ -1,8 +1,7 @@
 #include "ui/pages/settings_page.h"
 
 #include "data/recording_repository.h"
-#include "media/devices/camera_preview_service.h"
-#include "media/devices/mic_test_service.h"
+#include "media/devices/xrtc_settings_media.h"
 
 #include "config/client_config.h"
 #include "ui/pages/settings_page_ui.h"
@@ -75,10 +74,10 @@ ui::SettingsPage::SettingsPage(QWidget *parent) : Page(parent) {
     ui = std::make_unique<SettingsPageUi>();
     ui->setupUi(this);
 
-    preview_ = new CameraPreviewService(this);
-    connect(preview_, &CameraPreviewService::frameReady, this,
+    media_ = new XrtcSettingsMedia(this);
+    connect(media_, &XrtcSettingsMedia::frameReady, this,
             [this](const QImage &image) {
-                if (!ui || !ui->videoPreview) {
+                if (!ui || !ui->videoPreview || image.isNull()) {
                     return;
                 }
                 const QPixmap pix = QPixmap::fromImage(image).scaled(
@@ -87,28 +86,17 @@ ui::SettingsPage::SettingsPage(QWidget *parent) : Page(parent) {
                 ui->videoPreview->setText(QString());
                 ui->videoPreview->setPixmap(pix);
             });
-    connect(preview_, &CameraPreviewService::errorOccurred, this,
+    connect(media_, &XrtcSettingsMedia::errorOccurred, this,
             [this](const QString &message) {
-                QMessageBox::warning(
-                    this, tr("摄像头"),
-                    tr("无法打开摄像头预览：%1").arg(message));
+                QMessageBox::warning(this, tr("媒体设备"), message);
                 stopVideoPreview(true);
+                update_mic_ui();
             });
-
-
-    // 麦克风测试：采集与电平计算在 MicTestService，页面只做展示
-    mic_ = new MicTestService(this);
-    connect(mic_, &MicTestService::levelChanged, this, [this](int percent) {
+    connect(media_, &XrtcSettingsMedia::levelChanged, this, [this](int percent) {
         if (ui->micLevelBar) {
             ui->micLevelBar->setValue(percent);
         }
     });
-    connect(mic_, &MicTestService::errorOccurred, this,
-            [this](const QString &message) {
-                // 设备打开失败/被拔出：服务已停，页面要回到未测试状态
-                update_mic_ui();
-                QMessageBox::warning(this, tr("麦克风测试"), message);
-            });
 
     connect(ui->categoryList, &QListWidget::currentRowChanged, this,
             &ui::SettingsPage::onCategoryChanged);
@@ -126,8 +114,9 @@ ui::SettingsPage::SettingsPage(QWidget *parent) : Page(parent) {
     connect(ui->audioDeviceCombo,
             QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             [this](int) {
-                if (mic_ && mic_->running()) {
-                    mic_->start(currentAudioDeviceId());
+                if (media_ && media_->audio_running()) {
+                    media_->start_audio(
+                        currentAudioDeviceId().toStdString());
                     update_mic_ui();
                 }
             });
@@ -196,9 +185,9 @@ ui::SettingsPage::SettingsPage(QWidget *parent) : Page(parent) {
 }
 
 ui::SettingsPage::~SettingsPage() {
-    if (mic_) { mic_->stop(); }
-    update_mic_ui();
-    stopVideoPreview(false);  // 析构必须同步释放
+    if (media_) {
+        media_->close();
+    }
 }
 
 void ui::SettingsPage::on_show() {
@@ -221,6 +210,9 @@ void ui::SettingsPage::on_show() {
         }
         QElapsedTimer timer;
         timer.start();
+        if (!media_->open()) {
+            return;
+        }
         refreshVideoDevices();
         refreshAudioDevices();
         syncPreviewForCategory(ui->categoryList->currentRow());
@@ -230,10 +222,14 @@ void ui::SettingsPage::on_show() {
 }
 
 void ui::SettingsPage::on_hide() {
-    if (mic_) { mic_->stop(); }
+    if (media_) {
+        media_->close();
+    }
     update_mic_ui();
-    // 先返回让侧栏切页画完，摄像头 stop 放到下一拍
-    stopVideoPreview(true);
+    if (ui && ui->videoPreview) {
+        clearPreviewLabel(ui->videoPreview);
+        ui->videoPreview->setText(tr("摄像头预览已关闭"));
+    }
 }
 
 void ui::SettingsPage::onCategoryChanged(int row) {
@@ -249,8 +245,8 @@ void ui::SettingsPage::onCategoryChanged(int row) {
 
 void ui::SettingsPage::syncPreviewForCategory(int row) {
     if (row == 0) {
-        if (mic_) {
-            mic_->stop();
+        if (media_) {
+            media_->stop_audio();
         }
         update_mic_ui();
         if (video_preview_enabled_) {
@@ -262,8 +258,8 @@ void ui::SettingsPage::syncPreviewForCategory(int row) {
     } else if (row == 1) {
         stopVideoPreview();
     } else {
-        if (mic_) {
-            mic_->stop();
+        if (media_) {
+            media_->stop_audio();
         }
         update_mic_ui();
         stopVideoPreview();
@@ -271,30 +267,29 @@ void ui::SettingsPage::syncPreviewForCategory(int row) {
 }
 
 void ui::SettingsPage::refreshVideoDevices() {
-    if (!ui->videoDeviceCombo) {
+    if (!ui->videoDeviceCombo || !media_) {
         return;
     }
 
-    const QString savedId = catalog_.saved_video_device_id();
+    const QString savedId =
+        preferences().value(QStringLiteral("video/deviceId")).toString();
 
     block_video_signals_ = true;
     ui->videoDeviceCombo->clear();
 
-    const auto cameras = catalog_.video_devices();
-    spdlog::info("[SettingsPage] Qt cameras={}", cameras.size());
+    const auto cameras = media_->video_devices();
+    spdlog::info("[SettingsPage] xrtc cameras={}", cameras.size());
     int select = 0;
-    for (int i = 0; i < cameras.size(); ++i) {
-        const QCameraDevice &cam = cameras[i];
-        const QString id = QString::fromUtf8(cam.id());
-        const QString name = cam.description().trimmed().isEmpty()
-                                 ? id
-                                 : cam.description().trimmed();
-        ui->videoDeviceCombo->addItem(name, id);
+    for (int i = 0; i < static_cast<int>(cameras.size()); ++i) {
+        const auto &cam = cameras[static_cast<size_t>(i)];
+        const QString id = QString::fromStdString(cam.device_id);
+        const QString name = QString::fromStdString(cam.device_name).trimmed();
+        ui->videoDeviceCombo->addItem(name.isEmpty() ? id : name, id);
         if (!savedId.isEmpty() && savedId == id) {
             select = i;
         }
     }
-    if (cameras.isEmpty()) {
+    if (cameras.empty()) {
         ui->videoDeviceCombo->addItem(tr("（无可用摄像头）"));
         ui->videoDeviceCombo->setEnabled(false);
     } else {
@@ -307,30 +302,29 @@ void ui::SettingsPage::refreshVideoDevices() {
 }
 
 void ui::SettingsPage::refreshAudioDevices() {
-    if (!ui->audioDeviceCombo) {
+    if (!ui->audioDeviceCombo || !media_) {
         return;
     }
 
-    const QString savedId = catalog_.saved_audio_device_id();
+    const QString savedId =
+        preferences().value(QStringLiteral("audio/deviceId")).toString();
 
     // 重建列表会触发 currentIndexChanged(-1)；用阻塞避免误重启正在进行的测试
     const QSignalBlocker blocker(ui->audioDeviceCombo);
     ui->audioDeviceCombo->clear();
-    const auto mics = catalog_.audio_devices();
-    spdlog::info("[SettingsPage] Qt mics={}", mics.size());
+    const auto mics = media_->audio_devices();
+    spdlog::info("[SettingsPage] xrtc mics={}", mics.size());
     int select = 0;
-    for (int i = 0; i < mics.size(); ++i) {
-        const QAudioDevice &mic = mics[i];
-        const QString id = QString::fromUtf8(mic.id());
-        const QString name = mic.description().trimmed().isEmpty()
-                                 ? id
-                                 : mic.description().trimmed();
-        ui->audioDeviceCombo->addItem(name, id);
+    for (int i = 0; i < static_cast<int>(mics.size()); ++i) {
+        const auto &mic = mics[static_cast<size_t>(i)];
+        const QString id = QString::fromStdString(mic.device_id);
+        const QString name = QString::fromStdString(mic.device_name).trimmed();
+        ui->audioDeviceCombo->addItem(name.isEmpty() ? id : name, id);
         if (!savedId.isEmpty() && savedId == id) {
             select = i;
         }
     }
-    if (mics.isEmpty()) {
+    if (mics.empty()) {
         ui->audioDeviceCombo->addItem(tr("（无可用麦克风）"));
         ui->audioDeviceCombo->setEnabled(false);
         ui->micTestBtn->setEnabled(false);
@@ -346,8 +340,19 @@ void ui::SettingsPage::rebuildResolutionList() {
         return;
     }
 
-    const QCameraDevice device = catalog_.find_camera(currentVideoDeviceId());
-    const QList<QSize> resolutions = catalog_.resolutions(device);
+    QList<QSize> resolutions;
+    if (media_) {
+        const auto formats = media_->video_formats(
+            currentVideoDeviceId().toStdString());
+        for (const auto &format : formats) {
+            if (format.width > 0 && format.height > 0) {
+                const QSize size(format.width, format.height);
+                if (!resolutions.contains(size)) {
+                    resolutions.push_back(size);
+                }
+            }
+        }
+    }
 
     const auto &cfg = ClientConfig::instance().webrtc().video;
     IPreferences &s = preferences();
@@ -392,11 +397,21 @@ void ui::SettingsPage::rebuildFpsList() {
     const int preferFps =
         s.value(QStringLiteral("video/fps"), cfg.fps).toInt();
 
+    QList<int> rates;
+    if (media_) {
+        const auto formats = media_->video_formats(
+            currentVideoDeviceId().toStdString());
+        for (const auto &format : formats) {
+            if (format.width == res.width() && format.height == res.height() &&
+                format.fps > 0 && !rates.contains(format.fps)) {
+                rates.push_back(format.fps);
+            }
+        }
+    }
+    std::sort(rates.begin(), rates.end());
+
     block_video_signals_ = true;
     ui->videoFps->clear();
-
-    const QList<int> rates = catalog_.frame_rates(
-        catalog_.find_camera(currentVideoDeviceId()), res);
 
     int select = 0;
     int i = 0;
@@ -406,6 +421,10 @@ void ui::SettingsPage::rebuildFpsList() {
             select = i;
         }
         ++i;
+    }
+    if (rates.isEmpty()) {
+        ui->videoFps->addItem(QStringLiteral("30 fps"), 30);
+        select = 0;
     }
     ui->videoFps->setCurrentIndex(select);
     block_video_signals_ = false;
@@ -441,7 +460,7 @@ int ui::SettingsPage::currentFps() const {
 }
 
 void ui::SettingsPage::scheduleVideoPreview() {
-    if (!video_preview_enabled_) {
+    if (!video_preview_enabled_ || !media_) {
         // 默认不占用摄像头：进入设置页立刻返回，避免开关硬件造成的点击延迟
         return;
     }
@@ -449,7 +468,9 @@ void ui::SettingsPage::scheduleVideoPreview() {
         ui->videoPreview->setPixmap(QPixmap());
         ui->videoPreview->setText(tr("正在打开摄像头…"));
     }
-    preview_->start(currentVideoDeviceId(), currentResolution(), currentFps());
+    const QSize res = currentResolution();
+    media_->start_video(currentVideoDeviceId().toStdString(), res.width(),
+                        res.height(), currentFps());
 }
 
 
@@ -508,8 +529,9 @@ void ui::SettingsPage::update_preview_toggle_ui() {
 }
 
 void ui::SettingsPage::stopVideoPreview(bool deferHardware) {
-    if (preview_) {
-        preview_->stop(deferHardware);
+    Q_UNUSED(deferHardware);
+    if (media_) {
+        media_->stop_video();
     }
     if (ui && ui->videoPreview) {
         clearPreviewLabel(ui->videoPreview);
@@ -549,16 +571,16 @@ void ui::SettingsPage::onVideoFpsChanged(int) {
 }
 
 void ui::SettingsPage::onMicTestClicked() {
-    if (!mic_) {
+    if (!media_) {
         return;
     }
-    if (mic_->running()) {
-        mic_->stop();
+    if (media_->audio_running()) {
+        media_->stop_audio();
     } else {
         if (ui->micLevelBar) {
             ui->micLevelBar->setValue(0);   // 新一轮测试从 0 开始
         }
-        mic_->start(currentAudioDeviceId());
+        media_->start_audio(currentAudioDeviceId().toStdString());
     }
     update_mic_ui();
 }
@@ -567,7 +589,7 @@ void ui::SettingsPage::update_mic_ui() {
     if (!ui) {
         return;
     }
-    const bool running = mic_ && mic_->running();
+    const bool running = media_ && media_->audio_running();
     if (ui->micTestBtn) {
         ui->micTestBtn->setText(running ? tr("停止测试") : tr("麦克风测试"));
     }
@@ -647,12 +669,12 @@ void ui::SettingsPage::saveUiPrefs() const {
                ui->videoAutoPreview->isChecked());
 
     if (ui->videoDeviceCombo && ui->videoDeviceCombo->isEnabled()) {
-        catalog_.save_video_device_id(
-            ui->videoDeviceCombo->currentData().toString());
+        s.set_value(QStringLiteral("video/deviceId"),
+                    ui->videoDeviceCombo->currentData().toString());
     }
     if (ui->audioDeviceCombo && ui->audioDeviceCombo->isEnabled()) {
-        catalog_.save_audio_device_id(
-            ui->audioDeviceCombo->currentData().toString());
+        s.set_value(QStringLiteral("audio/deviceId"),
+                    ui->audioDeviceCombo->currentData().toString());
     }
     const QSize res = currentResolution();
     s.set_value(QStringLiteral("video/width"), res.width());
@@ -701,7 +723,7 @@ void ui::SettingsPage::onResetClicked() {
         return;
     }
 
-    if (mic_) { mic_->stop(); }
+    if (media_) { media_->stop_audio(); }
     update_mic_ui();
     stopVideoPreview();
     ui->audioMuteOnJoin->setChecked(false);

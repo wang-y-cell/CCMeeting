@@ -34,7 +34,7 @@ endif()
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
     set(CCMEETING_TESTS_STANDALONE ON)
 
-    find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Multimedia Network Sql WebSockets Test)
+    find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Multimedia Network Sql WebSockets Svg Test)
 
     if(NOT TARGET spdlog::spdlog)
         include(FetchContent)
@@ -52,7 +52,7 @@ endif()
     enable_testing()
 else()
     # 作为 client/ 的子目录：Qt / spdlog / 编译选项由父工程提供
-    find_package(Qt6 REQUIRED COMPONENTS Gui Widgets Multimedia Network Sql WebSockets Test)
+    find_package(Qt6 REQUIRED COMPONENTS Gui Widgets Multimedia Network Sql WebSockets Svg Test)
 endif()
 
 set(CCMEETING_TEST_LIB_SOURCES
@@ -104,11 +104,6 @@ ccmeeting_add_test(test_protocol_dispatcher
 ccmeeting_add_test(test_video_style
     test_video_style.cpp)
 
-# 设备目录：偏好键、未知/空设备、无格式时的回落（不枚举真实设备）
-ccmeeting_add_test(test_device_catalog
-    test_device_catalog.cpp
-    "${CMAKE_CURRENT_SOURCE_DIR}/../src/media/devices/device_catalog.cpp")
-target_link_libraries(test_device_catalog PRIVATE Qt6::Multimedia)
 # 连接协调器：挂起/补发/建会入会动作（纯逻辑，无网络）
 ccmeeting_add_test(test_connect_coordinator
     test_connect_coordinator.cpp
@@ -155,7 +150,7 @@ ccmeeting_add_test(test_chat_controller
     "${CMAKE_CURRENT_SOURCE_DIR}/../include/ui/foundation/theme_manager.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/foundation/theme_manager.cpp")
 target_link_libraries(test_chat_controller PRIVATE
-    Qt6::Widgets Qt6::Network Qt6::Multimedia Qt6::Sql)
+    Qt6::Widgets Qt6::Network Qt6::Multimedia Qt6::Sql Qt6::Svg)
 # 窗口行为开关：默认值/关闭/恢复默认/旧键清理
 ccmeeting_add_test(test_window_behavior
     test_window_behavior.cpp

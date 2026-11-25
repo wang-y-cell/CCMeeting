@@ -194,6 +194,38 @@ void ui::MeetingHistoryPage::ensure_loaded_for_view() {
     }
 }
 
+void ui::MeetingHistoryPage::load_next_page() {
+    if (!_cacheValid || _records.size() >= _totalCount) {
+        return;
+    }
+    auto filtered_count = [this]() {
+        int n = 0;
+        for (const MeetingRecord &record : _records) {
+            if (_filter < 0 || static_cast<int>(record.kind) == _filter) {
+                ++n;
+            }
+        }
+        return n;
+    };
+
+    const int before = filtered_count();
+    while (_records.size() < _totalCount) {
+        const QVector<MeetingRecord> page =
+            meeting_repository().page(_records.size(), _pageSize);
+        if (page.isEmpty()) {
+            break;
+        }
+        for (const MeetingRecord &record : page) {
+            _records.push_back(record);
+        }
+        // 无筛选时加载一页即可；有筛选时继续加载到出现新的可见记录，
+        // 否则一次滚动可能只加载到不匹配的记录而看不到变化。
+        if (_filter < 0 || filtered_count() > before) {
+            break;
+        }
+    }
+}
+
 void ui::MeetingHistoryPage::on_scroll_value_changed(int value) {
     if (!_cacheValid || !_scroll || !_scroll->verticalScrollBar()) {
         return;
@@ -202,8 +234,13 @@ void ui::MeetingHistoryPage::on_scroll_value_changed(int value) {
     if (value < bar->maximum() - 1 || _records.size() >= _totalCount) {
         return;
     }
-    ensure_loaded_for_view();
+    load_next_page();
     apply_filter();
+    // 追加后滚动到底部，确保新加载的条目可见
+    if (_scroll && _scroll->verticalScrollBar()) {
+        _scroll->verticalScrollBar()->setValue(
+            _scroll->verticalScrollBar()->maximum());
+    }
 }
 
 void ui::MeetingHistoryPage::resizeEvent(QResizeEvent *event) {

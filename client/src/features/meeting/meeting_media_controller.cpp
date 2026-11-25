@@ -33,7 +33,6 @@ xrtc::XRTCJoinConfig MeetingMediaController::build_join_config(
     config.create_room_if_missing = options.create_room;
     config.room_description = to_std(session.name());
     config.max_publishers = options.max_participants;
-    config.admin_key = to_std(cfg.admin_key);
     // wss 证书：优先配置文件的 ca_file，否则用内置证书导出的临时 PEM
     config.ca_file = cfg.janus_ca_file.isEmpty()
                          ? config::tls_ca_file()
@@ -52,28 +51,54 @@ xrtc::XRTCJoinConfig MeetingMediaController::build_join_config(
     if (_rtc) {
         IPreferences &prefs = preferences();
         const auto cameras = _rtc->get_video_device_info();
-        if (!_videoDeviceId.empty()) {
-            config.video_device_id = _videoDeviceId;
-        } else {
-            const QString savedVideo =
-                prefs.value(QStringLiteral("video/deviceId")).toString();
-            if (!savedVideo.isEmpty()) {
-                config.video_device_id = savedVideo.toStdString();
-            } else if (!cameras.empty()) {
-                config.video_device_id = cameras.front().device_id;
-            }
-        }
         const auto mics = _rtc->get_audio_device_info();
-        if (!_audioDeviceId.empty()) {
-            config.audio_device_id = _audioDeviceId;
-        } else {
-            const QString savedAudio =
-                prefs.value(QStringLiteral("audio/deviceId")).toString();
-            if (!savedAudio.isEmpty()) {
-                config.audio_device_id = savedAudio.toStdString();
-            } else if (!mics.empty()) {
-                config.audio_device_id = mics.front().device_id;
+        // Settings 页保存的是 Qt 的设备 ID，而 xrtc 采集使用 WebRTC 的设备 ID；
+        // 两者在部分 Windows 驱动下并不相同，必须校验后再交给 xrtc。
+        auto pick_video = [&cameras](const std::string &requested) -> std::string {
+            if (!requested.empty()) {
+                for (const auto &cam : cameras) {
+                    if (cam.device_id == requested) {
+                        return requested;
+                    }
+                }
             }
+            return cameras.empty() ? std::string() : cameras.front().device_id;
+        };
+        auto pick_audio = [&mics](const std::string &requested) -> std::string {
+            if (!requested.empty()) {
+                for (const auto &mic : mics) {
+                    if (mic.device_id == requested) {
+                        return requested;
+                    }
+                }
+            }
+            return mics.empty() ? std::string() : mics.front().device_id;
+        };
+
+        std::string requestedVideo = _videoDeviceId;
+        if (requestedVideo.empty()) {
+            requestedVideo =
+                prefs.value(QStringLiteral("video/deviceId")).toString().toStdString();
+        }
+        config.video_device_id = pick_video(requestedVideo);
+        if (!requestedVideo.empty() &&
+            requestedVideo != config.video_device_id) {
+            spdlog::warn("[MeetingMedia] saved video device id is not an xrtc id, "
+                         "fallback to {}",
+                         config.video_device_id);
+        }
+
+        std::string requestedAudio = _audioDeviceId;
+        if (requestedAudio.empty()) {
+            requestedAudio =
+                prefs.value(QStringLiteral("audio/deviceId")).toString().toStdString();
+        }
+        config.audio_device_id = pick_audio(requestedAudio);
+        if (!requestedAudio.empty() &&
+            requestedAudio != config.audio_device_id) {
+            spdlog::warn("[MeetingMedia] saved audio device id is not an xrtc id, "
+                         "fallback to {}",
+                         config.audio_device_id);
         }
         const auto speakers = _rtc->get_playout_device_info();
         if (!_playoutDeviceId.empty()) {
@@ -83,12 +108,30 @@ xrtc::XRTCJoinConfig MeetingMediaController::build_join_config(
         }
     }
 
+    // STUN 可以静态配置；TURN 使用登录时服务端签发的短期凭据，
+    // 不再读取 client.json 里可能存在的 TURN 用户名/密码。
     for (const auto &ice : cfg.ice_servers) {
+        if (!ice.uri.startsWith(QStringLiteral("stun:"))) {
+            continue;
+        }
         xrtc::XRTCIceServer server;
         server.uri = to_std(ice.uri);
-        server.username = to_std(ice.username);
-        server.password = to_std(ice.password);
         config.ice_servers.push_back(std::move(server));
+    }
+    const TurnCredentials &turn = session.turnCredentials();
+    if (turn.valid()) {
+        for (const QString &uri : turn.uris) {
+            xrtc::XRTCIceServer server;
+            server.uri = to_std(uri);
+            server.username = to_std(turn.username);
+            server.password = to_std(turn.password);
+            config.ice_servers.push_back(std::move(server));
+        }
+        spdlog::info("[MeetingMedia] using temporary TURN credentials ttl={}",
+                     turn.ttlSeconds);
+    } else {
+        spdlog::warn("[MeetingMedia] no temporary TURN credentials; "
+                     "only STUN is configured");
     }
     return config;
 }

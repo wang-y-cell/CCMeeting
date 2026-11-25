@@ -1,7 +1,6 @@
 #ifndef SETTINGS_PAGE_H
 #define SETTINGS_PAGE_H
 
-#include "media/devices/device_catalog.h"
 #include "ui/pages/page.h"
 #include "ui/pages/settings_page_ui.h"
 
@@ -11,15 +10,13 @@
 
 #include <memory>
 
-class CameraPreviewService;
-class MicTestService;
+class XrtcSettingsMedia;
 
 /**
  * @brief 设置页：布局 + 配置读写 + 服务转发
  *
- * 设备枚举/格式匹配在 `DeviceCatalog`，摄像头预览在
- * `CameraPreviewService`，麦克风测试在 `MicTestService`；
- * 本类不再持有任何 Qt Multimedia 硬件对象，也不再做线程编排。
+ * 设备枚举、摄像头预览、麦克风测试统一走 `XrtcSettingsMedia`，
+ * 与会议采集使用同一套 xrtc 设备 ID。
  */
 namespace ui {
 
@@ -86,11 +83,7 @@ private:
     QSize currentResolution() const;
 
     std::unique_ptr<SettingsPageUi> ui;
-    mutable DeviceCatalog catalog_;  ///< 保存偏好时是逻辑 const
-
-    CameraPreviewService *preview_ = nullptr;  ///< 摄像头预览（媒体服务）
-
-    MicTestService *mic_ = nullptr;  ///< 麦克风测试（媒体服务）
+    XrtcSettingsMedia *media_ = nullptr;  ///< xrtc 本地媒体（设置页专用）
     /** 用户是否手动开启了摄像头预览（默认 false：进设置页不碰摄像头） */
     bool video_preview_enabled_ = false;
     bool block_video_signals_ = false;

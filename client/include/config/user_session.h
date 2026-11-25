@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <QStringList>
 #include <QtGlobal>
 
 /** 用户资料扩展字段（性别/生日等），与登录、update-profile JSON 对齐 */
@@ -11,6 +12,18 @@ struct UserProfileExtras {
     QString phone;
     QString email;
     QString extraJson;  ///< 预留扩展
+};
+
+/** 认证服务签发的短期 TURN 凭据（coturn use-auth-secret） */
+struct TurnCredentials {
+    QString username;
+    QString password;
+    QStringList uris;
+    int ttlSeconds = 0;
+
+    bool valid() const {
+        return !username.isEmpty() && !password.isEmpty() && !uris.isEmpty();
+    }
 };
 
 class UserSession {
@@ -31,6 +44,8 @@ public:
     QString email() const { return m_extras.email; }
     QString extraJson() const { return m_extras.extraJson; }
     QString token() const { return m_token; }
+    const TurnCredentials& turnCredentials() const { return m_turn; }
+    void setTurnCredentials(const TurnCredentials& turn) { m_turn = turn; }
     void setToken(const QString& token) { m_token = token; }
     const UserProfileExtras& extras() const { return m_extras; }
 
@@ -66,4 +81,5 @@ private:
     QString m_info;
     UserProfileExtras m_extras;
     QString m_token;
+    TurnCredentials m_turn;
 };

@@ -30,7 +30,7 @@ QString AuthConfigData::defaultAvatarUrl() const {
     const QString base = public_base_url.isEmpty()
                              ? QStringLiteral("http://%1:%2").arg(host).arg(port)
                              : public_base_url;
-    return joinBaseUrlPath(base, default_avatar_path);
+    return joinBaseUrlPath(base, QStringLiteral("/static/avatar/default.png"));
 }
 
 ClientConfig& ClientConfig::instance() {
@@ -82,9 +82,6 @@ bool ClientConfig::loadFromJsonObject(const QJsonObject& root) {
                 .toString(auth_.update_profile_path);
         auth_.public_base_url =
             auth.value(QStringLiteral("public_base_url")).toString();
-        auth_.default_avatar_path =
-            auth.value(QStringLiteral("default_avatar_path"))
-                .toString(auth_.default_avatar_path);
     }
 
     if (const QJsonObject meeting =
@@ -102,8 +99,7 @@ bool ClientConfig::loadFromJsonObject(const QJsonObject& root) {
         !webrtc.isEmpty()) {
         webrtc_.janus_ws_url =
             webrtc.value(QStringLiteral("janus_ws_url")).toString();
-        webrtc_.admin_key = webrtc.value(QStringLiteral("admin_key")).toString();
-        webrtc_.janus_ca_file =
+            webrtc_.janus_ca_file =
             webrtc.value(QStringLiteral("janus_ca_file")).toString();
         webrtc_.janus_tls_verify =
             webrtc.value(QStringLiteral("janus_tls_verify")).toBool(true);
@@ -143,7 +139,6 @@ QJsonObject ClientConfig::toJsonObject() const {
     auth.insert(QStringLiteral("upload_avatar_path"), auth_.upload_avatar_path);
     auth.insert(QStringLiteral("update_profile_path"), auth_.update_profile_path);
     auth.insert(QStringLiteral("public_base_url"), auth_.public_base_url);
-    auth.insert(QStringLiteral("default_avatar_path"), auth_.default_avatar_path);
     root.insert(QStringLiteral("auth"), auth);
 
     QJsonObject meeting;
@@ -154,7 +149,6 @@ QJsonObject ClientConfig::toJsonObject() const {
 
     QJsonObject webrtc;
     webrtc.insert(QStringLiteral("janus_ws_url"), webrtc_.janus_ws_url);
-    webrtc.insert(QStringLiteral("admin_key"), webrtc_.admin_key);
     webrtc.insert(QStringLiteral("janus_ca_file"), webrtc_.janus_ca_file);
     webrtc.insert(QStringLiteral("janus_tls_verify"), webrtc_.janus_tls_verify);
     webrtc.insert(QStringLiteral("allow_plaintext_ws"), webrtc_.allow_plaintext_ws);
