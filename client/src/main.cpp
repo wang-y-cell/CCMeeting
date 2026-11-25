@@ -244,7 +244,7 @@ int main(int argc, char *argv[]) {
     // 改名后会议记录/缓存会"丢失"（其实还在旧目录）。必须在任何
     // QStandardPaths / QSettings 调用之前设置。
     QCoreApplication::setApplicationName(QStringLiteral("CCMeeting"));
-    QCoreApplication::setApplicationVersion(QStringLiteral("1.0"));
+    QCoreApplication::setApplicationVersion(QStringLiteral("1.1"));
     // 注意：不要把 organizationName 也设成 CCMeeting —— QStandardPaths 的
     // AppLocalDataLocation 规则是 <AppData>/<org>/<app>，会多出一层目录。
 

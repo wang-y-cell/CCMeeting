@@ -17,8 +17,9 @@ QImage makeCircularAvatarImage(const QImage &src);
 class AvatarService {
 public:
     static AvatarService& instance();
-
+    //配置网络管理器和缓存位置
     void initialize();
+    //关闭网络管理器
     void shutdown();
     QNetworkAccessManager* networkManager() const;
 

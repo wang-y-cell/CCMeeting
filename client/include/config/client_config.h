@@ -28,6 +28,7 @@ struct WebRtcConfig {
     std::vector<IceServerConfig> ice_servers;
 };
 
+//data_server
 struct AuthConfigData {
     QString host = QStringLiteral("127.0.0.1");
     int port = 9000;
@@ -40,6 +41,7 @@ struct AuthConfigData {
     QString defaultAvatarUrl() const;
 };
 
+//message_server
 struct MeetingServerConfig {
     QString host = QStringLiteral("127.0.0.1");
     int port = 8888;
@@ -50,6 +52,7 @@ class ClientConfig {
 public:
     static ClientConfig& instance();
 
+    //加载文件夹目录下的client.json文件并配置信息
     bool load();
     /// 写入 exe 旁 config/client.json（保留未在设置页编辑的字段）
     bool save() const;
@@ -64,6 +67,7 @@ public:
 
 private:
     ClientConfig() = default;
+    /// 根据读入的client.json文件配置信息
     bool loadFromJsonObject(const QJsonObject& root);
     QJsonObject toJsonObject() const;
 
