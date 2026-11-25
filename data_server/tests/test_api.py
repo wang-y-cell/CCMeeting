@@ -18,14 +18,11 @@ import sys
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.api import create_app  # noqa: E402
-from app.config import AuthServerConfig, AssetsConfig  # noqa: E402
-from app.security import hash_password, sha256_hex, verify_password  # noqa: E402
-from app.tokens import issue_token  # noqa: E402
+from app.security import sha256_hex, verify_password
+from app.tokens import issue_token
 
 PNG_1PX = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
@@ -95,7 +92,7 @@ def test_options_returns_204(ctx):
 
 # --------------------------------------------------------------- 注册
 def test_register_success_and_duplicate(ctx):
-    client, _, config = ctx
+    client, _, _config = ctx
     resp = _register(client)
     assert resp.status_code == 200
     body = resp.json()
@@ -264,7 +261,7 @@ def test_legacy_sha256_login_upgrades_hash(ctx):
     stored = db.query_one(
         "SELECT password_hash FROM sys_users WHERE user_id = ?", (user_id,)
     )["password_hash"]
-    assert stored.startswith("$argon2") or stored.startswith("$scrypt$"), stored
+    assert stored.startswith(("$argon2", "$scrypt$")), stored
     assert verify_password("legacy-pass", stored) is True
 
 
@@ -327,6 +324,7 @@ def test_update_profile_success(ctx):
         ({"info": "x" * 513}, "info too long"),
         ({"gender": "unknown"}, "invalid gender"),
         ({"birthday": "2005/09/14"}, "invalid birthday"),
+        ({"birthday": "2005-02-30"}, "invalid birthday"),  # 结构合法但不是真实日期
         ({"address": "x" * 257}, "field too long"),
         ({"phone": "1" * 33}, "field too long"),
     ],
@@ -343,7 +341,6 @@ def test_update_profile_validation(ctx, patch, expected):
 
 def test_write_api_requires_token(ctx):
     client, _, _ = ctx
-    user_id = _uid(client)
     resp = client.post(
         "/api/update-profile", json={"data": {"nickname": "x"}}
     )

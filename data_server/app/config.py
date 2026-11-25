@@ -66,15 +66,7 @@ class AuthServerConfig:
     turn: TurnConfig = field(default_factory=TurnConfig)
 
     # ---- 与 C++ 版同名的语义 ----
-    def default_avatar_url(self) -> str:
-        base = self.assets.public_base_url
-        path = self.assets.default_avatar_path
-        if not base:
-            return path
-        if base.endswith("/") and path.startswith("/"):
-            return base[:-1] + path
-        return base + path
-
+    # 默认头像由客户端内置 SVG 提供，服务端不再生成默认头像 URL。
     def join_public_url(self, relative_path: str) -> str:
         base = self.assets.public_base_url
         if not base:

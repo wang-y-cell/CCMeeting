@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 
 from .db import Database
 
+logger = logging.getLogger("ccmeeting.auth")
+
 
 @dataclass
 class UserCredential:
+    """用户校验信息"""
     user_id: int = 0
     username: str = ""
     password_hash: str = ""
@@ -57,6 +61,7 @@ class UserRepository:
 
     # ----------------------------------------------------------- 查询
     def find_credential_by_username(self, username: str) -> UserCredential | None:
+        """从数据库查找用户登录信息"""
         row = self._db.query_one(
             "SELECT user_id, username, password_hash, status "
             "FROM sys_users WHERE username = ? LIMIT 1",
@@ -196,4 +201,5 @@ class UserRepository:
                 (user_id, login_ip or "unknown", device_info, 1 if success else 0),
             )
         except Exception:
-            pass
+            # 登录审计写失败不应影响登录结果，但必须留下痕迹，否则日志丢了自己也不知道
+            logger.warning("insert_login_log failed user_id=%s", user_id, exc_info=True)

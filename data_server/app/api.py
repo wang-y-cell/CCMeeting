@@ -36,8 +36,8 @@ from fastapi.responses import JSONResponse, Response
 from .config import AuthServerConfig, load_config
 from .db import Database
 from .repository import UserInfo, UserRepository
-from .tokens import issue_token, verify_token
 from .service import AuthService
+from .tokens import issue_token, verify_token
 from .turn import make_turn_credentials
 
 logger = logging.getLogger("ccmeeting.auth")
@@ -94,7 +94,7 @@ def create_app(config: AuthServerConfig | None = None) -> FastAPI:
     # ---------------------------------------------------------------- 基础
     @app.middleware("http")
     async def add_server_header(request: Request, call_next):
-        response = await call_next(request)
+        response = await call_next(request) #等待处理这个请求,进入其他中间件如:app.get("/health")函数处理
         # 设置服务端回复的“信封”（即 HTTP 响应头）
         response.headers["Server"] = _SERVER_NAME
         for key, value in _CORS_HEADERS.items():

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import datetime
 import logging
 import secrets
 from dataclasses import dataclass
@@ -61,6 +62,17 @@ def _extension_for_mime(mime: str) -> str:
     return ""
 
 
+def _is_valid_iso_date(value: str) -> bool:
+    """严格校验 YYYY-MM-DD（含闰年与月日范围），空串由调用方放行。"""
+    if len(value) != 10 or value[4] != "-" or value[7] != "-":
+        return False
+    try:
+        datetime.date.fromisoformat(value)
+    except ValueError:
+        return False
+    return True
+
+
 class AuthService:
     def __init__(self, repository: UserRepository, config: AuthServerConfig) -> None:
         self._repo = repository
@@ -108,8 +120,8 @@ class AuthService:
             self._repo.insert_login_log(credential.user_id, client_ip, device_info, True)
             logger.info("login ok user_id=%s name=%s", user.id, user.name)
             return LoginResult(success=True, code=0, message="ok", user=user)
-        except Exception as exc:  # pragma: no cover - 数据库异常路径
-            logger.exception("login exception: %s", exc)
+        except Exception:  # pragma: no cover - 数据库异常路径
+            logger.exception("login exception")
             return LoginResult(code=500, message="internal server error")
 
     # --------------------------------------------------------------- 注册
@@ -134,8 +146,8 @@ class AuthService:
             user = self._repo.load_user_info(user_id, username)
             logger.info("register ok user_id=%s name=%s", user.id, user.name)
             return LoginResult(success=True, code=0, message="ok", user=user)
-        except Exception as exc:  # pragma: no cover
-            logger.exception("register exception: %s", exc)
+        except Exception:  # pragma: no cover
+            logger.exception("register exception")
             return LoginResult(code=500, message="internal server error")
 
     # ------------------------------------------------------------- 头像
@@ -177,8 +189,8 @@ class AuthService:
             return AvatarUploadResult(
                 success=True, code=0, message="ok", avatar_url=avatar_url
             )
-        except Exception as exc:  # pragma: no cover
-            logger.exception("upload_avatar exception: %s", exc)
+        except Exception:  # pragma: no cover
+            logger.exception("upload_avatar exception")
             return AvatarUploadResult(code=500, message="internal server error")
 
     # ------------------------------------------------------------- 资料
@@ -209,9 +221,9 @@ class AuthService:
         if gender not in ("", "male", "female", "other"):
             return ProfileUpdateResult(code=400, message="invalid gender")
 
-        if birthday:
-            if len(birthday) != 10 or birthday[4] != "-" or birthday[7] != "-":
-                return ProfileUpdateResult(code=400, message="invalid birthday")
+        # 生日必须是真的日历日期：旧实现只检查长度与分隔符，'abcd-ef-gh' 也能通过
+        if birthday and not _is_valid_iso_date(birthday):
+            return ProfileUpdateResult(code=400, message="invalid birthday")
 
         if (
             len(address.encode("utf-8")) > 256

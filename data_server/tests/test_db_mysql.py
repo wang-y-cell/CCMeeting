@@ -12,9 +12,9 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.db import Database  # noqa: E402
-from app.repository import UserRepository  # noqa: E402
-from app.security import hash_password  # noqa: E402
+from app.db import Database
+from app.repository import UserRepository
+from app.security import hash_password
 
 
 def test_schema_created_without_rbac_tables(mysql_db: Database):
@@ -86,10 +86,9 @@ def test_crud_profile_and_login_log(mysql_db: Database):
 def test_nested_transaction_rollback(mysql_db: Database):
     """create_user 内部自带事务；外层再包一层时，回滚必须整体生效。"""
     repo = UserRepository(mysql_db)
-    with pytest.raises(RuntimeError):
-        with mysql_db.transaction():
-            repo.create_user("tx_user", hash_password("secret-123"), "")
-            raise RuntimeError("boom")
+    with pytest.raises(RuntimeError), mysql_db.transaction():
+        repo.create_user("tx_user", hash_password("secret-123"), "")
+        raise RuntimeError("boom")
 
     row = mysql_db.query_one(
         "SELECT COUNT(*) AS n FROM sys_users WHERE username = ?", ("tx_user",)

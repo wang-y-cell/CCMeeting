@@ -15,8 +15,9 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import Sequence
 from datetime import date, datetime
-from typing import Any, Sequence
+from typing import Any
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS sys_users (
@@ -69,7 +70,7 @@ def _normalize(value: Any) -> Any:
 class Row:
     """同时支持下标与列名的行对象（对齐原 sqlite3.Row 的用法）。"""
 
-    __slots__ = ("_values", "_index")
+    __slots__ = ("_index", "_values")
 
     def __init__(self, values: Sequence[Any], columns: Sequence[str]) -> None:
         self._values = tuple(_normalize(v) for v in values)

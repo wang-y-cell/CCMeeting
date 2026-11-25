@@ -77,8 +77,21 @@ def needs_rehash(stored: str) -> bool:
 
 def _verify_scrypt(plain: str, stored: str) -> bool:
     try:
+        """
+        格式：这符合标准的密码哈希格式（如 Passlib 或 Argon2 生成的格式），
+        通常为：算法标识$版本号$参数$盐(Base64)$哈希值(Base64)。
+        前两个 _ 分别代表算法标识和版本号（例如 scrypt$1），在这里不需要使用，所以用 _ 丢弃。
+        params：包含 n, r, p 等计算参数。
+        salt_b64：Base64 编码的盐值。
+        dk_b64：Base64 编码的派生密钥（即真正的哈希值）。
+        """
         _, _, params, salt_b64, dk_b64 = stored.split("$")
+
+        """
+        将 n=16384,r=8,p=1 这样的参数字符串，解析成一个字典 {'n': '16384', 'r': '8', 'p': '1'}。
+        """
         params_map = dict(item.split("=") for item in params.split(","))
+        # 解码盐值与预期哈希值
         salt = base64.b64decode(salt_b64)
         expected = base64.b64decode(dk_b64)
         actual = hashlib.scrypt(
@@ -95,7 +108,11 @@ def _verify_scrypt(plain: str, stored: str) -> bool:
 
 
 def verify_password(plain: str, stored: str) -> bool:
-    """按哈希前缀分派校验；任何异常都当作"密码错误"处理。"""
+    """
+    按哈希前缀分派校验；任何异常都当作"密码错误"处理。
+    - plain 用户真实密码
+    - stored 用户密码的hash值
+    """
     if not stored:
         return False
 

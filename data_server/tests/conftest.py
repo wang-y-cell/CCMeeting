@@ -22,7 +22,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.db import Database  # noqa: E402
+from app.db import Database
 
 
 def _require_env() -> dict:
@@ -87,10 +87,9 @@ def mysql_db(mysql_kwargs):
 @pytest.fixture()
 def ctx(tmp_path: Path, mysql_kwargs):
     """HTTP 契约测试用的 TestClient（后端为 MySQL）。"""
-    from fastapi.testclient import TestClient
-
     from app.api import create_app
     from app.config import AssetsConfig, AuthServerConfig, MysqlConfig
+    from fastapi.testclient import TestClient
 
     config = AuthServerConfig(
         listen_address="127.0.0.1",

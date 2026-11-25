@@ -29,7 +29,7 @@ class FakeOperationalError(Exception):
 
 
 class FakeCursor:
-    def __init__(self, conn: "FakeConn") -> None:
+    def __init__(self, conn: FakeConn) -> None:
         self._conn = conn
         self.description = [("n",)]
         self.rowcount = 1
@@ -106,7 +106,7 @@ def fake_pymysql(monkeypatch):
     return made
 
 
-def _make_db() -> "object":
+def _make_db() -> object:
     from app.db import Database
 
     return Database(host="h", port=3306, user="u", password="p", database="d")
@@ -143,7 +143,6 @@ def test_query_retries_once_when_connection_drops_mid_flight(fake_pymysql):
 def test_transaction_does_not_retry_silently(fake_pymysql):
     """事务内不自动重试：重连会丢掉未提交事务，应由调用方回滚。"""
     db = _make_db()
-    with pytest.raises(FakeInterfaceError):
-        with db.transaction():
-            db._conn.fail_next_execute = True
-            db.query_one("SELECT 1")
+    with pytest.raises(FakeInterfaceError), db.transaction():
+        db._conn.fail_next_execute = True
+        db.query_one("SELECT 1")
