@@ -7,21 +7,84 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#ifdef _WIN32
-#  include <winsock2.h>
-#else
-#  include <arpa/inet.h>
-#endif
-#include <cstring>
+#include <cstdint>
+#include <string>
+#include <utility>
 
 namespace service {
 
 namespace {
 
+using json = nlohmann::json;
+
 constexpr uint32_t kMinParticipants = 2;
 constexpr uint32_t kMinDurationMinutes = 1;
 constexpr uint32_t kMaxDurationMinutes = 24 * 60;
 constexpr uint32_t kDefaultDurationMinutes = 60;
+
+/// 从 JSON data 读取非负整数；缺失/类型不符时返回 fallback
+uint32_t read_u32(const json& data, const char* key, uint32_t fallback) {
+    if (!data.is_object()) {
+        return fallback;
+    }
+    const auto it = data.find(key);
+    if (it == data.end() || !it->is_number_integer()) {
+        return fallback;
+    }
+    if (it->is_number_unsigned()) {
+        return static_cast<uint32_t>(it->get<uint64_t>());
+    }
+    const auto value = it->get<int64_t>();
+    return value <= 0 ? 0u : static_cast<uint32_t>(value);
+}
+
+/**
+ * @brief 确定上行业务身份
+ *
+ * v2 已删除 `u` 字段：优先用顶层 token 解出 user_id；
+ * 没有 token（或鉴权未开启且 token 无效）时退回连接状态。
+ * 鉴权开启时 token 缺失/无效视为鉴权失败。
+ * @param auth_failed 输出：鉴权开启时 token 校验是否失败
+ */
+uint64_t resolve_user_id(const config::ServerConfig& config,
+                         const protocol::Packet& packet,
+                         network::Connection::Id connection_id,
+                         bool& auth_failed) {
+    auth_failed = false;
+
+    if (!packet.auth_token.empty() && !config.token_secret.empty()) {
+        uint64_t user_id = 0;
+        if (protocol::token::verify(packet.auth_token, config.token_secret,
+                                    user_id)) {
+            return user_id;
+        }
+        if (config.require_auth) {
+            auth_failed = true;
+            return 0;
+        }
+    } else if (config.require_auth) {
+        auth_failed = true;
+        return 0;
+    }
+
+    if (packet.user_id != 0) {
+        return packet.user_id;  // 预留给服务层自行注入身份的场景
+    }
+    // 鉴权关闭且没有可用 token（开发/联调）：连接本身即身份
+    return connection_id;
+}
+
+/// 下游 room 类响应：{"code":...,"message":"...","data":{"room_id":...}}
+protocol::Packet make_room_response(protocol::MessageType type, int code,
+                                    const std::string& message,
+                                    uint32_t room_id) {
+    protocol::Packet response;
+    response.type = type;
+    response.code = code;
+    response.message = message;
+    response.data = json{{"room_id", room_id}};
+    return response;
+}
 
 meeting::RoomOptions parse_create_meeting_options(
     const protocol::Packet& packet, const config::ServerConfig& config) {
@@ -29,17 +92,12 @@ meeting::RoomOptions parse_create_meeting_options(
     options.max_participants = config.max_participants_per_room;
     options.duration_minutes = kDefaultDurationMinutes;
 
-    if (packet.payload.size() >= sizeof(uint32_t) * 2) {
-        uint32_t max_participants_net = 0;
-        uint32_t duration_minutes_net = 0;
-        std::memcpy(&max_participants_net, packet.payload.data(),
-                    sizeof(max_participants_net));
-        std::memcpy(&duration_minutes_net,
-                    packet.payload.data() + sizeof(max_participants_net),
-                    sizeof(duration_minutes_net));
-        options.max_participants = ntohl(max_participants_net);
-        options.duration_minutes = ntohl(duration_minutes_net);
-    }
+    // v2：参数在 data 里，缺失取默认，钳制逻辑与服务端配置保持一致
+    options.max_participants = read_u32(
+        packet.data, "max_participants",
+        static_cast<uint32_t>(options.max_participants));
+    options.duration_minutes = read_u32(packet.data, "duration_minutes",
+                                        kDefaultDurationMinutes);
 
     const uint32_t hard_max =
         static_cast<uint32_t>(config.max_participants_per_room);
@@ -87,8 +145,13 @@ void MeetingService::on_connection_read(std::shared_ptr<network::Connection> con
 
         auto room_it = _connection_room.find(conn->id());
         if (room_it != _connection_room.end()) {
-            /*找到了房间, 处理媒体消息*/
-            room_it->second->handle_packet(conn, packet);
+            /*找到了房间, 处理房间内消息*/
+            auto room = room_it->second;
+            room->handle_packet(conn, packet);
+            if (packet.type == protocol::MessageType::ExitMeeting) {
+                // exit_meeting 后该连接回到大厅（房主离开时房间已关闭并清理过映射）
+                _connection_room.erase(conn->id());
+            }
         } else {
             /*没有找到房间, 处理大厅消息*/
             handle_lobby_packet(conn, packet);
@@ -128,20 +191,17 @@ void MeetingService::handle_lobby_packet(std::shared_ptr<network::Connection> co
 void MeetingService::handle_create_meeting(std::shared_ptr<network::Connection> conn,
                                            const protocol::Packet& packet) {
     const auto options = parse_create_meeting_options(packet, _config);
-    uint64_t owner_user_id = packet.user_id;
-    if (_config.require_auth) {
-        if (!protocol::token::verify(packet.auth_token, _config.token_secret,
-                                     owner_user_id)) {
-            spdlog::warn("create meeting rejected: invalid token from connection {}",
-                         conn->id());
-            protocol::Packet response;
-            response.type = protocol::MessageType::CreateMeetingResponse;
-            response.payload.resize(sizeof(uint32_t));
-            const uint32_t zero = 0;
-            std::memcpy(response.payload.data(), &zero, sizeof(zero));
-            conn->send(protocol::Codec::encode(response));
-            return;
-        }
+
+    bool auth_failed = false;
+    const uint64_t owner_user_id =
+        resolve_user_id(_config, packet, conn->id(), auth_failed);
+    if (auth_failed) {
+        spdlog::warn("create meeting rejected: invalid token from connection {}",
+                     conn->id());
+        conn->send(protocol::Codec::encode(make_room_response(
+            protocol::MessageType::CreateMeetingResponse, -3,
+            "invalid token", 0)));
+        return;
     }
     if (owner_user_id == 0) {
         spdlog::warn("create meeting rejected: user_id=0 from connection {}",
@@ -149,58 +209,51 @@ void MeetingService::handle_create_meeting(std::shared_ptr<network::Connection> 
         conn->close();
         return;
     }
+
     const auto room_id = _room_manager.create_room(conn, options, owner_user_id);
-
-    protocol::Packet response;
-    response.type = protocol::MessageType::CreateMeetingResponse;
-
-    uint32_t room_no = 0;
-    if (room_id) {
-        auto room = _room_manager.get_room(*room_id);
-        room->set_close_callback([this](uint32_t id) { cleanup_room(id); });
-        _connection_room.emplace(conn->id(), room);
-        room_no = htonl(*room_id);
-        spdlog::info(
-            "meeting created: room id = {} owner connection id = {} "
-            "max_participants = {} duration_minutes = {}",
-            *room_id, conn->id(), options.max_participants,
-            options.duration_minutes);
-    } else {
+    if (!room_id) {
         spdlog::warn("create meeting failed for connection {}", conn->id());
+        conn->send(protocol::Codec::encode(make_room_response(
+            protocol::MessageType::CreateMeetingResponse, -1,
+            "create meeting failed", 0)));
+        return;
     }
 
-    response.payload.resize(sizeof(room_no));
-    std::memcpy(response.payload.data(), &room_no, sizeof(room_no));
-    conn->send(protocol::Codec::encode(response));
+    auto room = _room_manager.get_room(*room_id);
+    room->set_close_callback([this](uint32_t id) { cleanup_room(id); });
+    _connection_room.emplace(conn->id(), room);
+    spdlog::info(
+        "meeting created: room id = {} owner connection id = {} "
+        "max_participants = {} duration_minutes = {}",
+        *room_id, conn->id(), options.max_participants,
+        options.duration_minutes);
+
+    conn->send(protocol::Codec::encode(make_room_response(
+        protocol::MessageType::CreateMeetingResponse, 0, "ok", *room_id)));
 }
 
 void MeetingService::handle_join_meeting(std::shared_ptr<network::Connection> conn,
                                          const protocol::Packet& packet) {
-    if (packet.payload.size() < sizeof(uint32_t)) {
-        spdlog::warn("join meeting payload too short from connection {}", conn->id());
-        conn->close();
+    bool auth_failed = false;
+    const uint64_t user_id =
+        resolve_user_id(_config, packet, conn->id(), auth_failed);
+    if (auth_failed) {
+        spdlog::warn("join meeting rejected: invalid token from connection {}",
+                     conn->id());
+        conn->send(protocol::Codec::encode(make_room_response(
+            protocol::MessageType::JoinMeetingResponse, -3,
+            "invalid token", 0)));
         return;
     }
 
-    uint32_t room_no_net = 0;
-    /*将房间号复制到room_no_net中(网络字节序)*/
-    std::memcpy(&room_no_net, packet.payload.data(), sizeof(room_no_net));
-    /*将网络字节序转换为主机字节序*/
-    const uint32_t room_id = ntohl(room_no_net);
-    uint64_t user_id = packet.user_id;
-    if (_config.require_auth) {
-        if (!protocol::token::verify(packet.auth_token, _config.token_secret,
-                                     user_id)) {
-            spdlog::warn("join meeting rejected: invalid token from connection {}",
-                         conn->id());
-            protocol::Packet response;
-            response.type = protocol::MessageType::JoinMeetingResponse;
-            response.payload.resize(sizeof(uint32_t));
-            const uint32_t deny = htonl(static_cast<uint32_t>(-1));
-            std::memcpy(response.payload.data(), &deny, sizeof(deny));
-            conn->send(protocol::Codec::encode(response));
-            return;
-        }
+    const uint32_t room_id = read_u32(packet.data, "room_id", 0);
+    if (room_id == 0) {
+        spdlog::warn("join meeting rejected: missing room_id from connection {}",
+                     conn->id());
+        conn->send(protocol::Codec::encode(make_room_response(
+            protocol::MessageType::JoinMeetingResponse, -2,
+            "room not found", 0)));
+        return;
     }
     if (user_id == 0) {
         spdlog::warn("join meeting rejected: user_id=0 from connection {}",
@@ -208,37 +261,34 @@ void MeetingService::handle_join_meeting(std::shared_ptr<network::Connection> co
         conn->close();
         return;
     }
+
     spdlog::info("connection {} join meeting, room_id: {} user_id: {}",
                  conn->id(), room_id, user_id);
     const auto result = _room_manager.join_room(room_id, conn, user_id);
 
-    protocol::Packet response;
-    response.type = protocol::MessageType::JoinMeetingResponse;
-    response.payload.resize(sizeof(uint32_t));
-
-    uint32_t response_value = 0;
     if (result == meeting::RoomManager::JoinResult::Ok) {
         auto room = _room_manager.get_room(room_id);
         _connection_room.emplace(conn->id(), room);
 
-        response_value = htonl(room_id);
-        std::memcpy(response.payload.data(), &response_value, sizeof(response_value));
-        conn->send(protocol::Codec::encode(response));
+        conn->send(protocol::Codec::encode(make_room_response(
+            protocol::MessageType::JoinMeetingResponse, 0, "ok", room_id)));
         notify_partner_join(room, conn);
         spdlog::info("connection {} joined room {}", conn->id(), room_id);
         return;
     }
 
     if (result == meeting::RoomManager::JoinResult::Full) {
-        response_value = htonl(static_cast<uint32_t>(-1));
         spdlog::info("room {} is full, reject connection {}", room_id, conn->id());
-    } else {
-        spdlog::info("room {} not available, reject connection {}", room_id,
-                     conn->id());
+        conn->send(protocol::Codec::encode(make_room_response(
+            protocol::MessageType::JoinMeetingResponse, -1, "room is full", 0)));
+        return;
     }
 
-    std::memcpy(response.payload.data(), &response_value, sizeof(response_value));
-    conn->send(protocol::Codec::encode(response));
+    spdlog::info("room {} not available, reject connection {}", room_id,
+                 conn->id());
+    conn->send(protocol::Codec::encode(make_room_response(
+        protocol::MessageType::JoinMeetingResponse, -2,
+        "room not available", 0)));
 }
 
 void MeetingService::notify_partner_join(std::shared_ptr<meeting::Room> room,

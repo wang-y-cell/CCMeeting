@@ -1,14 +1,21 @@
-"""HTTP 层：路由、状态码、响应头与 C++ `http/http_session.cpp` 逐条对齐。
+"""HTTP 层：路由、状态码、响应头，契约见 `docs/schema/api.json`（v2）。
 
-契约（客户端不改，必须完全一致）：
-    GET  /health, /api/health          → 200 {"code":0,"message":"ok"}
+契约（v2，唯一事实来源 docs/schema/api.json）：
+    GET  /health, /api/health          → 200 {"code":0,"message":"ok","data":{}}
     OPTIONS *                          → 204 空体 + CORS 头
     GET  /static/**, /uploads/**       → 文件；不存在则落到 404 JSON
     POST /api/login                    → 200 / 400 / 401 / 403 / 500
     POST /api/register                 → 200 / 400 / 409 / 500
     POST /api/upload-avatar            → 200 / 400 / 404 / 413 / 500
     POST /api/update-profile           → 200 / 400 / 404 / 500
-    其它                                → 404 {"code":404,"message":"not found"}
+    其它                                → 404 {"code":404,"message":"not found","data":null}
+
+v2 与 v1 的差别：
+    1. 所有 POST 的业务字段都包进 data：{"data": {...}}；缺 data 或 data 不是对象 → 400；
+    2. 失败响应的 data 显式为 null（不再省略该字段）；
+    3. 用户字段全名化：user_id（原 id）、nickname（原 name）；
+    4. /api/upload-avatar、/api/update-profile 的身份只取 token 里的 user_id，
+       请求体不再接受 user_id（带了也不读）。
 
 统一响应头：Server: CloudMeetingAuthServer、Content-Type: application/json; charset=utf-8、
 Access-Control-Allow-Origin: *、Access-Control-Allow-Headers: Content-Type、
@@ -28,7 +35,7 @@ from fastapi.responses import JSONResponse, Response
 
 from .config import AuthServerConfig, load_config
 from .db import Database
-from .repository import UserRepository
+from .repository import UserInfo, UserRepository
 from .tokens import issue_token, verify_token
 from .service import AuthService
 from .turn import make_turn_credentials
@@ -55,8 +62,15 @@ def _json_response(status_code: int, payload: dict[str, Any]) -> JSONResponse:
     )
 
 
+def _error_response(status_code: int, message: str) -> JSONResponse:
+    """失败响应：code/message 之外，data 必须是显式的 null（v2 规范）。"""
+    return _json_response(
+        status_code, {"code": status_code, "message": message, "data": None}
+    )
+
+
 def _not_found_response() -> JSONResponse:
-    return _json_response(404, {"code": 404, "message": "not found"})
+    return _error_response(404, "not found")
 
 
 def create_app(config: AuthServerConfig | None = None) -> FastAPI:
@@ -90,14 +104,14 @@ def create_app(config: AuthServerConfig | None = None) -> FastAPI:
     @app.get("/health")
     @app.get("/api/health")
     async def health() -> Response:
-        return _json_response(200, {"code": 0, "message": "ok"})
+        return _json_response(200, {"code": 0, "message": "ok", "data": {}})
 
     # ---------------------------------------------------------------- 登录
     @app.post("/api/login")
     async def login(request: Request) -> Response:
         parsed = await _parse_login_request(request)
         if parsed is None:
-            return _json_response(400, {"code": 400, "message": "invalid json body"})
+            return _error_response(400, "invalid json body")
         username, password = parsed
 
         client_ip = request.client.host if request.client else "unknown"
@@ -120,7 +134,7 @@ def create_app(config: AuthServerConfig | None = None) -> FastAPI:
     async def register(request: Request) -> Response:
         parsed = await _parse_login_request(request)
         if parsed is None:
-            return _json_response(400, {"code": 400, "message": "invalid json body"})
+            return _error_response(400, "invalid json body")
         username, password = parsed
 
         result = service.register_user(username, password)
@@ -138,12 +152,12 @@ def create_app(config: AuthServerConfig | None = None) -> FastAPI:
     async def upload_avatar(request: Request) -> Response:
         parsed = await _parse_upload_avatar_request(request)
         if parsed is None:
-            return _json_response(400, {"code": 400, "message": "invalid json body"})
+            return _error_response(400, "invalid json body")
+        mime, data_base64 = parsed
         token_user_id = _authenticate(request)
         if token_user_id is None:
-            return _json_response(401, {"code": 401, "message": "unauthorized"})
-        # 以 token 身份为准，忽略 body 里的 user_id
-        _body_user_id, mime, data_base64 = parsed
+            return _error_response(401, "unauthorized")
+        # 身份只取 token；请求体里的 user_id 一律不读（v2 规范）
         user_id = token_user_id
 
         result = service.upload_avatar(user_id, mime, data_base64)
@@ -157,9 +171,13 @@ def create_app(config: AuthServerConfig | None = None) -> FastAPI:
         elif result.code == 500:
             status = 500
 
-        payload: dict[str, Any] = {"code": result.code, "message": result.message}
+        payload: dict[str, Any] = {
+            "code": result.code,
+            "message": result.message,
+            "data": None,
+        }
         if result.success:
-            payload["data"] = {"avatar": result.avatar_url}
+            payload["data"] = {"user_id": user_id, "avatar": result.avatar_url}
         return _json_response(status, payload)
 
     # ---------------------------------------------------------------- 资料
@@ -167,9 +185,8 @@ def create_app(config: AuthServerConfig | None = None) -> FastAPI:
     async def update_profile(request: Request) -> Response:
         parsed = await _parse_update_profile_request(request)
         if parsed is None:
-            return _json_response(400, {"code": 400, "message": "invalid json body"})
+            return _error_response(400, "invalid json body")
         (
-            user_id,
             nickname,
             info,
             gender,
@@ -181,8 +198,8 @@ def create_app(config: AuthServerConfig | None = None) -> FastAPI:
         ) = parsed
         token_user_id = _authenticate(request)
         if token_user_id is None:
-            return _json_response(401, {"code": 401, "message": "unauthorized"})
-        # 以 token 身份为准，忽略 body 里的 user_id
+            return _error_response(401, "unauthorized")
+        # 身份只取 token；请求体里的 user_id 一律不读（v2 规范）
         user_id = token_user_id
 
         result = service.update_profile(
@@ -196,18 +213,27 @@ def create_app(config: AuthServerConfig | None = None) -> FastAPI:
         elif result.code == 500:
             status = 500
 
-        payload: dict[str, Any] = {"code": result.code, "message": result.message}
+        payload: dict[str, Any] = {
+            "code": result.code,
+            "message": result.message,
+            "data": None,
+        }
         if result.success:
-            payload["data"] = {
-                "name": result.name,
-                "info": result.info,
-                "gender": result.gender,
-                "birthday": result.birthday,
-                "address": result.address,
-                "phone": result.phone,
-                "email": result.email,
-                "extra_json": result.extra_json,
-            }
+            user = result.user
+            if user is None:  # 兜底：service 未回读时用本次提交的字段拼装
+                user = UserInfo(
+                    id=user_id,
+                    username=result.username,
+                    name=result.nickname,
+                    info=result.info,
+                    gender=result.gender,
+                    birthday=result.birthday,
+                    address=result.address,
+                    phone=result.phone,
+                    email=result.email,
+                    extra_json=result.extra_json,
+                )
+            payload["data"] = {"user": _user_payload(user)}
         return _json_response(status, payload)
 
     # ------------------------------------------------------- 静态文件 / 兜底
@@ -261,12 +287,24 @@ async def _read_json_object(request: Request) -> dict[str, Any] | None:
     return root if isinstance(root, dict) else None
 
 
-async def _parse_login_request(request: Request) -> tuple[str, str] | None:
+async def _read_data_object(request: Request) -> dict[str, Any] | None:
+    """取出 v2 信封里的 data 对象：{"data": {...}}。
+
+    缺 data、data 不是对象、请求体不是合法 JSON 一律返回 None（调用方回 400）。
+    """
     root = await _read_json_object(request)
     if root is None:
         return None
-    username = root.get("username")
-    password = root.get("password")
+    data = root.get("data")
+    return data if isinstance(data, dict) else None
+
+
+async def _parse_login_request(request: Request) -> tuple[str, str] | None:
+    data = await _read_data_object(request)
+    if data is None:
+        return None
+    username = data.get("username")
+    password = data.get("password")
     if not isinstance(username, str) or not isinstance(password, str):
         return None
     if not username:
@@ -274,45 +312,36 @@ async def _parse_login_request(request: Request) -> tuple[str, str] | None:
     return username, password
 
 
-async def _parse_upload_avatar_request(
-    request: Request,
-) -> tuple[int, str, str] | None:
-    root = await _read_json_object(request)
-    if root is None:
+async def _parse_upload_avatar_request(request: Request) -> tuple[str, str] | None:
+    data = await _read_data_object(request)
+    if data is None:
         return None
-    mime = root.get("mime")
-    data_base64 = root.get("data_base64")
-    user_id = root.get("user_id")
+    mime = data.get("mime")
+    data_base64 = data.get("data_base64")
     if not isinstance(mime, str) or not isinstance(data_base64, str):
         return None
-    if not isinstance(user_id, int) or isinstance(user_id, bool):
+    if not mime or not data_base64:
         return None
-    if user_id <= 0 or not mime or not data_base64:
-        return None
-    return user_id, mime, data_base64
+    # 注意：不再读取 data.user_id，身份只认 token
+    return mime, data_base64
 
 
 async def _parse_update_profile_request(
     request: Request,
-) -> tuple[int, str, str, str, str, str, str, str, str] | None:
-    root = await _read_json_object(request)
-    if root is None:
+) -> tuple[str, str, str, str, str, str, str, str] | None:
+    data = await _read_data_object(request)
+    if data is None:
         return None
-    nickname = root.get("nickname")
-    user_id = root.get("user_id")
+    nickname = data.get("nickname")
     if not isinstance(nickname, str):
-        return None
-    if not isinstance(user_id, int) or isinstance(user_id, bool):
-        return None
-    if user_id <= 0:
         return None
 
     def optional(key: str) -> str:
-        value = root.get(key)
+        value = data.get(key)
         return value if isinstance(value, str) else ""
 
+    # 注意：不再读取 data.user_id，身份只认 token
     return (
-        user_id,
         nickname,
         optional("info"),
         optional("gender"),
@@ -325,22 +354,36 @@ async def _parse_update_profile_request(
 
 
 # ---------------------------------------------------------------- 响应构造
+def _user_payload(user: UserInfo) -> dict[str, Any]:
+    """UserInfo 的统一 JSON 形状（docs/schema/api.json > definitions.UserInfo）。
+
+    内部仍沿用 UserInfo.id / UserInfo.name，序列化时映射为 user_id / nickname。
+    """
+    return {
+        "user_id": user.id,
+        "username": user.username,
+        "nickname": user.name,
+        "avatar": user.avatar,
+        "info": user.info,
+        "gender": user.gender,
+        "birthday": user.birthday,
+        "address": user.address,
+        "phone": user.phone,
+        "email": user.email,
+        "extra_json": user.extra_json,
+    }
+
+
 def _login_payload(result, config: AuthServerConfig | None = None) -> dict[str, Any]:
-    payload: dict[str, Any] = {"code": result.code, "message": result.message}
+    payload: dict[str, Any] = {
+        "code": result.code,
+        "message": result.message,
+        "data": None,
+    }
     if result.success and result.user is not None:
         user = result.user
         payload["data"] = {
-            "id": user.id,
-            "username": user.username,
-            "name": user.name,
-            "avatar": user.avatar,
-            "info": user.info,
-            "gender": user.gender,
-            "birthday": user.birthday,
-            "address": user.address,
-            "phone": user.phone,
-            "email": user.email,
-            "extra_json": user.extra_json,
+            "user": _user_payload(user),
             "token": issue_token(user.id),
         }
         if config is not None:

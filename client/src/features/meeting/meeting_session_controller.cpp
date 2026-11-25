@@ -187,7 +187,9 @@ void MeetingSessionController::on_create_result(int room_no) {
 }
 
 void MeetingSessionController::on_join_result(int code) {
-    if (code == 0) {
+    // 协议 v2：code==0 表示成功（此时 codec 把 room_id 放进 code），
+    // 失败一律为负值：-1 满员 / -2 房间不存在或已关闭 / -3 鉴权失败。
+    if (code == 0 || code == -2) {
         _host->close_meeting_window();
         QMessageBox::information(nullptr, tr("Meeting Error"),
                                  tr("会议不存在"));
@@ -199,7 +201,16 @@ void MeetingSessionController::on_join_result(int code) {
                              tr("成员已满，无法加入"));
         return;
     }
-    if (code <= 0) {
+    if (code == -3) {
+        _host->close_meeting_window();
+        QMessageBox::warning(nullptr, tr("Meeting information"),
+                             tr("身份校验失败，请重新登录"));
+        return;
+    }
+    if (code < 0) {
+        _host->close_meeting_window();
+        QMessageBox::warning(nullptr, tr("Meeting information"),
+                             tr("加入会议失败"));
         return;
     }
 

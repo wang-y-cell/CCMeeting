@@ -1,0 +1,262 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ccmeeting/schema/api.json",
+  "title": "CloudMeeting 统一接口规范",
+  "description": "全系统唯一的 JSON 契约（v2）。所有业务字段都在 data 里，所有状态都在 code/message 里。",
+  "x-version": "2.0",
+  "x-updated": "2026-11-25",
+  "x-breaking": "相对 v1 不兼容：字段全名化、payload 由 base64 二进制改为 JSON 对象、房间开关由位掩码改为布尔、HTTP 请求体包进 data。",
+
+  "definitions": {
+
+    "Envelope": {
+      "title": "统一信封",
+      "type": "object",
+      "description": "HTTP 请求只带 data；HTTP 响应带 code/message/data；WS 上行带 t/token/data；WS 下行带 t/code/message/data。",
+      "properties": {
+        "t": { "type": "string", "description": "仅 WebSocket：消息类型，见 x-messages" },
+        "token": { "type": "string", "description": "仅 WebSocket：会话令牌。HTTP 用 Authorization 头承载" },
+        "code": { "type": "integer", "description": "仅响应：0=成功，非0=失败（HTTP 下与状态码同值）" },
+        "message": { "type": "string", "description": "仅响应：成功固定 ok，失败为可读原因" },
+        "data": { "description": "业务数据，形状由具体接口/消息决定" }
+      }
+    },
+
+    "UserInfo": {
+      "title": "用户资料（全系统唯一形状）",
+      "type": "object",
+      "required": ["user_id", "username", "nickname"],
+      "properties": {
+        "user_id": { "type": "integer", "minimum": 1 },
+        "username": { "type": "string", "x-maxUtf8Bytes": 50 },
+        "nickname": { "type": "string", "x-maxUtf8Bytes": 64 },
+        "avatar": { "type": "string", "description": "完整 URL；未设置为空串" },
+        "info": { "type": "string", "x-maxUtf8Bytes": 512 },
+        "gender": { "type": "string", "enum": ["", "male", "female", "other"] },
+        "birthday": { "type": "string", "description": "YYYY-MM-DD 或空串" },
+        "address": { "type": "string", "x-maxUtf8Bytes": 256 },
+        "phone": { "type": "string", "x-maxUtf8Bytes": 32 },
+        "email": { "type": "string", "x-maxUtf8Bytes": 128 },
+        "extra_json": { "type": "string", "x-maxUtf8Bytes": 2048 }
+      }
+    },
+
+    "Turn": {
+      "title": "coturn 临时凭据",
+      "type": "object",
+      "required": ["username", "password", "ttl", "uris"],
+      "properties": {
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "ttl": { "type": "integer", "minimum": 60, "maximum": 86400 },
+        "uris": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "DataSession": {
+      "title": "登录/注册成功的 data",
+      "type": "object",
+      "required": ["user", "token"],
+      "properties": {
+        "user": { "$ref": "#/definitions/UserInfo" },
+        "token": { "type": "string" },
+        "turn": { "$ref": "#/definitions/Turn" }
+      }
+    },
+
+    "DataAvatar": {
+      "title": "上传头像成功的 data",
+      "type": "object",
+      "required": ["user_id", "avatar"],
+      "properties": {
+        "user_id": { "type": "integer" },
+        "avatar": { "type": "string" }
+      }
+    },
+
+    "DataUser": {
+      "title": "更新资料成功的 data",
+      "type": "object",
+      "required": ["user"],
+      "properties": { "user": { "$ref": "#/definitions/UserInfo" } }
+    },
+
+    "DataEmpty": {
+      "title": "空 data",
+      "type": "object",
+      "maxProperties": 0
+    },
+
+    "DataTextSend": {
+      "type": "object", "required": ["text"],
+      "properties": { "text": { "type": "string" } }
+    },
+
+    "DataTextRecv": {
+      "type": "object", "required": ["user_id", "text"],
+      "properties": {
+        "user_id": { "type": "integer" },
+        "text": { "type": "string" }
+      }
+    },
+
+    "DataCreateMeeting": {
+      "type": "object",
+      "properties": {
+        "max_participants": { "type": "integer", "minimum": 2, "x-clamp": "服务端上限" },
+        "duration_minutes": { "type": "integer", "minimum": 1, "maximum": 1440, "default": 60 }
+      }
+    },
+
+    "DataJoinMeeting": {
+      "type": "object", "required": ["room_id"],
+      "properties": { "room_id": { "type": "integer", "minimum": 1 } }
+    },
+
+    "DataRoomSettings": {
+      "title": "房间开关（布尔，替代原位掩码）",
+      "type": "object",
+      "required": ["allow_record", "allow_member_share"],
+      "properties": {
+        "allow_record": { "type": "boolean", "default": true },
+        "allow_member_share": { "type": "boolean", "default": true }
+      }
+    },
+
+    "DataUserEvent": {
+      "title": "单个用户事件（加入/退出/关摄像头）",
+      "type": "object", "required": ["user_id"],
+      "properties": { "user_id": { "type": "integer" } }
+    },
+
+    "DataUserIds": {
+      "type": "object", "required": ["user_ids"],
+      "properties": { "user_ids": { "type": "array", "items": { "type": "integer" } } }
+    },
+
+    "DataUserProfile": {
+      "title": "user_profile 的 data（上行只带 nickname/avatar，下行带 user_id）",
+      "type": "object",
+      "required": ["nickname", "avatar"],
+      "properties": {
+        "user_id": { "type": "integer" },
+        "nickname": { "type": "string" },
+        "avatar": { "type": "string" }
+      }
+    },
+
+    "DataRoomId": {
+      "type": "object",
+      "required": ["room_id"],
+      "properties": { "room_id": { "type": "integer", "description": "失败时为 0" } }
+    }
+  },
+
+  "x-http": {
+    "baseUrl": "client.json > auth.public_base_url",
+    "authHeader": "Authorization: Bearer <token>",
+    "requestShape": "{ \"data\": { ... } }",
+    "responseShape": "{ \"code\": 0, \"message\": \"ok\", \"data\": { ... } }",
+    "token": {
+      "format": "base64url(\"<user_id>:<exp_unix>\").base64url(HMAC-SHA256(secret,payload))",
+      "ttlSeconds": 86400,
+      "secretEnv": "CCMEETING_TOKEN_SECRET",
+      "sharedWith": "message_server"
+    },
+    "errorCodes": {
+      "0": "成功",
+      "400": "请求体非法或参数校验失败",
+      "401": "凭据错误或缺少 token",
+      "403": "账号被禁用",
+      "404": "用户不存在 / 路径不存在",
+      "409": "用户名已存在",
+      "413": "头像超过大小上限",
+      "500": "服务端内部错误"
+    }
+  },
+
+  "x-endpoints": [
+    {
+      "method": "GET", "path": "/api/health", "auth": false, "request": null,
+      "response": { "code": 0, "message": "ok", "data": "DataEmpty" }
+    },
+    {
+      "method": "POST", "path": "/api/login", "auth": false,
+      "request": { "data": { "username": "string", "password": "string" } },
+      "responseData": "DataSession",
+      "errors": ["400 invalid body", "401 invalid username or password", "403 account disabled", "500"]
+    },
+    {
+      "method": "POST", "path": "/api/register", "auth": false,
+      "request": { "data": { "username": "string", "password": "string" } },
+      "responseData": "DataSession",
+      "note": "成功即视为已登录，返回 token 与 turn",
+      "errors": ["400 username too long", "409 username already exists", "500"]
+    },
+    {
+      "method": "POST", "path": "/api/upload-avatar", "auth": true,
+      "request": { "data": { "mime": "image/png|image/jpeg|image/jpg|image/webp", "data_base64": "string" } },
+      "responseData": "DataAvatar",
+      "note": "身份取自 token，不再接受 user_id",
+      "errors": ["400 unsupported mime / invalid base64", "401", "404 user not found", "413 avatar too large", "500"]
+    },
+    {
+      "method": "POST", "path": "/api/update-profile", "auth": true,
+      "request": { "data": { "nickname": "string", "info": "string?", "gender": "string?", "birthday": "string?", "address": "string?", "phone": "string?", "email": "string?", "extra_json": "string?" } },
+      "responseData": "DataUser",
+      "note": "身份取自 token，不再接受 user_id",
+      "errors": ["400 nickname is required / too long / invalid gender / invalid birthday / field too long", "401", "404", "500"]
+    },
+    {
+      "method": "GET", "path": "/static/{path}", "auth": false, "response": "binary"
+    },
+    {
+      "method": "GET", "path": "/uploads/{path}", "auth": false, "response": "binary"
+    }
+  ],
+
+  "x-ws": {
+    "transport": "WebSocket 文本帧，一条消息 = 一个 JSON 对象",
+    "url": "wss://<host>:8888（nginx 终止 TLS）",
+    "upstreamShape": "{ \"t\": \"...\", \"token\": \"...\", \"data\": { ... } }",
+    "downstreamShape": "{ \"t\": \"...\", \"code\": 0, \"message\": \"ok\", \"data\": { ... } }",
+    "auth": "CCMEETING_REQUIRE_AUTH=1 时 create_meeting / join_meeting 必须带 token",
+    "lobbyRestriction": "大厅只接受 create_meeting / join_meeting，其它类型断开连接",
+    "errorCodes": {
+      "0": "成功",
+      "-1": "房间已满",
+      "-2": "房间不存在或不可加入",
+      "-3": "鉴权失败"
+    }
+  },
+
+  "x-messages": [
+    { "t": "text_send", "dir": "c2s", "data": "DataTextSend", "note": "发文字" },
+    { "t": "text_recv", "dir": "s2c", "data": "DataTextRecv", "note": "转发文字" },
+    { "t": "create_meeting", "dir": "c2s", "data": "DataCreateMeeting", "note": "需 token" },
+    { "t": "create_meeting_response", "dir": "s2c", "data": "DataRoomId", "note": "失败时 code!=0 且 room_id=0" },
+    { "t": "join_meeting", "dir": "c2s", "data": "DataJoinMeeting", "note": "需 token" },
+    { "t": "join_meeting_response", "dir": "s2c", "data": "DataRoomId", "note": "失败时 code 为 -1/-2/-3" },
+    { "t": "exit_meeting", "dir": "c2s", "data": "DataEmpty", "note": "本次一并在服务端实现：离开房间并广播 partner_exit" },
+    { "t": "close_camera", "dir": "c2s", "data": "DataEmpty", "note": "关闭自己的摄像头" },
+    { "t": "close_camera", "dir": "s2c", "data": "DataUserEvent", "note": "广播他人关闭" },
+    { "t": "room_settings", "dir": "c2s", "data": "DataRoomSettings", "note": "仅房主生效" },
+    { "t": "room_settings_notify", "dir": "s2c", "data": "DataRoomSettings", "note": "广播给全员（含发起者）" },
+    { "t": "partner_join", "dir": "s2c", "data": "DataUserEvent", "note": "" },
+    { "t": "partner_exit", "dir": "s2c", "data": "DataUserEvent", "note": "" },
+    { "t": "partner_join2", "dir": "s2c", "data": "DataUserIds", "note": "成员快照，只发给新人" },
+    { "t": "user_profile", "dir": "c2s", "data": "DataUserProfile", "note": "只带 nickname/avatar，身份来自 token" },
+    { "t": "user_profile", "dir": "s2c", "data": "DataUserProfile", "note": "带 user_id" }
+  ],
+
+  "x-removed-from-v1": [
+    "p 字段（base64 二进制 payload）",
+    "u 字段（用户 id 移到 data.user_id）",
+    "s 字段（文本移到 data.text）",
+    "a 字段（token 改为顶层 token）",
+    "房间开关位掩码（改为 allow_record / allow_member_share 布尔）",
+    "join_meeting_response 的 -1/0 哨兵（改为 code/room_id）",
+    "HTTP 请求体的裸字段（改为包进 data）",
+    "id / name 字段名（改为 user_id / nickname）"
+  ]
+}

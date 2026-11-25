@@ -167,7 +167,12 @@ public:
     }
 };
 
-/** @brief 发送用户资料（显示名/头像） */
+/**
+ * @brief 发送用户资料（显示名/头像）
+ *
+ * 线上 data 为 {"nickname","avatar"}，身份取自顶层 token（不再携带 user_id）；
+ * user_id 参数仅用于本地记录/自检。
+ */
 class SendUserProfileMessage : public Message {
 public:
     SendUserProfileMessage(qint64 user_id = 0, std::string display_name = {},
@@ -190,7 +195,13 @@ private:
     std::string avatar_url_;
 };
 
-/** @brief 房主修改房间开关（上行）。payload 为 4 字节大端 flags */
+/**
+ * @brief 房主修改房间开关（上行）
+ *
+ * 线上 data 为 {"allow_record":bool,"allow_member_share":bool}（v2 规范）。
+ * 客户端内部仍用位掩码表达：flags() 与两个布尔之间的转换由 MessageCodec 完成
+ * （bit0=allow_record, bit1=allow_member_share），属过渡兼容，访问器保持不变。
+ */
 class RoomSettingsMessage : public Message {
 public:
     explicit RoomSettingsMessage(std::uint32_t flags = 0) : flags_(flags) {}
@@ -334,7 +345,12 @@ private:
     std::string avatar_url_;
 };
 
-/** @brief 房间开关通知（下行）。服务器校验房主后广播，并在新人入会时补发 */
+/**
+ * @brief 房间开关通知（下行）。服务器校验房主后广播，并在新人入会时补发
+ *
+ * 线上 data 为 {"allow_record":bool,"allow_member_share":bool}；flags() 仍是
+ * 兼容位掩码（bit0=allow_record, bit1=allow_member_share），转换在 MessageCodec 内。
+ */
 class RoomSettingsNotifyMessage : public Message {
 public:
     MessageKind kind() const override { return MessageKind::RoomSettingsNotify; }

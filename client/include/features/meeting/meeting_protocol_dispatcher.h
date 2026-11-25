@@ -28,7 +28,7 @@ public:
 signals:
     /** @brief 创建房间结果（0 表示失败） */
     void create_meeting_result(int room_no);
-    /** @brief 加入房间结果（0 不存在 / -1 已满 / >0 返回房间号） */
+    /** @brief 加入房间结果（>0 返回房间号；-1 已满 / -2 不存在或不可加入 / -3 鉴权失败） */
     void join_meeting_result(int code);
     /** @brief 房主关闭了会议 */
     void remote_host_closed();

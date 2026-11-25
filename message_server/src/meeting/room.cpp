@@ -5,33 +5,70 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#ifdef _WIN32
-#  include <winsock2.h>
-#else
-#  include <arpa/inet.h>
-#endif
 #include <chrono>
-#include <cstring>
+#include <utility>
+
+namespace meeting {
 
 namespace {
 
-uint64_t read_be64(const uint8_t* data) {
-    uint64_t value = 0;
-    for (int i = 0; i < 8; ++i) {
-        value = (value << 8) | data[i];
+using json = nlohmann::json;
+
+bool read_bool(const json& data, const char* key, bool fallback) {
+    if (!data.is_object()) {
+        return fallback;
     }
-    return value;
+    const auto it = data.find(key);
+    if (it == data.end() || !it->is_boolean()) {
+        return fallback;
+    }
+    return it->get<bool>();
 }
 
-void write_be64(uint8_t* out, uint64_t value) {
-    for (int i = 0; i < 8; ++i) {
-        out[i] = static_cast<uint8_t>((value >> (56 - i * 8)) & 0xFF);
+std::string read_string(const json& data, const char* key,
+                        const std::string& fallback = std::string()) {
+    if (!data.is_object()) {
+        return fallback;
     }
+    const auto it = data.find(key);
+    if (it == data.end() || !it->is_string()) {
+        return fallback;
+    }
+    return it->get<std::string>();
+}
+
+/// 单个用户事件（partner_join / partner_exit / close_camera）：data = {"user_id":...}
+protocol::Packet make_user_event_packet(protocol::MessageType type,
+                                        uint64_t user_id) {
+    protocol::Packet packet;
+    packet.type = type;
+    packet.user_id = user_id;
+    packet.data = json{{"user_id", user_id}};
+    return packet;
+}
+
+/// 房间开关广播：data = {"allow_record":bool,"allow_member_share":bool}
+protocol::Packet make_room_settings_packet(bool allow_record,
+                                           bool allow_member_share) {
+    protocol::Packet packet;
+    packet.type = protocol::MessageType::RoomSettingsNotify;
+    packet.data = json{{"allow_record", allow_record},
+                       {"allow_member_share", allow_member_share}};
+    return packet;
+}
+
+/// 用户资料：data = {"user_id":...,"nickname":"...","avatar":"..."}
+protocol::Packet make_user_profile_packet(const Participant& p) {
+    protocol::Packet packet;
+    packet.type = protocol::MessageType::UserProfile;
+    packet.user_id = p.user_id;
+    packet.data = json{{"user_id", p.user_id},
+                       {"nickname", p.display_name},
+                       {"avatar", p.avatar_url}};
+    return packet;
 }
 
 }  // namespace
-
-namespace meeting {
 
 Room::Room(uint32_t room_id,
            std::shared_ptr<network::Connection> owner,
@@ -117,10 +154,8 @@ void Room::remove_participant(network::Connection::Id conn_id) {
         return;
     }
 
-    protocol::Packet packet;
-    packet.type = protocol::MessageType::PartnerExit;
-    packet.user_id = user_id;
-    broadcast(packet);
+    // 普通成员离开：广播 partner_exit（exit_meeting 也走这里，不重复广播）
+    broadcast(make_user_event_packet(protocol::MessageType::PartnerExit, user_id));
 }
 
 void Room::close_room() {
@@ -180,53 +215,45 @@ void Room::handle_packet(std::shared_ptr<network::Connection> from,
         return;
     }
 
+    // 身份来自房间成员表（服务层用 token 或连接状态填好），不信任上行 data
     const uint64_t sender_user_id = participant_it->second.user_id;
     spdlog::debug("room {} handle packet from connection {}, type: {}", _room_id, from->id(), protocol::get_type_name(packet.type));
 
     switch (packet.type) {
         case protocol::MessageType::TextSend: {
-            protocol::Packet outbound = packet;
+            protocol::Packet outbound;
             outbound.type = protocol::MessageType::TextRecv;
             outbound.user_id = sender_user_id;
+            outbound.data = json{{"user_id", sender_user_id},
+                                 {"text", read_string(packet.data, "text")}};
             broadcast(outbound, from->id());
+            break;
+        }
+        case protocol::MessageType::ExitMeeting: {
+            // 离开房间：remove_participant 负责广播 partner_exit；房主离开则关房。
+            // 这里不再做二次清理，避免重复广播 / 重复关房。
+            remove_participant(from->id());
+            spdlog::info("room {} connection {} left by exit_meeting", _room_id,
+                         from->id());
             break;
         }
         case protocol::MessageType::CloseCamera: {
-            protocol::Packet outbound;
-            outbound.type = protocol::MessageType::CloseCamera;
-            outbound.user_id = sender_user_id;
-            broadcast(outbound, from->id());
+            broadcast(make_user_event_packet(protocol::MessageType::CloseCamera,
+                                             sender_user_id),
+                      from->id());
             break;
         }
         case protocol::MessageType::UserProfile: {
-            if (packet.payload.size() >= 12) {
-                std::size_t offset = 0;
-                const uint64_t user_id = read_be64(packet.payload.data());
-                offset += 8;
-                uint16_t name_len = 0;
-                std::memcpy(&name_len, packet.payload.data() + offset, sizeof(name_len));
-                name_len = ntohs(name_len);
-                offset += 2;
-                if (offset + name_len + 2 <= packet.payload.size()) {
-                    participant_it->second.user_id = user_id;
-                    participant_it->second.display_name.assign(
-                        packet.payload.begin() + static_cast<std::ptrdiff_t>(offset),
-                        packet.payload.begin() + static_cast<std::ptrdiff_t>(offset + name_len));
-                    offset += name_len;
-                    uint16_t avatar_len = 0;
-                    std::memcpy(&avatar_len, packet.payload.data() + offset,
-                                sizeof(avatar_len));
-                    avatar_len = ntohs(avatar_len);
-                    offset += 2;
-                    if (offset + avatar_len <= packet.payload.size()) {
-                        participant_it->second.avatar_url.assign(
-                            packet.payload.begin() + static_cast<std::ptrdiff_t>(offset),
-                            packet.payload.begin() + static_cast<std::ptrdiff_t>(offset + avatar_len));
-                    }
-                }
-            }
-            protocol::Packet outbound = packet;
-            outbound.user_id = participant_it->second.user_id;
+            // 上行只带 nickname/avatar，user_id 以房间成员身份为准
+            participant_it->second.display_name =
+                read_string(packet.data, "nickname",
+                            participant_it->second.display_name);
+            participant_it->second.avatar_url =
+                read_string(packet.data, "avatar",
+                            participant_it->second.avatar_url);
+
+            protocol::Packet outbound =
+                make_user_profile_packet(participant_it->second);
             broadcast(outbound, from->id());
             break;
         }
@@ -234,29 +261,21 @@ void Room::handle_packet(std::shared_ptr<network::Connection> from,
             // 只有房主能改房间开关；其余成员忽略并记日志
             if (!participant_it->second.is_owner) {
                 spdlog::warn(
-                    "room {} rejected RoomSettings from non-owner connection {}",
+                    "room {} rejected room_settings from non-owner connection {}",
                     _room_id, from->id());
                 break;
             }
-            uint32_t flags = _settings;
-            if (packet.payload.size() >= sizeof(uint32_t)) {
-                uint32_t net_flags = 0;
-                std::memcpy(&net_flags, packet.payload.data(),
-                            sizeof(net_flags));
-                flags = ntohl(net_flags);
-            }
-            _settings = flags;
-            spdlog::info("room {} settings updated by owner: 0x{:x}", _room_id,
-                         flags);
+            _allow_record =
+                read_bool(packet.data, "allow_record", _allow_record);
+            _allow_member_share =
+                read_bool(packet.data, "allow_member_share", _allow_member_share);
+            spdlog::info(
+                "room {} settings updated by owner: allow_record={} "
+                "allow_member_share={}",
+                _room_id, _allow_record, _allow_member_share);
 
-            protocol::Packet outbound;
-            outbound.type = protocol::MessageType::RoomSettingsNotify;
-            outbound.user_id = sender_user_id;
-            const uint32_t net_flags = htonl(_settings);
-            outbound.payload.resize(sizeof(net_flags));
-            std::memcpy(outbound.payload.data(), &net_flags,
-                        sizeof(net_flags));
-            broadcast(outbound);  // 含发起者，保证全员视图一致
+            broadcast(make_room_settings_packet(_allow_record,
+                                                _allow_member_share));
             break;
         }
         default:
@@ -265,46 +284,6 @@ void Room::handle_packet(std::shared_ptr<network::Connection> from,
             break;
     }
 }
-
-namespace {
-
-protocol::Packet make_user_profile_packet(const Participant& p) {
-    protocol::Packet packet;
-    packet.type = protocol::MessageType::UserProfile;
-    packet.user_id = p.user_id;
-
-    const auto& name = p.display_name;
-    const auto& avatar = p.avatar_url;
-    packet.payload.reserve(12 + name.size() + avatar.size());
-
-    uint8_t id_wire[8];
-    write_be64(id_wire, p.user_id);
-    packet.payload.insert(packet.payload.end(), id_wire, id_wire + 8);
-
-    const uint16_t name_len = htons(static_cast<uint16_t>(name.size()));
-    const auto* name_len_bytes = reinterpret_cast<const uint8_t*>(&name_len);
-    packet.payload.insert(packet.payload.end(), name_len_bytes,
-                          name_len_bytes + sizeof(name_len));
-    packet.payload.insert(packet.payload.end(), name.begin(), name.end());
-
-    const uint16_t avatar_len = htons(static_cast<uint16_t>(avatar.size()));
-    const auto* avatar_len_bytes = reinterpret_cast<const uint8_t*>(&avatar_len);
-    packet.payload.insert(packet.payload.end(), avatar_len_bytes,
-                          avatar_len_bytes + sizeof(avatar_len));
-    packet.payload.insert(packet.payload.end(), avatar.begin(), avatar.end());
-    return packet;
-}
-
-protocol::Packet make_room_settings_packet(uint32_t flags) {
-    protocol::Packet packet;
-    packet.type = protocol::MessageType::RoomSettingsNotify;
-    const uint32_t net_flags = htonl(flags);
-    packet.payload.resize(sizeof(net_flags));
-    std::memcpy(packet.payload.data(), &net_flags, sizeof(net_flags));
-    return packet;
-}
-
-}  // namespace
 
 void Room::notify_user_joined(std::shared_ptr<network::Connection> newcomer) {
     if (_closed || !newcomer) {
@@ -317,28 +296,27 @@ void Room::notify_user_joined(std::shared_ptr<network::Connection> newcomer) {
     }
     const uint64_t newcomer_user_id = newcomer_it->second.user_id;
 
-    protocol::Packet join_notice;
-    join_notice.type = protocol::MessageType::PartnerJoin;
-    join_notice.user_id = newcomer_user_id;
-    broadcast(join_notice, newcomer->id());
+    broadcast(make_user_event_packet(protocol::MessageType::PartnerJoin,
+                                     newcomer_user_id),
+              newcomer->id());
 
-    protocol::Packet partner_list;
-    partner_list.type = protocol::MessageType::PartnerJoin2;
+    json user_ids = json::array();
     for (const auto& item : _participants) {
         if (item.first == newcomer->id()) {
             continue;
         }
-        uint8_t id_wire[8];
-        write_be64(id_wire, item.second.user_id);
-        partner_list.payload.insert(partner_list.payload.end(), id_wire,
-                                    id_wire + sizeof(id_wire));
+        user_ids.push_back(item.second.user_id);
     }
+    protocol::Packet partner_list;
+    partner_list.type = protocol::MessageType::PartnerJoin2;
+    partner_list.data = json{{"user_ids", std::move(user_ids)}};
     send_to(newcomer, partner_list);
 
     // 房间开关：新人入会先同步当前策略，避免界面默认值与房间实际不一致
-    send_to(newcomer, make_room_settings_packet(_settings));
+    send_to(newcomer,
+            make_room_settings_packet(_allow_record, _allow_member_share));
 
-    // PartnerJoin2 只有 userId；把房内已缓存的资料补发给新人，否则新人看不到对方名称
+    // partner_join2 只有 user_id；把房内已缓存的资料补发给新人，否则新人看不到对方名称
     for (const auto& item : _participants) {
         if (item.first == newcomer->id()) {
             continue;

@@ -41,3 +41,6 @@ def test_login_payload_contains_token(monkeypatch):
     payload = _login_payload(result)
     token = payload["data"]["token"]
     assert tokens.verify_token(token) == 7
+    # v2：用户字段全名化，data.user 是 11 字段的 UserInfo
+    assert payload["data"]["user"]["user_id"] == 7
+    assert payload["data"]["user"]["nickname"] == "n"

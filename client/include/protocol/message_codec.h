@@ -5,37 +5,50 @@
 #include "protocol/net_header.h"
 
 #include <QByteArray>
+#include <QString>
 #include <cstdint>
 #include <optional>
 #include <vector>
 
 /**
- * @brief 业务 Message 与 WebSocket 帧之间的编解码
+ * @brief 业务 Message 与 WebSocket 帧之间的编解码（统一 JSON 规范 v2）
  *
- * 传输层已从自定义 TCP 字节流改为 WebSocket，因此不再有
- * `$ | type | uid | len | payload | #` 这种二进制帧头。
+ * 事实来源：docs/schema/api.json（x-ws / x-messages）。一条 WS 文本帧 = 一个 JSON 对象。
  *
- * 线上格式（UTF-8 JSON，一条 WS 消息 = 一条业务消息）：
+ * 上行（客户端 → 服务端）：
  * @code
- *   {"t":"text_send", "u":123, "s":"hello"}            // 文本类：明文 s 字段
- *   {"t":"create_meeting", "u":123, "p":"AAAAAgAA..."}  // 其它：p 为 payload 的 Base64
+ *   {"t":"text_send", "token":"<可选>", "data":{"text":"hello"}}
+ *   {"t":"create_meeting", "token":"...", "data":{"max_participants":8,"duration_minutes":60}}
+ *   {"t":"close_camera", "token":"...", "data":{}}
  * @endcode
  *
- * - `t` 消息类型名（见 type_name()）
- * - `u` 发送者 user_id（下行成员事件靠它区分是谁）
- * - `s` 文本内容（仅 TEXT_SEND / TEXT_RECV），不再压缩
- * - `p` 二进制 payload 的 Base64（旗帜位、房间号、资料结构等保持原二进制布局，
- *      因此服务端 room/service 的业务代码无需改动）
+ * 下行（服务端 → 客户端）：
+ * @code
+ *   {"t":"text_recv", "code":0, "message":"ok", "data":{"user_id":123,"text":"hello"}}
+ *   {"t":"join_meeting_response", "code":-1, "message":"房间已满", "data":{"room_id":0}}
+ * @endcode
+ *
+ * 约定：
+ * - `t` 消息类型名（见 type_name()）；
+ * - `token` 只在上行、且本地已登录时出现（取自 UserSession::instance().token()）；
+ * - `code`/`message` 只在下行出现：0=成功，非 0=失败（HTTP 下与状态码同值）；
+ * - 所有业务字段（含 user_id）一律在 `data` 里，不再有 `p`(base64 payload)、
+ *   `u`(用户 id)、`s`(文本)、`a`(token) 这些 v1 顶层字段，也不再有二进制大端布局。
+ *
+ * 为了不改动上层一堆调用点，Message 子类的公开访问器保持原样（room_no_u32()、
+ * flags()、text()、display_name()、avatar_url()、partner_user_ids() 等），
+ * 位掩码/布尔、房间号/响应码的转换全部收敛在本类内部完成。
  */
 class MessageCodec {
 public:
     /**
      * @brief 将业务 Message 编码为 JSON 文本帧
      * @param msg 业务 Message
-     * @param local_user_id 本地用户 ID
+     * @param local_user_id 本地用户 ID。上行帧不再携带 user_id（身份由 token 决定），
+     *        该参数仅在下行消息往返自测时作为 user_id 缺失的兜底值
      * @return UTF-8 JSON 字节
      */
-    static QByteArray encode_wire_frame(const Message &msg, qint64 local_user_id);
+    static QByteArray encode_json_frame(const Message &msg, qint64 local_user_id);
 
     /**
      * @brief 解析单条 JSON 文本帧为业务 Message
@@ -43,15 +56,6 @@ public:
      * @return 业务 Message（无法识别返回 nullptr）
      */
     static MessagePtr decode_json_frame(const QByteArray &json_frame);
-
-    /**
-     * @brief 解析已解出的 payload（保留此入口供自检使用）
-     * @param payload payload 字节（文本类为明文 UTF-8）
-     * @param user_id 发送者 user_id
-     * @param msgtype 消息类型
-     */
-    static MessagePtr decode_payload(const QByteArray &payload, qint64 user_id,
-                                     MSG_TYPE msgtype);
 
     /** @brief 消息类型名（线上 `t` 字段），如 text_send */
     static const char *type_name(MSG_TYPE type);
@@ -62,7 +66,7 @@ public:
      * @brief 流式解帧器
      *
      * WebSocket 按消息投递，正常每次 feed 就是一条完整 JSON；
-     * 仍保留缓冲以防御半包/粘包。
+     * 仍保留缓冲以防御半包/粘包。非 JSON 帧（旧协议残留/异常对端）会被丢弃并记日志。
      */
     class WireStreamParser {
     public:

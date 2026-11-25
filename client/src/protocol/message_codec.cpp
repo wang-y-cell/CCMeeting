@@ -1,148 +1,130 @@
 #include "protocol/message_codec.h"
 
 #include "config/user_session.h"
+#include "protocol/room_settings_flags.h"
 
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
 #include <QJsonValue>
-#include <QtEndian>
+#include <QString>
+#include <QVariant>
 
-#include <cstring>
 #include <spdlog/spdlog.h>
 
 /*
- * 线上格式：UTF-8 JSON，一条 WebSocket 消息 = 一条业务消息
+ * 线上格式：UTF-8 JSON，一条 WebSocket 消息 = 一条业务消息（规范见 docs/schema/api.json）
  *
- *   {"t":"text_send",      "u":123, "s":"hello"}
- *   {"t":"create_meeting", "u":123, "p":"<base64 payload>"}
+ *   上行：{"t":"text_send", "token":"...", "data":{"text":"hello"}}
+ *   下行：{"t":"text_recv", "code":0, "message":"ok", "data":{"user_id":123,"text":"hello"}}
  *
- * payload 的**二进制布局保持不变**（大端点、旗帜位、资料结构），
- * 这样服务端 room/service 的业务代码无需改动，只是外层从
- * `$|type|uid|len|payload|#` 换成 JSON。
+ * v1 的 `p`(base64 payload) / `u`(user_id) / `s`(text) / `a`(token) 与所有大端二进制
+ * 布局都已删除；房间开关由位掩码改为 allow_record / allow_member_share 两个布尔。
  */
 
 namespace {
 
-// ---------------- payload 编解码（布局与旧协议一致）----------------
+// ---------------- 通用小工具 ----------------
 
-MessagePtr decode_create_meeting_response(const QByteArray &body) {
-    auto msg = std::make_shared<CreateMeetingResponseMessage>();
-    if (body.size() >= 4) {
-        msg->set_room_no(static_cast<std::uint32_t>(
-            qFromBigEndian<std::int32_t>(body.constData())));
-    }
-    return msg;
+/// std::string ← QString（按 UTF-8 字节拷贝，不跨 DLL 共享内部布局）
+std::string to_std_string(const QString &value) {
+    const QByteArray bytes = value.toUtf8();
+    return std::string(bytes.constData(),
+                       static_cast<std::size_t>(bytes.size()));
 }
 
-MessagePtr decode_join_meeting_response(const QByteArray &body) {
-    auto msg = std::make_shared<JoinMeetingResponseMessage>();
-    if (body.size() >= static_cast<int>(sizeof(std::int32_t))) {
-        // 大端解析：成功时是房间号，失败时 0 / -1
-        msg->set_response_code(
-            qFromBigEndian<std::int32_t>(body.constData()));
-    }
-    return msg;
+/// QString ← std::string
+QString to_qstring(const std::string &value) {
+    return QString::fromUtf8(value.data(), static_cast<int>(value.size()));
 }
 
-MessagePtr decode_partner_join2(const QByteArray &body) {
-    auto msg = std::make_shared<PartnerJoin2Message>();
-    for (int offset = 0; offset + 8 <= body.size(); offset += 8) {
-        msg->add_partner_user_id(
-            static_cast<qint64>(qFromBigEndian<quint64>(body.constData() + offset)));
+/// data.room_id → uint32（缺失/非数字按 0 处理）
+std::uint32_t room_id_from(const QJsonObject &data) {
+    const qint64 room = data.value(QStringLiteral("room_id"))
+                            .toVariant()
+                            .toLongLong();
+    if (room <= 0) {
+        return 0;
     }
-    return msg;
+    return static_cast<std::uint32_t>(room);
 }
 
-MessagePtr decode_text_recv(const QByteArray &body, qint64 user_id) {
-    auto msg = std::make_shared<RecvTextMessage>();
-    msg->set_user_id(user_id);
-    msg->set_text(std::string(body.constData(),
-                              static_cast<std::size_t>(body.size())));
-    return msg;
+/// data.user_id → qint64（缺失按 0 处理）
+qint64 user_id_from(const QJsonObject &data, qint64 fallback) {
+    const QJsonValue value = data.value(QStringLiteral("user_id"));
+    if (value.isUndefined() || value.isNull()) {
+        return fallback;
+    }
+    return value.toVariant().toLongLong();
 }
 
-MessagePtr decode_user_profile(const QByteArray &body, qint64 sender_user_id) {
-    if (body.size() < 12) {
-        return nullptr;
-    }
-    const char *data = body.constData();
-    std::size_t offset = 0;
-    const quint64 user_id = qFromBigEndian<quint64>(data + offset);
-    offset += 8;
-    const quint16 name_len = qFromBigEndian<quint16>(data + offset);
-    offset += 2;
-    if (offset + name_len + 2 > static_cast<std::size_t>(body.size())) {
-        return nullptr;
-    }
-    const QString name =
-        QString::fromUtf8(data + offset, static_cast<int>(name_len));
-    offset += name_len;
-    const quint16 avatar_len = qFromBigEndian<quint16>(data + offset);
-    offset += 2;
-    if (offset + avatar_len > static_cast<std::size_t>(body.size())) {
-        return nullptr;
-    }
-    const QString avatar =
-        QString::fromUtf8(data + offset, static_cast<int>(avatar_len));
+// ---------------- 房间开关：布尔 ↔ 位掩码（过渡兼容）----------------
+//
+// 新规范（api.json DataRoomSettings）把房间开关拆成两个布尔：
+//   allow_record / allow_member_share
+// 但客户端内部（RoomSettingsController、MeetingSettingsPopup、dispatcher 信号）
+// 仍按 ROOM_SETTINGS_FLAG 位掩码工作，RoomSettingsMessage::flags() /
+// RoomSettingsNotifyMessage::flags() 的访问器保持不变。
+//
+// TODO(protocol-v2): 这是**过渡兼容**——等上层改成两个 bool 后即可删除。
+// 目前约定 bit0 = allow_record，bit1 = allow_member_share（与 room_settings_flags.h 一致）。
 
-    auto msg = std::make_shared<UserProfileNotifyMessage>();
-    msg->set_user_id(sender_user_id != 0 ? sender_user_id
-                                         : static_cast<qint64>(user_id));
-    msg->set_display_name(name.toUtf8().constData());
-    msg->set_avatar_url(avatar.toUtf8().constData());
-    return msg;
+std::uint32_t flags_from_settings(const QJsonObject &data) {
+    std::uint32_t flags = 0;
+    // 缺省 true：与 DataRoomSettings 的 default 保持一致
+    if (data.value(QStringLiteral("allow_record")).toBool(true)) {
+        flags |= ROOM_SETTINGS_ALLOW_RECORD;
+    }
+    if (data.value(QStringLiteral("allow_member_share")).toBool(true)) {
+        flags |= ROOM_SETTINGS_ALLOW_MEMBER_SHARE;
+    }
+    return flags;
 }
 
-QByteArray encode_user_profile_payload(qint64 user_id, const std::string &name,
-                                       const std::string &avatar) {
-    QByteArray body;
-    body.reserve(12 + static_cast<int>(name.size() + avatar.size()));
-    char buf[8];
-    qToBigEndian(static_cast<quint64>(user_id), buf);
-    body.append(buf, 8);
-    const quint16 name_len = static_cast<quint16>(name.size());
-    qToBigEndian(name_len, buf);
-    body.append(buf, 2);
-    body.append(name.data(), static_cast<int>(name.size()));
-    const quint16 avatar_len = static_cast<quint16>(avatar.size());
-    qToBigEndian(avatar_len, buf);
-    body.append(buf, 2);
-    body.append(avatar.data(), static_cast<int>(avatar.size()));
-    return body;
+QJsonObject settings_from_flags(std::uint32_t flags) {
+    QJsonObject data;
+    data.insert(QStringLiteral("allow_record"),
+                (flags & ROOM_SETTINGS_ALLOW_RECORD) != 0);
+    data.insert(QStringLiteral("allow_member_share"),
+                (flags & ROOM_SETTINGS_ALLOW_MEMBER_SHARE) != 0);
+    return data;
 }
 
-MessagePtr decode_simple_user_event(MessageKind kind, qint64 user_id) {
-    MessagePtr msg;
+// ---------------- 方向判断 ----------------
+
+/// 是否为服务端下行的消息（决定是否写 code/message，以及 data 里是否带 user_id）
+bool is_downstream_kind(MessageKind kind) {
     switch (kind) {
+    case MessageKind::CreateMeetingResponse:
+    case MessageKind::JoinMeetingResponse:
+    case MessageKind::RecvText:
+    case MessageKind::PartnerJoin:
     case MessageKind::PartnerExit:
-        msg = std::make_shared<PartnerExitMessage>();
-        break;
+    case MessageKind::PartnerJoin2:
     case MessageKind::CloseCameraNotify:
-        msg = std::make_shared<CloseCameraNotifyMessage>();
-        break;
+    case MessageKind::UserProfileNotify:
+    case MessageKind::RoomSettingsNotify:
+        return true;
     default:
-        msg = std::make_shared<PartnerJoinMessage>();
-        break;
-    }
-    msg->set_user_id(user_id);
-    return msg;
-}
-
-MessageKind partner_kind_from_wire(MSG_TYPE type) {
-    switch (type) {
-    case PARTNER_EXIT:
-        return MessageKind::PartnerExit;
-    case CLOSE_CAMERA:
-        return MessageKind::CloseCameraNotify;
-    default:
-        return MessageKind::PartnerJoin;
+        return false;
     }
 }
 
-/// 文本类消息（走 `s` 字段而不是 base64 `p`）
-bool is_text_type(MSG_TYPE type) {
-    return type == TEXT_SEND || type == TEXT_RECV;
+/// 下行失败码 → 可读原因（仅用于日志/对端可读性）
+QString code_message(int code) {
+    switch (code) {
+    case 0:
+        return QStringLiteral("ok");
+    case -1:
+        return QStringLiteral("room is full");
+    case -2:
+        return QStringLiteral("room not found");
+    case -3:
+        return QStringLiteral("authentication failed");
+    default:
+        return QStringLiteral("error");
+    }
 }
 
 }  // namespace
@@ -213,6 +195,7 @@ MSG_TYPE MessageCodec::to_wire_type(MessageKind kind) {
     case MessageKind::ExitMeeting:
         return EXIT_MEETING;
     case MessageKind::CloseCamera:
+    case MessageKind::CloseCameraNotify:
         return CLOSE_CAMERA;
     case MessageKind::SendText:
         return TEXT_SEND;
@@ -235,8 +218,6 @@ MSG_TYPE MessageCodec::to_wire_type(MessageKind kind) {
         return ROOM_SETTINGS;
     case MessageKind::RoomSettingsNotify:
         return ROOM_SETTINGS_NOTIFY;
-    case MessageKind::CloseCameraNotify:
-        return CLOSE_CAMERA;
     case MessageKind::RemoteHostClosedError:
         return RemoteHostClosedError;
     case MessageKind::OtherNetError:
@@ -283,151 +264,154 @@ MessageKind MessageCodec::from_wire_type(MSG_TYPE type) {
     return MessageKind::OtherNetError;
 }
 
-QByteArray MessageCodec::encode_wire_frame(const Message &msg,
+QByteArray MessageCodec::encode_json_frame(const Message &msg,
                                            qint64 local_user_id) {
     const MSG_TYPE wire_type = to_wire_type(msg.kind());
+    const bool downstream = is_downstream_kind(msg.kind());
 
-    QJsonObject object;
-    object.insert(QStringLiteral("t"),
-                  QString::fromLatin1(type_name(wire_type)));
-    object.insert(QStringLiteral("u"), static_cast<double>(local_user_id));
-    const QString auth_token = UserSession::instance().token();
-    if (!auth_token.isEmpty()) {
-        object.insert(QStringLiteral("a"), auth_token);
-    }
+    QJsonObject frame;
+    frame.insert(QStringLiteral("t"),
+                 QString::fromLatin1(type_name(wire_type)));
 
-    // 文本消息走明文 s 字段：WS 上直接可读，也顺手去掉了原来的 qCompress
-    if (msg.kind() == MessageKind::SendText) {
-        const auto *text_msg = dynamic_cast<const SendTextMessage *>(&msg);
-        if (text_msg) {
-            object.insert(QStringLiteral("s"),
-                          QString::fromUtf8(text_msg->text().data(),
-                                            static_cast<int>(
-                                                text_msg->text().size())));
+    // 上行：token 放在顶层（HTTP 用 Authorization 头，WS 用顶层 token）
+    if (!downstream) {
+        const QString token = UserSession::instance().token();
+        if (!token.isEmpty()) {
+            frame.insert(QStringLiteral("token"), token);
         }
-        return QJsonDocument(object).toJson(QJsonDocument::Compact);
     }
 
-    QByteArray payload;
+    QJsonObject data;
+
     switch (msg.kind()) {
+    // ---------------- 上行 ----------------
+    case MessageKind::SendText: {
+        const auto *text = dynamic_cast<const SendTextMessage *>(&msg);
+        data.insert(QStringLiteral("text"),
+                    text ? to_qstring(text->text()) : QString());
+        break;
+    }
     case MessageKind::CreateMeeting: {
         const auto *create = dynamic_cast<const CreateMeetingMessage *>(&msg);
-        char buf[8];
-        qToBigEndian(create ? create->max_participants() : 8u, buf);
-        qToBigEndian(create ? create->duration_minutes() : 60u, buf + 4);
-        payload.append(buf, 8);
+        data.insert(QStringLiteral("max_participants"),
+                    static_cast<int>(create ? create->max_participants() : 8u));
+        data.insert(QStringLiteral("duration_minutes"),
+                    static_cast<int>(create ? create->duration_minutes() : 60u));
         break;
     }
     case MessageKind::JoinMeeting: {
         const auto *join = dynamic_cast<const JoinMeetingMessage *>(&msg);
-        const std::uint32_t room = join ? join->room_no_u32() : 0;
-        char buf[4];
-        qToBigEndian(room, buf);
-        payload.append(buf, 4);
+        data.insert(QStringLiteral("room_id"),
+                    static_cast<int>(join ? join->room_no_u32() : 0u));
         break;
     }
+    case MessageKind::ExitMeeting:
+    case MessageKind::CloseCamera:
+        // DataEmpty：显式空对象
+        break;
     case MessageKind::RoomSettings: {
         const auto *settings = dynamic_cast<const RoomSettingsMessage *>(&msg);
-        char buf[4] = {};
-        qToBigEndian(settings ? settings->flags() : 0u, buf);
-        payload.append(buf, 4);
+        // 过渡兼容：位掩码 → 两个布尔
+        data = settings_from_flags(settings ? settings->flags() : 0u);
         break;
     }
     case MessageKind::SendUserProfile: {
         const auto *profile = dynamic_cast<const SendUserProfileMessage *>(&msg);
-        if (profile) {
-            payload = encode_user_profile_payload(
-                profile->user_id(), profile->display_name(),
-                profile->avatar_url());
-        }
+        // 新规范：上行 user_profile 只带 nickname/avatar，身份来自 token
+        data.insert(QStringLiteral("nickname"),
+                    profile ? to_qstring(profile->display_name()) : QString());
+        data.insert(QStringLiteral("avatar"),
+                    profile ? to_qstring(profile->avatar_url()) : QString());
         break;
     }
-    // ---- 以下为服务端下行消息；客户端一般只解码，这里一并支持，
-    //      使协议可单侧往返自测 ----
+
+    // ---------------- 下行（客户端一般只解码；这里一并支持，便于单侧往返自测）----------------
     case MessageKind::CreateMeetingResponse: {
-        const auto *resp = dynamic_cast<const CreateMeetingResponseMessage *>(&msg);
-        char buf[4];
-        qToBigEndian(resp ? resp->room_no() : 0u, buf);
-        payload.append(buf, 4);
+        const auto *resp =
+            dynamic_cast<const CreateMeetingResponseMessage *>(&msg);
+        data.insert(QStringLiteral("room_id"),
+                    static_cast<int>(resp ? resp->room_no() : 0u));
         break;
     }
     case MessageKind::JoinMeetingResponse: {
-        const auto *resp = dynamic_cast<const JoinMeetingResponseMessage *>(&msg);
-        char buf[4];
-        qToBigEndian(resp ? static_cast<std::int32_t>(resp->response_code())
-                          : std::int32_t{0},
-                     buf);
-        payload.append(buf, 4);
+        const auto *resp =
+            dynamic_cast<const JoinMeetingResponseMessage *>(&msg);
+        const std::int32_t response =
+            resp ? resp->response_code() : std::int32_t{0};
+        // 成功时 code==0、data.room_id 为房间号；失败时 code<0、room_id=0
+        data.insert(QStringLiteral("room_id"),
+                    response > 0 ? static_cast<int>(response) : 0);
+        break;
+    }
+    case MessageKind::RecvText: {
+        const auto *text = dynamic_cast<const RecvTextMessage *>(&msg);
+        data.insert(QStringLiteral("user_id"),
+                    static_cast<qint64>(msg.user_id() != 0 ? msg.user_id()
+                                                           : local_user_id));
+        data.insert(QStringLiteral("text"),
+                    text ? to_qstring(text->text()) : QString());
+        break;
+    }
+    case MessageKind::PartnerJoin:
+    case MessageKind::PartnerExit:
+    case MessageKind::CloseCameraNotify: {
+        data.insert(QStringLiteral("user_id"),
+                    static_cast<qint64>(msg.user_id() != 0 ? msg.user_id()
+                                                           : local_user_id));
         break;
     }
     case MessageKind::PartnerJoin2: {
         const auto *snapshot = dynamic_cast<const PartnerJoin2Message *>(&msg);
+        QJsonArray ids;
         if (snapshot) {
             for (const qint64 id : snapshot->partner_user_ids()) {
-                char buf[8];
-                qToBigEndian(static_cast<quint64>(id), buf);
-                payload.append(buf, 8);
+                ids.append(static_cast<qint64>(id));
             }
         }
-        break;
-    }
-    case MessageKind::RoomSettingsNotify: {
-        const auto *notify = dynamic_cast<const RoomSettingsNotifyMessage *>(&msg);
-        char buf[4] = {};
-        qToBigEndian(notify ? notify->flags() : 0u, buf);
-        payload.append(buf, 4);
+        data.insert(QStringLiteral("user_ids"), ids);
         break;
     }
     case MessageKind::UserProfileNotify: {
         const auto *profile = dynamic_cast<const UserProfileNotifyMessage *>(&msg);
-        if (profile) {
-            payload = encode_user_profile_payload(
-                profile->user_id(), profile->display_name(),
-                profile->avatar_url());
-        }
+        data.insert(QStringLiteral("user_id"),
+                    static_cast<qint64>(msg.user_id() != 0 ? msg.user_id()
+                                                           : local_user_id));
+        data.insert(QStringLiteral("nickname"),
+                    profile ? to_qstring(profile->display_name()) : QString());
+        data.insert(QStringLiteral("avatar"),
+                    profile ? to_qstring(profile->avatar_url()) : QString());
         break;
     }
-    default:
-        break;  // 其余消息无 payload
+    case MessageKind::RoomSettingsNotify: {
+        const auto *notify = dynamic_cast<const RoomSettingsNotifyMessage *>(&msg);
+        // 过渡兼容：位掩码 → 两个布尔
+        data = settings_from_flags(notify ? notify->flags() : 0u);
+        break;
+    }
+    case MessageKind::RemoteHostClosedError:
+    case MessageKind::OtherNetError:
+        // 本地网络错误，不走上行链路；如被自检编码，只保留 t + 空 data
+        break;
     }
 
-    if (!payload.isEmpty()) {
-        object.insert(QStringLiteral("p"),
-                      QString::fromLatin1(payload.toBase64()));
-    }
-    return QJsonDocument(object).toJson(QJsonDocument::Compact);
-}
+    frame.insert(QStringLiteral("data"), data);
 
-MessagePtr MessageCodec::decode_payload(const QByteArray &payload,
-                                        qint64 user_id, MSG_TYPE msgtype) {
-    switch (msgtype) {
-    case CREATE_MEETING_RESPONSE:
-        return decode_create_meeting_response(payload);
-    case JOIN_MEETING_RESPONSE:
-        return decode_join_meeting_response(payload);
-    case PARTNER_JOIN2:
-        return decode_partner_join2(payload);
-    case TEXT_RECV:
-        return decode_text_recv(payload, user_id);
-    case USER_PROFILE:
-        return decode_user_profile(payload, user_id);
-    case ROOM_SETTINGS_NOTIFY: {
-        auto msg = std::make_shared<RoomSettingsNotifyMessage>();
-        if (payload.size() >= static_cast<int>(sizeof(std::uint32_t))) {
-            msg->set_flags(qFromBigEndian<std::uint32_t>(payload.constData()));
+    if (downstream) {
+        int code = 0;
+        if (msg.kind() == MessageKind::JoinMeetingResponse) {
+            const auto *resp =
+                dynamic_cast<const JoinMeetingResponseMessage *>(&msg);
+            const std::int32_t response =
+                resp ? resp->response_code() : std::int32_t{0};
+            if (response < 0) {
+                code = response;
+            }
         }
-        return msg;
+        frame.insert(QStringLiteral("code"), code);
+        frame.insert(QStringLiteral("message"), code_message(code));
     }
-    case PARTNER_JOIN:
-    case PARTNER_EXIT:
-    case CLOSE_CAMERA:
-        return decode_simple_user_event(partner_kind_from_wire(msgtype),
-                                        user_id);
-    default:
-        spdlog::warn("[MessageCodec] unsupported message type: {}",
-                     static_cast<int>(msgtype));
-        return nullptr;
-    }
+
+    return QJsonDocument(frame).toJson(QJsonDocument::Compact);
 }
 
 MessagePtr MessageCodec::decode_json_frame(const QByteArray &json_frame) {
@@ -438,32 +422,137 @@ MessagePtr MessageCodec::decode_json_frame(const QByteArray &json_frame) {
                      error.errorString().toUtf8().constData());
         return nullptr;
     }
-    const QJsonObject object = doc.object();
 
-    const QString type_text = object.value(QStringLiteral("t")).toString();
+    const QJsonObject frame = doc.object();
+    const QString type_text = frame.value(QStringLiteral("t")).toString();
     const std::optional<MSG_TYPE> wire_type = type_from_name(type_text);
     if (!wire_type.has_value()) {
         spdlog::warn("[MessageCodec] unknown type '{}'",
                      type_text.toUtf8().constData());
         return nullptr;
     }
-    const qint64 user_id =
-        static_cast<qint64>(object.value(QStringLiteral("u")).toDouble());
 
-    // 文本类：优先取明文 s 字段
-    if (object.contains(QStringLiteral("s"))) {
-        const QByteArray payload = object.value(QStringLiteral("s"))
-                                       .toString()
-                                       .toUtf8();
-        return decode_payload(payload, user_id, *wire_type);
+    // 统一信封：code/message 只有下行才有；上行缺失时按 0/"ok" 处理
+    const int code = frame.value(QStringLiteral("code")).toInt(0);
+    const QString message = frame.value(QStringLiteral("message")).toString();
+    const QJsonObject data =
+        frame.value(QStringLiteral("data")).toObject();  // 缺失/非对象 → 空对象
+
+    if (code != 0) {
+        spdlog::debug("[MessageCodec] {} code={} message={}",
+                      type_text.toUtf8().constData(), code,
+                      message.toUtf8().constData());
     }
 
-    QByteArray payload;
-    if (object.contains(QStringLiteral("p"))) {
-        payload = QByteArray::fromBase64(
-            object.value(QStringLiteral("p")).toString().toLatin1());
+    switch (*wire_type) {
+    case TEXT_SEND: {
+        auto msg = std::make_shared<SendTextMessage>(
+            to_std_string(data.value(QStringLiteral("text")).toString()));
+        return msg;
     }
-    return decode_payload(payload, user_id, *wire_type);
+    case TEXT_RECV: {
+        auto msg = std::make_shared<RecvTextMessage>();
+        msg->set_user_id(user_id_from(data, 0));
+        msg->set_text(
+            to_std_string(data.value(QStringLiteral("text")).toString()));
+        return msg;
+    }
+    case CREATE_MEETING: {
+        auto msg = std::make_shared<CreateMeetingMessage>();
+        msg->set_max_participants(static_cast<std::uint32_t>(
+            data.value(QStringLiteral("max_participants")).toInt(8)));
+        msg->set_duration_minutes(static_cast<std::uint32_t>(
+            data.value(QStringLiteral("duration_minutes")).toInt(60)));
+        return msg;
+    }
+    case EXIT_MEETING:
+        return std::make_shared<ExitMeetingMessage>();
+    case JOIN_MEETING: {
+        auto msg = std::make_shared<JoinMeetingMessage>(
+            std::to_string(room_id_from(data)));
+        return msg;
+    }
+    case CLOSE_CAMERA: {
+        // 同一个 t 兼有上下行：data 带 user_id 的是「别人关闭摄像头」广播，
+        // 空 data 的是「我关闭摄像头」的上行。
+        if (data.contains(QStringLiteral("user_id"))) {
+            auto msg = std::make_shared<CloseCameraNotifyMessage>();
+            msg->set_user_id(user_id_from(data, 0));
+            return msg;
+        }
+        return std::make_shared<CloseCameraMessage>();
+    }
+    case ROOM_SETTINGS: {
+        auto msg = std::make_shared<RoomSettingsMessage>(flags_from_settings(data));
+        return msg;
+    }
+    case ROOM_SETTINGS_NOTIFY: {
+        auto msg = std::make_shared<RoomSettingsNotifyMessage>();
+        msg->set_flags(flags_from_settings(data));
+        return msg;
+    }
+    case CREATE_MEETING_RESPONSE: {
+        auto msg = std::make_shared<CreateMeetingResponseMessage>();
+        msg->set_room_no(room_id_from(data));
+        return msg;
+    }
+    case JOIN_MEETING_RESPONSE: {
+        auto msg = std::make_shared<JoinMeetingResponseMessage>();
+        if (code == 0) {
+            // 成功：response_code 承载 room_id（dispatcher 既有语义：正数=房间号）
+            msg->set_response_code(
+                static_cast<std::int32_t>(room_id_from(data)));
+        } else {
+            // 失败：保留负 code（-1 已满 / -2 不存在 / -3 鉴权），
+            // 非负但非 0 的异常 code 归一到 -2（房间不可加入），语义同 v1 的 0。
+            msg->set_response_code(code < 0 ? code : -2);
+        }
+        return msg;
+    }
+    case PARTNER_JOIN: {
+        auto msg = std::make_shared<PartnerJoinMessage>();
+        msg->set_user_id(user_id_from(data, 0));
+        return msg;
+    }
+    case PARTNER_EXIT: {
+        auto msg = std::make_shared<PartnerExitMessage>();
+        msg->set_user_id(user_id_from(data, 0));
+        return msg;
+    }
+    case PARTNER_JOIN2: {
+        auto msg = std::make_shared<PartnerJoin2Message>();
+        const QJsonArray ids = data.value(QStringLiteral("user_ids")).toArray();
+        for (const QJsonValue &value : ids) {
+            msg->add_partner_user_id(value.toVariant().toLongLong());
+        }
+        return msg;
+    }
+    case USER_PROFILE: {
+        const QString nickname =
+            data.value(QStringLiteral("nickname")).toString();
+        const QString avatar = data.value(QStringLiteral("avatar")).toString();
+        if (data.contains(QStringLiteral("user_id"))) {
+            // 下行：带 user_id，广播某个成员的资料
+            auto msg = std::make_shared<UserProfileNotifyMessage>();
+            msg->set_user_id(user_id_from(data, 0));
+            msg->set_display_name(to_std_string(nickname));
+            msg->set_avatar_url(to_std_string(avatar));
+            return msg;
+        }
+        // 上行：只有 nickname/avatar，身份来自 token
+        auto msg = std::make_shared<SendUserProfileMessage>(
+            0, to_std_string(nickname), to_std_string(avatar));
+        return msg;
+    }
+    case RemoteHostClosedError:
+        return std::make_shared<RemoteHostClosedErrorMessage>();
+    case OtherNetError:
+        return std::make_shared<OtherNetErrorMessage>();
+    }
+
+    spdlog::warn("[MessageCodec] unsupported message type: {}",
+                 static_cast<int>(*wire_type));
+    return nullptr;
 }
 
 void MessageCodec::WireStreamParser::reset() { buffer_.clear(); }
@@ -481,14 +570,14 @@ std::vector<MessagePtr> MessageCodec::WireStreamParser::feed(const char *data,
     }
     buffer_.append(data, static_cast<int>(len));
 
-    // WebSocket 按消息投递：整段就是一条 JSON
+    // WebSocket 按消息投递：整段就是一条 JSON（{"t":...,"code":...,"data":{...}}）
     const QByteArray frame = buffer_.trimmed();
     if (frame.isEmpty()) {
         return out;
     }
     if (!frame.startsWith('{')) {
-        spdlog::warn("[MessageCodec] non-json frame dropped ({} bytes)",
-                     frame.size());
+        // 旧的自定义帧（$|type|uid|len|payload|#）不会再出现，直接丢弃
+        spdlog::warn("[MessageCodec] non-json frame dropped ({} bytes)", frame.size());
         buffer_.clear();
         return out;
     }

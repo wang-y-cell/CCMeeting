@@ -132,7 +132,7 @@ class Database:
         self._conn = self._connect()
 
         try:
-            self._init_schema()
+            self._init_schema() # 建表
         except Exception:
             # 建表失败时不要留下半初始化对象：关掉连接再抛
             try:
@@ -211,6 +211,7 @@ class Database:
     # ------------------------------------------------------------ 方言
     @staticmethod
     def _sql(sql: str) -> str:
+        """将sqlite的语法改为mysql的语法"""
         return sql.replace("?", "%s").replace("datetime('now')", "NOW()")
 
     def _fetch(self, cursor, many: bool):
@@ -275,7 +276,7 @@ class Database:
         """保活探针：连接不可用则尝试重连，返回是否可用。
 
         注意：**不要**把它接进 `/api/health`——那个接口的响应体是客户端契约
-        （`{"code":0,"message":"ok"}`），改了会破坏兼容。
+        （`{"code":0,"message":"ok","data":{}}`），改了会破坏兼容。
         """
         with self._lock:
             try:

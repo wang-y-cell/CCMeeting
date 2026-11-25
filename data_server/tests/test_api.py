@@ -1,4 +1,11 @@
-"""接口契约测试：逐条对齐 C++ 版的 URL / 状态码 / JSON 形状。
+"""接口契约测试：逐条对齐 docs/schema/api.json（v2）。
+
+v2 要点：
+    * 所有 POST 的业务字段都包进 data：{"data": {...}}；
+    * 失败响应的 data 显式为 null（不省略该字段）；
+    * 用户字段全名化：user_id（原 id）、nickname（原 name）；
+    * /api/upload-avatar、/api/update-profile 的身份只取 token，
+      请求体里的 user_id 一律忽略。
 
 运行：.venv\\Scripts\\python -m pytest -q
 """
@@ -24,19 +31,36 @@ PNG_1PX = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
 )
 
-
+USER_FIELDS = (
+    "user_id",
+    "username",
+    "nickname",
+    "avatar",
+    "info",
+    "gender",
+    "birthday",
+    "address",
+    "phone",
+    "email",
+    "extra_json",
+)
 
 
 def _register(client, username="alice", password="secret-123"):
     return client.post(
-        "/api/register", json={"username": username, "password": password}
+        "/api/register", json={"data": {"username": username, "password": password}}
     )
 
 
 def _login(client, username="alice", password="secret-123"):
     return client.post(
-        "/api/login", json={"username": username, "password": password}
+        "/api/login", json={"data": {"username": username, "password": password}}
     )
+
+
+def _uid(client, username="alice", password="secret-123"):
+    """注册并取回 token 里的 user_id（v2 的 data.user.user_id）。"""
+    return _register(client, username, password).json()["data"]["user"]["user_id"]
 
 
 def _auth(user_id):
@@ -44,12 +68,12 @@ def _auth(user_id):
 
 
 # --------------------------------------------------------------- 基础契约
-def test_health_matches_cpp(ctx):
+def test_health_matches_spec(ctx):
     client, _, _ = ctx
     for path in ("/health", "/api/health"):
         resp = client.get(path)
         assert resp.status_code == 200
-        assert resp.json() == {"code": 0, "message": "ok"}
+        assert resp.json() == {"code": 0, "message": "ok", "data": {}}
         assert resp.headers["server"] == "CloudMeetingAuthServer"
         assert resp.headers["content-type"] == "application/json; charset=utf-8"
         assert resp.headers["access-control-allow-origin"] == "*"
@@ -59,7 +83,7 @@ def test_unknown_route_returns_404_json(ctx):
     client, _, _ = ctx
     resp = client.get("/nope")
     assert resp.status_code == 404
-    assert resp.json() == {"code": 404, "message": "not found"}
+    assert resp.json() == {"code": 404, "message": "not found", "data": None}
 
 
 def test_options_returns_204(ctx):
@@ -77,34 +101,74 @@ def test_register_success_and_duplicate(ctx):
     body = resp.json()
     assert body["code"] == 0 and body["message"] == "ok"
     data = body["data"]
-    assert data["username"] == "alice"
-    assert data["name"] == "alice"
+    assert set(data) == {"user", "token"}  # turn 未配置时不出现
+    user = data["user"]
+    assert set(user) == set(USER_FIELDS)
+    assert isinstance(user["user_id"], int) and user["user_id"] > 0
+    assert user["username"] == "alice"
+    assert user["nickname"] == "alice"
     # 默认头像由客户端本地 SVG 提供，注册时服务端不再写远程默认 URL
-    assert data["avatar"] == ""
-    for key in ("id", "info", "gender", "birthday", "address", "phone", "email", "extra_json"):
-        assert key in data
+    assert user["avatar"] == ""
+    assert data["token"]
 
     again = _register(client)
     assert again.status_code == 409
-    assert again.json() == {"code": 409, "message": "username already exists"}
+    assert again.json() == {
+        "code": 409,
+        "message": "username already exists",
+        "data": None,
+    }
+
+
+def test_register_turn_present_when_configured(ctx):
+    """配置了 turn 时，data.turn 必须出现且形状符合规范。"""
+    client, _, config = ctx
+    # create_app 内部持有同一个 config 对象，请求时读取 turn 配置
+    config.turn.secret = "test-secret"
+    config.turn.ttl_seconds = 600
+    config.turn.uris = ["turn:turn.example.com:3478"]
+
+    data = _register(client).json()["data"]
+    assert set(data) == {"user", "token", "turn"}
+    assert data["turn"]["ttl"] == 600
+    assert data["turn"]["uris"] == ["turn:turn.example.com:3478"]
+    assert data["turn"]["username"].endswith(f":{data['user']['user_id']}")
+    assert data["turn"]["password"]
 
 
 def test_register_invalid_body(ctx):
     client, _, _ = ctx
-    resp = client.post("/api/register", json={"username": "bob"})
+    # data 里缺 password
+    resp = client.post("/api/register", json={"data": {"username": "bob"}})
     assert resp.status_code == 400
-    assert resp.json() == {"code": 400, "message": "invalid json body"}
+    assert resp.json() == {"code": 400, "message": "invalid json body", "data": None}
+
+    # v1 的裸字段（没有 data 信封）也必须被拒绝
+    resp = client.post(
+        "/api/register", json={"username": "bob", "password": "secret-123"}
+    )
+    assert resp.status_code == 400
+    assert resp.json() == {"code": 400, "message": "invalid json body", "data": None}
+
+    # data 不是对象
+    resp = client.post("/api/register", json={"data": "bob"})
+    assert resp.status_code == 400
+    assert resp.json() == {"code": 400, "message": "invalid json body", "data": None}
 
     resp = client.post("/api/register", content=b"not-json")
     assert resp.status_code == 400
-    assert resp.json()["message"] == "invalid json body"
+    assert resp.json() == {"code": 400, "message": "invalid json body", "data": None}
 
 
 def test_register_username_too_long(ctx):
     client, _, _ = ctx
     resp = _register(client, username="u" * 51)
     assert resp.status_code == 400
-    assert resp.json() == {"code": 400, "message": "username too long"}
+    assert resp.json() == {
+        "code": 400,
+        "message": "username too long",
+        "data": None,
+    }
 
 
 # --------------------------------------------------------------- 登录
@@ -114,7 +178,13 @@ def test_login_success(ctx):
     resp = _login(client)
     assert resp.status_code == 200
     body = resp.json()
-    assert body["code"] == 0 and body["data"]["username"] == "alice"
+    assert body["code"] == 0 and body["message"] == "ok"
+    data = body["data"]
+    assert set(data) == {"user", "token"}
+    assert set(data["user"]) == set(USER_FIELDS)
+    assert data["user"]["username"] == "alice"
+    assert data["user"]["nickname"] == "alice"
+    assert data["token"]
 
 
 def test_login_wrong_password_and_unknown_user(ctx):
@@ -122,11 +192,19 @@ def test_login_wrong_password_and_unknown_user(ctx):
     _register(client)
     bad = _login(client, password="wrong")
     assert bad.status_code == 401
-    assert bad.json() == {"code": 401, "message": "invalid username or password"}
+    assert bad.json() == {
+        "code": 401,
+        "message": "invalid username or password",
+        "data": None,
+    }
 
     ghost = _login(client, username="ghost")
     assert ghost.status_code == 401
-    assert ghost.json() == {"code": 401, "message": "invalid username or password"}
+    assert ghost.json() == {
+        "code": 401,
+        "message": "invalid username or password",
+        "data": None,
+    }
 
 
 def test_login_disabled_account(ctx):
@@ -135,7 +213,11 @@ def test_login_disabled_account(ctx):
     app.state.db.execute("UPDATE sys_users SET status = 0 WHERE username = 'alice'")
     resp = _login(client)
     assert resp.status_code == 403
-    assert resp.json() == {"code": 403, "message": "account disabled or locked"}
+    assert resp.json() == {
+        "code": 403,
+        "message": "account disabled or locked",
+        "data": None,
+    }
 
 
 def test_login_logs_are_recorded(ctx):
@@ -177,6 +259,7 @@ def test_legacy_sha256_login_upgrades_hash(ctx):
 
     resp = _login(client, username="legacy", password="legacy-pass")
     assert resp.status_code == 200
+    assert resp.json()["data"]["user"]["nickname"] == "legacy"
 
     stored = db.query_one(
         "SELECT password_hash FROM sys_users WHERE user_id = ?", (user_id,)
@@ -195,13 +278,33 @@ def test_sha256_matches_cpp_algorithm():
 # --------------------------------------------------------------- 资料
 def test_update_profile_success(ctx):
     client, _, _ = ctx
-    user_id = _register(client).json()["data"]["id"]
+    user_id = _uid(client)
 
     resp = client.post(
         "/api/update-profile",
         json={
+            "data": {
+                "nickname": "小王",
+                "info": "hi",
+                "gender": "male",
+                "birthday": "2005-09-14",
+                "address": "Shanghai",
+                "phone": "13800000000",
+                "email": "a@b.c",
+                "extra_json": "{}",
+            }
+        },
+        headers=_auth(user_id),
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["code"] == 0 and body["message"] == "ok"
+    assert body["data"] == {
+        "user": {
             "user_id": user_id,
+            "username": "alice",
             "nickname": "小王",
+            "avatar": "",
             "info": "hi",
             "gender": "male",
             "birthday": "2005-09-14",
@@ -209,25 +312,11 @@ def test_update_profile_success(ctx):
             "phone": "13800000000",
             "email": "a@b.c",
             "extra_json": "{}",
-        },
-        headers=_auth(user_id),
-    )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["code"] == 0
-    assert body["data"] == {
-        "name": "小王",
-        "info": "hi",
-        "gender": "male",
-        "birthday": "2005-09-14",
-        "address": "Shanghai",
-        "phone": "13800000000",
-        "email": "a@b.c",
-        "extra_json": "{}",
+        }
     }
 
     # 再登录应拿到新昵称
-    assert _login(client).json()["data"]["name"] == "小王"
+    assert _login(client).json()["data"]["user"]["nickname"] == "小王"
 
 
 @pytest.mark.parametrize(
@@ -244,52 +333,85 @@ def test_update_profile_success(ctx):
 )
 def test_update_profile_validation(ctx, patch, expected):
     client, _, _ = ctx
-    user_id = _register(client).json()["data"]["id"]
-    payload = {"user_id": user_id, "nickname": "ok"}
-    payload.update(patch)
+    user_id = _uid(client)
+    payload = {"data": {"nickname": "ok"}}
+    payload["data"].update(patch)
     resp = client.post("/api/update-profile", json=payload, headers=_auth(user_id))
     assert resp.status_code == 400
-    assert resp.json() == {"code": 400, "message": expected}
+    assert resp.json() == {"code": 400, "message": expected, "data": None}
 
 
 def test_write_api_requires_token(ctx):
     client, _, _ = ctx
-    user_id = _register(client).json()["data"]["id"]
+    user_id = _uid(client)
     resp = client.post(
-        "/api/update-profile", json={"user_id": user_id, "nickname": "x"}
+        "/api/update-profile", json={"data": {"nickname": "x"}}
     )
     assert resp.status_code == 401
-    assert resp.json() == {"code": 401, "message": "unauthorized"}
+    assert resp.json() == {"code": 401, "message": "unauthorized", "data": None}
+
+    resp = client.post(
+        "/api/upload-avatar",
+        json={"data": {"mime": "image/png", "data_base64": "AAAA"}},
+    )
+    assert resp.status_code == 401
+    assert resp.json() == {"code": 401, "message": "unauthorized", "data": None}
 
 
 def test_update_profile_user_not_found(ctx):
     client, _, _ = ctx
     resp = client.post(
-        "/api/update-profile", json={"user_id": 999999, "nickname": "nobody"},
+        "/api/update-profile",
+        json={"data": {"nickname": "nobody"}},
         headers=_auth(999999),
     )
     assert resp.status_code == 404
-    assert resp.json() == {"code": 404, "message": "user not found"}
+    assert resp.json() == {"code": 404, "message": "user not found", "data": None}
+
+
+def test_update_profile_ignores_body_user_id(ctx):
+    """身份只取 token：请求体里塞别人的 user_id 不影响写入对象。"""
+    client, _, _ = ctx
+    alice_id = _uid(client, "alice")
+    bob_id = _uid(client, "bob")
+
+    resp = client.post(
+        "/api/update-profile",
+        json={"data": {"user_id": bob_id, "nickname": "阿丽丝"}},
+        headers=_auth(alice_id),
+    )
+    assert resp.status_code == 200
+    user = resp.json()["data"]["user"]
+    assert user["user_id"] == alice_id
+    assert user["username"] == "alice"
+    assert user["nickname"] == "阿丽丝"
+
+    # bob 没有被改动
+    assert _login(client, "bob").json()["data"]["user"]["nickname"] == "bob"
+    assert _login(client, "alice").json()["data"]["user"]["nickname"] == "阿丽丝"
 
 
 # --------------------------------------------------------------- 头像
 def test_upload_avatar_and_serve(ctx):
     client, _, config = ctx
-    user_id = _register(client).json()["data"]["id"]
+    user_id = _uid(client)
 
     resp = client.post(
         "/api/upload-avatar",
         json={
-            "user_id": user_id,
-            "mime": "image/png",
-            "data_base64": base64.b64encode(PNG_1PX).decode(),
+            "data": {
+                "mime": "image/png",
+                "data_base64": base64.b64encode(PNG_1PX).decode(),
+            }
         },
         headers=_auth(user_id),
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body["code"] == 0
+    assert body["code"] == 0 and body["message"] == "ok"
+    assert body["data"]["user_id"] == user_id
     avatar_url = body["data"]["avatar"]
+    assert set(body["data"]) == {"user_id", "avatar"}
     assert avatar_url.startswith("http://testserver/uploads/avatars/")
     assert avatar_url.endswith(".png")
 
@@ -306,49 +428,99 @@ def test_upload_avatar_and_serve(ctx):
     assert fetched.content == PNG_1PX
 
     # 登录返回的头像已更新
-    assert _login(client).json()["data"]["avatar"] == avatar_url
+    assert _login(client).json()["data"]["user"]["avatar"] == avatar_url
+
+
+def test_upload_avatar_ignores_body_user_id(ctx):
+    """身份只取 token：请求体里塞别人的 user_id 不会写到别人头上。"""
+    client, _, _ = ctx
+    alice_id = _uid(client, "alice")
+    bob_id = _uid(client, "bob")
+
+    resp = client.post(
+        "/api/upload-avatar",
+        json={
+            "data": {
+                "user_id": bob_id,
+                "mime": "image/png",
+                "data_base64": base64.b64encode(PNG_1PX).decode(),
+            }
+        },
+        headers=_auth(alice_id),
+    )
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["user_id"] == alice_id
+    assert f"/avatars/{alice_id}/" in data["avatar"]
+    assert _login(client, "bob").json()["data"]["user"]["avatar"] == ""
+    assert _login(client, "alice").json()["data"]["user"]["avatar"] == data["avatar"]
 
 
 def test_upload_avatar_errors(ctx):
     client, _, _ = ctx
-    user_id = _register(client).json()["data"]["id"]
+    user_id = _uid(client)
     good = base64.b64encode(PNG_1PX).decode()
 
     bad_mime = client.post(
         "/api/upload-avatar",
-        json={"user_id": user_id, "mime": "image/tiff", "data_base64": good},
+        json={"data": {"mime": "image/tiff", "data_base64": good}},
         headers=_auth(user_id),
     )
     assert bad_mime.status_code == 400
-    assert bad_mime.json() == {"code": 400, "message": "unsupported mime type"}
+    assert bad_mime.json() == {
+        "code": 400,
+        "message": "unsupported mime type",
+        "data": None,
+    }
 
     ghost = client.post(
         "/api/upload-avatar",
-        json={"user_id": 999999, "mime": "image/png", "data_base64": good},
+        json={"data": {"mime": "image/png", "data_base64": good}},
         headers=_auth(999999),
     )
     assert ghost.status_code == 404
-    assert ghost.json() == {"code": 404, "message": "user not found"}
+    assert ghost.json() == {"code": 404, "message": "user not found", "data": None}
 
     bad_b64 = client.post(
         "/api/upload-avatar",
-        json={"user_id": user_id, "mime": "image/png", "data_base64": "!!!not-base64!!!"},
+        json={"data": {"mime": "image/png", "data_base64": "!!!not-base64!!!"}},
         headers=_auth(user_id),
     )
     assert bad_b64.status_code == 400
-    assert bad_b64.json() == {"code": 400, "message": "invalid base64 data"}
+    assert bad_b64.json() == {
+        "code": 400,
+        "message": "invalid base64 data",
+        "data": None,
+    }
 
     too_big = client.post(
         "/api/upload-avatar",
         json={
-            "user_id": user_id,
-            "mime": "image/png",
-            "data_base64": base64.b64encode(b"\x00" * (2 * 1024 * 1024 + 1)).decode(),
+            "data": {
+                "mime": "image/png",
+                "data_base64": base64.b64encode(b"\x00" * (2 * 1024 * 1024 + 1)).decode(),
+            }
         },
         headers=_auth(user_id),
     )
     assert too_big.status_code == 413
-    assert too_big.json() == {"code": 413, "message": "avatar too large"}
+    assert too_big.json() == {
+        "code": 413,
+        "message": "avatar too large",
+        "data": None,
+    }
+
+    # data 缺 mime / data_base64 → 400
+    missing = client.post(
+        "/api/upload-avatar", json={"data": {"mime": "image/png"}},
+        headers=_auth(user_id),
+    )
+    assert missing.status_code == 400
+    assert missing.json() == {
+        "code": 400,
+        "message": "invalid json body",
+        "data": None,
+    }
 
 
 # --------------------------------------------------------------- 静态文件
@@ -365,7 +537,7 @@ def test_missing_static_falls_through_to_404_json(ctx):
     client, _, _ = ctx
     resp = client.get("/static/avatar/nope.png")
     assert resp.status_code == 404
-    assert resp.json() == {"code": 404, "message": "not found"}
+    assert resp.json() == {"code": 404, "message": "not found", "data": None}
 
 
 def test_static_traversal_rejected(ctx):
@@ -379,18 +551,35 @@ def test_static_traversal_rejected(ctx):
 # --------------------------------------------------------------- 并发/一致性
 def test_login_after_profile_update_reflects_db(ctx):
     client, app, _ = ctx
-    user_id = _register(client).json()["data"]["id"]
+    user_id = _uid(client)
     app.state.db.execute(
         "UPDATE sys_user_profiles SET nickname = ?, gender = ? WHERE user_id = ?",
         ("改名了", "female", user_id),
     )
-    data = _login(client).json()["data"]
-    assert data["name"] == "改名了"
-    assert data["gender"] == "female"
+    user = _login(client).json()["data"]["user"]
+    assert user["nickname"] == "改名了"
+    assert user["gender"] == "female"
 
 
 def test_json_shape_is_compact_json(ctx):
     client, _, _ = ctx
     resp = client.get("/health")
-    assert json.loads(resp.text) == {"code": 0, "message": "ok"}
-    assert " " not in resp.text.replace('"message": "ok"', "")  # 紧凑输出
+    assert json.loads(resp.text) == {"code": 0, "message": "ok", "data": {}}
+    assert " " not in resp.text.replace('"message":"ok"', "")  # 紧凑输出
+
+
+def test_failure_responses_always_carry_data_null(ctx):
+    """v2：凡是失败响应，data 字段都必须存在且为 null。"""
+    client, _, _ = ctx
+    cases = [
+        client.post("/api/login", json={"data": {}}),
+        client.post("/api/register", json={}),
+        client.post("/api/update-profile", json={"data": {"nickname": "x"}}),
+        client.post("/api/upload-avatar", json={"data": {}}),
+        client.get("/nope"),
+    ]
+    for resp in cases:
+        assert resp.status_code >= 400
+        body = resp.json()
+        assert "data" in body
+        assert body["data"] is None

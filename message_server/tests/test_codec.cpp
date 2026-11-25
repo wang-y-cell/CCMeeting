@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "network/buffer.h"
@@ -10,25 +11,41 @@
 
 namespace {
 
-void append_frame(Buffer &buffer, const std::vector<uint8_t> &json) {
-    const uint32_t size = static_cast<uint32_t>(json.size());
-    uint8_t head[4] = {static_cast<uint8_t>((size >> 24) & 0xFF),
-                       static_cast<uint8_t>((size >> 16) & 0xFF),
-                       static_cast<uint8_t>((size >> 8) & 0xFF),
-                       static_cast<uint8_t>(size & 0xFF)};
-    buffer.write(head, sizeof(head));
-    if (!json.empty()) {
-        buffer.write(const_cast<uint8_t *>(json.data()), json.size());
-    }
-}
+using json = nlohmann::json;
 
-protocol::Packet make_packet(protocol::MessageType type, uint64_t user_id,
-                             std::vector<uint8_t> payload) {
+protocol::Packet make_packet(protocol::MessageType type,
+                             json data = json::object()) {
     protocol::Packet packet;
     packet.type = type;
-    packet.user_id = user_id;
-    packet.payload = std::move(payload);
+    packet.data = std::move(data);
     return packet;
+}
+
+void append_bytes(Buffer &buffer, const std::vector<uint8_t> &bytes) {
+    if (bytes.empty()) {
+        return;
+    }
+    buffer.write(const_cast<uint8_t *>(bytes.data()), bytes.size());
+}
+
+void append_text(Buffer &buffer, const std::string &text) {
+    if (text.empty()) {
+        return;
+    }
+    buffer.write(reinterpret_cast<uint8_t *>(const_cast<char *>(text.data())),
+                 text.size());
+}
+
+json encode_to_json(const protocol::Packet &packet) {
+    const auto bytes = protocol::Codec::encode(packet);
+    return json::parse(std::string(bytes.begin(), bytes.end()));
+}
+
+protocol::DecodeStatus decode_text(const std::string &text,
+                                   protocol::Packet &packet) {
+    Buffer buffer;
+    append_text(buffer, text);
+    return protocol::Codec::try_decode(buffer, packet);
 }
 
 }  // namespace
@@ -70,85 +87,130 @@ TEST(CodecTypeNames, TextTypesAreMarked) {
     EXPECT_FALSE(protocol::Codec::is_text_type(protocol::MessageType::JoinMeeting));
 }
 
-TEST(CodecEncode, TextPayloadGoesIntoPlainTextField) {
-    const std::string text = "hello 世界";
-    const std::vector<uint8_t> payload(text.begin(), text.end());
-    const auto json = protocol::Codec::encode(
-        make_packet(protocol::MessageType::TextSend, 42, payload));
+TEST(CodecEncode, EnvelopeCarriesTypeCodeMessageData) {
+    protocol::Packet packet =
+        make_packet(protocol::MessageType::TextSend, json{{"text", "hello 世界"}});
+    packet.auth_token = "tok-123";
 
-    const std::string json_text(json.begin(), json.end());
-    EXPECT_NE(json_text.find("\"t\":\"text_send\""), std::string::npos);
-    EXPECT_NE(json_text.find("\"u\":42"), std::string::npos);
-    EXPECT_NE(json_text.find("\"s\":\""), std::string::npos);
-    EXPECT_EQ(json_text.find("\"p\""), std::string::npos);
+    const json document = encode_to_json(packet);
+    EXPECT_EQ(document["t"].get<std::string>(), "text_send");
+    EXPECT_EQ(document["code"], 0);
+    EXPECT_EQ(document["message"].get<std::string>(), "ok");
+    EXPECT_EQ(document["token"].get<std::string>(), "tok-123");
+    ASSERT_TRUE(document["data"].is_object());
+    EXPECT_EQ(document["data"]["text"].get<std::string>(), "hello 世界");
 }
 
-TEST(CodecEncode, BinaryPayloadIsBase64Encoded) {
-    const std::vector<uint8_t> payload{0x00, 0x01, 0x02, 0xFF, 0x7F};
-    const auto json = protocol::Codec::encode(
-        make_packet(protocol::MessageType::CreateMeeting, 7, payload));
-    const std::string json_text(json.begin(), json.end());
-
-    EXPECT_NE(json_text.find("\"p\":\""), std::string::npos);
-    EXPECT_EQ(json_text.find("\"s\""), std::string::npos);
-    // {0,1,2,255,127} 的 Base64
-    EXPECT_NE(json_text.find("AAEC/38="), std::string::npos);
+TEST(CodecEncode, LegacyFieldsAreAbsent) {
+    const json document = encode_to_json(
+        make_packet(protocol::MessageType::TextSend, json{{"text", "x"}}));
+    EXPECT_FALSE(document.contains("p"));
+    EXPECT_FALSE(document.contains("u"));
+    EXPECT_FALSE(document.contains("s"));
+    EXPECT_FALSE(document.contains("a"));
+    EXPECT_FALSE(document.contains("token"));  // 空 token 不写出
 }
 
-TEST(CodecEncode, EmptyPayloadOmitsPayloadFields) {
-    const auto json = protocol::Codec::encode(
-        make_packet(protocol::MessageType::JoinMeeting, 9, {}));
-    const std::string json_text(json.begin(), json.end());
-    EXPECT_EQ(json_text.find("\"p\""), std::string::npos);
-    EXPECT_EQ(json_text.find("\"s\""), std::string::npos);
+TEST(CodecEncode, DownstreamCarriesStatus) {
+    protocol::Packet packet =
+        make_packet(protocol::MessageType::JoinMeetingResponse,
+                    json{{"room_id", 0}});
+    packet.code = -2;
+    packet.message = "room not found";
+
+    const json document = encode_to_json(packet);
+    EXPECT_EQ(document["code"], -2);
+    EXPECT_EQ(document["message"].get<std::string>(), "room not found");
+    EXPECT_EQ(document["data"]["room_id"], 0);
 }
 
-TEST(CodecDecode, TextMessageRoundTrips) {
-    const std::string text = "hi there";
-    const std::vector<uint8_t> payload(text.begin(), text.end());
-    const auto json = protocol::Codec::encode(
-        make_packet(protocol::MessageType::TextRecv, 123, payload));
+TEST(CodecEncode, DataObjectIsAlwaysPresent) {
+    // 默认 data 为空对象，不应是 null
+    const json document =
+        encode_to_json(make_packet(protocol::MessageType::ExitMeeting));
+    ASSERT_TRUE(document.contains("data"));
+    EXPECT_TRUE(document["data"].is_object());
+    EXPECT_TRUE(document["data"].empty());
+}
+
+TEST(CodecDecode, UpstreamTextMessage) {
+    protocol::Packet packet;
+    ASSERT_EQ(decode_text(
+                  R"({"t":"text_send","token":"tk","data":{"text":"hi"}})",
+                  packet),
+              protocol::DecodeStatus::Ok);
+    EXPECT_EQ(packet.type, protocol::MessageType::TextSend);
+    EXPECT_EQ(packet.auth_token, "tk");
+    EXPECT_EQ(packet.user_id, 0u);   // v2：解码阶段不填 user_id
+    ASSERT_TRUE(packet.data.is_object());
+    EXPECT_EQ(packet.data["text"].get<std::string>(), "hi");
+    EXPECT_EQ(packet.code, 0);
+    EXPECT_EQ(packet.message, "ok");
+}
+
+TEST(CodecDecode, MissingDataBecomesEmptyObject) {
+    protocol::Packet packet;
+    ASSERT_EQ(decode_text(R"({"t":"exit_meeting"})", packet),
+              protocol::DecodeStatus::Ok);
+    EXPECT_EQ(packet.type, protocol::MessageType::ExitMeeting);
+    ASSERT_TRUE(packet.data.is_object());
+    EXPECT_TRUE(packet.data.empty());
+}
+
+TEST(CodecDecode, DownstreamStatusIsParsed) {
+    protocol::Packet packet;
+    ASSERT_EQ(decode_text(
+                  R"({"t":"join_meeting_response","code":-1,"message":"room is full","data":{"room_id":0}})",
+                  packet),
+              protocol::DecodeStatus::Ok);
+    EXPECT_EQ(packet.code, -1);
+    EXPECT_EQ(packet.message, "room is full");
+    EXPECT_EQ(packet.data["room_id"], 0);
+}
+
+TEST(CodecDecode, LegacyFieldsAreIgnored) {
+    protocol::Packet packet;
+    ASSERT_EQ(decode_text(
+                  R"({"t":"text_send","u":42,"s":"legacy","a":"old","p":"AA=="})",
+                  packet),
+              protocol::DecodeStatus::Ok);
+    EXPECT_EQ(packet.user_id, 0u);
+    EXPECT_TRUE(packet.auth_token.empty());
+    EXPECT_TRUE(packet.data.empty());
+}
+
+TEST(CodecRoundTrip, RoomSettingsBooleans) {
+    protocol::Packet outbound = make_packet(
+        protocol::MessageType::RoomSettings,
+        json{{"allow_record", false}, {"allow_member_share", true}});
 
     Buffer buffer;
-    append_frame(buffer, json);
+    append_bytes(buffer, protocol::Codec::encode(outbound));
 
-    protocol::Packet packet;
-    ASSERT_EQ(protocol::Codec::try_decode(buffer, packet),
+    protocol::Packet inbound;
+    ASSERT_EQ(protocol::Codec::try_decode(buffer, inbound),
               protocol::DecodeStatus::Ok);
-    EXPECT_EQ(packet.type, protocol::MessageType::TextRecv);
-    EXPECT_EQ(packet.user_id, 123u);
-    EXPECT_EQ(std::string(packet.payload.begin(), packet.payload.end()), text);
+    EXPECT_EQ(inbound.type, protocol::MessageType::RoomSettings);
+    EXPECT_EQ(inbound.data["allow_record"], false);
+    EXPECT_EQ(inbound.data["allow_member_share"], true);
     EXPECT_EQ(buffer.readable_size(), 0u);
 }
 
-TEST(CodecDecode, BinaryMessageRoundTrips) {
-    const std::vector<uint8_t> payload{0xDE, 0xAD, 0xBE, 0xEF};
-    const auto json = protocol::Codec::encode(
-        make_packet(protocol::MessageType::RoomSettings, 55, payload));
+TEST(CodecRoundTrip, UserIdsAndTextSurvive) {
+    protocol::Packet outbound = make_packet(
+        protocol::MessageType::TextRecv,
+        json{{"user_id", 5002}, {"text", "hi there"}});
+    outbound.code = 0;
 
     Buffer buffer;
-    append_frame(buffer, json);
+    append_bytes(buffer, protocol::Codec::encode(outbound));
 
-    protocol::Packet packet;
-    ASSERT_EQ(protocol::Codec::try_decode(buffer, packet),
+    protocol::Packet inbound;
+    ASSERT_EQ(protocol::Codec::try_decode(buffer, inbound),
               protocol::DecodeStatus::Ok);
-    EXPECT_EQ(packet.type, protocol::MessageType::RoomSettings);
-    EXPECT_EQ(packet.user_id, 55u);
-    EXPECT_EQ(packet.payload, payload);
-}
-
-TEST(CodecDecode, EmptyPayloadMessageRoundTrips) {
-    const auto json = protocol::Codec::encode(
-        make_packet(protocol::MessageType::CloseCamera, 1, {}));
-
-    Buffer buffer;
-    append_frame(buffer, json);
-
-    protocol::Packet packet;
-    ASSERT_EQ(protocol::Codec::try_decode(buffer, packet),
-              protocol::DecodeStatus::Ok);
-    EXPECT_EQ(packet.type, protocol::MessageType::CloseCamera);
-    EXPECT_TRUE(packet.payload.empty());
+    EXPECT_EQ(inbound.type, protocol::MessageType::TextRecv);
+    EXPECT_EQ(inbound.data["user_id"], 5002);
+    EXPECT_EQ(inbound.data["text"].get<std::string>(), "hi there");
 }
 
 TEST(CodecDecode, NeedMoreForEmptyBuffer) {
@@ -158,64 +220,19 @@ TEST(CodecDecode, NeedMoreForEmptyBuffer) {
               protocol::DecodeStatus::NeedMore);
 }
 
-TEST(CodecDecode, NeedMoreForPartialLengthPrefix) {
-    Buffer buffer;
-    const uint8_t partial[2] = {0x00, 0x00};
-    buffer.write(const_cast<uint8_t *>(partial), sizeof(partial));
-
-    protocol::Packet packet;
-    EXPECT_EQ(protocol::Codec::try_decode(buffer, packet),
-              protocol::DecodeStatus::NeedMore);
-}
-
-TEST(CodecDecode, NeedMoreForTruncatedJson) {
-    const auto json = protocol::Codec::encode(
-        make_packet(protocol::MessageType::JoinMeeting, 3, {1, 2, 3}));
-    const uint32_t size = static_cast<uint32_t>(json.size());
-    uint8_t head[4] = {static_cast<uint8_t>((size >> 24) & 0xFF),
-                       static_cast<uint8_t>((size >> 16) & 0xFF),
-                       static_cast<uint8_t>((size >> 8) & 0xFF),
-                       static_cast<uint8_t>(size & 0xFF)};
-
-    Buffer buffer;
-    buffer.write(head, sizeof(head));
-    buffer.write(const_cast<uint8_t *>(json.data()), json.size() - 1);
-
-    protocol::Packet packet;
-    EXPECT_EQ(protocol::Codec::try_decode(buffer, packet),
-              protocol::DecodeStatus::NeedMore);
-    EXPECT_EQ(buffer.readable_size(), 4u + json.size() - 1);   // 不消费
-}
-
-TEST(CodecDecode, ZeroLengthJsonIsInvalid) {
-    Buffer buffer;
-    uint8_t head[4] = {0, 0, 0, 0};
-    buffer.write(head, sizeof(head));
-
-    protocol::Packet packet;
-    EXPECT_EQ(protocol::Codec::try_decode(buffer, packet),
-              protocol::DecodeStatus::Invalid);
-}
-
 TEST(CodecDecode, MalformedJsonIsInvalidAndConsumed) {
-    const std::string bad = "{not valid json";
-    std::vector<uint8_t> json(bad.begin(), bad.end());
-
     Buffer buffer;
-    append_frame(buffer, json);
+    append_text(buffer, "{not valid json");
 
     protocol::Packet packet;
     EXPECT_EQ(protocol::Codec::try_decode(buffer, packet),
               protocol::DecodeStatus::Invalid);
-    EXPECT_EQ(buffer.readable_size(), 0u);   // 坏帧被丢弃，避免卡死
+    EXPECT_EQ(buffer.readable_size(), 0u);   // 坏消息被丢弃，避免卡死
 }
 
-TEST(CodecDecode, UnknownTypeIsInvalid) {
-    const std::string text = R"({"t":"no_such_type","u":1})";
-    std::vector<uint8_t> json(text.begin(), text.end());
-
+TEST(CodecDecode, NonObjectJsonIsInvalid) {
     Buffer buffer;
-    append_frame(buffer, json);
+    append_text(buffer, "[1,2,3]");
 
     protocol::Packet packet;
     EXPECT_EQ(protocol::Codec::try_decode(buffer, packet),
@@ -223,23 +240,65 @@ TEST(CodecDecode, UnknownTypeIsInvalid) {
     EXPECT_EQ(buffer.readable_size(), 0u);
 }
 
-TEST(CodecDecode, TwoFramesDecodeOneAtATime) {
-    const auto first = protocol::Codec::encode(
-        make_packet(protocol::MessageType::TextSend, 1, {0x41}));
-    const auto second = protocol::Codec::encode(
-        make_packet(protocol::MessageType::TextSend, 2, {0x42}));
-
+TEST(CodecDecode, UnknownTypeIsInvalid) {
     Buffer buffer;
-    append_frame(buffer, first);
-    append_frame(buffer, second);
+    append_text(buffer, R"({"t":"no_such_type","data":{}})");
 
     protocol::Packet packet;
+    EXPECT_EQ(protocol::Codec::try_decode(buffer, packet),
+              protocol::DecodeStatus::Invalid);
+    EXPECT_EQ(buffer.readable_size(), 0u);
+}
+
+TEST(CodecDecode, NonStringTypeIsInvalid) {
+    Buffer buffer;
+    append_text(buffer, R"({"t":5})");
+
+    protocol::Packet packet;
+    EXPECT_EQ(protocol::Codec::try_decode(buffer, packet),
+              protocol::DecodeStatus::Invalid);
+}
+
+TEST(CodecDecode, ReusedPacketDoesNotLeakPreviousFields) {
+    protocol::Packet packet;
+    Buffer buffer;
+
+    append_bytes(buffer, protocol::Codec::encode(make_packet(
+                             protocol::MessageType::TextSend,
+                             json{{"text", "first"}})));
+    packet.auth_token = "stale-token";
     ASSERT_EQ(protocol::Codec::try_decode(buffer, packet),
               protocol::DecodeStatus::Ok);
-    EXPECT_EQ(packet.user_id, 1u);
+    EXPECT_EQ(packet.data["text"].get<std::string>(), "first");
+
+    // 第二条消息不带 token / data：复用同一个 Packet 也不应残留旧值
+    append_text(buffer, R"({"t":"exit_meeting"})");
     ASSERT_EQ(protocol::Codec::try_decode(buffer, packet),
               protocol::DecodeStatus::Ok);
-    EXPECT_EQ(packet.user_id, 2u);
+    EXPECT_EQ(packet.type, protocol::MessageType::ExitMeeting);
+    EXPECT_TRUE(packet.auth_token.empty());
+    ASSERT_TRUE(packet.data.is_object());
+    EXPECT_TRUE(packet.data.empty());
+    EXPECT_EQ(buffer.readable_size(), 0u);
+}
+
+TEST(CodecDecode, ConsecutiveMessagesDecodeOneAtATime) {
+    Buffer buffer;
+    protocol::Packet packet;
+
+    append_bytes(buffer, protocol::Codec::encode(make_packet(
+                             protocol::MessageType::TextSend,
+                             json{{"text", "a"}})));
+    ASSERT_EQ(protocol::Codec::try_decode(buffer, packet),
+              protocol::DecodeStatus::Ok);
+    EXPECT_EQ(packet.data["text"].get<std::string>(), "a");
+
+    append_bytes(buffer, protocol::Codec::encode(make_packet(
+                             protocol::MessageType::TextSend,
+                             json{{"text", "b"}})));
+    ASSERT_EQ(protocol::Codec::try_decode(buffer, packet),
+              protocol::DecodeStatus::Ok);
+    EXPECT_EQ(packet.data["text"].get<std::string>(), "b");
     EXPECT_EQ(buffer.readable_size(), 0u);
 }
 

@@ -87,18 +87,21 @@ endfunction()
 ccmeeting_add_test(test_priority_queue
     test_priority_queue.cpp)
 
-# 编解码：线上 JSON 格式与二进制 payload 布局
+# 编解码：统一 JSON 信封（上行 t/token/data，下行 t/code/message/data）
 ccmeeting_add_test(test_message_codec
     test_message_codec.cpp
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/protocol/message_codec.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/user_session.cpp")
 
 # 协议分发：网络消息 → 语义信号
+# 直接喂下行 JSON（经 MessageCodec 解码），锁定 code/data → 信号值的映射。
 # 注意：被测类头文件必须列进源列表，AUTOMOC 才会为它生成 moc（Q_OBJECT）
 ccmeeting_add_test(test_protocol_dispatcher
     test_protocol_dispatcher.cpp
     "${CMAKE_CURRENT_SOURCE_DIR}/../include/features/meeting/meeting_protocol_dispatcher.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../src/features/meeting/meeting_protocol_dispatcher.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/features/meeting/meeting_protocol_dispatcher.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/protocol/message_codec.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/user_session.cpp")
 
 # 画面样式预设：头像 72×72、主画面头像 10% 高度、视频等比铺满
 ccmeeting_add_test(test_video_style

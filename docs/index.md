@@ -9,6 +9,8 @@
 |---|---|---|
 | [`index.md`](index.md) | 本文件：文档索引 + 目录职责划分与归类规则 | 找文档、决定"这份文档该放哪"时 |
 | [`build/BUILD.md`](build/BUILD.md) | 构建与运行手册：技术栈、环境准备、三端的编译命令、客户端单元测试（ctest）、常用 `-D` 选项、产物、启动顺序、Doxygen | 要编译 / 运行 / 跑测试 / 生成 API 文档时 |
+| [`API.md`](API.md) | 接口规范 **v2 速查**：三条通道、统一信封 `{code,message,data}`、鉴权、HTTP/信令速查表、失败码语义、v1→v2 破坏性变化清单 | 改接口、排查"字段对不上"、新人接手协议 |
+| [`schema/api.json`](schema/api.json) | 接口规范的**唯一事实来源**（JSON Schema draft-07，v2）：全部请求/响应定义、16 条信令消息、data 形状、错误码表 | 需要精确字段名/约束/形状时；改接口先改这里 |
 | [`deploy/DEPLOY-SERVICES.md`](deploy/DEPLOY-SERVICES.md) | 一键部署（本地 → 云服务器）的**怎么用**：备份 → 同步 → 装依赖 → 装 unit → 重启 → 健康检查，失败自动回滚 | 要部署/更新/回滚服务端时 |
 | [`deploy/DEPLOY-JANUS-COTURN.md`](deploy/DEPLOY-JANUS-COTURN.md) | Janus 与 coturn 的**从零重建手册**：版本、编译依赖、配置、证书、systemd、端口/安全组、验证、迁移 | 要重装、迁移或排查 Janus / coturn 时 |
 | [`notes/以发现bug但是没有修复.md`](notes/以发现bug但是没有修复.md) | 已知但未修复的问题清单（2 条，均与头像有关） | 排查头像显示问题前先看 |

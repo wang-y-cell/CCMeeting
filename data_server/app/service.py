@@ -18,6 +18,7 @@ logger = logging.getLogger("ccmeeting.auth")
 
 @dataclass
 class LoginResult:
+    """登录结果信息"""
     success: bool = False
     code: int = 0
     message: str = ""
@@ -37,7 +38,8 @@ class ProfileUpdateResult:
     success: bool = False
     code: int = 0
     message: str = ""
-    name: str = ""
+    nickname: str = ""
+    username: str = ""
     info: str = ""
     gender: str = ""
     birthday: str = ""
@@ -45,6 +47,8 @@ class ProfileUpdateResult:
     phone: str = ""
     email: str = ""
     extra_json: str = ""
+    # 更新成功后回读的完整用户资料；api 层据此拼 DataUser.user（11 个字段）
+    user: UserInfo | None = None
 
 
 def _extension_for_mime(mime: str) -> str:
@@ -226,11 +230,31 @@ class AuthService:
             return ProfileUpdateResult(code=500, message="failed to update profile")
 
         logger.info("update_profile ok user_id=%s nickname=%s", user_id, nickname)
+        # 回读完整资料：v2 的 DataUser.user 是 11 字段的 UserInfo（含 username/avatar）
+        try:
+            user = self._repo.load_user_info(user_id, nickname)
+        except Exception:  # pragma: no cover - 回读失败不影响本次更新的成功语义
+            logger.exception("load_user_info after update failed user_id=%s", user_id)
+            user = UserInfo(
+                id=user_id,
+                username=nickname,
+                name=nickname,
+                info=info,
+                gender=gender,
+                birthday=birthday,
+                address=address,
+                phone=phone,
+                email=email,
+                extra_json=extra_json,
+            )
+        if not user.name:
+            user.name = nickname
         return ProfileUpdateResult(
             success=True,
             code=0,
             message="ok",
-            name=nickname,
+            nickname=nickname,
+            username=user.username,
             info=info,
             gender=gender,
             birthday=birthday,
@@ -238,4 +262,5 @@ class AuthService:
             phone=phone,
             email=email,
             extra_json=extra_json,
+            user=user,
         )

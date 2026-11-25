@@ -104,9 +104,12 @@ void ui::LoginWindow::Login() {
 
     const QUrl url = ui::auth_url(ClientConfig::instance().auth().login_path);
 
+    // v2 规范（docs/schema/api.json）：请求体只带 data —— {"data":{"username","password"}}
+    QJsonObject credentials;
+    credentials.insert(QStringLiteral("username"), username);
+    credentials.insert(QStringLiteral("password"), password);
     QJsonObject body;
-    body.insert(QStringLiteral("username"), username);
-    body.insert(QStringLiteral("password"), password);
+    body.insert(QStringLiteral("data"), credentials);
 
     m_pendingRequest = PendingRequest::Login;
     m_requestInFlight = true;
@@ -132,9 +135,12 @@ void ui::LoginWindow::Register() {
 
     const QUrl url = ui::auth_url(ClientConfig::instance().auth().register_path);
 
+    // v2 规范：{"data":{"username","password"}}；成功同样返回 DataSession
+    QJsonObject credentials;
+    credentials.insert(QStringLiteral("username"), username);
+    credentials.insert(QStringLiteral("password"), password);
     QJsonObject body;
-    body.insert(QStringLiteral("username"), username);
-    body.insert(QStringLiteral("password"), password);
+    body.insert(QStringLiteral("data"), credentials);
 
     m_pendingRequest = PendingRequest::Register;
     m_requestInFlight = true;
@@ -207,20 +213,28 @@ void ui::LoginWindow::onLoginFinished(QNetworkReply *reply) {
         return;
     }
 
+    // v2：data = { user:{user_id,username,nickname,avatar,info,gender,birthday,
+    //                    address,phone,email,extra_json}, token, turn }
     const QJsonObject data = root.value(QStringLiteral("data")).toObject();
-    const qint64 userId =
-        data.value(QStringLiteral("id")).toVariant().toLongLong();
-    const QString username = data.value(QStringLiteral("username")).toString();
-    const QString name = data.value(QStringLiteral("name")).toString();
-    const QString avatar = data.value(QStringLiteral("avatar")).toString();
-    const QString info = data.value(QStringLiteral("info")).toString();
+    const QJsonObject user = data.value(QStringLiteral("user")).toObject();
+    if (user.isEmpty()) {
+        spdlog::warn("[login] missing data.user in response");
+        flush_log();
+    }
+    const qint64 userId = user.value(QStringLiteral("user_id"))
+                              .toVariant()
+                              .toLongLong();
+    const QString username = user.value(QStringLiteral("username")).toString();
+    const QString name = user.value(QStringLiteral("nickname")).toString();
+    const QString avatar = user.value(QStringLiteral("avatar")).toString();
+    const QString info = user.value(QStringLiteral("info")).toString();
     UserProfileExtras extras;
-    extras.gender = data.value(QStringLiteral("gender")).toString();
-    extras.birthday = data.value(QStringLiteral("birthday")).toString();
-    extras.address = data.value(QStringLiteral("address")).toString();
-    extras.phone = data.value(QStringLiteral("phone")).toString();
-    extras.email = data.value(QStringLiteral("email")).toString();
-    extras.extraJson = data.value(QStringLiteral("extra_json")).toString();
+    extras.gender = user.value(QStringLiteral("gender")).toString();
+    extras.birthday = user.value(QStringLiteral("birthday")).toString();
+    extras.address = user.value(QStringLiteral("address")).toString();
+    extras.phone = user.value(QStringLiteral("phone")).toString();
+    extras.email = user.value(QStringLiteral("email")).toString();
+    extras.extraJson = user.value(QStringLiteral("extra_json")).toString();
 
     UserSession::instance().setToken(
         data.value(QStringLiteral("token")).toString());

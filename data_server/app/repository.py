@@ -51,6 +51,7 @@ def _text(row, index: int) -> str:
 
 
 class UserRepository:
+    """数据库操作的封装"""
     def __init__(self, db: Database) -> None:
         self._db = db
 

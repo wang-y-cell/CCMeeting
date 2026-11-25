@@ -4,7 +4,8 @@
  * room.h — 单个会议房间
  *
  * 管理房间成员、媒体消息广播与成员进出通知。
- * 房主断开或会议时长到期时关闭整个房间；普通成员离开则广播 PARTNER_EXIT。
+ * 房主断开或会议时长到期时关闭整个房间；普通成员离开则广播 partner_exit。
+ * exit_meeting 与连接断开走同一套清理逻辑（remove_participant）。
  */
 
 #include "config/server_config.h"
@@ -60,9 +61,13 @@ public:
      */
     uint32_t duration_minutes() const { return _options.duration_minutes; }
     /**
-     * @brief 房间开关位掩码（允许录制 / 允许成员共享屏幕等）
+     * @brief 是否允许录制会议（房间开关，仅房主可改）
      */
-    uint32_t settings() const { return _settings; }
+    bool allow_record() const { return _allow_record; }
+    /**
+     * @brief 是否允许普通成员共享屏幕（房间开关，仅房主可改）
+     */
+    bool allow_member_share() const { return _allow_member_share; }
 
     /**
      * @brief 启动到期关房定时器（须在 shared_ptr 管理下调用）
@@ -84,7 +89,8 @@ public:
     void remove_participant(network::Connection::Id conn_id);
 
     /**
-     * @brief 处理房间内控制/文本消息（TEXT/CLOSE_CAMERA/USER_PROFILE 等），转发给其它成员
+     * @brief 处理房间内控制/文本消息（text_send / exit_meeting / close_camera /
+     *        user_profile / room_settings），转发给其它成员
      * @param from 发送者
      * @param packet 消息
      */
@@ -130,7 +136,8 @@ private:
     boost::asio::io_context& _io_ctx;/*IO上下文，用于到期定时器*/
     std::unique_ptr<boost::asio::steady_timer> _expire_timer;/*到期关房定时器*/
     bool _closed = false;/*房间是否关闭*/
-    uint32_t _settings = protocol::kRoomSettingsDefault;/*房间开关，仅房主可改*/
+    bool _allow_record = true;/*允许录制会议，仅房主可改*/
+    bool _allow_member_share = true;/*允许普通成员共享屏幕，仅房主可改*/
     std::unordered_map<network::Connection::Id, Participant> _participants;/*连接ID和参与者的映射*/
     CloseCallback _close_callback;/*关闭回调*/
 };

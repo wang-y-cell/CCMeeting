@@ -217,7 +217,8 @@ void Connection::sendWireData(const QByteArray &frame,
         return;
     }
 
-    // 一条业务消息 = 一条 WS 文本帧（JSON）
+    // 一条业务消息 = 一条 WS 文本帧（JSON）：
+    //   {"t":"<类型>","token":"<可选>","data":{...}}（上行，codec 已序列化好）
     const QString text = QString::fromUtf8(frame);
     const qint64 queued = m_socket->sendTextMessage(text);
     if (queued < 0) {
@@ -232,6 +233,9 @@ void Connection::onTextMessage(const QString &message) {
     if (m_hub == nullptr)
         return;
 
+    // 下行统一信封：{"t":"<类型>","code":0,"message":"ok","data":{...}}
+    // 非 JSON 帧（旧自定义帧残留 / 异常对端）由 WireStreamParser 丢弃并告警，
+    // 半包则留在其缓冲区等待后续字节。
     const QByteArray utf8 = message.toUtf8();
     spdlog::debug("[Connection] ws message bytes={}", utf8.size());
     const auto packets = m_parser.feed(utf8.constData(),

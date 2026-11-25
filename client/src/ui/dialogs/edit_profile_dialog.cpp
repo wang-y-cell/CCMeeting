@@ -211,11 +211,13 @@ void ui::EditProfileDialog::uploadPendingAvatar() {
         return;
     }
 
+    // v2 规范：{"data":{"mime","data_base64"}}；身份取自 token，不再传 user_id
+    QJsonObject avatar_data;
+    avatar_data.insert(QStringLiteral("mime"), QStringLiteral("image/png"));
+    avatar_data.insert(QStringLiteral("data_base64"),
+                       QString::fromLatin1(bytes.toBase64()));
     QJsonObject body;
-    body.insert(QStringLiteral("user_id"), UserSession::instance().userId());
-    body.insert(QStringLiteral("mime"), QStringLiteral("image/png"));
-    body.insert(QStringLiteral("data_base64"),
-                QString::fromLatin1(bytes.toBase64()));
+    body.insert(QStringLiteral("data"), avatar_data);
 
     const QUrl url =
         ui::auth_url(ClientConfig::instance().auth().upload_avatar_path);
@@ -261,11 +263,9 @@ void ui::EditProfileDialog::onAvatarUploadFinished() {
         return;
     }
 
-    const QString newAvatar =
-        root.value(QStringLiteral("data"))
-            .toObject()
-            .value(QStringLiteral("avatar"))
-            .toString();
+    // v2：data = { user_id, avatar }
+    const QJsonObject data = root.value(QStringLiteral("data")).toObject();
+    const QString newAvatar = data.value(QStringLiteral("avatar")).toString();
     if (newAvatar.isEmpty()) {
         setBusy(false);
         QMessageBox::warning(this, tr("修改资料"), tr("服务器未返回头像地址"));
@@ -287,17 +287,20 @@ void ui::EditProfileDialog::submitProfileUpdate() {
     }
 
     const UserProfileExtras extras = collectExtras();
+    // v2 规范：请求体包进 data —— {"data":{"nickname","info",...}}
+    // 身份取自 token，不再传 user_id（服务端拒绝多余的 user_id 语义）
+    QJsonObject profile;
+    profile.insert(QStringLiteral("nickname"),
+                   ui.nicknameEdit->text().trimmed());
+    profile.insert(QStringLiteral("info"), ui.infoEdit->toPlainText().trimmed());
+    profile.insert(QStringLiteral("gender"), extras.gender);
+    profile.insert(QStringLiteral("birthday"), extras.birthday);
+    profile.insert(QStringLiteral("address"), extras.address);
+    profile.insert(QStringLiteral("phone"), extras.phone);
+    profile.insert(QStringLiteral("email"), extras.email);
+    profile.insert(QStringLiteral("extra_json"), extras.extraJson);
     QJsonObject body;
-    body.insert(QStringLiteral("user_id"), UserSession::instance().userId());
-    body.insert(QStringLiteral("nickname"),
-                ui.nicknameEdit->text().trimmed());
-    body.insert(QStringLiteral("info"), ui.infoEdit->toPlainText().trimmed());
-    body.insert(QStringLiteral("gender"), extras.gender);
-    body.insert(QStringLiteral("birthday"), extras.birthday);
-    body.insert(QStringLiteral("address"), extras.address);
-    body.insert(QStringLiteral("phone"), extras.phone);
-    body.insert(QStringLiteral("email"), extras.email);
-    body.insert(QStringLiteral("extra_json"), extras.extraJson);
+    body.insert(QStringLiteral("data"), profile);
 
     const QUrl url =
         ui::auth_url(ClientConfig::instance().auth().update_profile_path);
@@ -343,18 +346,24 @@ void ui::EditProfileDialog::onProfileUpdateFinished() {
         return;
     }
 
+    // v2：data = { user:{user_id,username,nickname,avatar,info,...} }
     const QJsonObject data = root.value(QStringLiteral("data")).toObject();
-    const QString name = data.value(QStringLiteral("name")).toString(
+    const QJsonObject user = data.value(QStringLiteral("user")).toObject();
+    const QString name = user.value(QStringLiteral("nickname")).toString(
         ui.nicknameEdit->text().trimmed());
-    const QString info = data.value(QStringLiteral("info")).toString(
+    const QString info = user.value(QStringLiteral("info")).toString(
         ui.infoEdit->toPlainText().trimmed());
-    UserProfileExtras extras = extrasFromJson(data);
+    UserProfileExtras extras = extrasFromJson(user);
     if (extras.gender.isEmpty() && extras.birthday.isEmpty() &&
         extras.address.isEmpty()) {
         extras = collectExtras();
     }
 
-    UserSession::instance().updateProfile(name, QString(), info, extras);
+    // data.user 是服务端权威快照；头像为空时不覆盖本地缓存（QString() 为 null）
+    const QString avatar = user.value(QStringLiteral("avatar")).toString();
+    UserSession::instance().updateProfile(name,
+                                          avatar.isEmpty() ? QString() : avatar,
+                                          info, extras);
     setBusy(false);
     emit profileSaved();
     accept();

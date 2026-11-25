@@ -155,8 +155,10 @@ void MessageHub::send_loop(std::uint64_t epoch) {
 
         const MessageKind kind = (*msg)->kind();           // 获取消息的类型
         const qint64 local_user_id = UserSession::instance().userId();
+        // 统一 JSON 规范：{"t":...,"token":...,"data":{...}}（token 由 codec 从
+        // UserSession 取，上行不再携带 user_id）
         const QByteArray frame =
-            MessageCodec::encode_wire_frame(**msg, local_user_id);
+            MessageCodec::encode_json_frame(**msg, local_user_id);
         if (frame.isEmpty()) {
             spdlog::error("[MessageHub] 编码失败 kind={}",
                           static_cast<int>(kind));

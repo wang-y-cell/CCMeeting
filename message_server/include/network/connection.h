@@ -4,8 +4,8 @@
  * connection.h — WebSocket 连接
  *
  * 每个客户端一条 WebSocket（Boost.Beast），仅负责异步收发消息。
- * 收到一条 WS 消息后，按 `[uint32 大端长度][JSON]` 追加进 read_buffer，
- * 再回调上层（protocol::Codec 按该长度切分并解析 JSON）。
+ * 收到一条 WS 消息后，把整段 JSON 字节追加进 read_buffer，
+ * 再回调上层（protocol::Codec 把整条消息当作一个 JSON 解析）。
  * 发送时把上层给的 JSON 作为一条 WS 文本消息发出。
  */
 
@@ -42,7 +42,7 @@ public:
     void send(const uint8_t* data, std::size_t length);
     void send(const std::vector<uint8_t>& data);
 
-    Buffer& read_buffer();  // 累积的接收缓冲（长度前缀 + JSON），供上层拆包
+    Buffer& read_buffer();  // 累积的接收缓冲（每条 WS 消息 = 一个 JSON），供上层解析
     void consume_read(std::size_t size);
 
     Id id() const { return _id; }
@@ -63,7 +63,7 @@ private:
     Id _id;
     websocket::stream<beast::tcp_stream> _ws;
     beast::flat_buffer _ws_buffer;   // 单条 WS 消息的接收缓冲
-    Buffer _read_buffer;             // 交给上层的 [len][json] 流
+    Buffer _read_buffer;             // 交给上层的 JSON 消息流
     std::queue<std::string> _write_queue;
     bool _write_in_progress = false;
     bool _closed = false;

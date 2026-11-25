@@ -2,6 +2,8 @@
 
 #include "features/meeting/meeting_protocol_dispatcher.h"
 #include "protocol/message.h"
+#include "protocol/message_codec.h"
+#include "protocol/room_settings_flags.h"
 
 #include <memory>
 
@@ -11,59 +13,88 @@
  * 这一层把网络消息翻译成语义信号，是「协议字段提取」的唯一位置：
  * 提取错了，界面表现就是"成员列表少人/聊天串人"，但线上抓包看不出问题。
  * 因此每个 dispatch_* 入口都按消息 kind 分派，这里逐个固定其输出。
+ *
+ * 协议 v2 之后，消息对象统一由 MessageCodec::decode_json_frame 从下行 JSON 构造
+ * （{"t":"<类型>","code":0,"message":"ok","data":{...}}），
+ * 这里直接喂真实线格式，顺带锁定 code/data 到信号值的映射。
  */
 class TestProtocolDispatcher : public QObject {
     Q_OBJECT
 
 private slots:
-    void create_meeting_result_carries_room_no();
-    void join_meeting_result_carries_code();
-    void partner_joined_carries_user_id();
-    void partner_snapshot_carries_ids();
-    void user_profile_carries_name_and_avatar();
-    void room_settings_carries_flags();
-    void text_received_carries_sender_and_text();
+    void create_meeting_result_from_json_carries_room_no();
+    void join_meeting_success_from_json_carries_room_no();
+    void join_meeting_failure_from_json_carries_negative_code();
+    void partner_joined_from_json_carries_user_id();
+    void partner_snapshot_from_json_carries_ids();
+    void user_profile_from_json_carries_name_and_avatar();
+    void room_settings_from_json_carries_flags();
+    void text_received_from_json_carries_sender_and_text();
     void null_message_emits_nothing();
     void mismatched_kind_emits_nothing();
 };
 
-void TestProtocolDispatcher::create_meeting_result_carries_room_no() {
+void TestProtocolDispatcher::create_meeting_result_from_json_carries_room_no() {
     MeetingProtocolDispatcher dispatcher;
     QSignalSpy spy(&dispatcher, &MeetingProtocolDispatcher::create_meeting_result);
 
-    auto msg = std::make_shared<CreateMeetingResponseMessage>();
-    msg->set_room_no(1234);
+    const MessagePtr msg = MessageCodec::decode_json_frame(
+        R"({"t":"create_meeting_response","code":0,"message":"ok","data":{"room_id":1234}})");
+    QVERIFY(msg != nullptr);
     dispatcher.dispatch_request(msg);
 
     QCOMPARE(spy.count(), 1);
     QCOMPARE(spy.at(0).at(0).toInt(), 1234);
 }
 
-void TestProtocolDispatcher::join_meeting_result_carries_code() {
+void TestProtocolDispatcher::join_meeting_success_from_json_carries_room_no() {
     MeetingProtocolDispatcher dispatcher;
     QSignalSpy spy(&dispatcher, &MeetingProtocolDispatcher::join_meeting_result);
 
-    auto msg = std::make_shared<JoinMeetingResponseMessage>();
-    msg->set_response_code(-1);  // 已满
+    // 成功：code==0，房间号在 data.room_id；信号仍是「正数 = 房间号」
+    const MessagePtr msg = MessageCodec::decode_json_frame(
+        R"({"t":"join_meeting_response","code":0,"message":"ok","data":{"room_id":906870}})");
+    QVERIFY(msg != nullptr);
     dispatcher.dispatch_request(msg);
 
     QCOMPARE(spy.count(), 1);
-    QCOMPARE(spy.at(0).at(0).toInt(), -1);
+    QCOMPARE(spy.at(0).at(0).toInt(), 906870);
 }
 
-void TestProtocolDispatcher::partner_joined_carries_user_id() {
+void TestProtocolDispatcher::join_meeting_failure_from_json_carries_negative_code() {
+    MeetingProtocolDispatcher dispatcher;
+    QSignalSpy spy(&dispatcher, &MeetingProtocolDispatcher::join_meeting_result);
+
+    // 失败：code 为负（-1 已满 / -2 不存在 / -3 鉴权），原样透传
+    for (const int code : {-1, -2, -3}) {
+        spy.clear();
+        const MessagePtr msg = MessageCodec::decode_json_frame(
+            QStringLiteral(
+                R"({"t":"join_meeting_response","code":%1,"message":"failed","data":{"room_id":0}})")
+                .arg(code)
+                .toUtf8());
+        QVERIFY(msg != nullptr);
+        dispatcher.dispatch_request(msg);
+
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(spy.at(0).at(0).toInt(), code);
+    }
+}
+
+void TestProtocolDispatcher::partner_joined_from_json_carries_user_id() {
     MeetingProtocolDispatcher dispatcher;
     QSignalSpy spy(&dispatcher, &MeetingProtocolDispatcher::partner_joined);
 
-    auto msg = std::make_shared<PartnerJoinMessage>();
-    msg->set_user_id(42);
+    const MessagePtr msg = MessageCodec::decode_json_frame(
+        R"({"t":"partner_join","code":0,"message":"ok","data":{"user_id":42}})");
+    QVERIFY(msg != nullptr);
     dispatcher.dispatch_user_info(msg);
 
     QCOMPARE(spy.count(), 1);
     QCOMPARE(spy.at(0).at(0).toLongLong(), 42);
 }
 
-void TestProtocolDispatcher::partner_snapshot_carries_ids() {
+void TestProtocolDispatcher::partner_snapshot_from_json_carries_ids() {
     MeetingProtocolDispatcher dispatcher;
     QList<qint64> captured;
     bool emitted = false;
@@ -73,8 +104,9 @@ void TestProtocolDispatcher::partner_snapshot_carries_ids() {
                 captured = ids;
             });
 
-    auto msg = std::make_shared<PartnerJoin2Message>();
-    msg->set_partner_user_ids({1, 2, 3});
+    const MessagePtr msg = MessageCodec::decode_json_frame(
+        R"({"t":"partner_join2","code":0,"message":"ok","data":{"user_ids":[1,2,3]}})");
+    QVERIFY(msg != nullptr);
     dispatcher.dispatch_user_info(msg);
 
     QVERIFY(emitted);
@@ -82,14 +114,14 @@ void TestProtocolDispatcher::partner_snapshot_carries_ids() {
     QCOMPARE(captured.at(2), 3);
 }
 
-void TestProtocolDispatcher::user_profile_carries_name_and_avatar() {
+void TestProtocolDispatcher::user_profile_from_json_carries_name_and_avatar() {
     MeetingProtocolDispatcher dispatcher;
     QSignalSpy spy(&dispatcher, &MeetingProtocolDispatcher::user_profile);
 
-    auto msg = std::make_shared<UserProfileNotifyMessage>();
-    msg->set_user_id(7);
-    msg->set_display_name("张三");
-    msg->set_avatar_url("https://example.test/a.png");
+    const MessagePtr msg = MessageCodec::decode_json_frame(
+        R"({"t":"user_profile","code":0,"message":"ok",)"
+        R"("data":{"user_id":7,"nickname":"张三","avatar":"https://example.test/a.png"}})");
+    QVERIFY(msg != nullptr);
     dispatcher.dispatch_user_info(msg);
 
     QCOMPARE(spy.count(), 1);
@@ -99,26 +131,41 @@ void TestProtocolDispatcher::user_profile_carries_name_and_avatar() {
              QStringLiteral("https://example.test/a.png"));
 }
 
-void TestProtocolDispatcher::room_settings_carries_flags() {
+void TestProtocolDispatcher::room_settings_from_json_carries_flags() {
     MeetingProtocolDispatcher dispatcher;
     QSignalSpy spy(&dispatcher,
                    &MeetingProtocolDispatcher::room_settings_received);
 
-    auto msg = std::make_shared<RoomSettingsNotifyMessage>();
-    msg->set_flags(0x1u);
+    // 布尔 → 兼容位掩码：allow_record=true, allow_member_share=false → bit0
+    const MessagePtr msg = MessageCodec::decode_json_frame(
+        R"({"t":"room_settings_notify","code":0,"message":"ok",)"
+        R"("data":{"allow_record":true,"allow_member_share":false}})");
+    QVERIFY(msg != nullptr);
     dispatcher.dispatch_user_info(msg);
 
     QCOMPARE(spy.count(), 1);
-    QCOMPARE(spy.at(0).at(0).toUInt(), 0x1u);
+    QCOMPARE(spy.at(0).at(0).toUInt(),
+             static_cast<unsigned>(ROOM_SETTINGS_ALLOW_RECORD));
+
+    spy.clear();
+    const MessagePtr both = MessageCodec::decode_json_frame(
+        R"({"t":"room_settings_notify","code":0,"message":"ok",)"
+        R"("data":{"allow_record":true,"allow_member_share":true}})");
+    QVERIFY(both != nullptr);
+    dispatcher.dispatch_user_info(both);
+
+    QCOMPARE(spy.count(), 1);
+    QCOMPARE(spy.at(0).at(0).toUInt(),
+             static_cast<unsigned>(ROOM_SETTINGS_DEFAULT));
 }
 
-void TestProtocolDispatcher::text_received_carries_sender_and_text() {
+void TestProtocolDispatcher::text_received_from_json_carries_sender_and_text() {
     MeetingProtocolDispatcher dispatcher;
     QSignalSpy spy(&dispatcher, &MeetingProtocolDispatcher::text_received);
 
-    auto msg = std::make_shared<RecvTextMessage>();
-    msg->set_user_id(11);
-    msg->set_text("hi");
+    const MessagePtr msg = MessageCodec::decode_json_frame(
+        R"({"t":"text_recv","code":0,"message":"ok","data":{"user_id":11,"text":"hi"}})");
+    QVERIFY(msg != nullptr);
     dispatcher.dispatch_text(msg);
 
     QCOMPARE(spy.count(), 1);

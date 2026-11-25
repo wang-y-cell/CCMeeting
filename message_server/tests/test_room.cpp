@@ -1,14 +1,11 @@
 #include <gtest/gtest.h>
 
-#ifdef _WIN32
-#  include <winsock2.h>
-#else
-#  include <arpa/inet.h>
-#endif
 #include <boost/asio.hpp>
 
 #include <cstdint>
 #include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "meeting/room_manager.h"
@@ -17,6 +14,7 @@
 namespace {
 
 using boost::asio::ip::tcp;
+using json = nlohmann::json;
 
 std::shared_ptr<network::Connection> make_connection(
     boost::asio::io_context &io, bool open = true) {
@@ -43,20 +41,33 @@ meeting::RoomOptions make_options(std::size_t max_participants = 4,
     return options;
 }
 
-protocol::Packet make_room_settings_packet(uint32_t flags) {
+protocol::Packet make_room_settings_packet(bool allow_record,
+                                           bool allow_member_share) {
     protocol::Packet packet;
     packet.type = protocol::MessageType::RoomSettings;
-    const uint32_t net_flags = htonl(flags);
-    packet.payload.resize(sizeof(net_flags));
-    std::memcpy(packet.payload.data(), &net_flags, sizeof(net_flags));
+    packet.data = json{{"allow_record", allow_record},
+                       {"allow_member_share", allow_member_share}};
     return packet;
 }
 
-protocol::Packet make_text_packet(uint64_t user_id, const std::string &text) {
+protocol::Packet make_text_packet(const std::string &text) {
     protocol::Packet packet;
     packet.type = protocol::MessageType::TextSend;
-    packet.user_id = user_id;
-    packet.payload.assign(text.begin(), text.end());
+    packet.data = json{{"text", text}};
+    return packet;
+}
+
+protocol::Packet make_exit_packet() {
+    protocol::Packet packet;
+    packet.type = protocol::MessageType::ExitMeeting;
+    return packet;
+}
+
+protocol::Packet make_profile_packet(const std::string &nickname,
+                                     const std::string &avatar) {
+    protocol::Packet packet;
+    packet.type = protocol::MessageType::UserProfile;
+    packet.data = json{{"nickname", nickname}, {"avatar", avatar}};
     return packet;
 }
 
@@ -79,6 +90,9 @@ TEST(RoomManagerTest, CreateRoomAddsOwnerAndRegistersRoom) {
     EXPECT_EQ(room->max_participants(), 2u);
     EXPECT_EQ(room->duration_minutes(), 0u);
     EXPECT_FALSE(room->is_closed());
+    // 默认允许录制、允许成员共享
+    EXPECT_TRUE(room->allow_record());
+    EXPECT_TRUE(room->allow_member_share());
 }
 
 TEST(RoomManagerTest, CreateRoomRejectsClosedOwner) {
@@ -210,9 +224,14 @@ TEST(RoomTest, OwnerCanUpdateRoomSettings) {
     ASSERT_TRUE(room_id.has_value());
     auto room = manager.get_room(*room_id);
 
-    const uint32_t flags = 0x3;
-    room->handle_packet(owner, make_room_settings_packet(flags));
-    EXPECT_EQ(room->settings(), flags);
+    room->handle_packet(owner, make_room_settings_packet(false, true));
+    EXPECT_FALSE(room->allow_record());
+    EXPECT_TRUE(room->allow_member_share());
+
+    // 两个开关互相独立，可再次取反
+    room->handle_packet(owner, make_room_settings_packet(true, false));
+    EXPECT_TRUE(room->allow_record());
+    EXPECT_FALSE(room->allow_member_share());
 }
 
 TEST(RoomTest, NonOwnerCannotUpdateRoomSettings) {
@@ -227,9 +246,75 @@ TEST(RoomTest, NonOwnerCannotUpdateRoomSettings) {
               meeting::RoomManager::JoinResult::Ok);
     auto room = manager.get_room(*room_id);
 
-    const uint32_t before = room->settings();
-    room->handle_packet(member, make_room_settings_packet(0x7));
-    EXPECT_EQ(room->settings(), before);
+    room->handle_packet(owner, make_room_settings_packet(false, false));
+    ASSERT_FALSE(room->allow_record());
+    ASSERT_FALSE(room->allow_member_share());
+
+    room->handle_packet(member, make_room_settings_packet(true, true));
+    EXPECT_FALSE(room->allow_record());
+    EXPECT_FALSE(room->allow_member_share());
+}
+
+TEST(RoomTest, MemberExitMeetingRemovesParticipantWithoutClosingRoom) {
+    boost::asio::io_context io;
+    meeting::RoomManager manager(make_config(), io);
+    auto owner = make_connection(io);
+    auto member = make_connection(io);
+
+    const auto room_id = manager.create_room(owner, make_options(4, 0), 1);
+    ASSERT_TRUE(room_id.has_value());
+    ASSERT_EQ(manager.join_room(*room_id, member, 2),
+              meeting::RoomManager::JoinResult::Ok);
+    auto room = manager.get_room(*room_id);
+
+    room->handle_packet(member, make_exit_packet());
+
+    EXPECT_FALSE(room->is_closed());
+    EXPECT_EQ(room->participant_count(), 1u);
+
+    // 重复 exit_meeting 不应再改变状态（remove_participant 幂等）
+    room->handle_packet(member, make_exit_packet());
+    EXPECT_FALSE(room->is_closed());
+    EXPECT_EQ(room->participant_count(), 1u);
+}
+
+TEST(RoomTest, OwnerExitMeetingClosesRoom) {
+    boost::asio::io_context io;
+    meeting::RoomManager manager(make_config(), io);
+    auto owner = make_connection(io);
+    auto member = make_connection(io);
+
+    const auto room_id = manager.create_room(owner, make_options(4, 0), 1);
+    ASSERT_TRUE(room_id.has_value());
+    ASSERT_EQ(manager.join_room(*room_id, member, 2),
+              meeting::RoomManager::JoinResult::Ok);
+    auto room = manager.get_room(*room_id);
+
+    int close_calls = 0;
+    room->set_close_callback([&](uint32_t) { ++close_calls; });
+    room->handle_packet(owner, make_exit_packet());
+
+    EXPECT_TRUE(room->is_closed());
+    EXPECT_EQ(room->participant_count(), 0u);
+    EXPECT_EQ(close_calls, 1);
+}
+
+TEST(RoomTest, UserProfileOnlyChangesDisplayState) {
+    boost::asio::io_context io;
+    meeting::RoomManager manager(make_config(), io);
+    auto owner = make_connection(io);
+    auto member = make_connection(io);
+
+    const auto room_id = manager.create_room(owner, make_options(), 1);
+    ASSERT_TRUE(room_id.has_value());
+    ASSERT_EQ(manager.join_room(*room_id, member, 2),
+              meeting::RoomManager::JoinResult::Ok);
+    auto room = manager.get_room(*room_id);
+
+    room->handle_packet(member, make_profile_packet("Alice", "http://a/b.png"));
+    // user_profile 不改变成员数量/身份
+    EXPECT_EQ(room->participant_count(), 2u);
+    EXPECT_FALSE(room->is_closed());
 }
 
 TEST(RoomTest, PacketFromNonParticipantIsIgnored) {
@@ -242,7 +327,7 @@ TEST(RoomTest, PacketFromNonParticipantIsIgnored) {
     ASSERT_TRUE(room_id.has_value());
     auto room = manager.get_room(*room_id);
 
-    room->handle_packet(outsider, make_text_packet(99, "hack"));
+    room->handle_packet(outsider, make_text_packet("hack"));
     EXPECT_EQ(room->participant_count(), 1u);
     EXPECT_FALSE(room->is_closed());
 }
@@ -257,7 +342,7 @@ TEST(RoomTest, ClosedRoomIgnoresPackets) {
     auto room = manager.get_room(*room_id);
     room->remove_participant(owner->id());   // 房主离开 -> 关房
 
-    room->handle_packet(owner, make_text_packet(1, "after close"));
+    room->handle_packet(owner, make_text_packet("after close"));
     EXPECT_TRUE(room->is_closed());
     EXPECT_EQ(room->participant_count(), 0u);
 }

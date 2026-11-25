@@ -58,6 +58,7 @@ class TurnConfig:
 
 @dataclass
 class AuthServerConfig:
+    """服务端代码的各项配置信息"""
     listen_address: str = "0.0.0.0"
     listen_port: int = 9000
     mysql: MysqlConfig = field(default_factory=MysqlConfig)

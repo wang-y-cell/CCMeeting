@@ -552,36 +552,38 @@ int run_avatar_alpha_selftest() {
 }  // namespace
 
 // ---------------------------------------------------------------------------
-// 加入会议响应的字节序自检
+// 协议矩阵自检（统一 JSON 规范 v2，见 docs/schema/api.json）
 // 用法：UiPreview.exe --join-codec-selftest
-// 服务端用 htonl(room_id) 发送；低位 >= 0x80 的房间号曾被读成负数而静默失败。
+// 上行 {"t":"...","token":"...","data":{...}}；
+// 下行 {"t":"...","code":0,"message":"ok","data":{...}}。
+// 历史背景：v1 用 htonl(room_id) 传房间号，低位 >= 0x80 的房间号曾被读成负数而静默失败；
+// 现在房间号走 data.room_id，成功/失败由 code 表达。
 // ---------------------------------------------------------------------------
 namespace {
 
 int run_join_codec_selftest() {
-    // 线上格式已从自定义 TCP 字节流改为 WebSocket + JSON，这里做协议矩阵自检：
-    // 每种消息 encode → JSON → decode 回来，字段必须一致。
+    // 每种消息 encode → JSON → decode 回来，字段必须一致，且不得残留 v1 的 p/u/s/a。
     bool all_ok = true;
     auto check = [&](const char *name, bool ok) {
         all_ok = all_ok && ok;
         std::printf("[proto] %-28s %s\n", name, ok ? "OK" : "MISMATCH");
     };
 
-    // 1) 创建会议响应（房间号）
+    // 1) 创建会议响应（房间号在 data.room_id）
     {
         CreateMeetingResponseMessage msg;
         msg.set_room_no(906870u);
-        const QByteArray json = MessageCodec::encode_wire_frame(msg, 1);
+        const QByteArray json = MessageCodec::encode_json_frame(msg, 1);
         auto decoded = MessageCodec::decode_json_frame(json);
         auto *resp = dynamic_cast<CreateMeetingResponseMessage *>(decoded.get());
         check("create_meeting_response", resp && resp->room_no() == 906870u);
     }
 
-    // 2) 加入响应：低位 >= 0x80 的随机房间号不能被读成负数
+    // 2) 加入响应：成功 code==0，房间号在 data.room_id（低位 >= 0x80 也不能变成负数）
     for (const std::uint32_t room : {906870u, 906880u, 524288u, 999999u}) {
         JoinMeetingResponseMessage msg;
         msg.set_response_code(static_cast<std::int32_t>(room));
-        const QByteArray json = MessageCodec::encode_wire_frame(msg, 1);
+        const QByteArray json = MessageCodec::encode_json_frame(msg, 1);
         auto decoded = MessageCodec::decode_json_frame(json);
         auto *resp = dynamic_cast<JoinMeetingResponseMessage *>(decoded.get());
         const bool ok = resp && resp->response_code() == static_cast<int>(room);
@@ -590,12 +592,29 @@ int run_join_codec_selftest() {
                     resp ? resp->response_code() : -1, ok ? "OK" : "MISMATCH");
     }
 
-    // 3) 成员快照（PartnerJoin2）
+    // 2b) 加入失败：code 为负（-1 已满 / -2 不存在 / -3 鉴权），原样保留
+    {
+        bool ok = true;
+        for (const int code : {-1, -2, -3}) {
+            const QByteArray json =
+                QStringLiteral(
+                    R"({"t":"join_meeting_response","code":%1,"message":"failed","data":{"room_id":0}})")
+                    .arg(code)
+                    .toUtf8();
+            auto decoded = MessageCodec::decode_json_frame(json);
+            auto *resp =
+                dynamic_cast<JoinMeetingResponseMessage *>(decoded.get());
+            ok = ok && resp && resp->response_code() == code;
+        }
+        check("join_meeting_response 失败码", ok);
+    }
+
+    // 3) 成员快照（PartnerJoin2）：data.user_ids 数组
     {
         PartnerJoin2Message msg;
         msg.add_partner_user_id(11);
         msg.add_partner_user_id(22);
-        const QByteArray json = MessageCodec::encode_wire_frame(msg, 1);
+        const QByteArray json = MessageCodec::encode_json_frame(msg, 1);
         auto decoded = MessageCodec::decode_json_frame(json);
         auto *snapshot = dynamic_cast<PartnerJoin2Message *>(decoded.get());
         check("partner_join2",
@@ -603,56 +622,69 @@ int run_join_codec_selftest() {
                   snapshot->partner_user_ids()[1] == 22);
     }
 
-    // 4) 房间开关广播
+    // 4) 房间开关广播：布尔 ↔ 兼容位掩码（bit0=allow_record, bit1=allow_member_share）
     {
         RoomSettingsNotifyMessage msg;
         msg.set_flags(ROOM_SETTINGS_ALLOW_RECORD);
-        const QByteArray json = MessageCodec::encode_wire_frame(msg, 1);
+        const QByteArray json = MessageCodec::encode_json_frame(msg, 1);
+        const QJsonObject object = QJsonDocument::fromJson(json).object();
+        const QJsonObject data = object.value(QStringLiteral("data")).toObject();
+        const bool booleans_ok =
+            data.value(QStringLiteral("allow_record")).toBool(false) &&
+            !data.value(QStringLiteral("allow_member_share")).toBool(true);
         auto decoded = MessageCodec::decode_json_frame(json);
         auto *notify = dynamic_cast<RoomSettingsNotifyMessage *>(decoded.get());
         check("room_settings_notify",
-              notify && notify->flags() == ROOM_SETTINGS_ALLOW_RECORD);
+              booleans_ok && notify &&
+                  notify->flags() == ROOM_SETTINGS_ALLOW_RECORD);
     }
 
-    // 5) 文本消息：必须是明文 s 字段，且不再出现旧帧头
+    // 5) 文本消息：data.text 明文，且不再有 v1 的 p/u/s/a 字段
     {
         SendTextMessage msg;
-        msg.set_user_id(1);
         const QByteArray text_utf8 = QStringLiteral("你好 WebSocket").toUtf8();
         msg.set_text(std::string(text_utf8.constData(),
                                  static_cast<std::size_t>(text_utf8.size())));
-        const QByteArray json = MessageCodec::encode_wire_frame(msg, 1);
-        const QString text = QString::fromUtf8(json);
-        const bool readable = text.contains(QStringLiteral("\"t\":\"text_send\"")) &&
-                              text.contains(QStringLiteral("你好 WebSocket"));
-        const bool no_legacy_header =
-            !json.startsWith('$') && !json.endsWith('#');
-        check("text_send 明文 + 无旧帧头", readable && no_legacy_header);
+        const QByteArray json = MessageCodec::encode_json_frame(msg, 1);
+        const QJsonObject object = QJsonDocument::fromJson(json).object();
+        const bool readable =
+            object.value(QStringLiteral("t")).toString() ==
+                QStringLiteral("text_send") &&
+            object.value(QStringLiteral("data"))
+                    .toObject()
+                    .value(QStringLiteral("text"))
+                    .toString() == QStringLiteral("你好 WebSocket");
+        const bool no_legacy =
+            !object.contains(QStringLiteral("p")) &&
+            !object.contains(QStringLiteral("u")) &&
+            !object.contains(QStringLiteral("s")) &&
+            !object.contains(QStringLiteral("a"));
+        check("text_send JSON v2", readable && no_legacy);
 
         // 服务端下行的 text_recv 走同一条解析路径
-        const QByteArray server_json =
-            QByteArray(R"({"t":"text_recv","u":7,"s":"server says hi"})");
+        const QByteArray server_json = QByteArray(
+            R"({"t":"text_recv","code":0,"message":"ok","data":{"user_id":7,"text":"server says hi"}})");
         auto decoded = MessageCodec::decode_json_frame(server_json);
         auto *recv = dynamic_cast<RecvTextMessage *>(decoded.get());
         check("text_recv", recv && recv->user_id() == 7 &&
                                recv->text() == "server says hi");
     }
 
-    // 6) 创建会议：payload 保持二进制布局（8 字节大端），经 base64 传输
+    // 6) 创建会议：data 里是两个整数（不再有 8 字节大端 payload）
     {
         CreateMeetingMessage msg;
         msg.set_max_participants(8);
         msg.set_duration_minutes(60);
-        const QByteArray json = MessageCodec::encode_wire_frame(msg, 42);
-        const QJsonObject object =
-            QJsonDocument::fromJson(json).object();
-        const QByteArray payload = QByteArray::fromBase64(
-            object.value(QStringLiteral("p")).toString().toLatin1());
-        const bool ok = object.value(QStringLiteral("t")).toString() ==
-                            QStringLiteral("create_meeting") &&
-                        object.value(QStringLiteral("u")).toInt() == 42 &&
-                        payload.size() == 8;
-        check("create_meeting payload", ok);
+        const QByteArray json = MessageCodec::encode_json_frame(msg, 42);
+        const QJsonObject object = QJsonDocument::fromJson(json).object();
+        const QJsonObject data = object.value(QStringLiteral("data")).toObject();
+        const bool ok =
+            object.value(QStringLiteral("t")).toString() ==
+                QStringLiteral("create_meeting") &&
+            data.value(QStringLiteral("max_participants")).toInt() == 8 &&
+            data.value(QStringLiteral("duration_minutes")).toInt() == 60 &&
+            !object.contains(QStringLiteral("p"));
+        check("create_meeting data", ok);
     }
 
     // 7) 类型名双向映射

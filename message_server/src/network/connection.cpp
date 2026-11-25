@@ -10,16 +10,6 @@ namespace {
 
 std::atomic<Connection::Id> g_next_connection_id{1};
 
-void append_uint32_be(Buffer& buffer, uint32_t value) {
-    uint8_t bytes[4] = {
-        static_cast<uint8_t>((value >> 24) & 0xFF),
-        static_cast<uint8_t>((value >> 16) & 0xFF),
-        static_cast<uint8_t>((value >> 8) & 0xFF),
-        static_cast<uint8_t>(value & 0xFF),
-    };
-    buffer.write(bytes, sizeof(bytes));
-}
-
 }  // namespace
 
 Connection::Id Connection::next_id() {
@@ -92,9 +82,7 @@ void Connection::do_read() {
                            beast::buffers_to_string(_ws_buffer.data());
                        _ws_buffer.consume(length);
 
-                       // 交给上层的内部格式：[uint32 大端长度][JSON]
-                       append_uint32_be(_read_buffer,
-                                        static_cast<uint32_t>(message.size()));
+                       // 一条 WS 消息 = 一个 JSON，直接交给上层解析
                        _read_buffer.write(
                            const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(
                                message.data())),

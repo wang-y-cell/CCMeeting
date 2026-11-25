@@ -16,7 +16,8 @@ class MessageHub;
  * @brief WebSocket 连接：在 IO 线程读写，收到消息后交给 MessageHub 分类入队
  *
  * 传输已从自定义 TCP 字节流改为 WebSocket（`ws://ip:port`），
- * 一条 WS 消息对应一条业务消息（JSON，见 MessageCodec）。
+ * 一条 WS 消息对应一条业务消息（统一 JSON 信封，见 MessageCodec）：
+ * 上行 `{"t","token","data"}`，下行 `{"t","code","message","data"}`。
  */
 class Connection : public QObject {
     Q_OBJECT
