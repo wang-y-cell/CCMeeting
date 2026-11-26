@@ -55,6 +55,15 @@ public:
     qint64 current_user_id() const { return _user_id; }
     /** @brief 当前账号库路径；未打开时为空 */
     QString data_database_path() const { return _user_path; }
+    /**
+     * @brief 删除某个账号的本地库（注销账号时用）
+     *
+     * 会先关闭当前账号库（若正是该账号），再删掉
+     * users/user_<id>/ 下的库文件（含 WAL 附属文件）。
+     * 注意：只删「索引」，不删磁盘上的录制视频文件——
+     * 那些文件的归属登记仍留在共享库里，不会被其他账号认领。
+     */
+    void purge_user_data(qint64 user_id);
     /** @brief 某账号的库文件路径（不需要已打开；user_id<=0 返回空） */
     static QString user_database_path(qint64 user_id);
     /** @brief 账号库连接（未打开时无效） */

@@ -208,6 +208,12 @@
       "errors": ["400 nickname is required / too long / invalid gender / invalid birthday / field too long", "401", "404", "500"]
     },
     {
+      "method": "POST", "path": "/api/delete-account", "auth": true,
+      "request": {},
+      "note": "注销当前账号（软删：sys_users.status 置 0，此后登录被拒）。身份只取 token；客户端成功后清理本地账号库并回登录界面",
+      "errors": ["401", "404 user not found", "500"]
+    },
+    {
       "method": "GET", "path": "/static/{path}", "auth": false, "response": "binary"
     },
     {

@@ -189,6 +189,24 @@ class UserRepository:
         except Exception:
             return False
 
+    def disable_user(self, user_id: int) -> bool:
+        """注销账号：软删（status 置 0），登录会被拒绝。
+
+        幂等：账号已经是停用态时重复调用也返回 True（不算失败），
+        否则重复点「注销账号」会被当成服务端错误。
+        """
+        if user_id == 0:
+            return False
+        try:
+            self._db.execute(
+                "UPDATE sys_users SET status = 0, "
+                "updated_at = datetime('now') WHERE user_id = ?",
+                (user_id,),
+            )
+            return True
+        except Exception:
+            return False
+
     def insert_login_log(
         self, user_id: int, login_ip: str, device_info: str, success: bool
     ) -> None:

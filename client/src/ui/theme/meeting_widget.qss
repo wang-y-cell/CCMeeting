@@ -300,10 +300,23 @@ QToolButton#leaveMeetingBtn:disabled {
     background-color: transparent;
 }
 
-/* 结束会议：与麦克风/摄像头一致（白色文字 + 中性图标，悬停淡底色）；
-   红色只保留在麦克风/摄像头关闭态的斜杠上。 */
+/* 结束会议：危险操作 → 红字 + 红图标，hover 淡红底 */
 QToolButton#leaveMeetingBtn {
-    color: @text;
+    color: @danger;
+}
+
+QToolButton#leaveMeetingBtn:hover {
+    background-color: rgba(229, 72, 77, 0.12);
+    color: @dangerHover;
+}
+
+QToolButton#leaveMeetingBtn:pressed {
+    background-color: rgba(229, 72, 77, 0.20);
+}
+
+QToolButton#leaveMeetingBtn:disabled {
+    color: @textDisabled;
+    background-color: transparent;
 }
 /* ---------- 设备选择菜单 ---------- */
 

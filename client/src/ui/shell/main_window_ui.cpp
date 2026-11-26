@@ -25,23 +25,38 @@ void MainWindowUi::setupUi(QWidget *parent) {
     userCard = new QWidget(parent);
     userCard->setObjectName(QStringLiteral("userProfile"));
     userCard->setCursor(Qt::PointingHandCursor);
-    auto *userLayout = new QVBoxLayout(userCard);
-    userLayout->setContentsMargins(12, 12, 12, 12);
-    userLayout->setSpacing(8);
+    // 横排：左头像，右「昵称 + 简介」（账号操作在个人资料页里，不占卡片）
+    auto *userLayout = new QHBoxLayout(userCard);
+    userLayout->setContentsMargins(10, 10, 10, 10);
+    userLayout->setSpacing(10);
 
     avatarLabel = new QLabel(userCard);
     avatarLabel->setObjectName(QStringLiteral("userAvatar"));
-    avatarLabel->setFixedSize(72, 72);
+    avatarLabel->setFixedSize(44, 44);
     avatarLabel->setAlignment(Qt::AlignCenter);
     avatarLabel->setScaledContents(true);
 
+    auto *textColumn = new QVBoxLayout();
+    textColumn->setContentsMargins(0, 0, 0, 0);
+    textColumn->setSpacing(2);
+
     nameLabel = new QLabel(userCard);
     nameLabel->setObjectName(QStringLiteral("userName"));
-    nameLabel->setAlignment(Qt::AlignCenter);
-    nameLabel->setWordWrap(true);
+    nameLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    nameLabel->setWordWrap(false);
 
-    userLayout->addWidget(avatarLabel, 0, Qt::AlignHCenter);
-    userLayout->addWidget(nameLabel);
+    infoLabel = new QLabel(userCard);
+    infoLabel->setObjectName(QStringLiteral("userInfo"));
+    infoLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    infoLabel->setWordWrap(false);
+
+    textColumn->addStretch(1);
+    textColumn->addWidget(nameLabel);
+    textColumn->addWidget(infoLabel);
+    textColumn->addStretch(1);
+
+    userLayout->addWidget(avatarLabel, 0, Qt::AlignVCenter);
+    userLayout->addLayout(textColumn, 1);
     leftColumn->addWidget(userCard);
 
     sideNav = new QListWidget(parent);
@@ -62,13 +77,7 @@ void MainWindowUi::setupUi(QWidget *parent) {
     sideBarStatus->setContentsMargins(4, 0, 4, 0);
     leftColumn->addWidget(sideBarStatus);
 
-    // 退出登录：清掉本机凭据并回到登录界面
-    btnLogout = new QPushButton(QObject::tr("退出登录"), parent);
-    btnLogout->setObjectName(QStringLiteral("sideLogoutBtn"));
-    btnLogout->setCursor(Qt::PointingHandCursor);
-    btnLogout->setToolTip(QObject::tr("清除本机保存的账号，返回登录界面"));
-    leftColumn->addWidget(btnLogout);
-
+    // 退出登录 / 注销账号已移到用户卡里（见上面 userCard 的账号操作区）
     auto *sideBarVersion = new QLabel(QStringLiteral("CloudMeeting 1.0"), parent);
     sideBarVersion->setObjectName(QStringLiteral("sideBarVersion"));
     sideBarVersion->setContentsMargins(4, 0, 4, 4);

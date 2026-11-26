@@ -140,6 +140,13 @@ ccmeeting_add_test(test_storage_users
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/core/storage.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/data/meeting_history.cpp")
 target_link_libraries(test_storage_users PRIVATE Qt6::Sql)
+
+# 主窗口骨架：账号操作（退出登录/注销账号）必须在用户卡里
+ccmeeting_add_test(test_main_window_ui
+    test_main_window_ui.cpp
+    "${CMAKE_CURRENT_SOURCE_DIR}/../include/ui/shell/main_window_ui.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/shell/main_window_ui.cpp")
+target_link_libraries(test_main_window_ui PRIVATE Qt6::Widgets)
 # 主题令牌：颜色有效 / 对比度 / 灰调 / hover 区分度
 ccmeeting_add_test(test_theme_tokens
     test_theme_tokens.cpp)

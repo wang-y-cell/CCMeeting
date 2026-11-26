@@ -36,6 +36,8 @@ signals:
 private slots:
     /** @brief 退出登录 */
     void onLogoutClicked();
+    /** @brief 注销账号（服务端删除 + 清本机数据 + 回登录界面） */
+    void onDeleteAccountClicked();
     /** @brief 服务端确认开会/入会成功 → 写会议记录 */
     void onMeetingConfirmed(bool created, int roomNo);
     /** @brief 会议结束 → 回填时长并刷新列表 */
@@ -69,11 +71,18 @@ private:
     void build_pages();
     /** @brief 刷新「最近会议」列表（创建页 / 记录页 / 加入页各刷一份） */
     void refresh_meeting_summaries();
+    /** @brief 按标签实际宽度重新省略用户卡上的昵称/简介 */
+    void update_user_card_text();
 
     MainWindowUi ui;
     ui::MeetingWindow *widget = nullptr;
     /** 主窗口是否因会议而隐藏（避免重复 hide/show） */
     bool hidden_for_meeting_ = false;
+    /** 注销账号请求进行中（避免重复点击） */
+    bool _deletingAccount = false;
+    /** 用户卡完整文本（省略前），布局变化时据此重算 */
+    QString _userCardName;
+    QString _userCardInfo;
 
     /** 页面注册表：外壳只依赖它，不再硬编码具体页面类 */
     ui::PageRegistry m_pages;

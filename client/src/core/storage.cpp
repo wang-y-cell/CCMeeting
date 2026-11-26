@@ -327,6 +327,33 @@ void Storage::close_user_data() {
     _user_path.clear();
 }
 
+void Storage::purge_user_data(qint64 user_id) {
+    if (user_id <= 0) {
+        return;
+    }
+    if (_user_open && _user_id == user_id) {
+        close_user_data();
+    }
+
+    const QString path = user_database_path(user_id);
+    if (path.isEmpty()) {
+        return;
+    }
+    // WAL 模式还有 -wal / -shm 两个附属文件，一起删
+    QFile::remove(path);
+    QFile::remove(path + QStringLiteral("-wal"));
+    QFile::remove(path + QStringLiteral("-shm"));
+
+    const QString dir = QFileInfo(path).absolutePath();
+    if (QDir(dir).removeRecursively()) {
+        spdlog::info("[Storage] 已删除账号本地数据: {}",
+                     dir.toUtf8().constData());
+    } else {
+        spdlog::warn("[Storage] 删除账号本地数据失败: {}",
+                     dir.toUtf8().constData());
+    }
+}
+
 QSqlDatabase Storage::connection() const {
     if (!_open) {
         return QSqlDatabase();

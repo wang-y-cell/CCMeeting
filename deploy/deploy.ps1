@@ -1,7 +1,10 @@
-﻿param(
+param(
     [string]$Target = "all",
     [string]$Remote = "root@8.153.155.18",
-    [string]$RepoPath = "/root/code/CCMeeting"
+    [string]$RepoPath = "/root/code/CCMeeting",
+    # 要部署的 git ref；留空 = 沿用服务器脚本默认（origin/main）。
+    # 例：-Ref origin/refactor
+    [string]$Ref = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,8 +40,9 @@ foreach ($unit in (Get-ChildItem (Join-Path $deployDir "units") -Filter *.servic
 }
 
 # 4) 执行部署（失败由服务器脚本自动回滚）
-Write-Host "[deploy] running deploy.sh $Target ..." -ForegroundColor Cyan
-& ssh -o StrictHostKeyChecking=no $Remote "cd $RepoPath && bash deploy/deploy.sh $Target"
+Write-Host "[deploy] running deploy.sh $Target (ref=$($Ref -replace '^$','<server default>')) ..." -ForegroundColor Cyan
+$refPrefix = if ($Ref) { "REF=$Ref " } else { "" }
+& ssh -o StrictHostKeyChecking=no $Remote "cd $RepoPath && $refPrefix bash deploy/deploy.sh $Target"
 $exit = $LASTEXITCODE
 
 if ($exit -eq 0) {

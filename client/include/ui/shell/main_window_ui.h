@@ -13,7 +13,7 @@ public:
     QWidget *userCard = nullptr;
     QLabel *avatarLabel = nullptr;
     QLabel *nameLabel = nullptr;
-    QPushButton *btnLogout = nullptr;
+    QLabel *infoLabel = nullptr; ///< 昵称下方的简介（单行省略）
     QListWidget *sideNav = nullptr;
     QStackedWidget *contentStack = nullptr;
 

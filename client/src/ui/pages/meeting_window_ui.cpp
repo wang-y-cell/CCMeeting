@@ -64,8 +64,10 @@ QToolButton *makeToolButton(const QString &objectName, const QString &text,
         // 设备下拉箭头小一号；其余图标统一用中性色
         // （结束会议与麦克风/摄像头一致：图标本体不染色，红色只留给文字/斜杠）
         const int icon_size = is_device ? 12 : 18;
-        const QColor icon_color =
-            ui::ThemeManager::instance().color(QStringLiteral("icon"));
+        // 结束会议是危险操作：图标用 danger 色（与 QSS 的红色文字呼应）
+        const bool is_danger = objectName == QStringLiteral("leaveMeetingBtn");
+        const QColor icon_color = ui::ThemeManager::instance().color(
+            is_danger ? QStringLiteral("danger") : QStringLiteral("icon"));
         btn->setIcon(ui::IconProvider::instance().icon(it.value(), icon_color, icon_size));
         btn->setIconSize(QSize(icon_size, icon_size));
         if (is_device) {
@@ -298,14 +300,16 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
     verticalLayout->addLayout(main_box_layout, 1);
 
     // ---- 底栏工具条 ----
+    // 高度 = 按钮 44 + 上下各 6 的内边距；比原来（约 63）略紧凑，
+    // 按钮在条内垂直居中，不再靠不对称 margin 撑高。
     avToolbar = new QWidget(parent);
     avToolbar->setObjectName(QStringLiteral("avToolbar"));
-    avToolbar->setMinimumHeight(48);
+    avToolbar->setFixedHeight(56);
 
     auto *AV_box = new QHBoxLayout(avToolbar);
     AV_box->setObjectName(QStringLiteral("AV_box"));
     AV_box->setSpacing(0);
-    AV_box->setContentsMargins(8, 4, 8, 5);
+    AV_box->setContentsMargins(8, 0, 8, 0);
     AV_box->addItem(
         new QSpacerItem(20, 10, QSizePolicy::Expanding, QSizePolicy::Minimum));
 
@@ -314,7 +318,7 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
     auto *controlPillLayout = new QHBoxLayout(controlPill);
     controlPillLayout->setObjectName(QStringLiteral("controlPillLayout"));
     controlPillLayout->setSpacing(1);
-    controlPillLayout->setContentsMargins(4, 5, 4, 5);
+    controlPillLayout->setContentsMargins(4, 6, 4, 6);
 
     btnSideMembers =
         makeToolButton(QStringLiteral("btnSideMembers"), QObject::tr("成员"),

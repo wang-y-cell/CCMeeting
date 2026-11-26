@@ -21,9 +21,16 @@ public:
 
     void refreshFromSession();
 
+    /** @brief 账号操作按钮可用性（注销请求进行中置灰，防重复点击） */
+    void set_account_actions_enabled(bool enabled);
+
 signals:
     void backHomeRequested();
     void avatarUpdated();
+    /** @brief 用户点了「退出登录」（由主窗口负责清凭据并回登录界面） */
+    void logoutRequested();
+    /** @brief 用户点了「注销账号」（由主窗口负责调服务端并清本机数据） */
+    void deleteAccountRequested();
 
 private slots:
     void onEditProfileClicked();

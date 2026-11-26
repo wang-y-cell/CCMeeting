@@ -35,6 +35,14 @@ class AvatarUploadResult:
 
 
 @dataclass
+class DeleteAccountResult:
+    """注销账号结果（软删：status 置 0，登录会被拒绝）"""
+    success: bool = False
+    code: int = 0
+    message: str = ""
+
+
+@dataclass
 class ProfileUpdateResult:
     success: bool = False
     code: int = 0
@@ -276,3 +284,24 @@ class AuthService:
             extra_json=extra_json,
             user=user,
         )
+
+    # ------------------------------------------------------------ 注销账号
+    def delete_account(self, user_id: int) -> DeleteAccountResult:
+        """注销账号：软删除（status=0）。
+
+        选择软删而不是物理删除的原因：
+        - 登录已按 status 拒绝（见 login()），效果等价；
+        - 会议记录/登录日志等审计数据保留，误删可由管理员恢复；
+        - 不破坏外键（sys_user_profiles / sys_user_login_logs 仍指向该用户）。
+        """
+        if user_id == 0:
+            return DeleteAccountResult(code=400, message="user_id is required")
+
+        if not self._repo.user_exists(user_id):
+            return DeleteAccountResult(code=404, message="user not found")
+
+        if not self._repo.disable_user(user_id):
+            return DeleteAccountResult(code=500, message="failed to disable account")
+
+        logger.info("delete_account ok user_id=%s", user_id)
+        return DeleteAccountResult(success=True, code=0, message="ok")

@@ -8,6 +8,7 @@
     POST /api/register                 → 200 / 400 / 409 / 500
     POST /api/upload-avatar            → 200 / 400 / 404 / 413 / 500
     POST /api/update-profile           → 200 / 400 / 404 / 500
+    POST /api/delete-account           → 200 / 401 / 404 / 500
     其它                                → 404 {"code":404,"message":"not found","data":null}
 
 v2 与 v1 的差别：
@@ -235,6 +236,26 @@ def create_app(config: AuthServerConfig | None = None) -> FastAPI:
                 )
             payload["data"] = {"user": _user_payload(user)}
         return _json_response(status, payload)
+
+    # ------------------------------------------------------------ 注销账号
+    @app.post("/api/delete-account")
+    async def delete_account(request: Request) -> Response:
+        user_id = _authenticate(request)
+        if user_id is None:
+            return _error_response(401, "unauthorized")
+        # 身份只取 token；请求体（如果有）一律不读
+        result = service.delete_account(user_id)
+        if result.success:
+            return _json_response(200, {"code": 0, "message": "ok", "data": None})
+        status = 400
+        if result.code == 404:
+            status = 404
+        elif result.code == 500:
+            status = 500
+        return _json_response(
+            status,
+            {"code": result.code, "message": result.message, "data": None},
+        )
 
     # ------------------------------------------------------- 静态文件 / 兜底
     @app.get("/static/{file_path:path}")

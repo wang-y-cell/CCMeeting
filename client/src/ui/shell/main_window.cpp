@@ -9,15 +9,22 @@
 #include "config/preferences.h"
 #include "ui/composites/recent_meeting_list.h"
 #include "config/user_session.h"
+#include "core/storage.h"
+#include "ui/foundation/auth_http.h"
 
 #include <QEvent>
+#include <QFontMetrics>
 #include <QLabel>
 #include <QListWidget>
 #include <QAudioDevice>
 #include <QCameraDevice>
 #include <QElapsedTimer>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QMediaDevices>
 #include <QMessageBox>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
 #include <QTimer>
 #include <QMouseEvent>
 #include <QStackedWidget>
@@ -57,14 +64,15 @@ main_window::main_window(QWidget *parent) : FramelessWindow<QWidget>(parent) {
         connect(join_meeting_widget, &ui::JoinMeetingPage::join_requested, this,
                 &main_window::JoinMeeting_button_clicked);
     }
-    if (ui.btnLogout) {
-        connect(ui.btnLogout, &QPushButton::clicked, this,
-                &main_window::onLogoutClicked);
-    }
     connect(user_profile_widget, &ui::UserProfilePage::backHomeRequested, this,
             &main_window::onProfileBackHome);
     connect(user_profile_widget, &ui::UserProfilePage::avatarUpdated, this,
             &main_window::onProfileAvatarUpdated);
+    // 账号操作在个人资料页（退出登录 / 注销账号）
+    connect(user_profile_widget, &ui::UserProfilePage::logoutRequested, this,
+            &main_window::onLogoutClicked);
+    connect(user_profile_widget, &ui::UserProfilePage::deleteAccountRequested,
+            this, &main_window::onDeleteAccountClicked);
 
     // 预热 Qt Multimedia 设备枚举：首次 videoInputs() 冷启动 500ms+，
     // 放到主界面显示后的空闲时刻做完，之后打开设置页就不会再卡。
@@ -136,7 +144,25 @@ void main_window::refreshUserCard() {
     const auto &session = UserSession::instance();
     const QString displayName =
         session.isLoggedIn() ? session.name() : tr("未登录");
-    ui.nameLabel->setText(displayName);
+    const QString infoText =
+        session.isLoggedIn() ? session.info().trimmed() : QString();
+
+    // 卡片在 200px 侧栏里横排：侧栏内边距 20 + 卡片内边距 20 + 头像 44 + 间距 10
+    // → 文字可用宽度 = 卡片宽 - 74；构造期还没布局时按侧栏实际尺寸兜底 106
+    // 字号由 QSS 决定，这里只负责「按实际可用宽度省略」：
+    // 文字宽度取标签真实宽度（布局完成后才有值），构造期兜底用侧栏常量。
+    // 卡片尺寸变化时（见 eventFilter 的 Resize 分支）会重新算一遍。
+    if (ui.nameLabel) {
+        ui.nameLabel->setText(displayName);
+    }
+    if (ui.infoLabel) {
+        // 没有简介时给一句占位，避免卡片高度随资料有无而跳动
+        ui.infoLabel->setText(infoText.isEmpty() ? tr("暂无简介") : infoText);
+        ui.infoLabel->setToolTip(infoText.isEmpty() ? tr("暂无简介") : infoText);
+    }
+    _userCardName = displayName;
+    _userCardInfo = infoText;
+    update_user_card_text();
 
     // 头像未就绪时显示姓名首字，避免侧栏出现一个空白圆圈
     const QString monogram =
@@ -160,6 +186,10 @@ void main_window::refreshUserCard() {
 }
 
 bool main_window::eventFilter(QObject *watched, QEvent *event) {
+    if (watched == ui.userCard && event->type() == QEvent::Resize) {
+        // 卡片拿到真实宽度后重新省略文字（构造期宽度还没算出来）
+        update_user_card_text();
+    }
     if (watched == ui.userCard && event->type() == QEvent::MouseButtonRelease) {
         auto *mouseEvent = static_cast<QMouseEvent *>(event);
         if (mouseEvent->button() == Qt::LeftButton) {
@@ -180,6 +210,30 @@ void main_window::onUserCardClicked() {
     if (ui.contentStack) {
         ui.contentStack->setCurrentWidget(user_profile_widget);
     }
+}
+
+void main_window::update_user_card_text() {
+    if (!ui.nameLabel || !ui.infoLabel) {
+        return;
+    }
+
+    // 可用宽度优先取标签真实宽度（布局完成后才有值）；
+    // 构造期还没布局时按侧栏常量兜底：200 - 20(侧栏内边距) - 20(卡片内边距)
+    // - 44(头像) - 10(间距) = 106。
+    int textWidth = ui.infoLabel->width();
+    if (textWidth <= 0) {
+        textWidth = 106;
+    }
+
+    const QFontMetrics nameMetrics(ui.nameLabel->font());
+    ui.nameLabel->setText(
+        nameMetrics.elidedText(_userCardName, Qt::ElideRight, textWidth));
+
+    const QFontMetrics infoMetrics(ui.infoLabel->font());
+    const QString shown =
+        _userCardInfo.isEmpty() ? tr("暂无简介") : _userCardInfo;
+    ui.infoLabel->setText(
+        infoMetrics.elidedText(shown, Qt::ElideRight, textWidth));
 }
 
 void main_window::onProfileBackHome() {
@@ -447,4 +501,79 @@ void main_window::onLogoutClicked() {
     LoginStore::clear();
     spdlog::info("[main_window] logout requested");
     emit logoutRequested();
+}
+
+void main_window::onDeleteAccountClicked() {
+    const auto &session = UserSession::instance();
+    if (!session.isLoggedIn() || session.token().isEmpty()) {
+        QMessageBox::warning(this, tr("注销账号"), tr("请先登录"));
+        return;
+    }
+    if (_deletingAccount) {
+        return;
+    }
+
+    const auto answer = QMessageBox::warning(
+        this, tr("注销账号"),
+        tr("将永久注销账号「%1」，并删除本机的会议记录与录制索引，无法恢复。\n\n"
+           "确定继续？")
+            .arg(session.username()),
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+    if (answer != QMessageBox::Yes) {
+        return;
+    }
+
+    _deletingAccount = true;
+    if (user_profile_widget) {
+        user_profile_widget->set_account_actions_enabled(false);
+    }
+
+    auto *nam = new QNetworkAccessManager(this);
+    const qint64 deleted_user = session.userId();
+    QNetworkReply *reply = nam->post(
+        ui::auth_request(ui::auth_url(QStringLiteral("/api/delete-account"))),
+        QByteArrayLiteral("{}"));
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, nam, deleted_user]() {
+                const QByteArray body = reply->readAll();
+                const QString network_error = reply->errorString();
+                const bool failed = reply->error() != QNetworkReply::NoError;
+                reply->deleteLater();
+                nam->deleteLater();
+
+                _deletingAccount = false;
+                if (user_profile_widget) {
+                    user_profile_widget->set_account_actions_enabled(true);
+                }
+
+                const QJsonObject root =
+                    QJsonDocument::fromJson(body).object();
+                const int code = root.value(QStringLiteral("code")).toInt(-1);
+                if (failed || code != 0) {
+                    QString reason =
+                        root.value(QStringLiteral("message")).toString();
+                    if (code == 404 &&
+                        reason == QStringLiteral("not found")) {
+                        // 认证服务还是旧版本：没有 /api/delete-account 这条路由
+                        reason = tr("服务端未启用注销接口，请更新并重启认证服务");
+                    } else if (code == 401 || code == 403) {
+                        reason = tr("登录状态已失效，请重新登录后再试");
+                    } else if (reason.isEmpty()) {
+                        reason = network_error;
+                    }
+                    spdlog::warn("[main_window] delete account failed: code={} {}",
+                                 code, reason.toUtf8().constData());
+                    QMessageBox::warning(
+                        this, tr("注销账号"),
+                        tr("注销失败：%1").arg(reason));
+                    return;
+                }
+
+                // 服务端已注销：清本地凭据 + 账号库（会议记录/录制索引），回登录界面
+                spdlog::info("[main_window] account deleted, purging local data");
+                LoginStore::clear();
+                Storage::instance().purge_user_data(deleted_user);
+                UserSession::instance().clear();
+                emit logoutRequested();
+            });
 }

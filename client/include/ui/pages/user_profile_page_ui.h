@@ -24,6 +24,8 @@ public:
     QLabel *valueInfo = nullptr;
     QPushButton *editProfileBtn = nullptr;
     QPushButton *backHomeBtn = nullptr;
+    QPushButton *logoutBtn = nullptr;        ///< 退出登录（回登录界面）
+    QPushButton *deleteAccountBtn = nullptr; ///< 注销账号（服务端删除 + 清本机数据）
     QScrollArea *scrollArea = nullptr;
 
     void setupUi(QWidget *parent);

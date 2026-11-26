@@ -156,5 +156,19 @@ void ui::UserProfilePageUi::setupUi(QWidget *parent) {
     actionRow->addWidget(backHomeBtn);
 
     actionRow->addStretch(1);
+
+    // 账号操作靠右：退出登录（中性）/ 注销账号（危险色）
+    logoutBtn = new QPushButton(QObject::tr("退出登录"), parent);
+    logoutBtn->setObjectName(QStringLiteral("profileLogoutBtn"));
+    logoutBtn->setCursor(Qt::PointingHandCursor);
+    logoutBtn->setToolTip(QObject::tr("清除本机保存的账号，返回登录界面"));
+    actionRow->addWidget(logoutBtn, 0, Qt::AlignVCenter);
+
+    deleteAccountBtn = new QPushButton(QObject::tr("注销账号"), parent);
+    deleteAccountBtn->setObjectName(QStringLiteral("deleteAccountBtn"));
+    deleteAccountBtn->setCursor(Qt::PointingHandCursor);
+    deleteAccountBtn->setToolTip(QObject::tr("永久注销当前账号并清除本机数据"));
+    actionRow->addWidget(deleteAccountBtn, 0, Qt::AlignVCenter);
+
     root->addLayout(actionRow);
 }

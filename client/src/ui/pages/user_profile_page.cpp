@@ -22,6 +22,20 @@ ui::UserProfilePage::UserProfilePage(QWidget *parent) : Page(parent) {
             &ui::UserProfilePage::onEditProfileClicked);
     connect(ui.backHomeBtn, &QPushButton::clicked, this,
             &ui::UserProfilePage::backHomeRequested);
+    // 账号操作：本页只发信号，具体逻辑（清凭据/调服务端/清库）在主窗口
+    connect(ui.logoutBtn, &QPushButton::clicked, this,
+            &ui::UserProfilePage::logoutRequested);
+    connect(ui.deleteAccountBtn, &QPushButton::clicked, this,
+            &ui::UserProfilePage::deleteAccountRequested);
+}
+
+void ui::UserProfilePage::set_account_actions_enabled(bool enabled) {
+    if (ui.logoutBtn) {
+        ui.logoutBtn->setEnabled(enabled);
+    }
+    if (ui.deleteAccountBtn) {
+        ui.deleteAccountBtn->setEnabled(enabled);
+    }
 }
 
 void ui::UserProfilePage::refreshFromSession() {
