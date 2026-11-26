@@ -133,6 +133,13 @@ ccmeeting_add_test(test_local_store
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/core/storage.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/../src/data/meeting_history.cpp")
 target_link_libraries(test_local_store PRIVATE Qt6::Sql)
+
+# 存储分级：共享库（偏好/凭据）+ 按账号分库（会议记录/录制），含旧数据迁移
+ccmeeting_add_test(test_storage_users
+    test_storage_users.cpp
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/core/storage.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/data/meeting_history.cpp")
+target_link_libraries(test_storage_users PRIVATE Qt6::Sql)
 # 主题令牌：颜色有效 / 对比度 / 灰调 / hover 区分度
 ccmeeting_add_test(test_theme_tokens
     test_theme_tokens.cpp)

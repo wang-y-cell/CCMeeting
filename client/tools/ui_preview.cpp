@@ -447,6 +447,8 @@ int run_meeting_history_selftest() {
         std::printf("[hist-test] 存储不可用，无法验证会议记录\n");
         return 1;
     }
+    // 会议记录按账号分库：自检固定用 user_id = 1
+    Storage::instance().open_user_data(1);
     meeting_repository().clear();
     std::printf("[hist-test] 存储路径 %s\n",
                 meeting_repository().storage_path().toUtf8().constData());

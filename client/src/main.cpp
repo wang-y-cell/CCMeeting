@@ -427,6 +427,15 @@ int main(int argc, char *argv[]) {
                  qutf8(session.name()));
     flush_log();
 
+    // 会议记录/录制索引按账号分库（users/user_<id>/ccmeeting.db）：
+    // 登录成功后再打开；未登录时不打开（历史/录制功能静默停用）。
+    if (!Storage::instance().open_user_data(session.userId())) {
+        spdlog::warn("[main] 账号库打开失败（user_id={}），"
+                     "本次会议记录/录制索引不可用",
+                     session.userId());
+    }
+    flush_log();
+
     spdlog::info("[main] constructing main_window ...");
     flush_log();
     std::unique_ptr<main_window> main_windowDialog;

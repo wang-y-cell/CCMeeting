@@ -20,6 +20,9 @@ private slots:
         QCoreApplication::setOrganizationName(QStringLiteral("CCMeetingTests"));
         QVERIFY(Storage::instance().open());
         QVERIFY(Storage::instance().isOpen());
+        // 会议记录/录制索引在账号库里：测试固定用 user_id = 1
+        QVERIFY(Storage::instance().open_user_data(1));
+        QVERIFY(Storage::instance().is_user_open());
     }
 
     void init() {

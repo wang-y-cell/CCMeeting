@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -67,6 +68,58 @@ void apply_sidecar_meta(RecordingEntry &entry) {
     }
 }
 
+/**
+ * @brief 录制文件归属登记
+ *
+ * 录制目录是共享的（默认 Videos/CCMeeting，所有账号写同一个目录），
+ * 而录制索引按账号分库存。为了不让 A 的录制出现在 B 的列表里，
+ * 在共享库里登记「文件 → 账号」，扫描时跳过别人的文件。
+ */
+QSqlDatabase owners_db() { return Storage::instance().connection(); }
+
+qint64 recording_owner(const QString &path) {
+    QSqlDatabase db = owners_db();
+    if (!db.isValid() || path.isEmpty()) {
+        return 0;
+    }
+    QSqlQuery query(db);
+    query.prepare(
+        QStringLiteral("SELECT user_id FROM recording_owners WHERE path = ?"));
+    query.addBindValue(path);
+    if (!query.exec() || !query.next()) {
+        return 0;
+    }
+    return query.value(0).toLongLong();
+}
+
+/** @brief 把文件登记给当前账号（已有归属时不覆盖） */
+void claim_recording(const QString &path) {
+    const qint64 me = Storage::instance().current_user_id();
+    QSqlDatabase db = owners_db();
+    if (!db.isValid() || path.isEmpty() || me <= 0) {
+        return;
+    }
+    QSqlQuery query(db);
+    query.prepare(QStringLiteral(
+        "INSERT OR IGNORE INTO recording_owners(path, user_id, claimed_at) "
+        "VALUES(?, ?, ?)"));
+    query.addBindValue(path);
+    query.addBindValue(me);
+    query.addBindValue(QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
+    query.exec();
+}
+
+void release_recording(const QString &path) {
+    QSqlDatabase db = owners_db();
+    if (!db.isValid() || path.isEmpty()) {
+        return;
+    }
+    QSqlQuery query(db);
+    query.prepare(QStringLiteral("DELETE FROM recording_owners WHERE path = ?"));
+    query.addBindValue(path);
+    query.exec();
+}
+
 }  // namespace
 
 QString RecordingEntry::startedText() const {
@@ -90,13 +143,13 @@ QString RecordingEntry::sizeText() const {
 
 // ---- 数据库辅助：录制元数据入库，列表优先从库读 ----
 
-bool db_ready() { return Storage::instance().isOpen(); }
+bool db_ready() { return Storage::instance().is_user_open(); }
 
 void upsert_db_entry(const RecordingEntry &entry) {
     if (!db_ready() || entry.filePath.isEmpty()) {
         return;
     }
-    QSqlQuery query(Storage::instance().connection());
+    QSqlQuery query(Storage::instance().data_connection());
     query.prepare(QStringLiteral(
         "INSERT INTO recordings(path, title, room_no, started_at, duration_ms, "
         "size_bytes) VALUES(?, ?, ?, ?, ?, ?) "
@@ -120,7 +173,7 @@ QVector<RecordingEntry> load_db_entries() {
     if (!db_ready()) {
         return entries;
     }
-    QSqlQuery query(Storage::instance().connection());
+    QSqlQuery query(Storage::instance().data_connection());
     if (!query.exec(QStringLiteral(
             "SELECT path, title, started_at, size_bytes, room_no, duration_ms "
             "FROM recordings ORDER BY started_at DESC"))) {
@@ -151,6 +204,7 @@ void sync_db_from_files() {
         knownPaths.insert(entry.filePath);
     }
 
+    const qint64 me = Storage::instance().current_user_id();
     QDir dir(RecordingLibrary::recordingsDir());
     const QFileInfoList files =
         dir.entryInfoList({QStringLiteral("*.mp4"), QStringLiteral("*.mkv")},
@@ -161,6 +215,14 @@ void sync_db_from_files() {
         onDisk.insert(path);
         if (knownPaths.contains(path)) {
             continue;
+        }
+        // 别的账号录的文件：不认领、不入本账号的库
+        const qint64 owner = recording_owner(path);
+        if (owner != 0 && owner != me) {
+            continue;
+        }
+        if (owner == 0) {
+            claim_recording(path); // 无主文件（例如升级前录的）：归当前账号
         }
         RecordingEntry entry;
         entry.filePath = path;
@@ -175,7 +237,7 @@ void sync_db_from_files() {
         if (onDisk.contains(entry.filePath)) {
             continue;
         }
-        QSqlQuery query(Storage::instance().connection());
+        QSqlQuery query(Storage::instance().data_connection());
         query.prepare(QStringLiteral("DELETE FROM recordings WHERE path = ?"));
         query.addBindValue(entry.filePath);
         query.exec();
@@ -233,6 +295,8 @@ void RecordingLibrary::write_meta(const QString &video_path, int room_no,
         spdlog::warn("[RecordingLibrary] 无法写入元数据 {}",
                      file.fileName().toUtf8().constData());
     }
+    // 归属登记：录制一结束就把文件记到当前账号名下，扫描时不至于被别的账号认领
+    claim_recording(QFileInfo(video_path).absoluteFilePath());
     upsert_db_entry(RecordingEntry{QFileInfo(video_path).absoluteFilePath(),
                                    QFileInfo(video_path).completeBaseName(),
                                    started_at,
@@ -241,13 +305,11 @@ void RecordingLibrary::write_meta(const QString &video_path, int room_no,
 }
 
 QVector<RecordingEntry> RecordingLibrary::scan() {
-    if (Storage::instance().isOpen()) {
+    if (Storage::instance().is_user_open()) {
         sync_db_from_files();
-        const QVector<RecordingEntry> fromDb = load_db_entries();
-        if (!fromDb.isEmpty()) {
-            return fromDb;
-        }
-        // 库里没有但磁盘有（例如库被清空）→ 回落文件系统
+        // 只返回本账号库里的条目：录制目录是共享的，不能回落到"整目录扫描"，
+        // 否则会把别的账号的录制也列出来。
+        return load_db_entries();
     }
     return scan_files();
 }
@@ -283,8 +345,8 @@ QVector<RecordingEntry> RecordingLibrary::scan_files() {
 qint64 RecordingLibrary::total_bytes(int *count) {
     qint64 bytes = 0;
     int files = 0;
-    if (Storage::instance().isOpen()) {
-        QSqlQuery query(Storage::instance().connection());
+    if (Storage::instance().is_user_open()) {
+        QSqlQuery query(Storage::instance().data_connection());
         if (query.exec(QStringLiteral(
                 "SELECT COUNT(*), COALESCE(SUM(size_bytes), 0) FROM recordings")) &&
             query.next()) {
@@ -309,12 +371,14 @@ bool RecordingLibrary::remove(const RecordingEntry &entry) {
     }
     bool ok = QFile::remove(entry.filePath);
     QFile::remove(meta_path_for(entry.filePath));
-    if (Storage::instance().isOpen()) {
-        QSqlQuery query(Storage::instance().connection());
+    if (Storage::instance().is_user_open()) {
+        QSqlQuery query(Storage::instance().data_connection());
         query.prepare(QStringLiteral("DELETE FROM recordings WHERE path = ?"));
         query.addBindValue(entry.filePath);
         query.exec();
     }
+    // 文件没了就把归属也清掉，避免共享库里残留无意义登记
+    release_recording(entry.filePath);
     if (!ok) {
         spdlog::warn("[RecordingLibrary] 删除失败 {}",
                      entry.filePath.toUtf8().constData());

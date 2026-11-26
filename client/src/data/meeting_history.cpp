@@ -32,12 +32,13 @@ QString format_duration(qint64 ms) {
 
 /** 数据库连接不可用时只提示一次，避免每次调用刷日志 */
 QSqlDatabase open_database(const char *where) {
-    QSqlDatabase db = Storage::instance().connection();
+    // 会议记录在「账号库」里：未登录/账号库没打开时历史功能静默停用
+    QSqlDatabase db = Storage::instance().data_connection();
     if (!db.isValid()) {
         static bool warned = false;
         if (!warned) {
             warned = true;
-            spdlog::warn("[MeetingHistory] 数据库不可用，会议记录功能停用（{}）",
+            spdlog::warn("[MeetingHistory] 账号库不可用，会议记录功能停用（{}）",
                          where);
         }
     }
@@ -89,7 +90,7 @@ QString MeetingRecord::durationText() const {
 }
 
 QString MeetingHistory::storage_path() {
-    return Storage::instance().databasePath();
+    return Storage::instance().data_database_path();
 }
 
 QVector<MeetingRecord> MeetingHistory::load() {
