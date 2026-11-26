@@ -3,6 +3,7 @@
         <file alias="demo-avatar.png">resources/images/demo-avatar.png</file>
         <file alias="default-avatar.svg">resources/images/default-avatar.svg</file>
         <file alias="loading.gif">resources/images/loading.gif</file>
+        <file alias="logo.svg">resources/images/logo.svg</file>
     </qresource>
     <qresource prefix="/ui/icons">
         <file alias="calendar.svg">resources/icons/calendar.svg</file>

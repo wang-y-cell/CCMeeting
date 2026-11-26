@@ -10,13 +10,10 @@ QDialog#login {
 
 /* ---------- 品牌区 ---------- */
 
+/* 品牌图标：放的是 logo 位图（自带圆角蓝底），这里不再画底/描边 */
 QLabel#logoLabel {
-    background-color: rgba(76, 141, 255, 0.16);
-    color: @primary;
-    border: 1px solid rgba(76, 141, 255, 0.28);
-    border-radius: 16px;
-    font-size: 22px;
-    font-weight: 700;
+    background: transparent;
+    border: none;
 }
 
 QLabel#brandLabel,

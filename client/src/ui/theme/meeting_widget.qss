@@ -9,6 +9,9 @@
 QWidget#meetingWidget {
     background-color: @canvas;
     border: 1px solid @border;
+    /* 圆角：与 Win11 DWM 的窗口圆角（8 DIP）一致，边框才能贴着弧线走；
+       DWM 不可用时 FramelessWindow 会回退成同名半径的遮罩 */
+    border-radius: 8px;
 }
 
 /* ---------- 顶部状态栏 ---------- */
@@ -21,9 +24,10 @@ QWidget#topStatusBar {
 /* ---------- 主画面 ---------- */
 
 QWidget#groupBox_2 {
+    background-clip: padding-box;
     background-color: @videoBackdrop;
     border: 1px solid @borderSoft;
-    border-radius: 0px;
+    border-radius: 12px;
     margin-top: 0;
     padding-top: 0;
 }
@@ -31,7 +35,7 @@ QWidget#groupBox_2 {
 VideoGLWidget#mainshow_label {
     background-color: @videoBackdrop;
     border: none;
-    border-radius: 0px;
+    border-radius: 12px;
 }
 
 /* 未入会时的画布占位提示 */
@@ -48,6 +52,7 @@ QTabWidget#tabWidget {
     background-color: @sidebar;
     border: 1px solid @borderSoft;
     border-radius: 12px;
+    background-clip: padding-box;
 }
 
 QTabWidget::pane {

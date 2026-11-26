@@ -1,5 +1,8 @@
 #include "ui/pages/login_window_ui.h"
 
+#include "config/global_config.h"
+
+#include <QIcon>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
@@ -29,10 +32,14 @@ void ui::LoginWindowUi::setupUi(QWidget *parent) {
     loginPageLayout->setSpacing(0);
     loginPageLayout->setContentsMargins(0, 0, 0, 0);
 
-    auto *logoLabel = new QLabel(QObject::tr("云"), loginPage);
+    // 品牌图标：用统一的 logo（矢量，按 DPR 取清晰位图）
+    auto *logoLabel = new QLabel(loginPage);
     logoLabel->setObjectName(QStringLiteral("logoLabel"));
     logoLabel->setAlignment(Qt::AlignCenter);
     logoLabel->setFixedSize(52, 52);
+    logoLabel->setPixmap(
+        QIcon(QString::fromLatin1(config::paths::logo)).pixmap(52, 52));
+    logoLabel->setScaledContents(true);
     loginPageLayout->addWidget(logoLabel, 0, Qt::AlignHCenter);
     loginPageLayout->addItem(
         new QSpacerItem(20, 18, QSizePolicy::Minimum, QSizePolicy::Fixed));

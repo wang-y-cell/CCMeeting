@@ -113,9 +113,9 @@ ui::MeetingWindow::MeetingWindow(QWidget *parent)
     init_connect();
     init_settings_popup();
 
-    // 会议窗口要直角：FramelessWindow 默认会在 showEvent 里申请 Win11 圆角，
-    // 直接调 disable_rounded_corners 会被随后的 showEvent 覆盖，必须走开关。
-    setRoundedCornersEnabled(false);
+    // 会议窗口也用圆角：FramelessWindow 默认会在 showEvent 里申请 Win11 圆角
+    // （Win10 自动回退为圆角遮罩）；显式打开，别再调 disable_rounded_corners。
+    setRoundedCornersEnabled(true);
     spdlog::debug("[MeetingWindow] ctor done");
     spdlog::default_logger()->flush();
 }

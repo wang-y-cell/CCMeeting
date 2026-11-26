@@ -12,6 +12,7 @@
 #include <QStandardPaths>
 #include <QFile>
 #include <QFileInfo>
+#include <QIcon>
 #include <QMessageLogContext>
 #include <QString>
 #include <cstdio>
@@ -249,6 +250,8 @@ int main(int argc, char *argv[]) {
     // QStandardPaths / QSettings 调用之前设置。
     QCoreApplication::setApplicationName(config::app::app_name.c_str());
     QCoreApplication::setApplicationVersion(config::app::ccmeeting_version.c_str());
+    // 窗口/任务栏/Alt-Tab 图标（用统一 logo）
+    app.setWindowIcon(QIcon(QString::fromLatin1(config::paths::logo)));
     // 注意：不要把 organizationName 也设成 CCMeeting —— QStandardPaths 的
     // AppLocalDataLocation 规则是 <AppData>/<org>/<app>，会多出一层目录。
 

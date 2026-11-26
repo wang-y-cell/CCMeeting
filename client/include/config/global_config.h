@@ -72,6 +72,8 @@ inline constexpr const char *calendar_popup = ":/Style/source/calendar_popup.qss
 /** @brief 其它资源 */
 inline constexpr const char *message_sound = ":/ui/audio/message.wav";
 inline constexpr const char *loading_gif = ":/ui/images/loading.gif";
+/** @brief 应用图标（矢量；窗口/任务栏/登录页都用它） */
+inline constexpr const char *logo = ":/ui/images/logo.svg";
 
 }  // namespace paths
 
