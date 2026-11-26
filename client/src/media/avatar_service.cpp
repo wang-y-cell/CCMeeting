@@ -71,24 +71,12 @@ QPixmap renderLocalAvatar(const QSize& targetSize) {
     return pixmap;
 }
 
-/**
- * @brief 是否指向服务端的默认头像
- *
- * 默认头像一律由客户端内置 SVG 提供，不再向服务端请求。
- * 这里按**路径后缀**判断（不限 host / 端口 / 协议），
- * 这样历史上写进数据库的 `http://IP:9000/static/avatar/default.png`
- * 和现在的 `https://IP/static/avatar/default.png` 都会被识别。
- */
-bool is_server_default_avatar(const QString& url) {
-    if (url.isEmpty()) {
-        return false;
-    }
-    return QUrl(url).path().endsWith(QStringLiteral("/static/avatar/default.png"));
-}
 
+///判断是否是默认头像,如果是默认头像就返回默认头像的地址
+///否则返回请求的网络头像地址
 QString resolvedAvatarUrl(const QString& url) {
     // 空头像与服务端默认头像都落到客户端内置 SVG，避免无意义的远程请求。
-    if (url.isEmpty() || is_server_default_avatar(url)) {
+    if (url.isEmpty()) {
         return QString::fromLatin1(kDefaultAvatarResource);
     }
     return url;

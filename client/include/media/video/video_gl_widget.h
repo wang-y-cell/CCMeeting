@@ -1,30 +1,45 @@
 #ifndef VIDEOGLWIDGET_H
 #define VIDEOGLWIDGET_H
 
+#include <QColor>
 #include <QImage>
 #include <QMutex>
-#include <QOpenGLExtraFunctions>
-#include <QOpenGLShaderProgram>
-#include <QOpenGLWidget>
 #include <QRect>
-#include <QResizeEvent>
 #include <QSize>
+#include <QWidget>
 
 #include <xrtc/xrtc_defines.h>
 
 #include "media/video/video_style.h"
 
+class QPainter;
+
 /**
- * @brief 会议画面 OpenGL 控件。
+ * @brief 会议画面控件（CPU 光栅渲染）
+ *
+ * 历史与取舍：
+ * 原实现继承 QOpenGLWidget，把 I420 三平面直接上传 GPU 转 RGB。
+ * 但 Qt 有个硬性设计——「窗口里只要有一个 QOpenGLWidget，整个顶层窗口就切成
+ * OpenGL 合成」（Qt 文档：Adding a QOpenGLWidget into a window turns on
+ * OpenGL-based compositing for the entire window）。于是：
+ *   - 窗口的合成缓冲带上 alpha 通道；
+ *   - 每次窗口尺寸变化都要整窗重绘 + 整窗 GL 合成 + swapBuffers；
+ *   - 期间「窗口已经是新尺寸、内容还没画完」的那几帧没有不透明内容，
+ *     表现就是缩放时闪烁/透出桌面；小数 DPI 下还会在边缘留一条 1px 缝。
+ *
+ * 改成 QWidget + QPainter 直绘后，窗口回到普通光栅表面：
+ *   - 不再整窗 GL 合成、不再带 alpha，缩放由 Qt 后备缓冲 + 系统背景兜底；
+ *   - 说话绿框直接画在 paintEvent 里（不再叠加独立子控件）；
+ *   - 对外 API 与原来完全一致，调用方无需改动。
  *
  * 两条显示路径：
- * - 视频：I420 三平面上传（Y/U/V），片元着色器转 RGB，避免 CPU 转 ARGB；
- * - 头像等静态图：QImage → RGBA 单纹理。
+ * - 视频：I420 → RGB32（BT.601，与旧片元着色器同一套系数），按 DrawMode 适配；
+ * - 头像等静态图：QImage（内部统一为 ARGB32 预乘），透明角落透出清屏色。
  *
  * setI420Frame / setFrame / clearFrame 均可跨线程调用；内部用互斥缓存最新帧，
- * 在 paintGL 中上传纹理并按 DrawMode 计算目标矩形后绘制。
+ * 在 paintEvent 中取走并转换。
  */
-class VideoGLWidget : public QOpenGLWidget, protected QOpenGLExtraFunctions {
+class VideoGLWidget : public QWidget {
     Q_OBJECT
 signals:
     /**
@@ -34,14 +49,12 @@ signals:
     void content_kind_changed(bool video);
 
 public:
-
     /**
-     * @brief 构造 OpenGL 画面控件
+     * @brief 构造画面控件
      * @param parent 父控件
      */
     explicit VideoGLWidget(QWidget *parent = nullptr);
-    /** @brief 释放 GL 资源（未 initializeGL 时安全跳过） */
-    ~VideoGLWidget() override;
+    ~VideoGLWidget() override = default;
 
     /**
      * @brief 一次性设置样式
@@ -55,12 +68,12 @@ public:
     VideoStyle style() const;
 
     /**
-     * @brief 提交一帧 I420 视频（移动语义；持有 frame.storage 至上传完成）
+     * @brief 提交一帧 I420 视频（移动语义；持有 frame.storage 至转换完成）
      * @param frame 须 valid()；可跨线程调用
      */
     void setI420Frame(xrtc::XRTCVideoFrame frame);
     /**
-     * @brief 提交 RGBA 图像（头像等）；内部转为 Format_RGBA8888
+     * @brief 提交 RGBA 图像（头像等）；内部转为 ARGB32 预乘
      * @param image 非空图像；可跨线程调用
      */
     void setFrame(QImage image);
@@ -71,7 +84,7 @@ public:
      * 否则会出现一圈/一块异色方块。
      */
     void setClearColor(const QColor &color);
-    /** @brief 清空画面（下一帧 paintGL 只清背景） */
+    /** @brief 清空画面（下一帧只画背景） */
     void clearFrame();
     /**
      * @brief 说话态：视频画边框、头像画圆环。
@@ -85,15 +98,17 @@ public:
     /** @brief 当前头像实际绘制矩形（控件坐标）；非头像返回空 */
     QRect avatar_rect() const;
 
+    /**
+     * @brief 离屏读回当前渲染结果（自检用）
+     * @note 保留原 QOpenGLWidget 的同名接口，行为等价于 grab()
+     */
+    QImage grabFramebuffer();
+
 protected:
-    /** @brief 编译着色器、创建 VBO */
-    void initializeGL() override;
-    /** @brief 尺寸变化时触发重绘 */
-    void resizeGL(int w, int h) override;
-    /** @brief 尺寸变化时同步说话边框 overlay */
+    /** @brief 取待绘制帧 → 转 RGB → 按 destRect 绘制 */
+    void paintEvent(QPaintEvent *event) override;
+    /** @brief 尺寸变化时请求重绘（destRect 依赖控件尺寸） */
     void resizeEvent(QResizeEvent *event) override;
-    /** @brief 取待绘制帧、上传纹理、按 destRect 画四边形 */
-    void paintGL() override;
 
 private:
     /** @brief 当前待绘 / 已绘内容类型 */
@@ -103,34 +118,8 @@ private:
         Rgba  ///< 头像等 RGBA
     };
 
-    /** @brief 删除纹理 / VBO / 着色器程序 */
-    void destroyGl();
-    /** @brief 确保 YUV→RGB 着色器已链接 */
-    bool ensureYuvProgram();
-    /** @brief 确保 RGBA 着色器已链接 */
-    bool ensureRgbaProgram();
-    /**
-     * @brief 按分辨率分配或复用 Y/U/V 纹理（U/V 为半分辨率）
-     * @param width  亮度宽
-     * @param height 亮度高
-     */
-    void ensureYuvTextures(int width, int height);
-    /**
-     * @brief 按分辨率分配或复用 RGBA 纹理
-     * @param width  宽
-     * @param height 高
-     */
-    void ensureRgbaTexture(int width, int height);
-    /**
-     * @brief 将 I420 平面上传到 Y/U/V 纹理（尊重 stride）
-     * @param frame 有效 I420 帧
-     */
-    void uploadI420(const xrtc::XRTCVideoFrame &frame);
-    /**
-     * @brief 将 RGBA8888 图像上传到GPU纹理,为后面的绘制做准备
-     * @param image 源图
-     */
-    void uploadRgba(const QImage &image);
+    /** @brief 在 GUI 线程取走缓存帧，必要时转换成 QImage */
+    void takePendingFrame();
     /**
      * @brief 按 DrawMode / 对齐计算帧在控件内的目标矩形
      * @param frameW 帧宽
@@ -141,12 +130,8 @@ private:
     QRect effectiveContentRect() const;
     /** @brief FixedSize 时用固定尺寸，否则用内容区尺寸 */
     QSize effectiveTargetSize() const;
-    /**
-     * @brief 绑定对应着色器与纹理，绘制 dest 四边形
-     * @param dest 目标矩形（控件坐标）
-     * @param yuv  true=I420 程序，false=RGBA 程序
-     */
-    void drawTexturedQuad(const QRectF &dest, bool yuv);
+    /** @brief 画说话提示：视频矩形框 / 头像圆环 */
+    void paintSpeakingBorder(QPainter &painter);
 
     DrawMode m_drawMode = DrawMode::FitWidgetSmooth; ///< 缩放适配模式
     QSize m_fixedOutputSize;   ///< FixedSize 输出尺寸
@@ -155,32 +140,20 @@ private:
     double m_heightFraction = 0.5; ///< 高度比例（ScaleToHeightFractionCentered）
 
     QMutex m_mutex;                      ///< 保护 pending 帧与标志
-    xrtc::XRTCVideoFrame m_pendingI420;  ///< 待上传的最新 I420
-    QImage m_pendingRgba;
-    QColor m_clearColor{7, 8, 11};                ///< 待上传的最新 RGBA
-    bool m_dirty = false;                ///< 有新帧待 paintGL 取走
-    bool m_clearRequested = false;       ///< 请求清空画面,表示是否请求清空画面
-    ContentKind m_pendingKind = ContentKind::None; ///< pending 帧类型,表示缓存的是视频帧还是头像图
+    xrtc::XRTCVideoFrame m_pendingI420;  ///< 待转换的最新 I420
+    QImage m_pendingRgba;                ///< 待绘制的最新 RGBA
+    QColor m_clearColor{7, 8, 11};       ///< 清屏色
+    bool m_dirty = false;                ///< 有新帧待取走
+    bool m_clearRequested = false;       ///< 请求清空画面
+    ContentKind m_pendingKind = ContentKind::None; ///< 缓存的是视频帧还是头像图
 
-    ContentKind m_drawnKind = ContentKind::None; ///< 当前纹理上已上传的类型
-    int m_videoW = 0; ///< 已上传帧宽
-    int m_videoH = 0; ///< 已上传帧高
+    QImage m_image;                      ///< 当前待绘图像（RGB32 / ARGB32_Premultiplied）
+    ContentKind m_drawnKind = ContentKind::None; ///< 当前已就绪的内容类型
+    int m_videoW = 0; ///< 当前图像宽
+    int m_videoH = 0; ///< 当前图像高
 
-    QOpenGLShaderProgram *m_yuvProgram = nullptr;  ///< I420→RGB
-    QOpenGLShaderProgram *m_rgbaProgram = nullptr; ///< RGBA 直出
-    GLuint m_vbo = 0;     ///< 四边形顶点（位置 + UV）
-    GLuint m_texY = 0;    ///< Y 平面
-    GLuint m_texU = 0;    ///< U 平面
-    GLuint m_texV = 0;    ///< V 平面
-    GLuint m_texRgba = 0; ///< RGBA 纹理
-    int m_yuvTexW = 0;    ///< YUV 纹理当前宽
-    int m_yuvTexH = 0;    ///< YUV 纹理当前高
-    int m_rgbaTexW = 0;   ///< RGBA 纹理当前宽
-    int m_rgbaTexH = 0;   ///< RGBA 纹理当前高
-    bool m_glReady = false; ///< initializeGL 是否已成功执行
-    QWidget *m_speakingOverlay = nullptr; ///< 说话绿框/头像圆环 overlay
-    bool m_speaking = false;
-    bool m_drawVideoBorder = true;
+    bool m_speaking = false;       ///< 是否说话态
+    bool m_drawVideoBorder = true; ///< 视频模式是否画边框
 };
 
-#endif // VIDEOGLWIDGET_H
+#endif

@@ -27,6 +27,7 @@ def _secret() -> bytes:
 
 
 def _b64url(raw: bytes) -> str:
+    """将raw字节序转化成url安全的序列,删除末尾生成的=并使aascii编码"""
     return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
 
 
@@ -36,10 +37,12 @@ def _b64url_decode(text: str) -> bytes:
 
 
 def _sign(payload: bytes) -> bytes:
+    """获得一段使用sha256算法计算payload得到的hash值"""
     return hmac.new(_secret(), payload, hashlib.sha256).digest()
 
 
 def issue_token(user_id: int, ttl_seconds: int = _TTL_SECONDS) -> str:
+    """计算token值并返回,token值包含用户id和截止时间"""
     exp = int(time.time()) + int(ttl_seconds)
     payload = f"{int(user_id)}:{exp}".encode("ascii")
     return f"{_b64url(payload)}.{_b64url(_sign(payload))}"

@@ -107,6 +107,19 @@ ccmeeting_add_test(test_protocol_dispatcher
 ccmeeting_add_test(test_video_style
     test_video_style.cpp)
 
+# 画面控件（CPU 光栅）：清屏色 / 头像透明角落 / I420 转换系数 / 说话边框，
+# 并加一条护栏防止有人把基类换回 QOpenGLWidget（那样会重新引入整窗 GL 合成
+# 与缩放闪烁）。xrtc 只有头文件依赖，独立构建时若缺 SDK 就跳过。
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/webrtcSDK/include/xrtc/xrtc_defines.h")
+    ccmeeting_add_test(test_video_widget
+        test_video_widget.cpp
+        "${CMAKE_CURRENT_SOURCE_DIR}/../include/media/video/video_gl_widget.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../src/media/video/video_gl_widget.cpp")
+    target_include_directories(test_video_widget PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/webrtcSDK/include")
+    target_link_libraries(test_video_widget PRIVATE Qt6::Widgets)
+endif()
+
 # 连接协调器：挂起/补发/建会入会动作（纯逻辑，无网络）
 ccmeeting_add_test(test_connect_coordinator
     test_connect_coordinator.cpp

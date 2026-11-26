@@ -783,6 +783,7 @@ private:
      * 避免逐帧累加误差。
      */
     void doResize(const QPoint &globalPos) {
+        //获得鼠标移动的相对位移
         const QPoint delta = globalPos - m_dragGlobalPos;
         const int region = static_cast<int>(m_resizeRegion);
 
@@ -872,23 +873,28 @@ private:
 
     /**
      * @brief 调度几何更新（节流到当前显示器刷新率）
+     * 根据频幕刷新率选择是否重绘
      *
      * - 距上次应用已超过间隔：立即应用（保证拖动跟手）
      * - 否则：挂起，由定时器在剩余时间后应用"最新目标"
      */
     void schedule_geometry_update() {
+        //根据屏幕分辨率设置绘制间隔
         const int interval = effective_geometry_interval();
         if (interval <= 0 || m_geometryTimer == nullptr) {
             flush_geometry_update();
             return;
         }
+        //还在计时中,跳过这一帧
         if (m_geometryTimer->isActive()) {
             ++m_geometryThrottleCount;
             return;
         }
+        //计算计时开始到现在过去的时间
         const qint64 elapsed = m_geometryApplied.isValid()
                                    ? m_geometryApplied.elapsed()
                                    : interval;
+        //如果距离上次计时超过一个interval,就重新计时,并修改窗口位置和缩放
         if (elapsed >= interval) {
             flush_geometry_update();
             return;
@@ -953,9 +959,9 @@ private:
     QElapsedTimer m_geometryApplied;     ///< 上次应用几何的时刻
     QPoint m_pendingDragPos;             ///< 挂起的拖动目标位置
     QRect m_pendingResizeGeometry;       ///< 挂起的缩放目标矩形
-    bool m_hasPendingDrag = false;       ///< 是否有缓存的位置
-    bool m_hasPendingResize = false;     ///是否有缓存的大小改变的位置
-    std::uint32_t m_geometryThrottleCount = 0; ///< 被合并的更新次数（自检用）
+    bool m_hasPendingDrag = false;       ///< 是否有缓存的位置变化
+    bool m_hasPendingResize = false;     ///<是否有新的窗口缩放缓存
+    std::uint32_t m_geometryThrottleCount = 0; ///< 重绘次数
     bool m_resizing = false;              ///< 是否正在拖边缩放
     bool m_resizable = true;              ///< 是否允许边缘缩放
     bool m_maximizable = true;            ///< 是否允许最大化（按钮/双击）
