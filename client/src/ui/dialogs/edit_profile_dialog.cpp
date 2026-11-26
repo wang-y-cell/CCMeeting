@@ -1,4 +1,5 @@
 #include "ui/dialogs/edit_profile_dialog.h"
+#include "config/global_config.h"
 
 #include "ui/foundation/auth_http.h"
 #include "ui/foundation/theme_manager.h"
@@ -52,7 +53,7 @@ ui::EditProfileDialog::EditProfileDialog(QWidget *parent)
 
     ui.setupUi(this);
     ui::ThemeManager::instance().apply_to(
-        this, QStringLiteral(":/Style/source/edit_profile_dialog.qss"));
+        this, QString::fromLatin1(config::paths::style::edit_profile));
     loadFromSession();
 
     connect(ui.changeAvatarBtn, &QPushButton::clicked, this,

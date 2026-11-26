@@ -1,4 +1,5 @@
 #include "media/avatar_service.h"
+#include "config/global_config.h"
 
 #include "ui/foundation/auth_http.h"
 
@@ -53,7 +54,7 @@ QPixmap scalePixmap(const QPixmap& source, const QSize& targetSize) {
     return source.scaled(targetSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 }
 
-constexpr const char *kDefaultAvatarResource = ":/ui/images/default-avatar.svg";
+constexpr const char *kDefaultAvatarResource = config::media::default_avatar;
 
 QPixmap renderLocalAvatar(const QSize& targetSize) {
     const QSize size = targetSize.isValid() ? targetSize : QSize(128, 128);

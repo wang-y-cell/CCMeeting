@@ -1,5 +1,7 @@
 #include "ui/shell/main_window_ui.h"
 
+#include "config/global_config.h"
+
 #include <QFont>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -16,23 +18,31 @@ void MainWindowUi::setupUi(QWidget *parent) {
     parent->setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
 
     auto *mainLayout = new QHBoxLayout(parent);
-    mainLayout->setContentsMargins(18, 42, 18, 18);
+    // 顶部留出标题栏高度（无边框窗口自己画标题栏）
+    mainLayout->setContentsMargins(config::ui::sidebar::outer_margin,
+                                   config::window::main_title_bar_height,
+                                   config::ui::sidebar::outer_margin,
+                                   config::ui::sidebar::outer_margin);
     mainLayout->setSpacing(16);
 
     auto *leftColumn = new QVBoxLayout();
-    leftColumn->setSpacing(12);
+    leftColumn->setSpacing(config::ui::sidebar::layout_spacing);
 
     userCard = new QWidget(parent);
     userCard->setObjectName(QStringLiteral("userProfile"));
     userCard->setCursor(Qt::PointingHandCursor);
     // 横排：左头像，右「昵称 + 简介」（账号操作在个人资料页里，不占卡片）
     auto *userLayout = new QHBoxLayout(userCard);
-    userLayout->setContentsMargins(10, 10, 10, 10);
-    userLayout->setSpacing(10);
+    userLayout->setContentsMargins(config::ui::sidebar::user_card_margin,
+                                   config::ui::sidebar::user_card_margin,
+                                   config::ui::sidebar::user_card_margin,
+                                   config::ui::sidebar::user_card_margin);
+    userLayout->setSpacing(config::ui::sidebar::user_card_spacing);
 
     avatarLabel = new QLabel(userCard);
     avatarLabel->setObjectName(QStringLiteral("userAvatar"));
-    avatarLabel->setFixedSize(44, 44);
+    avatarLabel->setFixedSize(config::ui::sidebar::user_avatar_side,
+                              config::ui::sidebar::user_avatar_side);
     avatarLabel->setAlignment(Qt::AlignCenter);
     avatarLabel->setScaledContents(true);
 
@@ -74,20 +84,27 @@ void MainWindowUi::setupUi(QWidget *parent) {
     // 侧边栏底部：连接状态 + 版本，给左下角一个落点，避免大片空白
     auto *sideBarStatus = new QLabel(QObject::tr("● 服务就绪"), parent);
     sideBarStatus->setObjectName(QStringLiteral("sideBarStatus"));
-    sideBarStatus->setContentsMargins(4, 0, 4, 0);
+    sideBarStatus->setContentsMargins(config::ui::sidebar::version_margin, 0,
+                                      config::ui::sidebar::version_margin, 0);
     leftColumn->addWidget(sideBarStatus);
 
-    // 退出登录 / 注销账号已移到用户卡里（见上面 userCard 的账号操作区）
-    auto *sideBarVersion = new QLabel(QStringLiteral("CloudMeeting 1.0"), parent);
+    // 版本号统一取 config::app::about_text（"CloudMeeting 1.2.0"）
+    auto *sideBarVersion =
+        new QLabel(QString::fromStdString(config::app::about_text), parent);
     sideBarVersion->setObjectName(QStringLiteral("sideBarVersion"));
-    sideBarVersion->setContentsMargins(4, 0, 4, 4);
+    sideBarVersion->setContentsMargins(config::ui::sidebar::version_margin, 0,
+                                       config::ui::sidebar::version_margin,
+                                       config::ui::sidebar::version_margin);
     leftColumn->addWidget(sideBarVersion);
 
     auto *leftWrap = new QWidget(parent);
     leftWrap->setObjectName(QStringLiteral("sideBar"));
-    leftWrap->setFixedWidth(200);
+    leftWrap->setFixedWidth(config::ui::sidebar::width);
     auto *leftWrapLayout = new QVBoxLayout(leftWrap);
-    leftWrapLayout->setContentsMargins(10, 10, 10, 10);
+    leftWrapLayout->setContentsMargins(config::ui::sidebar::inner_margin,
+                                       config::ui::sidebar::inner_margin,
+                                       config::ui::sidebar::inner_margin,
+                                       config::ui::sidebar::inner_margin);
     leftWrapLayout->setSpacing(0);
     leftWrapLayout->addLayout(leftColumn);
 

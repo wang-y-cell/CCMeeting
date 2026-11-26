@@ -1,4 +1,5 @@
 #include "ui/composites/calendar_popup.h"
+#include "config/global_config.h"
 
 #include "ui/foundation/icon_provider.h"
 #include "ui/foundation/theme_manager.h"
@@ -14,8 +15,8 @@
 namespace ui {
 
 namespace {
-constexpr int kCalendarWidth = 320;
-constexpr int kCalendarHeight = 252;
+constexpr int kCalendarWidth = config::ui::calendar::width;
+constexpr int kCalendarHeight = config::ui::calendar::height;
 }  // namespace
 
 CalendarPopup::CalendarPopup(QWidget *parent) : QDialog(parent) {
@@ -23,7 +24,7 @@ CalendarPopup::CalendarPopup(QWidget *parent) : QDialog(parent) {
     setAttribute(Qt::WA_TranslucentBackground);
     // 弹层是独立顶层窗口：自己套一份样式，不依赖父窗口的 stylesheet 继承
     ui::ThemeManager::instance().apply_to(
-        this, QStringLiteral(":/Style/source/calendar_popup.qss"));
+        this, QString::fromLatin1(config::paths::style::calendar_popup));
 
     auto *frame = new QFrame(this);
     frame->setObjectName(QStringLiteral("calendarPopup"));

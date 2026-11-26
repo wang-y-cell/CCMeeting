@@ -77,11 +77,11 @@ void ui::LoginWindowUi::setupUi(QWidget *parent) {
     loginPageLayout->addItem(
         new QSpacerItem(20, 24, QSizePolicy::Minimum, QSizePolicy::Expanding));
 
-    hintLabel =
-        new QLabel(QObject::tr("演示账号 demo / demo123"), loginPage);
-    hintLabel->setObjectName(QStringLiteral("hintLabel"));
-    hintLabel->setAlignment(Qt::AlignCenter);
-    loginPageLayout->addWidget(hintLabel);
+    //hintLabel =
+    //    new QLabel(QObject::tr("演示账号 demo / demo123"), loginPage);
+    //hintLabel->setObjectName(QStringLiteral("hintLabel"));
+    //hintLabel->setAlignment(Qt::AlignCenter);
+    //loginPageLayout->addWidget(hintLabel);
     loginPageLayout->addItem(
         new QSpacerItem(20, 10, QSizePolicy::Minimum, QSizePolicy::Fixed));
 

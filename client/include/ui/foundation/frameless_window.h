@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdint>
 
+#include "config/global_config.h"
 #include "ui/foundation/icon_provider.h"
 #include "ui/foundation/theme_manager.h"
 #include "ui/foundation/window_behavior.h"
@@ -327,7 +328,7 @@ protected:
         if (screen == nullptr) {
             return;
         }
-        constexpr int kSnapThreshold = 8;
+        constexpr int kSnapThreshold = config::window::snap_threshold;
         const QRect avail = screen->availableGeometry();
 
         if (global_pos.y() <= avail.top() + kSnapThreshold) {
@@ -451,9 +452,10 @@ private:
         return edges;
     }
 
-    static constexpr int kBorderWidth = 8; ///< 边缘可拖缩放的热区厚度（像素）
-    static constexpr int kBtnMargin = 6;   ///< 标题按钮距窗口右上边缘的边距
-    static constexpr int kBtnGap = 4;      ///< 最大化按钮与关闭按钮间距
+    static constexpr int kBorderWidth =
+        config::window::resize_border_width; ///< 边缘可拖缩放的热区厚度（像素）
+    static constexpr int kBtnMargin = config::window::title_button_margin;
+    static constexpr int kBtnGap = config::window::title_button_gap;
 
     /**
      * @brief 创建最大化、关闭按钮并绑定点击
@@ -469,11 +471,13 @@ private:
                                         const QString &tooltip) {
             auto *button = new QPushButton(this);
             button->setObjectName(object_name);
-            button->setFixedSize(32, 32);
+            button->setFixedSize(config::window::title_button_size,
+                                 config::window::title_button_size);
             button->setCursor(Qt::PointingHandCursor);
             button->setFocusPolicy(Qt::NoFocus);
             button->setToolTip(tooltip);
-            button->setIconSize(QSize(12, 12));
+            button->setIconSize(QSize(config::window::title_button_icon_size,
+                                      config::window::title_button_icon_size));
             return button;
         };
 
@@ -516,7 +520,8 @@ private:
                             const QColor &active) const {
         QIcon icon;
         const QPixmap normal_pm =
-            ui::IconProvider::instance().pixmap(name, normal, 12);
+            ui::IconProvider::instance().pixmap(name, normal,
+                                                config::window::title_button_icon_size);
         const QPixmap active_pm =
             ui::IconProvider::instance().pixmap(name, active, 12);
         if (!normal_pm.isNull()) {
@@ -980,7 +985,7 @@ private:
     QPushButton *m_maxBtn = nullptr;      ///< 最大化/还原按钮
     QPushButton *m_minBtn = nullptr;      ///< 最小化按钮
     QSize m_savedMaxSize;                 ///< 最大化前备份的 maximumSize
-    int m_titleBarHeight = 36;            ///< 可拖动标题栏高度（像素）
+    int m_titleBarHeight = config::window::default_title_bar_height; ///< 可拖动标题栏高度（像素）
 
     /// ----- 自检/性能诊断 -----
     bool m_roundedCornersApplied = false;  ///< 是否已申请过系统圆角

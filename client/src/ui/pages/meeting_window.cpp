@@ -1,4 +1,5 @@
 #include "ui/pages/meeting_window.h"
+#include "config/global_config.h"
 
 #include "app/meeting_session.h"
 #include "config/user_session.h"
@@ -166,7 +167,7 @@ void ui::MeetingWindow::init_ui() {
     setAttribute(Qt::WA_StyledBackground, true);
     setObjectName(QStringLiteral("meetingWidget"));
     ui::ThemeManager::instance().apply_to(
-        this, QStringLiteral(":/Style/source/meeting_widget.qss"));
+        this, QString::fromLatin1(config::paths::style::meeting_window));
 
     // 普通 QWidget 默认不绘制 stylesheet 背景，需显式开启，否则顶栏/底栏
     // 会透出根窗同色，分层看起来消失。
@@ -177,17 +178,17 @@ void ui::MeetingWindow::init_ui() {
 
     // 无边框窗的 QSS border 画在客户区内；左右下必须留 1px，
     // 否则子控件铺满会盖住边框，只剩左上角标题栏空隙露出来一段。
-    ui_.verticalLayout->setContentsMargins(1, 42, 1, 1);
-    setTitleBarHeight(42);
+    ui_.verticalLayout->setContentsMargins(1, config::window::meeting_title_bar_height, 1, 1);
+    setTitleBarHeight(config::window::meeting_title_bar_height);
 
-    const QRect pos(0.1 * Screen::width, 0.1 * Screen::height,
-                    0.8 * Screen::width, 0.8 * Screen::height);
+    const QRect pos(config::meeting::layout::window_margin_ratio * Screen::width, config::meeting::layout::window_margin_ratio * Screen::height,
+                    config::meeting::layout::window_size_ratio * Screen::width, config::meeting::layout::window_size_ratio * Screen::height);
     ui_.openAudio->setText(QString(OPENAUDIO).toUtf8());
     ui_.openVedio->setText(QString(OPENVIDEO).toUtf8());
 
-    const QRect size(pos.x(), pos.y(), pos.width() * 0.5, pos.height() * 0.5);
+    const QRect size(pos.x(), pos.y(), pos.width() * config::meeting::layout::session_window_scale, pos.height() * config::meeting::layout::session_window_scale);
     setGeometry(size);
-    setMinimumSize(QSize(pos.width() * 0.7, pos.height() * 0.7));
+    setMinimumSize(QSize(pos.width() * config::meeting::layout::min_window_scale, pos.height() * config::meeting::layout::min_window_scale));
     setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
 
     ui_.openAudio->setDisabled(true);
@@ -241,11 +242,11 @@ void ui::MeetingWindow::update_main_video_geometry() {
         return;
     }
     // 主画面固定 16:9，居中；两侧/上下留背景，不拉伸到整个容器
-    int videoW = qMin(area.width(), area.height() * 16 / 9);
-    int videoH = videoW * 9 / 16;
+    int videoW = qMin(area.width(), area.height() * config::meeting::layout::video_aspect_w / config::meeting::layout::video_aspect_h);
+    int videoH = videoW * config::meeting::layout::video_aspect_h / config::meeting::layout::video_aspect_w;
     if (videoH > area.height()) {
         videoH = area.height();
-        videoW = videoH * 16 / 9;
+        videoW = videoH * config::meeting::layout::video_aspect_w / config::meeting::layout::video_aspect_h;
     }
     ui_.mainshow_label->setGeometry((area.width() - videoW) / 2,
                                     (area.height() - videoH) / 2, videoW,
@@ -301,12 +302,12 @@ void ui::MeetingWindow::update_main_overlay() {
     if (name.isEmpty()) {
         _mainNameLabel->hide();
     } else {
-        const int margin = 10; //姓名标签距离视频边框的距离
+        const int margin = config::ui::meeting::name_badge_margin; //姓名标签距离视频边框的距离
         const int maxW = qMax(24, area.width() - 2 * margin);
         _mainNameLabel->setMaximumWidth(maxW);
         _mainNameLabel->adjustSize();
-        const int labelW = qMin(_mainNameLabel->sizeHint().width() + 12, maxW);
-        const int labelH = qMax(18, _mainNameLabel->sizeHint().height());
+        const int labelW = qMin(_mainNameLabel->sizeHint().width() + 2 * config::ui::meeting::name_badge_padding_h, maxW);
+        const int labelH = qMax(config::ui::meeting::name_badge_min_height, _mainNameLabel->sizeHint().height());
         _mainNameLabel->setGeometry(margin, area.height() - labelH - margin,
                                     labelW, labelH);
         _mainNameLabel->setAlignment(Qt::AlignCenter);

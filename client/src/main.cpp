@@ -36,6 +36,8 @@
 #include "ui/foundation/font_registry.h"
 #include "ui/foundation/window_effects.h"
 #include "ui/foundation/theme_manager.h"
+#include "config/global_config.h"
+
 
 #ifdef _WIN32
 #include <windows.h>
@@ -221,6 +223,8 @@ void on_terminate() {
 
 }  // namespace
 
+
+
 int main(int argc, char *argv[]) {
     //在程序因为未捕获的异常而即将崩溃（调用 std::terminate）时，
     //拦截这个异常，提取出有用的错误信息并记录到日志中，最后再安全地终止程序
@@ -243,8 +247,8 @@ int main(int argc, char *argv[]) {
     // 固定应用名：否则 %LOCALAPPDATA% 下的目录会跟随 exe 文件名变化，
     // 改名后会议记录/缓存会"丢失"（其实还在旧目录）。必须在任何
     // QStandardPaths / QSettings 调用之前设置。
-    QCoreApplication::setApplicationName(QStringLiteral("CCMeeting"));
-    QCoreApplication::setApplicationVersion(QStringLiteral("1.1"));
+    QCoreApplication::setApplicationName(config::app::app_name.c_str());
+    QCoreApplication::setApplicationVersion(config::app::ccmeeting_version.c_str());
     // 注意：不要把 organizationName 也设成 CCMeeting —— QStandardPaths 的
     // AppLocalDataLocation 规则是 <AppData>/<org>/<app>，会多出一层目录。
 
@@ -341,7 +345,7 @@ int main(int argc, char *argv[]) {
         };
         theme.set_theme(ui::ThemeManager::parse(mode, system_theme()));
 
-        if (theme.apply_global(QStringLiteral(":/Style/source/style.qss"))) {
+        if (theme.apply_global(QString::fromLatin1(config::paths::style::global))) {
             spdlog::info("[main] style.qss applied (theme={})",
                          ui::ThemeManager::name_of(theme.theme()).toStdString());
         } else {
@@ -400,7 +404,7 @@ int main(int argc, char *argv[]) {
 
     // 空闲预热 Qt Multimedia 设备枚举：首次 videoInputs() 冷启动 500ms+，
     // 若拖到用户第一次打开设置页才做，会表现为"点设置卡一下"。
-    QTimer::singleShot(1500, &loginDialog, []() {
+    QTimer::singleShot(config::ui::timing::device_warmup_ms, &loginDialog, []() {
         QElapsedTimer timer;
         timer.start();
         const auto cameras = QMediaDevices::videoInputs();

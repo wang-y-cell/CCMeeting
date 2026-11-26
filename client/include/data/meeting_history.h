@@ -2,6 +2,7 @@
 #define MEETING_HISTORY_H
 
 #include "data/meeting_record.h"
+#include "config/global_config.h"
 
 #include <QDateTime>
 #include <QVector>
@@ -43,7 +44,7 @@ public:
     static void set_now_override(const QDateTime &now);
 
     /** @brief 最多保留的条数 */
-    static constexpr int kMaxRecords = 100;
+    static constexpr int kMaxRecords = config::meeting::history_max_records;
 };
 
 #endif  // MEETING_HISTORY_H

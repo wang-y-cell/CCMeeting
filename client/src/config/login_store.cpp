@@ -1,4 +1,5 @@
 #include "config/login_store.h"
+#include "config/global_config.h"
 
 #include <QByteArray>
 #include "core/storage.h"
@@ -14,9 +15,9 @@ namespace {
 
 constexpr const char *kOrg = "CCMeeting";
 constexpr const char *kApp = "Client";
-constexpr const char *kKeyUser = "login/username";
-constexpr const char *kKeyPass = "login/password";
-constexpr const char *kKeyAuto = "login/auto";
+constexpr const char *kKeyUser = config::prefs::login_username;
+constexpr const char *kKeyPass = config::prefs::login_password;
+constexpr const char *kKeyAuto = config::prefs::login_auto;
 
 }  // namespace
 

@@ -2,6 +2,7 @@
 #define MEETING_RTC_OBSERVER_H
 
 #include <QHash>
+#include "config/global_config.h"
 #include <QObject>
 #include <QString>
 
@@ -90,7 +91,7 @@ private:
     std::atomic<bool> _localTalking{false};
 
 private:
-    inline static constexpr int audio_threshold = 4; //调整音量闪烁绿色边框的阈值大小
+    inline static constexpr int audio_threshold = config::meeting::audio_speaking_threshold; //调整音量闪烁绿色边框的阈值大小
 };
 
 #endif // MEETING_RTC_OBSERVER_H

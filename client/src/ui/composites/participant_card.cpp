@@ -1,4 +1,5 @@
 #include "ui/composites/participant_card.h"
+#include "config/global_config.h"
 
 #include "media/video/img_display.h"
 #include "media/video/video_gl_widget.h"
@@ -11,13 +12,13 @@
 #include <QResizeEvent>
 
 namespace {
-constexpr int kCardHMargin = 8;
-constexpr int kCardVPadding = 8;
-constexpr int kCardRadius = 12; //方框圆角半径
-constexpr int kNameMargin = 8; // 名称标签边距
-constexpr int kVideoAspectW = 16;
-constexpr int kVideoAspectH = 9;
-constexpr int kAvatarSide = 72;
+constexpr int kCardHMargin = config::ui::participant_card::h_margin;
+constexpr int kCardVPadding = config::ui::participant_card::v_padding;
+constexpr int kCardRadius = config::ui::participant_card::radius;
+constexpr int kNameMargin = config::ui::participant_card::name_margin;
+constexpr int kVideoAspectW = config::ui::participant_card::video_aspect_w;
+constexpr int kVideoAspectH = config::ui::participant_card::video_aspect_h;
+constexpr int kAvatarSide = config::ui::participant_card::avatar_side;
 }  // namespace
 
 ParticipantCard::ParticipantCard(qint64 userId, QWidget *parent)
@@ -122,7 +123,7 @@ void ParticipantCard::position_name_label() {
     _nameLabel->setMaximumWidth(maxW);
     _nameLabel->adjustSize();
     const int labelW = qMin(_nameLabel->sizeHint().width() + 12, maxW);
-    const int labelH = qMax(16, _nameLabel->sizeHint().height());
+    const int labelH = qMax(config::ui::participant_card::name_label_min_height, _nameLabel->sizeHint().height());
     const int videoW = qMax(1, width() - 2 * kCardHMargin);
     const int videoH = qMax(1, videoW * kVideoAspectH / kVideoAspectW);
     _nameLabel->setGeometry(kNameMargin,

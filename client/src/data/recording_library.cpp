@@ -1,4 +1,5 @@
 #include "data/recording_library.h"
+#include "config/global_config.h"
 
 #include <algorithm>
 
@@ -260,7 +261,7 @@ QString RecordingLibrary::recordingsDir() {
     if (base.isEmpty()) {
         base = QDir::homePath();
     }
-    const QString dir = QDir(base).filePath(QStringLiteral("CCMeeting"));
+    const QString dir = QDir(base).filePath(QString::fromLatin1(config::recording::default_dir_name));
     QDir().mkpath(dir);
     return dir;
 }
@@ -268,11 +269,11 @@ QString RecordingLibrary::recordingsDir() {
 QString RecordingLibrary::make_output_path(int room_no,
                                            const QDateTime &started_at) {
     const QString stamp =
-        started_at.toString(QStringLiteral("yyyyMMdd-HHmmss"));
+        started_at.toString(QString::fromLatin1(config::recording::file_time_format));
     const QString name =
         room_no > 0
-            ? QStringLiteral("CCMeeting_%1_room%2.mp4").arg(stamp).arg(room_no)
-            : QStringLiteral("CCMeeting_%1.mp4").arg(stamp);
+            ? QString::fromLatin1(config::recording::file_name_with_room).arg(stamp).arg(room_no)
+            : QString::fromLatin1(config::recording::file_name_plain).arg(stamp);
     return QDir(recordingsDir()).filePath(name);
 }
 

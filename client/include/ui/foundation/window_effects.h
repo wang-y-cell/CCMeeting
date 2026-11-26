@@ -10,6 +10,8 @@
  * 由系统合成器画抗锯齿圆角；Win10 及更早没有该属性时回退为圆角遮罩。
  */
 
+#include "config/global_config.h"
+
 #include <QWidget>
 
 namespace ui {
@@ -20,7 +22,8 @@ namespace ui {
  * @param fallback_radius Win10 回退遮罩的圆角半径（像素）
  * @return true 表示由 DWM 接管（Win11），false 表示用了遮罩回退
  */
-bool enable_rounded_corners(QWidget *window, int fallback_radius = 12);
+bool enable_rounded_corners(
+    QWidget *window, int fallback_radius = config::window::rounded_radius);
 /** @brief 关闭窗口圆角（Win11 DWM + mask），会议主窗口用直角 */
 bool disable_rounded_corners(QWidget *window);
 

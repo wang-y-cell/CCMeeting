@@ -18,8 +18,9 @@ namespace {
 
 #ifdef Q_OS_WIN
 // Win11 22000+ 的圆角偏好枚举（SDK 里 DWMWA_WINDOW_CORNER_PREFERENCE 未提供时兜底）
-constexpr DWORD kDwmWindowCornerPreference = 33;
-constexpr int kDwmRound = 2;  // DWMWCP_ROUND
+constexpr DWORD kDwmWindowCornerPreference =
+    config::window::dwm_corner_preference_attr;
+constexpr int kDwmRound = config::window::dwm_corner_round;  // DWMWCP_ROUND
 
 QRegion rounded_region(const QSize &size, int radius) {
     if (radius <= 0 || size.isEmpty()) {
@@ -95,7 +96,8 @@ public:
                     (widget->windowFlags() & Qt::WindowType_Mask) == Qt::Popup ||
                     (widget->windowFlags() & Qt::WindowType_Mask) == Qt::ToolTip;
                 if (is_popup) {
-                    enable_rounded_corners(widget, 10);
+                    enable_rounded_corners(widget,
+                                           config::window::popup_rounded_radius);
                 }
             }
         }
@@ -113,7 +115,7 @@ bool disable_rounded_corners(QWidget *window) {
     const HWND hwnd = reinterpret_cast<HWND>(window->winId());
     if (hwnd != nullptr) {
         // DWMWCP_DONOTROUND = 1
-        const int preference = 1;
+        const int preference = config::window::dwm_corner_do_not_round;
         const HRESULT result = ::DwmSetWindowAttribute(
             hwnd, kDwmWindowCornerPreference, &preference, sizeof(preference));
         window->clearMask();

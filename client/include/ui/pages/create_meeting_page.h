@@ -2,6 +2,7 @@
 #define CREATEMEETING_PAGE_H
 
 #include "ui/pages/page.h"
+#include "config/global_config.h"
 
 #include "ui/pages/create_meeting_page_ui.h"
 
@@ -21,17 +22,17 @@ public:
 
 public:
     ///设置默认最大参加人数
-    static constexpr std::uint32_t kDefaultMaxParticipants = 8;
+    static constexpr std::uint32_t kDefaultMaxParticipants = config::meeting::default_max_participants;
     ///设置默认会议时长
-    static constexpr std::uint32_t kDefaultDurationMinutes = 60;
+    static constexpr std::uint32_t kDefaultDurationMinutes = config::meeting::default_duration_minutes;
     ///设置最小参加人数
-    static constexpr std::uint32_t kMinParticipants = 2;
+    static constexpr std::uint32_t kMinParticipants = config::meeting::min_participants;
     ///设置最大参加人数
-    static constexpr std::uint32_t kMaxParticipants = 1024;
+    static constexpr std::uint32_t kMaxParticipants = config::meeting::max_participants;
     ///设置最小会议时长
-    static constexpr std::uint32_t kMinDurationMinutes = 1;
+    static constexpr std::uint32_t kMinDurationMinutes = config::meeting::min_duration_minutes;
     ///设置最大会议时长
-    static constexpr std::uint32_t kMaxDurationMinutes = 24 * 60;
+    static constexpr std::uint32_t kMaxDurationMinutes = config::meeting::max_duration_minutes;
 
     /**
      * @brief 构造创建会议页

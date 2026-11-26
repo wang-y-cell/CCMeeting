@@ -1,4 +1,5 @@
 #include "ui/dialogs/recording_playback_dialog.h"
+#include "config/global_config.h"
 
 #include "ui/foundation/theme_manager.h"
 
@@ -46,7 +47,7 @@ ui::RecordingPlaybackDialog::RecordingPlaybackDialog(const RecordingEntry &entry
     setMaximizable(true);
     build_ui();
     ui::ThemeManager::instance().apply_to(
-        this, QStringLiteral(":/Style/source/recording_playback_dialog.qss"));
+        this, QString::fromLatin1(config::paths::style::recording_playback));
     resize(960, 620);
 }
 

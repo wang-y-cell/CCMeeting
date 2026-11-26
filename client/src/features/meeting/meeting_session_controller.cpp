@@ -1,4 +1,5 @@
 #include "features/meeting/meeting_session_controller.h"
+#include "config/global_config.h"
 
 #include "config/user_session.h"
 #include "features/meeting/chat_controller.h"
@@ -336,7 +337,7 @@ void MeetingSessionController::end_session(bool was_connecting) {
             net->disconnect_from_host();
         }
         _host->state()._sessionActive = false;
-        QTimer::singleShot(800, this, [this]() {
+        QTimer::singleShot(config::ui::timing::session_end_settle_ms, this, [this]() {
             if (!_host->state()._sessionEnding) {
                 return;
             }

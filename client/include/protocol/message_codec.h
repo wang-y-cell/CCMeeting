@@ -2,6 +2,7 @@
 #define MESSAGECODEC_H
 
 #include "protocol/message.h"
+#include "config/global_config.h"
 #include "protocol/net_header.h"
 
 #include <QByteArray>
@@ -77,7 +78,7 @@ public:
 
     private:
         QByteArray buffer_;
-        static constexpr std::size_t k_max_buffer = 4 * 1024 * 1024;
+        static constexpr std::size_t k_max_buffer = config::protocol::max_message_buffer;
     };
 
 private:

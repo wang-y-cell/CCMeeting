@@ -1,4 +1,5 @@
 #include "core/storage.h"
+#include "config/global_config.h"
 
 #include <QDateTime>
 #include <QDir>
@@ -14,10 +15,10 @@
 
 namespace {
 
-constexpr const char *kConnection = "ccmeeting";          ///< 共享库（机器级）
-constexpr const char *kUserConnection = "ccmeeting_user"; ///< 账号库
-constexpr const char *kSchemaVersion = "1";
-constexpr const char *kUserSchemaVersion = "1";
+constexpr const char *kConnection = config::storage::shared_connection; ///< 共享库（机器级）
+constexpr const char *kUserConnection = config::storage::user_connection; ///< 账号库
+constexpr const char *kSchemaVersion = config::storage::shared_schema_version;
+constexpr const char *kUserSchemaVersion = config::storage::user_schema_version;
 
 /// 旧版本共享库里遗留的数据（升级时一次性迁到账号库）
 struct LegacyHistoryRow {
@@ -220,7 +221,7 @@ bool Storage::open() {
         spdlog::error("[Storage] 无法创建数据目录 {}",
                       base.toUtf8().constData());
     }
-    _path = QDir(base).filePath(QStringLiteral("ccmeeting.db"));
+    _path = QDir(base).filePath(QString::fromLatin1(config::storage::shared_db_file));
 
     QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),
                                                 QString::fromLatin1(kConnection));
@@ -255,8 +256,11 @@ QString Storage::user_database_path(qint64 user_id) {
     if (user_id <= 0) {
         return QString();
     }
-    return QDir(shared_base_dir())
-        .filePath(QStringLiteral("users/user_%1/ccmeeting.db").arg(user_id));
+    // <base>/users/user_<id>/ccmeeting.db
+    const QString relative =
+        QString::fromLatin1(config::storage::user_db_dir_format).arg(user_id) +
+        QLatin1Char('/') + QString::fromLatin1(config::storage::shared_db_file);
+    return QDir(shared_base_dir()).filePath(relative);
 }
 
 bool Storage::open_user_data(qint64 user_id) {
@@ -379,7 +383,7 @@ void Storage::migrate_legacy_data(QSqlDatabase &user_db, qint64 user_id) {
     {
         QSqlQuery query(shared);
         query.prepare(QStringLiteral("SELECT value FROM meta WHERE key = ?"));
-        query.addBindValue(QStringLiteral("legacy_history_migrated"));
+        query.addBindValue(QString::fromLatin1(config::storage::legacy_migrated_key));
         if (!query.exec() || query.next()) {
             return;
         }
@@ -393,7 +397,7 @@ void Storage::migrate_legacy_data(QSqlDatabase &user_db, qint64 user_id) {
         QSqlQuery query(shared);
         query.prepare(QStringLiteral(
             "INSERT OR REPLACE INTO meta(key, value) VALUES(?, ?)"));
-        query.addBindValue(QStringLiteral("legacy_history_migrated"));
+        query.addBindValue(QString::fromLatin1(config::storage::legacy_migrated_key));
         query.addBindValue(
             QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
         query.exec();

@@ -145,7 +145,8 @@ target_link_libraries(test_storage_users PRIVATE Qt6::Sql)
 ccmeeting_add_test(test_main_window_ui
     test_main_window_ui.cpp
     "${CMAKE_CURRENT_SOURCE_DIR}/../include/ui/shell/main_window_ui.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/shell/main_window_ui.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/ui/shell/main_window_ui.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../src/config/global_config.cpp")
 target_link_libraries(test_main_window_ui PRIVATE Qt6::Widgets)
 # 主题令牌：颜色有效 / 对比度 / 灰调 / hover 区分度
 ccmeeting_add_test(test_theme_tokens

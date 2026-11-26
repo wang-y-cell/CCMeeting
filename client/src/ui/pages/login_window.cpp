@@ -1,4 +1,5 @@
 #include "ui/pages/login_window.h"
+#include "config/global_config.h"
 
 #include "ui/foundation/auth_http.h"
 #include "ui/foundation/theme_manager.h"
@@ -60,7 +61,7 @@ ui::LoginWindow::LoginWindow(QWidget *parent)
         if (ui.hintLabel) {
             ui.hintLabel->setText(tr("正在自动登录…"));
         }
-        QTimer::singleShot(40, this, &ui::LoginWindow::Login);
+        QTimer::singleShot(config::ui::timing::login_auto_click_ms, this, &ui::LoginWindow::Login);
     } else if (!creds.username.isEmpty()) {
         ui.account_line->setText(creds.username);
     }
@@ -76,7 +77,7 @@ ui::LoginWindow::LoginWindow(QWidget *parent)
 }
 
 void ui::LoginWindow::set_style() {
-    ui::ThemeManager::instance().apply_to(this, QStringLiteral(":/Style/source/login.qss"));
+    ui::ThemeManager::instance().apply_to(this, QString::fromLatin1(config::paths::style::login));
 }
 
 void ui::LoginWindow::showRegisterPage() {

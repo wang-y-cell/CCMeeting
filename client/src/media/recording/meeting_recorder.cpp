@@ -1,4 +1,5 @@
 #include "media/recording/meeting_recorder.h"
+#include "config/global_config.h"
 
 #include "data/recording_library.h"
 
@@ -142,7 +143,7 @@ bool MeetingRecorder::start(int room_no) {
 
     if (!_progressTimer) {
         _progressTimer = new QTimer(this);
-        _progressTimer->setInterval(1000);
+        _progressTimer->setInterval(config::recording::progress_interval_ms);
         connect(_progressTimer, &QTimer::timeout, this,
                 [this]() { emit progress(elapsed_ms()); });
     }
@@ -220,7 +221,7 @@ void MeetingRecorder::stop() {
         finalize();
     }
     // 兜底：个别后端不回调状态，300ms 后强制收尾
-    QTimer::singleShot(300, this, [this]() { finalize(); });
+    QTimer::singleShot(config::recording::finalize_delay_ms, this, [this]() { finalize(); });
 }
 
 void MeetingRecorder::finalize() {

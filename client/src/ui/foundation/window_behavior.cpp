@@ -1,12 +1,13 @@
 #include "ui/foundation/window_behavior.h"
 
+#include "config/global_config.h"
 #include "config/preferences.h"
 
 namespace ui {
 
 namespace {
-constexpr const char *kNativeMoveKey = "ui/nativeMove";
-constexpr const char *kNativeResizeKey = "ui/nativeResize";
+constexpr const char *kNativeMoveKey = config::prefs::native_move;
+constexpr const char *kNativeResizeKey = config::prefs::native_resize;
 }  // namespace
 
 bool WindowBehavior::native_move_enabled() {

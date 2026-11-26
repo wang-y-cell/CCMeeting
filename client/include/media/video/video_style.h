@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QRect>
+#include "config/global_config.h"
 #include <QSize>
 #include <Qt>
 #include <QtGlobal>
@@ -46,7 +47,7 @@ struct VideoStyle {
 namespace VideoStyles {
 
 /** @brief 成员卡片头像边长（布局与绘制共用同一个值） */
-constexpr int kMemberAvatarSide = 72;
+constexpr int kMemberAvatarSide = config::ui::participant_card::avatar_side;
 
 /** @brief 视频：等比适应内容区并居中（主画面 / 成员小窗通用） */
 inline VideoStyle video() {

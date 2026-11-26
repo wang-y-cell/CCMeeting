@@ -1,4 +1,5 @@
 #include "ui/pages/settings_page.h"
+#include "config/global_config.h"
 
 #include "data/recording_repository.h"
 #include "media/devices/xrtc_settings_media.h"
@@ -38,7 +39,7 @@
 namespace {
 
 ///首次进入设置页时延迟枚举设备，确保页面先绘制出来
-constexpr int kDeviceRefreshDelayMs = 50;
+constexpr int kDeviceRefreshDelayMs = config::ui::timing::device_refresh_delay_ms;
 
 void clearPreviewLabel(QLabel *label) {
     if (!label) {
@@ -130,7 +131,7 @@ ui::SettingsPage::SettingsPage(QWidget *parent) : Page(parent) {
     // 主题单选：改变即生效并持久化（不需要点保存）
     {
         const auto apply_mode = [this](const QString &mode) {
-            preferences().set_value(QStringLiteral("ui/theme"), mode);
+            preferences().set_value(QString::fromLatin1(config::prefs::theme), mode);
             ui::ThemeManager &theme = ui::ThemeManager::instance();
             // "system" 由系统配色决定；字符串解析统一走 ThemeManager::parse
             const auto scheme = QGuiApplication::styleHints()->colorScheme();
@@ -483,7 +484,7 @@ void ui::SettingsPage::onOpenRecordDirClicked() {
 
 void ui::SettingsPage::onResetRecordDirClicked() {
     IPreferences &settings = preferences();
-    settings.remove(QStringLiteral("record/saveDir"));
+    settings.remove(QString::fromLatin1(config::prefs::record_save_dir));
     refreshRecordDirLabel();
 }
 
@@ -714,7 +715,7 @@ void ui::SettingsPage::onResetClicked() {
     ui->soundEnabled->setChecked(true);
     ui->videoAutoPreview->setChecked(false);
     IPreferences &reset_settings = preferences();
-    reset_settings.remove(QStringLiteral("record/saveDir"));
+    reset_settings.remove(QString::fromLatin1(config::prefs::record_save_dir));
     refreshRecordDirLabel();
 
     IPreferences &s = preferences();

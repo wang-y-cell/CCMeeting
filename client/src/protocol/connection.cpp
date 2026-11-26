@@ -1,4 +1,5 @@
 #include "protocol/connection.h"
+#include "config/global_config.h"
 
 #include "config/tls_config.h"
 #include "protocol/message_hub.h"
@@ -99,7 +100,7 @@ bool Connection::connectOnIoThread(const QString &ip, const QString &port) {
                             .arg(m_useTls ? QStringLiteral("wss")
                                           : QStringLiteral("ws"),
                                  ip, port)));
-    timeout.start(5000);
+    timeout.start(config::network::handshake_timeout_ms);
     loop.exec();
 
     if (!handshake_ok) {
@@ -127,7 +128,7 @@ bool Connection::connectOnIoThread(const QString &ip, const QString &port) {
         m_lastPongMs = QDateTime::currentMSecsSinceEpoch();
     });
     m_lastPongMs = QDateTime::currentMSecsSinceEpoch();
-    m_heartbeatTimer->start(5000);
+    m_heartbeatTimer->start(config::network::heartbeat_interval_ms);
 
     m_reconnectAttempt = 0;
     m_lastError.clear();
@@ -140,7 +141,7 @@ void Connection::onSocketDisconnected() {
         return;   // 主动断开：由 disconnectOnIoThread 统一收尾
     }
     spdlog::warn("[Connection] 对端关闭 WebSocket");
-    if (m_autoReconnect && m_reconnectAttempt < 5) {
+    if (m_autoReconnect && m_reconnectAttempt < config::network::max_reconnect_attempts) {
         tryReconnect();
         return;
     }
@@ -153,7 +154,7 @@ void Connection::onHeartbeatTick() {
         return;
     }
     const qint64 now = QDateTime::currentMSecsSinceEpoch();
-    if (now - m_lastPongMs > 15000) {
+    if (now - m_lastPongMs > config::network::heartbeat_dead_ms) {
         spdlog::warn("[Connection] 心跳超时（15s 无 pong），判定连接已死");
         destroySocket();
         tryReconnect();   // 先尝试恢复；全部失败才由 reconnect_failed 通知 UI
@@ -167,13 +168,13 @@ void Connection::tryReconnect() {
         emit reconnect_failed();
         return;
     }
-    if (m_reconnectAttempt >= 5) {
+    if (m_reconnectAttempt >= config::network::max_reconnect_attempts) {
         spdlog::error("[Connection] 重连 5 次仍失败，放弃");
         emit reconnect_failed();
         return;
     }
     ++m_reconnectAttempt;
-    const int delay_ms = 1000 << (m_reconnectAttempt - 1);   // 1s,2s,4s,8s,16s
+    const int delay_ms = config::network::reconnect_base_delay_ms << (m_reconnectAttempt - 1); // 1s,2s,4s,8s,16s
     emit reconnecting(m_reconnectAttempt, delay_ms);
     QTimer::singleShot(delay_ms, this, [this]() {
         if (m_userDisconnect || !m_autoReconnect) {

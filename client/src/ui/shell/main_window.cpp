@@ -9,6 +9,7 @@
 #include "config/preferences.h"
 #include "ui/composites/recent_meeting_list.h"
 #include "config/user_session.h"
+#include "config/global_config.h"
 #include "core/storage.h"
 #include "ui/foundation/auth_http.h"
 
@@ -52,7 +53,7 @@ main_window::main_window(QWidget *parent) : FramelessWindow<QWidget>(parent) {
     spdlog::default_logger()->flush();
 
     init_ui();
-    setWindowTitle(tr("CloudMeeting"));
+    setWindowTitle(QString::fromStdString(config::app::main_window_title));
     set_style();
     refreshUserCard();
 
@@ -76,7 +77,7 @@ main_window::main_window(QWidget *parent) : FramelessWindow<QWidget>(parent) {
 
     // 预热 Qt Multimedia 设备枚举：首次 videoInputs() 冷启动 500ms+，
     // 放到主界面显示后的空闲时刻做完，之后打开设置页就不会再卡。
-    QTimer::singleShot(5000, this, [this]() {
+    QTimer::singleShot(config::ui::timing::main_window_device_warmup_ms, this, [this]() {
         QElapsedTimer timer;
         timer.start();
         const auto cameras = QMediaDevices::videoInputs();
@@ -94,7 +95,7 @@ main_window::main_window(QWidget *parent) : FramelessWindow<QWidget>(parent) {
 void main_window::set_style() {
     // 统一走令牌替换：QSS 里可以写 @primary / @canvas 等占位符（见 ui/foundation/design_tokens.h）
     ui::ThemeManager::instance().apply_to(
-        this, QStringLiteral(":/Style/source/main_window.qss"));
+        this, QString::fromLatin1(config::paths::style::main_window));
 }
 
 void main_window::destroyMeetingWindow() {
@@ -147,8 +148,7 @@ void main_window::refreshUserCard() {
     const QString infoText =
         session.isLoggedIn() ? session.info().trimmed() : QString();
 
-    // 卡片在 200px 侧栏里横排：侧栏内边距 20 + 卡片内边距 20 + 头像 44 + 间距 10
-    // → 文字可用宽度 = 卡片宽 - 74；构造期还没布局时按侧栏实际尺寸兜底 106
+    // 卡片横排：可用宽度 = 卡片宽 - (头像 + 间距 + 两侧内边距)，见 config::ui::sidebar
     // 字号由 QSS 决定，这里只负责「按实际可用宽度省略」：
     // 文字宽度取标签真实宽度（布局完成后才有值），构造期兜底用侧栏常量。
     // 卡片尺寸变化时（见 eventFilter 的 Resize 分支）会重新算一遍。
@@ -218,11 +218,10 @@ void main_window::update_user_card_text() {
     }
 
     // 可用宽度优先取标签真实宽度（布局完成后才有值）；
-    // 构造期还没布局时按侧栏常量兜底：200 - 20(侧栏内边距) - 20(卡片内边距)
-    // - 44(头像) - 10(间距) = 106。
+    // 构造期还没布局时用 config::ui::sidebar::user_card_fallback_text_width 兜底。
     int textWidth = ui.infoLabel->width();
     if (textWidth <= 0) {
-        textWidth = 106;
+        textWidth = config::ui::sidebar::user_card_fallback_text_width;
     }
 
     const QFontMetrics nameMetrics(ui.nameLabel->font());
@@ -373,7 +372,7 @@ void main_window::init_ui() {
 
     {
         int startPage =
-            preferences().value(QStringLiteral("ui/startPage"), 0).toInt();
+            preferences().value(QString::fromLatin1(config::prefs::start_page), 0).toInt();
         if (startPage < 0 || startPage >= ui.sideNav->count()) {
             startPage = 0;
         }

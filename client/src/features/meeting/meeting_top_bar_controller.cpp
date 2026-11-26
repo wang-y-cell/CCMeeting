@@ -1,4 +1,5 @@
 #include "features/meeting/meeting_top_bar_controller.h"
+#include "config/global_config.h"
 
 #include "config/preferences.h"
 #include "config/user_session.h"
@@ -25,7 +26,7 @@ MeetingTopBarController::MeetingTopBarController(IMeetingWindowHost *host,
                                                  QObject *parent)
     : QObject(parent), _host(host) {
     _durationTimer = new QTimer(this);
-    _durationTimer->setInterval(1000);
+    _durationTimer->setInterval(config::ui::timing::duration_chip_interval_ms);
     connect(_durationTimer, &QTimer::timeout, this,
             &MeetingTopBarController::refresh_duration);
 }
@@ -47,7 +48,7 @@ void MeetingTopBarController::apply_tab_bar_visibility() {
     }
     // 默认隐藏标签栏（可在 设置 → 界面 → 会议窗口显示右侧标签栏 打开）
     const bool show_tabs =
-        preferences().value(QStringLiteral("meeting/showTabs"), false).toBool();
+        preferences().value(QString::fromLatin1(config::prefs::meeting_show_tabs), false).toBool();
     ui.tabWidget->tabBar()->setVisible(show_tabs);
 }
 

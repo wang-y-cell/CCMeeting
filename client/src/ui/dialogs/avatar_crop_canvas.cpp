@@ -1,4 +1,5 @@
 #include "ui/dialogs/avatar_crop_canvas.h"
+#include "config/global_config.h"
 
 #include <QMouseEvent>
 #include <QPainter>
@@ -8,8 +9,8 @@
 
 namespace {
 
-constexpr qreal kMaxZoomFactor = 6.0; ///< 相对 cover 最小缩放的最大倍数
-constexpr qreal kWheelFactor = 1.12;
+constexpr qreal kMaxZoomFactor = config::ui::crop::max_zoom_factor; ///< 相对 cover 最小缩放的最大倍数
+constexpr qreal kWheelFactor = config::ui::crop::wheel_factor;
 
 } // namespace
 

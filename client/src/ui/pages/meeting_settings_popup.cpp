@@ -1,4 +1,5 @@
 #include "ui/pages/meeting_settings_popup.h"
+#include "config/global_config.h"
 
 #include "ui/foundation/theme_manager.h"
 
@@ -39,7 +40,7 @@ ui::MeetingSettingsPopup::MeetingSettingsPopup(QWidget *parent)
     // 与其它无边框窗口保持一致的圆角
     ui::enable_rounded_corners(this);
     setFixedWidth(304);
-    ui::ThemeManager::instance().apply_to(this, QStringLiteral(":/Style/source/meeting_settings_popup.qss"));
+    ui::ThemeManager::instance().apply_to(this, QString::fromLatin1(config::paths::style::meeting_settings));
 
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(16, 14, 16, 14);

@@ -1,4 +1,5 @@
 #include "ui/dialogs/avatar_crop_dialog.h"
+#include "config/global_config.h"
 
 #include "ui/foundation/theme_manager.h"
 #include "ui/dialogs/avatar_crop_canvas.h"
@@ -18,7 +19,7 @@ ui::AvatarCropDialog::AvatarCropDialog(const QImage &source, QWidget *parent)
     setModal(true);
     resize(520, 620);
     ui::ThemeManager::instance().apply_to(
-        this, QStringLiteral(":/Style/source/avatar_crop_dialog.qss"));
+        this, QString::fromLatin1(config::paths::style::avatar_crop));
 
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(20, 48, 20, 20);

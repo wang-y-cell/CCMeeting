@@ -1,4 +1,5 @@
 #include "ui/pages/recordings_page.h"
+#include "config/global_config.h"
 
 #include "ui/foundation/theme_manager.h"
 
@@ -18,7 +19,7 @@
 ui::RecordingsPage::RecordingsPage(QWidget *parent) : Page(parent) {
     setObjectName(QStringLiteral("RecordingsPage"));
     build_ui();
-    ui::ThemeManager::instance().apply_to(this, QStringLiteral(":/Style/source/stack_recordings.qss"));
+    ui::ThemeManager::instance().apply_to(this, QString::fromLatin1(config::paths::style::recordings_page));
     refresh();
 }
 

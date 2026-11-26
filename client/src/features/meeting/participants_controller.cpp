@@ -1,4 +1,5 @@
 #include "features/meeting/participants_controller.h"
+#include "config/global_config.h"
 
 #include "media/avatar_service.h"
 #include "media/video/meeting_video.h"
@@ -9,7 +10,7 @@
 
 namespace {
 /// 头像统一按这个尺寸加载：小窗显示 72、主画面显示约 10% 控件高，够用且只下载一次
-constexpr int kAvatarSourcePx = 256;
+constexpr int kAvatarSourcePx = config::media::avatar_source_px;
 }  // namespace
 
 ParticipantsController::ParticipantsController(QVBoxLayout *tiles_layout,
