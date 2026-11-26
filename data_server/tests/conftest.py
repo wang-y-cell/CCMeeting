@@ -99,7 +99,6 @@ def ctx(tmp_path: Path, mysql_kwargs):
             public_base_url="http://testserver",
             static_root=str(Path(__file__).resolve().parent.parent / "static"),
             upload_root=str(tmp_path / "uploads"),
-            default_avatar_path="/static/avatar/default.png",
             max_avatar_bytes=2 * 1024 * 1024,
         ),
     )

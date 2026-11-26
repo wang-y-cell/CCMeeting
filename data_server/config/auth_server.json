@@ -15,7 +15,6 @@
     "public_base_url": "https://8.153.155.18",
     "static_root": "./static",
     "upload_root": "./uploads",
-    "default_avatar_path": "/static/avatar/default.png",
     "max_avatar_bytes": 2097152
   },
   "turn": {

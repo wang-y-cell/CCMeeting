@@ -20,7 +20,6 @@ class AssetsConfig:
     public_base_url: str = "http://127.0.0.1:9000"
     static_root: str = "./static"
     upload_root: str = "./uploads"
-    default_avatar_path: str = "/static/avatar/default.png"
     max_avatar_bytes: int = 2 * 1024 * 1024
 
 
@@ -153,8 +152,6 @@ def _apply(config: AuthServerConfig, root: dict) -> None:
             config.assets.static_root = assets["static_root"]
         if isinstance(assets.get("upload_root"), str):
             config.assets.upload_root = assets["upload_root"]
-        if isinstance(assets.get("default_avatar_path"), str):
-            config.assets.default_avatar_path = assets["default_avatar_path"]
         if isinstance(assets.get("max_avatar_bytes"), int):
             config.assets.max_avatar_bytes = assets["max_avatar_bytes"]
 
