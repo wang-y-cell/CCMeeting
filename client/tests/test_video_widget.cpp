@@ -190,6 +190,66 @@ private slots:
         QVERIFY(widget.speaking());
         QVERIFY(widget.draw_video_border());
     }
+
+    /**
+     * 说话绿框必须跟着画面圆角走
+     *
+     * 画面裁了圆角（主画面 / 成员小窗）后，绿框如果还是 drawRect 的直角，
+     * 四个角就会出现一段直角绿边（或被圆角裁掉一截）。这里用像素断言：
+     * - 上边中点必须有绿线
+     * - 左上角 3×3 区域不能有绿线（直角才会在这）
+     * - 圆弧经过的位置必须有绿线
+     */
+    void speaking_border_follows_corner_radius() {
+        VideoGLWidget widget;
+        widget.resize(200, 120);
+        const QColor clear(7, 8, 11);
+        widget.setClearColor(clear);
+        widget.setCornerRadius(10);
+        widget.setI420Frame(make_flat_i420(16, 12, 40, 128, 128));
+        widget.set_speaking(true, true);
+
+        const QImage shot = render(&widget);
+        QVERIFY(!shot.isNull());
+        if (qEnvironmentVariableIsSet("CCMEETING_TEST_DUMP")) {
+            shot.save(QStringLiteral("speaking-border-rounded.png"));
+        }
+
+        const auto has_green = [&shot](int x0, int y0, int w, int h) {
+            for (int y = y0; y < y0 + h; ++y) {
+                for (int x = x0; x < x0 + w; ++x) {
+                    const QColor c = shot.pixelColor(x, y);
+                    if (c.green() > 150 && c.red() < 130 && c.blue() < 150) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        };
+
+        QVERIFY2(has_green(90, 0, 20, 4), "上边中点没有绿框");
+        QVERIFY2(!has_green(0, 0, 3, 3), "左上角出现直角绿边（未跟随圆角）");
+        QVERIFY2(!has_green(196, 0, 3, 3), "右上角出现直角绿边（未跟随圆角）");
+        QVERIFY2(has_green(7, 0, 8, 4), "圆角弧上缺少绿框");
+    }
+
+    /** 没有圆角时保持原来的直角边框（回归） */
+    void speaking_border_stays_square_without_radius() {
+        VideoGLWidget widget;
+        widget.resize(200, 120);
+        widget.setClearColor(QColor(7, 8, 11));
+        widget.setI420Frame(make_flat_i420(16, 12, 40, 128, 128));
+        widget.set_speaking(true, true);
+
+        const QImage shot = render(&widget);
+        QVERIFY(!shot.isNull());
+        const QColor corner = shot.pixelColor(1, 1);
+        QVERIFY2(corner.green() > 150 && corner.red() < 130 && corner.blue() < 150,
+                 qPrintable(QStringLiteral("corner=%1,%2,%3")
+                                .arg(corner.red())
+                                .arg(corner.green())
+                                .arg(corner.blue())));
+    }
 };
 
 QTEST_MAIN(TestVideoWidget)

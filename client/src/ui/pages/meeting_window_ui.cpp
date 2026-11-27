@@ -135,16 +135,18 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
     verticalLayout->setSpacing(0);// 控件之间间距为0
     verticalLayout->setContentsMargins(0, 0, 0, 0); //布局四周内边距为0
 
-    // ---- 顶栏 ----
+    // ---- 顶栏：与最小化/最大化/关闭同一行（由 MeetingWindow 摆进标题栏区域） ----
     topStatusBar = new QWidget(parent);
     topStatusBar->setObjectName(QStringLiteral("topStatusBar"));
-    topStatusBar->setMinimumHeight(config::ui::meeting::top_status_bar_height);
-    topStatusBar->setMaximumHeight(config::ui::meeting::top_status_bar_height);
+    topStatusBar->setMinimumHeight(config::window::meeting_title_bar_height);
+    topStatusBar->setMaximumHeight(config::window::meeting_title_bar_height);
 
     auto *topStatusLayout = new QHBoxLayout(topStatusBar);
     topStatusLayout->setObjectName(QStringLiteral("topStatusLayout"));
     topStatusLayout->setSpacing(config::ui::meeting::top_status_spacing);
-    topStatusLayout->setContentsMargins(config::ui::meeting::top_status_margin_h, config::ui::meeting::top_status_margin_v, config::ui::meeting::top_status_margin_h, config::ui::meeting::top_status_margin_v);
+    // 垂直方向不留边：26px 的按钮在 42px 的标题栏里自然居中
+    topStatusLayout->setContentsMargins(config::ui::meeting::top_status_margin_h, 0,
+                                        config::ui::meeting::top_status_margin_h, 0);
 
 
     // 会议时长：每秒走动（未入会显示占位）
@@ -178,18 +180,24 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
         new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum));
 
     topStatusLayout->addWidget(btnMeetingSettings);
-    verticalLayout->addWidget(topStatusBar);
+    // 注意：顶栏不再加入 verticalLayout —— 它作为浮层摆在标题栏区域，
+    // 位置由 MeetingWindow::update_title_overlay_geometry() 计算。
 
     // ---- 主区域：画面 + 侧栏 ----
     auto *main_box_layout = new QHBoxLayout();
     main_box_layout->setObjectName(QStringLiteral("main_box_layout"));
-    main_box_layout->setSpacing(0);
+    // 「浮动卡片」：画面卡片与右侧面板之间留空隙
+    main_box_layout->setSpacing(config::ui::meeting::panel_gap);
     main_box_layout->setContentsMargins(0, 0, 0, 0);
 
     groupBox_2 = new QWidget(parent);
     groupBox_2->setObjectName(QStringLiteral("groupBox_2"));
     groupBox_2->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    groupBox_2->setContentsMargins(config::ui::meeting::video_host_margin_h, 0, config::ui::meeting::video_host_margin_h, 0);
+    // 画面在卡片内四周留白，圆角才不会被画面方角顶穿
+    groupBox_2->setContentsMargins(config::ui::meeting::video_host_margin_h,
+                                   config::ui::meeting::video_host_margin_h,
+                                   config::ui::meeting::video_host_margin_h,
+                                   config::ui::meeting::video_host_margin_h);
 
     auto *gridLayout = new QGridLayout(groupBox_2);
     gridLayout->setObjectName(QStringLiteral("gridLayout"));
@@ -199,6 +207,7 @@ void ui::MeetingWindowUi::setupUi(QWidget *parent) {
     mainshow_label = new VideoGLWidget(groupBox_2);
     mainshow_label->setObjectName(QStringLiteral("mainshow_label"));
     mainshow_label->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Expanding);
+    mainshow_label->setCornerRadius(config::ui::meeting::video_corner_radius);
     gridLayout->addWidget(mainshow_label, 0, 0);
 
     // 未入会时的画布占位提示（与画面同格叠放，入会后隐藏）

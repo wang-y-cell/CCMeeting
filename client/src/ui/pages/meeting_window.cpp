@@ -178,8 +178,17 @@ void ui::MeetingWindow::init_ui() {
 
     // 无边框窗的 QSS border 画在客户区内；左右下必须留 1px，
     // 否则子控件铺满会盖住边框，只剩左上角标题栏空隙露出来一段。
-    ui_.verticalLayout->setContentsMargins(1, config::window::meeting_title_bar_height, 1, 1);
+    // 浮动卡片布局：左右/底部留出窗口外边距，卡片之间再留 panel_gap
+    ui_.verticalLayout->setContentsMargins(config::ui::meeting::panel_outer_margin,
+                                          config::window::meeting_title_bar_height,
+                                          config::ui::meeting::panel_outer_margin,
+                                          config::ui::meeting::panel_outer_margin);
     setTitleBarHeight(config::window::meeting_title_bar_height);
+
+    // 顶栏与窗口按钮同一行：作为浮层摆在标题栏区域，并把空白处的鼠标事件
+    // 转发回 FramelessWindow（否则标题栏这一条就没法拖动窗口了）。
+    ui_.topStatusBar->installEventFilter(this);
+    update_title_overlay_geometry();
 
     const QRect pos(config::meeting::layout::window_margin_ratio * Screen::width, config::meeting::layout::window_margin_ratio * Screen::height,
                     config::meeting::layout::window_size_ratio * Screen::width, config::meeting::layout::window_size_ratio * Screen::height);
@@ -329,8 +338,62 @@ bool ui::MeetingWindow::eventFilter(QObject *watched, QEvent *event) {
     } else if (watched == ui_.mainshow_label &&
                event->type() == QEvent::Resize) {
         update_main_overlay();
+    } else if (watched == ui_.topStatusBar) {
+        // 顶栏被搬进了标题栏区域：它在空白处会挡住窗口自己的 mousePressEvent，
+        // 这里把按下/双击转发回 FramelessWindow，拖动与双击最大化照常可用。
+        if (event->type() == QEvent::MouseButtonPress) {
+            auto *mouse = static_cast<QMouseEvent *>(event);
+            if (mouse->button() == Qt::LeftButton) {
+                const QPoint windowPos =
+                    ui_.topStatusBar->mapTo(this, mouse->position().toPoint());
+                if (forward_title_drag(windowPos,
+                                       mouse->globalPosition().toPoint())) {
+                    mouse->accept();
+                    return true;
+                }
+            }
+        } else if (event->type() == QEvent::MouseButtonDblClick) {
+            auto *mouse = static_cast<QMouseEvent *>(event);
+            if (mouse->button() == Qt::LeftButton) {
+                // 能走到这里的双击一定落在空白处（按钮会自己吃掉点击）
+                toggleMaximize();
+                mouse->accept();
+                return true;
+            }
+        } else if (window_drag_active() &&
+                   (event->type() == QEvent::MouseMove ||
+                    event->type() == QEvent::MouseButtonRelease)) {
+            // 系统拖动不可用时的自绘拖动：按下事件被顶栏吃掉了，
+            // 后续 move/release 也要转发给窗口，否则窗口不会跟手。
+            auto *mouse = static_cast<QMouseEvent *>(event);
+            if (event->type() == QEvent::MouseMove) {
+                FramelessWindow<QWidget>::mouseMoveEvent(mouse);
+            } else {
+                FramelessWindow<QWidget>::mouseReleaseEvent(mouse);
+            }
+            return true;
+        }
     }
     return FramelessWindow<QWidget>::eventFilter(watched, event);
+}
+
+void ui::MeetingWindow::resizeEvent(QResizeEvent *event) {
+    FramelessWindow<QWidget>::resizeEvent(event);
+    update_title_overlay_geometry();
+}
+
+void ui::MeetingWindow::update_title_overlay_geometry() {
+    if (!ui_.topStatusBar) {
+        return;
+    }
+    // 标题栏右侧要给最小化/最大化/关闭留位置（三个按钮 + 间距 + 边距）
+    const int reserved = config::window::title_button_size * 3 +
+                         config::window::title_button_gap * 2 +
+                         config::window::title_button_margin;
+    const int width_now = qMax(0, width() - reserved);
+    ui_.topStatusBar->setGeometry(
+        0, 0, width_now, config::window::meeting_title_bar_height);
+    ui_.topStatusBar->raise();
 }
 
 void ui::MeetingWindow::init_controllers_wiring() {

@@ -7,14 +7,11 @@
 
 #include <QLabel>
 #include <QMouseEvent>
-#include <QPainter>
-#include <QPaintEvent>
 #include <QResizeEvent>
 
 namespace {
 constexpr int kCardHMargin = config::ui::participant_card::h_margin;
 constexpr int kCardVPadding = config::ui::participant_card::v_padding;
-constexpr int kCardRadius = config::ui::participant_card::radius;
 constexpr int kNameMargin = config::ui::participant_card::name_margin;
 constexpr int kVideoAspectW = config::ui::participant_card::video_aspect_w;
 constexpr int kVideoAspectH = config::ui::participant_card::video_aspect_h;
@@ -30,8 +27,11 @@ ParticipantCard::ParticipantCard(qint64 userId, QWidget *parent)
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
     _display = new VideoGLWidget(this);
+    // 清屏色 == 卡片底色(@surface)：视频裁圆角后四角透出的是卡片本身，不会出现黑角
     _display->setClearColor(
         ui::ThemeManager::instance().color(QStringLiteral("surface")));
+    // 与主画面同一套圆角，小窗看起来也是"圆角视频卡"
+    _display->setCornerRadius(config::ui::participant_card::video_corner_radius);
     _display->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
 
     _nameLabel = new QLabel(this);
@@ -83,7 +83,8 @@ void ParticipantCard::set_video_mode(bool video) {
     }
     _videoMode = video;
     if (_display) {
-        _display->set_speaking(_speaking && !video, false);
+        // 绿框统一画在画面上：视频时沿画面圆角，头像时是圆环
+        _display->set_speaking(_speaking, true);
     }
     update_card_geometry();
 }
@@ -126,8 +127,9 @@ void ParticipantCard::position_name_label() {
     const int labelH = qMax(config::ui::participant_card::name_label_min_height, _nameLabel->sizeHint().height());
     const int videoW = qMax(1, width() - 2 * kCardHMargin);
     const int videoH = qMax(1, videoW * kVideoAspectH / kVideoAspectW);
-    _nameLabel->setGeometry(kNameMargin,
-                            kCardVPadding + videoH - labelH - kNameMargin,
+    // 昵称徽标整块落在画面内部，避免压到"说话绿框"的边线
+    const int inset = kNameMargin + 4;
+    _nameLabel->setGeometry(inset, kCardVPadding + videoH - labelH - inset,
                             labelW, labelH);
     _nameLabel->setAlignment(Qt::AlignCenter);
     _nameLabel->raise();
@@ -139,25 +141,8 @@ void ParticipantCard::set_speaking(bool speaking) {
     }
     _speaking = speaking;
     if (_display) {
-        _display->set_speaking(_speaking && !_videoMode, false);
-    }
-    update();
-}
-
-void ParticipantCard::paintEvent(QPaintEvent *event) {
-    QWidget::paintEvent(event);
-    if (!_speaking) {
-        return;
-    }
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing); //开启抗锯齿
-    QPen pen(ui::ThemeManager::instance().color(QStringLiteral("success")), 2.0);
-    painter.setPen(pen);
-    painter.setBrush(Qt::NoBrush);
-    if (_videoMode) {
-        // 视频：绿色卡片边框；头像圆环由 VideoGLWidget 的 overlay 画
-        painter.drawRoundedRect(rect().adjusted(1, 1, -1, -1), kCardRadius,
-                                kCardRadius);
+        // 绿框由画面自己画：跟着画面圆角走，不再框卡片外沿
+        _display->set_speaking(_speaking, true);
     }
 }
 

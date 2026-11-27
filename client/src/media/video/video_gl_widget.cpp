@@ -2,6 +2,7 @@
 
 #include <QPaintEvent>
 #include <QPainter>
+#include <QPainterPath>
 #include <QResizeEvent>
 
 #include <algorithm>
@@ -348,7 +349,16 @@ void VideoGLWidget::paintEvent(QPaintEvent *) {
     }
 
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-    painter.setRenderHint(QPainter::Antialiasing, false);
+    // 圆角：只把「内容」裁成圆角，四角保留上面已经铺满的清屏色
+    // （会议主画面里清屏色 == 卡片底色，所以无缝；成员卡片是直角，半径 0）
+    if (m_cornerRadius > 0) {
+        QPainterPath clip;
+        clip.addRoundedRect(QRectF(rect()), m_cornerRadius, m_cornerRadius);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setClipPath(clip);
+    } else {
+        painter.setRenderHint(QPainter::Antialiasing, false);
+    }
     painter.drawImage(dest, m_image, source);
 
     paintSpeakingBorder(painter);
@@ -364,7 +374,15 @@ void VideoGLWidget::paintSpeakingBorder(QPainter &painter) {
     painter.setBrush(Qt::NoBrush);
     if (video_content()) {
         if (m_drawVideoBorder) {
-            painter.drawRect(rect().adjusted(1, 1, -1, -1));
+            const QRect border = rect().adjusted(1, 1, -1, -1);
+            // 画面裁了圆角时，绿框必须沿同一段圆弧走，否则四角会露出直角绿边
+            // （画笔沿内缩 1px 的矩形描边，半径同步减 1 才能与外圈同心）
+            const int radius = qMax(0, m_cornerRadius - 1);
+            if (radius > 0) {
+                painter.drawRoundedRect(QRectF(border), radius, radius);
+            } else {
+                painter.drawRect(border);
+            }
         }
     } else {
         const QRect avatar = avatar_rect();
@@ -399,6 +417,15 @@ QRect VideoGLWidget::avatar_rect() const {
         return {};
     }
     return destRectForFrame(m_videoW, m_videoH).toRect();
+}
+
+void VideoGLWidget::setCornerRadius(int radius) {
+    const int clamped = qMax(0, radius);
+    if (m_cornerRadius == clamped) {
+        return;
+    }
+    m_cornerRadius = clamped;
+    update();
 }
 
 void VideoGLWidget::setClearColor(const QColor &color) {

@@ -178,18 +178,22 @@ namespace meeting {
 inline constexpr int default_width = 922;
 inline constexpr int default_height = 610;
 
-inline constexpr int top_status_bar_height = 40;
 inline constexpr int top_status_spacing = 12;
 inline constexpr int top_status_margin_h = 16;
-inline constexpr int top_status_margin_v = 4;
 /** @brief 顶栏两个文字按钮（会议详情/会议设置） */
 inline constexpr int top_button_height = 26;
 inline constexpr int top_button_icon_size = 12;
 inline constexpr int top_info_icon_size = 14;
 inline constexpr int tab_icon_size = 16;
 
-/** @brief 主画面容器左右留白（QSS 边框内） */
-inline constexpr int video_host_margin_h = 5;
+/** @brief 主画面卡片四周留白（画面与卡片边缘的间距） */
+inline constexpr int video_host_margin_h = 8;
+/** @brief 主画面圆角半径（画面本身裁圆角，避免方角顶穿卡片圆角） */
+inline constexpr int video_corner_radius = 10;
+/** @brief 画面卡片与右侧面板之间的空隙（"浮动卡片"） */
+inline constexpr int panel_gap = 8;
+/** @brief 窗口左右/底部外边距（卡片与窗口边缘的间距） */
+inline constexpr int panel_outer_margin = 8;
 
 inline constexpr int toolbar_height = 56;
 inline constexpr int toolbar_margin_h = 8;
@@ -238,6 +242,8 @@ inline constexpr int avatar_side = 72;
 inline constexpr int video_aspect_w = 16;
 inline constexpr int video_aspect_h = 9;
 inline constexpr int name_label_min_height = 16;
+/** @brief 小窗画面圆角（与主画面一致，看起来是一块"圆角视频卡"） */
+inline constexpr int video_corner_radius = 10;
 }  // namespace participant_card
 
 /** @brief 日历弹层 */

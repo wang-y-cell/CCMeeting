@@ -8,7 +8,6 @@
 
 class QLabel;
 class QMouseEvent;
-class QPaintEvent;
 class QResizeEvent;
 class VideoGLWidget;
 
@@ -16,9 +15,9 @@ class VideoGLWidget;
  * @brief 会议侧边栏的成员卡片：16:9 画面（头像 / 视频）+ 左下角昵称
  *
  * - 画面统一 16:9，视频用 cover 填满（不拉伸、不留黑边）；
- * - 卡片圆角、视频直角，视频四周留白避免被卡片圆角裁到；
+ * - 卡片和画面都是圆角，画面四周留白避免被卡片圆角裁到；
  * - 昵称浮在画面左下角，半透明底色保证对比度；
- * - 说话时由 set_speaking() 点亮绿色圆角边框。
+ * - 说话绿框画在**画面**上（跟随画面的圆角，而不是卡片外沿）。
  */
 class ParticipantCard : public QWidget {
     Q_OBJECT
@@ -40,7 +39,7 @@ public:
     void show_avatar(const QImage &image);
     /** @brief 切换内容：视频铺满 16:9 / 头像居中 */
     void set_video_mode(bool video);
-    /** @brief 当前是否正在说话（绿色边框） */
+    /** @brief 当前是否正在说话（绿色边框，画在画面上） */
     void set_speaking(bool speaking);
 
 signals:
@@ -49,7 +48,6 @@ signals:
 protected:
     void mousePressEvent(QMouseEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
-    void paintEvent(QPaintEvent *event) override;
 
 private:
     void update_card_geometry();

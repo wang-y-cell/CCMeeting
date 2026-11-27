@@ -6,6 +6,7 @@
  *       < 卡片 @surface < 悬浮工具条 @surface(带描边)
  * ============================================================ */
 
+/* 窗口底色：卡片浮在它上面（浅色下比卡片亮、深色下比卡片暗） */
 QWidget#meetingWidget {
     background-color: @canvas;
     border: 1px solid @border;
@@ -14,28 +15,26 @@ QWidget#meetingWidget {
     border-radius: 8px;
 }
 
-/* ---------- 顶部状态栏 ---------- */
+/* ---------- 顶部状态栏（透明，直接浮在窗口底色上） ---------- */
 
 QWidget#topStatusBar {
-    background-color: @sidebar;
-    border-bottom: 1px solid @borderSoft;
+    background: transparent;
+    border: none;
 }
 
-/* ---------- 主画面 ---------- */
+/* ---------- 主画面卡片 ---------- */
 
 QWidget#groupBox_2 {
     background-clip: padding-box;
     background-color: @videoBackdrop;
-    border: 1px solid @borderSoft;
+    border: 1px solid @border;
     border-radius: 12px;
-    margin-top: 0;
-    padding-top: 0;
 }
 
+/* 圆角由代码裁剪（VideoGLWidget::setCornerRadius），这里只定底色 */
 VideoGLWidget#mainshow_label {
     background-color: @videoBackdrop;
     border: none;
-    border-radius: 12px;
 }
 
 /* 未入会时的画布占位提示 */
@@ -50,7 +49,7 @@ QLabel#canvasHint {
 
 QTabWidget#tabWidget {
     background-color: @sidebar;
-    border: 1px solid @borderSoft;
+    border: 1px solid @border;
     border-radius: 12px;
     background-clip: padding-box;
 }
@@ -58,9 +57,8 @@ QTabWidget#tabWidget {
 QTabWidget::pane {
     background-color: @sidebar;
     border: none;
-    border-top: 1px solid @borderSoft;
-    border-bottom-left-radius: 12px;
-    border-bottom-right-radius: 12px;
+    /* 四个角都跟着卡片圆角，否则面板顶部两个方角会盖住卡片的圆弧 */
+    border-radius: 12px;
     top: -1px;
 }
 

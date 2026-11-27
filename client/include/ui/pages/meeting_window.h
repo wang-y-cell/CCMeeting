@@ -94,6 +94,7 @@ public:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
 
 public slots:
     void on_open_vedio_clicked_slot();
@@ -167,6 +168,8 @@ private:
     void init_settings_popup();
     void init_main_video_host();
     void update_main_video_geometry();
+    /** @brief 把「会议详情/时长/会议设置」摆进标题栏区域（与窗口按钮同一行） */
+    void update_title_overlay_geometry();
     void init_main_overlay();
     void update_main_overlay();
     void show_side_panel_tab(int index);

@@ -2231,6 +2231,62 @@ int run_device_menu_selftest() {
 }
 
 }  // namespace
+
+// ---------------------------------------------------------------------------
+// 截图用素材：I420 渐变色帧
+//
+// 成员卡片 / 主画面的"说话绿框"是按内容类型分派的：只有 I420 才算视频。
+// 用 QImage 铺帧会被当成头像（缩成 72×72、画圆环），所以这里直接造 I420。
+// ---------------------------------------------------------------------------
+namespace {
+
+xrtc::XRTCVideoFrame make_gradient_i420(int width, int height) {
+    const int cw = (width + 1) / 2;
+    const int ch = (height + 1) / 2;
+    const std::size_t y_size = static_cast<std::size_t>(width) * height;
+    const std::size_t c_size = static_cast<std::size_t>(cw) * ch;
+    auto buffer = std::make_shared<std::vector<std::uint8_t>>(y_size + c_size * 2, 0);
+    std::uint8_t *base = buffer->data();
+    std::uint8_t *y_plane = base;
+    std::uint8_t *u_plane = base + y_size;
+    std::uint8_t *v_plane = base + y_size + c_size;
+
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            const int r = (x * 255) / width;
+            const int g = (y * 255) / height;
+            const int b = 160;
+            y_plane[y * width + x] = static_cast<std::uint8_t>(
+                std::clamp(static_cast<int>(0.299 * r + 0.587 * g + 0.114 * b), 0, 255));
+        }
+    }
+    for (int y = 0; y < ch; ++y) {
+        for (int x = 0; x < cw; ++x) {
+            const int r = (x * 2 * 255) / width;
+            const int g = (y * 2 * 255) / height;
+            const int b = 160;
+            u_plane[y * cw + x] = static_cast<std::uint8_t>(
+                std::clamp(static_cast<int>(-0.169 * r - 0.331 * g + 0.5 * b + 128), 0, 255));
+            v_plane[y * cw + x] = static_cast<std::uint8_t>(
+                std::clamp(static_cast<int>(0.5 * r - 0.419 * g - 0.081 * b + 128), 0, 255));
+        }
+    }
+
+    xrtc::XRTCVideoFrame frame;
+    frame.width = width;
+    frame.height = height;
+    frame.stride_y = width;
+    frame.stride_u = cw;
+    frame.stride_v = cw;
+    frame.data_y = y_plane;
+    frame.data_u = u_plane;
+    frame.data_v = v_plane;
+    frame.storage = buffer;
+    return frame;
+}
+
+}  // namespace
+
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     QApplication::setStyle(QStyleFactory::create(QStringLiteral("Fusion")));
@@ -2486,19 +2542,16 @@ int main(int argc, char *argv[]) {
             &panel, QStringLiteral(":/Style/source/meeting_widget.qss"));
         auto *card = new ParticipantCard(1002, &panel);
         card->setGeometry(8, 8, 284, 302);
-        QImage frame(640, 360, QImage::Format_ARGB32_Premultiplied);
-        for (int y = 0; y < frame.height(); ++y) {
-            for (int x = 0; x < frame.width(); ++x) {
-                frame.setPixelColor(x, y, QColor((x * 255) / frame.width(),
-                                                 (y * 255) / frame.height(), 160));
-            }
-        }
-        // setFrame 属于 RGBA 内容（会被当作头像 → 缩回 72），
-        // 所以先送帧，再显式切到"视频模式"，等价于 I420 帧到达的效果
-        ImgDisplay::show(card->displayWidget(), frame, VideoStyles::video());
+        // 用 I420 渐变帧（而不是 QImage）：这样画面会被识别为"视频"，
+        // 说话绿框才走"沿画面圆角"的分支，与真实会议一致。
+        xrtc::XRTCVideoFrame frame = make_gradient_i420(640, 360);
+        card->displayWidget()->setI420Frame(frame);
         card->set_video_mode(true);
         card->set_profile(QStringLiteral("李雷"), QString());
         capture(&panel, QStringLiteral("00b-member-tile-video"), 300, 330);
+        // 说话态：绿框画在画面上（跟随画面圆角），用于回归检查是否贴齐
+        card->set_speaking(true);
+        capture(&panel, QStringLiteral("00c-member-tile-speaking"), 300, 330);
     }
     // 单个成员卡片：验证头像为 72 方形、名字常驻显示
     {

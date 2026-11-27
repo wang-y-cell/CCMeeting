@@ -99,6 +99,17 @@ public:
     QRect avatar_rect() const;
 
     /**
+     * @brief 圆角半径（0 = 直角）
+     *
+     * 视频/头像会被裁剪成圆角，用于「浮动卡片」外观。
+     * 四角保留清屏色（setClearColor），会议主画面的清屏色与卡片底色一致，
+     * 因此圆角处无缝、不会出现黑角。
+     */
+    void setCornerRadius(int radius);
+    /** @brief 当前圆角半径 */
+    int corner_radius() const { return m_cornerRadius; }
+
+    /**
      * @brief 离屏读回当前渲染结果（自检用）
      * @note 保留原 QOpenGLWidget 的同名接口，行为等价于 grab()
      */
@@ -154,6 +165,7 @@ private:
 
     bool m_speaking = false;       ///< 是否说话态
     bool m_drawVideoBorder = true; ///< 视频模式是否画边框
+    int m_cornerRadius = 0;        ///< 圆角半径（0 = 直角）
 };
 
 #endif

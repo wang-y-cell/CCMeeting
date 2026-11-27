@@ -37,3 +37,6 @@ ui-preview*/
 
 # 私有部署配置（含服务器地址 / TURN 凭据），只保留 .example
 /client/config/client.json
+
+# 安装配置文件
+setup/

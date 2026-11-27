@@ -143,6 +143,44 @@ public:
     /** @brief 获取最小化按钮（对话框等不允许最小化的窗口为隐藏状态） */
     QPushButton *minimizeButton() const { return m_minBtn; }
 
+    /** @brief 当前是否处于「自绘拖动」状态（供标题栏子控件转发 move/release） */
+    bool window_drag_active() const { return m_dragging; }
+
+    /**
+     * @brief 标题栏内的子控件转发「开始拖动窗口」
+     *
+     * 把内容（如会议窗口的"会议详情/时长/会议设置"）搬进标题栏后，
+     * 这些子控件会挡住窗口自身的 mousePressEvent。子控件在空白处按下时
+     * 调用本方法即可获得与直接点在标题栏上一致的拖动行为。
+     * @param window_pos 鼠标在窗口客户区内的坐标
+     * @param global_pos 鼠标屏幕坐标
+     * @return true 表示已接管（调用方应 accept 事件）
+     */
+    bool forward_title_drag(const QPoint &window_pos, const QPoint &global_pos) {
+        if (!isInTitleBar(window_pos) || isOverTitleButton(window_pos)) {
+            return false;
+        }
+        // 与 mousePressEvent 的标题栏分支保持同一套策略
+        if (ui::WindowBehavior::native_move_enabled() &&
+            !Base::testAttribute(Qt::WA_DontShowOnScreen)) {
+            if (QWindow *window = Base::windowHandle()) {
+                if (window->startSystemMove()) {
+                    return true;
+                }
+            }
+        }
+        if (Base::isMaximized() && m_maximizable) {
+            restoreFromMaximizedAt(global_pos, window_pos);
+            m_dragging = true;
+        } else if (!Base::isMaximized()) {
+            m_dragging = true;
+            m_dragMoved = false;
+            m_dragGlobalPos = global_pos;
+            m_dragOffset = global_pos - Base::frameGeometry().topLeft();
+        }
+        return true;
+    }
+
     /** @brief 当前实际使用的几何更新间隔（按屏幕刷新率换算） */
     int effective_geometry_interval() const {
         const QScreen *screen = Base::screen();
