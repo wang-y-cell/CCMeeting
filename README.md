@@ -7,7 +7,7 @@
 
 | 端 | 技术栈 | 职责 |
 |---|---|---|
-| 客户端 `client/` | Qt 6 + C++（MSVC） | 无边框会议界面；音视频走 WebRTC（xrtc + Janus VideoRoom） |
+| 客户端 `client/` | Qt 6 + C++（MSVC/clang-cl） | 无边框会议界面；音视频走 WebRTC（xrtc + Janus VideoRoom） |
 | 信令服务器 `message_server/` | C++ / Boost.Asio | WebSocket + JSON：房间、成员进出、文字、房间开关等**控制消息**，不转发媒体 |
 | 认证服务器 `data_server/` | Python / FastAPI + MySQL 8.0 | 注册、登录、资料与头像（密码 Argon2id） |
 

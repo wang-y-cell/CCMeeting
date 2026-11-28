@@ -11,7 +11,7 @@
 
 | 组件 | 依赖 | 说明 |
 |------|------|------|
-| 客户端 | **Qt 6** + **MSVC** | 与 xrtc/webrtc 预编译库 ABI 一致 |
+| 客户端 | **Qt 6** + **MSVC ABI**（`clang-cl`，可换回 `cl.exe`） | 与 xrtc/webrtc 预编译库 ABI 一致 |
 | 客户端 | **xrtc**（`third_party/webrtcSDK`） | `add_subdirectory` 后链接 `xrtc`；WebRTC/Boost/json 由 xrtc 自动准备 |
 | 消息服务器 | **Boost.Asio / System**（≥ 1.70） | 异步 TCP；无本机 Boost 时自动下载头文件包 |
 | 认证服务器 | **Python 3.10+ / FastAPI / uvicorn** | HTTP + JSON（原 C++ 版已移除） |
@@ -27,11 +27,21 @@
 
 ## 环境准备
 
-1. **客户端**：Visual Studio（与 xrtc 要求一致的 MSVC 工具集）、Qt 6（如 `F:/Qt/6.8.3/msvc2022_64`）、独立 Ninja（如 `F:/ninja/ninja.exe`）
+1. **客户端**：Visual Studio（与 xrtc 要求一致的 MSVC 工具集；默认再装「C++ Clang tools for Windows」，即 `clang-cl`）、Qt 6（如 `F:/Qt/6.8.3/msvc2022_64`）、独立 Ninja（如 `F:/ninja/ninja.exe`）
 2. **服务端**：**Linux（含 WSL2）上的 GCC** —— 信令服务源码直接 `#include <arpa/inet.h>` 等 POSIX 头，MSVC 下配置能过、编译会 `fatal error C1083`（实测）；Boost 可选（本机装 1.83 即可，没有会下载源码包）；认证服另需 Python 3.10+（依赖见 `data_server/requirements.txt`）与 MySQL 8.0
 3. 客户端 / 服务端首次配置可能从 GitHub 下载依赖（需能访问网络；国内可设代理）
 
-## 客户端（MSVC + Ninja）
+## 客户端（clang-cl / MSVC + Ninja）
+
+> 偷懒就用仓库根的 `build.ps1`：`.\\build.ps1`（默认 **clang-cl**）、
+> `.\\build.ps1 -Compiler msvc`（换回 `cl.exe`）、`.\\build.ps1 -Config release`。
+> 它自己导入 vcvars、清理换了编译器的旧缓存并调 CMake。
+
+两个编译器都是 MSVC ABI，都能链接 `webrtc.lib`（该库是 Chromium 自带 clang 以 MSVC ABI 编的，
+所以 `clang-cl` 与它同源）。手工配置时**必须显式指定编译器**，否则 CMake 会挑 PATH 里的 `cl.exe`：
+
+- `clang-cl`：加 `-DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl`
+- `cl.exe`：加 `-DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl`
 
 PowerShell 里不要直接 `& vcvars64.bat`（环境不会留下）。用 **一条 cmd** 加载工具链后再配置、编译：
 
@@ -44,7 +54,7 @@ $vcvars = Join-Path $vs "VC\Auxiliary\Build\vcvars64.bat"
 
 Remove-Item -Recurse -Force build\client -ErrorAction SilentlyContinue
 
-cmd /c "`"$vcvars`" && cmake -S . -B build/client -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=F:/ninja/ninja.exe -DBUILD_CLIENT=ON -DBUILD_SERVER=OFF -DQT_INSTALL_PATH=F:/Qt/6.8.3/msvc2022_64 && cmake --build build/client -j"
+cmd /c "`"$vcvars`" && cmake -S . -B build/client -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_MAKE_PROGRAM=F:/ninja/ninja.exe -DBUILD_CLIENT=ON -DBUILD_SERVER=OFF -DQT_INSTALL_PATH=F:/Qt/6.8.3/msvc2022_64 && cmake --build build/client -j"
 ```
 
 可选：已有 Boost 头文件时加 `-DBoost_ROOT=F:/wy/boost_install`，跳过 xrtc 内下载。

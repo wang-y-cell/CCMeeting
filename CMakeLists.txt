@@ -15,13 +15,25 @@ option(BUILD_SERVER "Build message_server (WebSocket meeting signaling)" OFF)
 # 注意：认证服务是 data_server/（Python / FastAPI），不由 CMake 构建；
 # 原 C++ 版认证服务已移除，BUILD_SERVER2 选项随之删除。
 
-# 客户端依赖 xrtc/webrtc 预编译库，Windows 上必须用 MSVC x64（与 webrtcSDK 一致）
+# 客户端依赖 xrtc/webrtc 预编译库（MSVC ABI），所以编译器必须是 MSVC ABI：
+# cl.exe（MSVC）或 clang-cl（Clang + MSVC 命令行 / ABI）都行，不能用 MinGW/gcc。
+#
+# 说明：CMake 对 clang-cl 也会走 Platform/Windows-MSVC.cmake 并定义 MSVC=1，
+# 因此下面所有 if(MSVC) 分支对 cl.exe 和 clang-cl 同时生效（/utf-8、/bigobj、
+# _ITERATOR_DEBUG_LEVEL=0、_WIN32_WINNT 等无需重复写）。
+set(CCMEETING_CLANG_CL OFF)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang"
+   AND CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+    set(CCMEETING_CLANG_CL ON)
+endif()
+
 if(BUILD_CLIENT AND WIN32 AND NOT MSVC)
     message(FATAL_ERROR
-        "客户端必须用 MSVC x64（cl.exe），当前是 "
+        "客户端必须用 MSVC ABI 的编译器（cl.exe 或 clang-cl），当前是 "
         "${CMAKE_CXX_COMPILER} (${CMAKE_CXX_COMPILER_ID}).\n"
         "请在已加载 vcvars64.bat 的环境中配置，例如:\n"
         "  cmake -S . -B build/client -G Ninja -DCMAKE_BUILD_TYPE=Debug "
+        "-DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl "
         "-DCMAKE_MAKE_PROGRAM=F:/ninja/ninja.exe "
         "-DQT_INSTALL_PATH=F:/Qt/6.8.3/msvc2022_64")
 endif()
@@ -56,6 +68,14 @@ set(CCMEETING_BOOST_URL
 
 if(MSVC)
     add_compile_options(/wd4819 /utf-8)
+    if(CCMEETING_CLANG_CL)
+        message(STATUS "[CCMeeting] 编译器: clang-cl ${CMAKE_CXX_COMPILER_VERSION} "
+                       "(MSVC ABI ${MSVC_VERSION})")
+        # webrtc 头文件（_Nonnull 注解）在 clang 下会刷上百条 nullability 警告
+        add_compile_options(-Wno-nullability-completeness)
+    else()
+        message(STATUS "[CCMeeting] 编译器: MSVC ${CMAKE_CXX_COMPILER_VERSION}")
+    endif()
 endif()
 
 #-------------------------------------------------
